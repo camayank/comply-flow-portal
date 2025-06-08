@@ -58,6 +58,7 @@ const ServiceSelection = () => {
       id: 'trademark',
       title: 'Trademark Registration',
       description: 'Protect your brand identity',
+      deadline: 'No deadline',
       price: '₹8,999',
       originalPrice: '₹12,999',
       urgency: 'low',
@@ -70,6 +71,7 @@ const ServiceSelection = () => {
       id: 'iso-certification',
       title: 'ISO 9001:2015 Certification',
       description: 'Quality management system certification',
+      deadline: 'No deadline',
       price: '₹24,999',
       originalPrice: '₹35,999',
       urgency: 'low',
@@ -82,6 +84,7 @@ const ServiceSelection = () => {
       id: 'tax-consultation',
       title: 'Tax Optimization Consultation',
       description: 'Save ₹1.2L+ annually with expert tax planning',
+      deadline: 'No deadline',
       price: '₹9,999',
       originalPrice: '₹15,999',
       urgency: 'medium',
@@ -94,6 +97,7 @@ const ServiceSelection = () => {
       id: 'fssai-license',
       title: 'FSSAI License',
       description: 'Mandatory for food business operations',
+      deadline: 'Industry requirement',
       price: '₹4,999',
       originalPrice: '₹7,999',
       urgency: 'high',
@@ -204,29 +208,23 @@ const ServiceSelection = () => {
                           {getUrgencyIcon(service.urgency)}
                           URGENT
                         </Badge>
-                        {service.conversionRate && (
-                          <Badge variant="secondary" className="text-xs">
-                            {service.conversionRate} convert
-                          </Badge>
-                        )}
+                        <Badge variant="secondary" className="text-xs">
+                          {service.conversionRate} convert
+                        </Badge>
                       </div>
                       <CardTitle className="text-lg">{service.title}</CardTitle>
                       <CardDescription>{service.description}</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {service.deadline && (
-                          <div className="flex items-center gap-2 text-red-600">
-                            <Calendar className="h-4 w-4" />
-                            <span className="text-sm font-medium">{service.deadline}</span>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-2 text-red-600">
+                          <Calendar className="h-4 w-4" />
+                          <span className="text-sm font-medium">{service.deadline}</span>
+                        </div>
                         
                         <div className="flex items-center gap-2">
                           <span className="text-2xl font-bold text-green-600">{service.price}</span>
-                          {service.originalPrice && (
-                            <span className="text-sm text-gray-500 line-through">{service.originalPrice}</span>
-                          )}
+                          <span className="text-sm text-gray-500 line-through">{service.originalPrice}</span>
                         </div>
 
                         <ul className="text-sm text-gray-600 space-y-1">
