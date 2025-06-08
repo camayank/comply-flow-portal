@@ -9,6 +9,7 @@ import ServiceSelection from "./pages/ServiceSelection";
 import DocumentUpload from "./pages/DocumentUpload";
 import ComplianceTracker from "./pages/ComplianceTracker";
 import Confirmation from "./pages/Confirmation";
+import AdminPanel from "./pages/AdminPanel";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import NotFound from "./pages/NotFound";
@@ -30,6 +31,7 @@ const App = () => (
               <Route path="/documents" element={<DocumentUpload />} />
               <Route path="/tracker" element={<ComplianceTracker />} />
               <Route path="/confirmation" element={<Confirmation />} />
+              <Route path="/admin" element={<AdminPanel />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
