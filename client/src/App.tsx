@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router, Route, Switch } from "wouter";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Onboarding from "./pages/Onboarding";
 import BusinessType from "./pages/BusinessType";
 import PackageSelection from "./pages/PackageSelection";
@@ -24,37 +25,39 @@ import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <Router>
-        <div className="min-h-screen flex flex-col">
-          <Navbar />
-          <main className="flex-grow">
-            <Switch>
-              <Route path="/" component={Onboarding} />
-              <Route path="/business-type" component={BusinessType} />
-              <Route path="/package-selection" component={PackageSelection} />
-              <Route path="/founder-details" component={FounderDetails} />
-              <Route path="/industry-classification" component={IndustryClassification} />
-              <Route path="/services" component={ServiceSelection} />
-              <Route path="/service-flow" component={ServiceFlowDashboard} />
-              <Route path="/documents" component={DocumentUpload} />
-              <Route path="/document-upload" component={DocumentUpload} />
-              <Route path="/esign-agreements" component={ESignAgreements} />
-              <Route path="/payment-gateway" component={PaymentGateway} />
-              <Route path="/tracker" component={ComplianceTracker} />
-              <Route path="/confirmation" component={Confirmation} />
-              <Route path="/admin" component={AdminPanel} />
-              <Route component={NotFound} />
-            </Switch>
-          </main>
-          <Footer />
-        </div>
-      </Router>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <Router>
+          <div className="min-h-screen flex flex-col">
+            <Navbar />
+            <main className="flex-grow">
+              <Switch>
+                <Route path="/" component={Onboarding} />
+                <Route path="/business-type" component={BusinessType} />
+                <Route path="/package-selection" component={PackageSelection} />
+                <Route path="/founder-details" component={FounderDetails} />
+                <Route path="/industry-classification" component={IndustryClassification} />
+                <Route path="/services" component={ServiceSelection} />
+                <Route path="/service-flow" component={ServiceFlowDashboard} />
+                <Route path="/documents" component={DocumentUpload} />
+                <Route path="/document-upload" component={DocumentUpload} />
+                <Route path="/esign-agreements" component={ESignAgreements} />
+                <Route path="/payment-gateway" component={PaymentGateway} />
+                <Route path="/tracker" component={ComplianceTracker} />
+                <Route path="/confirmation" component={Confirmation} />
+                <Route path="/admin" component={AdminPanel} />
+                <Route component={NotFound} />
+              </Switch>
+            </main>
+            <Footer />
+          </div>
+        </Router>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
