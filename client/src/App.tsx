@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Router, Route, Switch } from "wouter";
 import Onboarding from "./pages/Onboarding";
 import ServiceSelection from "./pages/ServiceSelection";
 import DocumentUpload from "./pages/DocumentUpload";
@@ -21,23 +21,23 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <Router>
         <div className="min-h-screen flex flex-col">
           <Navbar />
           <main className="flex-grow">
-            <Routes>
-              <Route path="/" element={<Onboarding />} />
-              <Route path="/services" element={<ServiceSelection />} />
-              <Route path="/documents" element={<DocumentUpload />} />
-              <Route path="/tracker" element={<ComplianceTracker />} />
-              <Route path="/confirmation" element={<Confirmation />} />
-              <Route path="/admin" element={<AdminPanel />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <Switch>
+              <Route path="/" component={Onboarding} />
+              <Route path="/services" component={ServiceSelection} />
+              <Route path="/documents" component={DocumentUpload} />
+              <Route path="/tracker" component={ComplianceTracker} />
+              <Route path="/confirmation" component={Confirmation} />
+              <Route path="/admin" component={AdminPanel} />
+              <Route component={NotFound} />
+            </Switch>
           </main>
           <Footer />
         </div>
-      </BrowserRouter>
+      </Router>
     </TooltipProvider>
   </QueryClientProvider>
 );

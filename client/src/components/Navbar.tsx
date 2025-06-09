@@ -1,12 +1,11 @@
 
 import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Shield, Menu } from 'lucide-react';
 
 const Navbar = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const [location, setLocation] = useLocation();
 
   const navItems = [
     { path: '/', label: 'Onboarding' },
@@ -33,9 +32,9 @@ const Navbar = () => {
             {navItems.map((item, index) => (
               <Button
                 key={item.path}
-                variant={location.pathname === item.path ? 'default' : 'ghost'}
+                variant={location === item.path ? 'default' : 'ghost'}
                 size="sm"
-                onClick={() => navigate(item.path)}
+                onClick={() => setLocation(item.path)}
                 className="text-sm"
               >
                 <span className="mr-2 text-xs bg-gray-200 text-gray-700 rounded-full w-5 h-5 flex items-center justify-center">

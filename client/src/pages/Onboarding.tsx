@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Building2, Users, FileText, Shield } from 'lucide-react';
 
 const Onboarding = () => {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const [formData, setFormData] = useState({
     companyName: '',
     industry: '',
@@ -28,7 +28,7 @@ const Onboarding = () => {
     e.preventDefault();
     // Store data in localStorage for now
     localStorage.setItem('companyData', JSON.stringify(formData));
-    navigate('/services');
+    setLocation('/services');
   };
 
   const features = [
