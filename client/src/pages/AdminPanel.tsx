@@ -99,6 +99,27 @@ const AdminPanel = () => {
     enabled: true
   });
 
+  // Fetch enhanced admin data
+  const { data: serviceConfigurations } = useQuery({
+    queryKey: ['/api/admin/service-configurations'],
+    enabled: true
+  });
+
+  const { data: performanceReport } = useQuery({
+    queryKey: ['/api/admin/performance-report'],
+    enabled: true
+  });
+
+  const { data: pricingOptimization } = useQuery({
+    queryKey: ['/api/admin/pricing-optimization'],
+    enabled: true
+  });
+
+  const { data: clientSegmentation } = useQuery({
+    queryKey: ['/api/admin/client-segmentation'],
+    enabled: true
+  });
+
   // Service configuration form
   const serviceForm = useForm<ServiceConfig>({
     resolver: zodResolver(serviceConfigSchema),
@@ -301,18 +322,26 @@ const AdminPanel = () => {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             <TabsTrigger value="services" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
-              Service Configuration
+              Service Config
             </TabsTrigger>
             <TabsTrigger value="checklists" className="flex items-center gap-2">
               <List className="h-4 w-4" />
-              Checklist Management
+              Checklists
             </TabsTrigger>
             <TabsTrigger value="combos" className="flex items-center gap-2">
               <Zap className="h-4 w-4" />
               Combo Triggers
+            </TabsTrigger>
+            <TabsTrigger value="analytics" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Analytics
+            </TabsTrigger>
+            <TabsTrigger value="optimization" className="flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Optimization
             </TabsTrigger>
           </TabsList>
 
@@ -896,6 +925,233 @@ const AdminPanel = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              {/* Performance Report */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Service Performance Report</CardTitle>
+                  <CardDescription>Comprehensive service analytics and metrics</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {performanceReport ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium">Total Services:</span>
+                          <p className="text-2xl font-bold text-blue-600">{performanceReport.totalServices}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium">Total Revenue:</span>
+                          <p className="text-2xl font-bold text-green-600">₹{performanceReport.totalRevenue?.toLocaleString()}</p>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-medium mb-2">Top Performing Services:</h4>
+                        <div className="space-y-2">
+                          {performanceReport.topPerformingServices?.map((service, idx) => (
+                            <div key={idx} className="flex justify-between text-sm">
+                              <span>{service.name}</span>
+                              <span className="font-medium">₹{service.revenue?.toLocaleString()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">Loading performance data...</div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Client Segmentation */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Client Segmentation Analysis</CardTitle>
+                  <CardDescription>Strategic client insights and opportunities</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {clientSegmentation ? (
+                    <div className="space-y-4">
+                      {clientSegmentation.segments?.map((segment, idx) => (
+                        <div key={idx} className="border rounded-lg p-3">
+                          <div className="flex justify-between items-start mb-2">
+                            <h4 className="font-medium">{segment.name}</h4>
+                            <Badge variant="outline">{segment.count} clients</Badge>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-2">
+                            Avg Spend: ₹{segment.avgSpend?.toLocaleString()}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {Object.entries(segment.criteria).map(([key, value]) => `${key}: ${value}`).join(', ')}
+                          </p>
+                        </div>
+                      ))}
+                      
+                      <div className="mt-4">
+                        <h4 className="font-medium mb-2">Key Insights:</h4>
+                        <ul className="text-sm space-y-1">
+                          {clientSegmentation.insights?.map((insight, idx) => (
+                            <li key={idx} className="text-gray-600">• {insight}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">Loading segmentation data...</div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Quality Standards Overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Quality Standards & Compliance</CardTitle>
+                <CardDescription>Service quality metrics and audit results</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <div className="text-2xl font-bold text-green-600">98.5%</div>
+                    <div className="text-sm text-gray-600">Avg Quality Score</div>
+                  </div>
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <div className="text-2xl font-bold text-blue-600">15 mins</div>
+                    <div className="text-sm text-gray-600">Avg Response Time</div>
+                  </div>
+                  <div className="text-center p-4 bg-purple-50 rounded-lg">
+                    <div className="text-2xl font-bold text-purple-600">99.2%</div>
+                    <div className="text-sm text-gray-600">SLA Compliance</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Optimization Tab */}
+          <TabsContent value="optimization">
+            <div className="space-y-6">
+              {/* Pricing Optimization */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pricing Optimization</CardTitle>
+                  <CardDescription>AI-driven pricing recommendations and market analysis</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {pricingOptimization ? (
+                    <div className="space-y-6">
+                      {/* Market Analysis */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="text-center p-4 bg-blue-50 rounded-lg">
+                          <div className="text-2xl font-bold text-blue-600">
+                            ₹{pricingOptimization.marketAnalysis?.averageMarketPrice?.toLocaleString()}
+                          </div>
+                          <div className="text-sm text-gray-600">Avg Market Price</div>
+                        </div>
+                        <div className="text-center p-4 bg-green-50 rounded-lg">
+                          <div className="text-2xl font-bold text-green-600">
+                            {pricingOptimization.marketAnalysis?.competitivePositioning?.toUpperCase()}
+                          </div>
+                          <div className="text-sm text-gray-600">Market Position</div>
+                        </div>
+                        <div className="text-center p-4 bg-purple-50 rounded-lg">
+                          <div className="text-2xl font-bold text-purple-600">
+                            {pricingOptimization.marketAnalysis?.priceElasticity}
+                          </div>
+                          <div className="text-sm text-gray-600">Price Elasticity</div>
+                        </div>
+                      </div>
+
+                      {/* Pricing Recommendations */}
+                      <div>
+                        <h4 className="font-medium mb-3">Pricing Recommendations</h4>
+                        <div className="space-y-3">
+                          {pricingOptimization.recommendations?.map((rec, idx) => (
+                            <div key={idx} className="border rounded-lg p-4">
+                              <div className="flex justify-between items-start mb-2">
+                                <h5 className="font-medium">{rec.serviceId}</h5>
+                                <div className="text-right">
+                                  <div className="text-sm text-gray-500">Current: ₹{rec.currentPrice?.toLocaleString()}</div>
+                                  <div className="text-sm font-medium text-green-600">Suggested: ₹{rec.suggestedPrice?.toLocaleString()}</div>
+                                </div>
+                              </div>
+                              <p className="text-sm text-gray-600 mb-2">{rec.reasoning}</p>
+                              <div className="text-sm font-medium text-blue-600">{rec.expectedImpact}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Bundling Opportunities */}
+                      <div>
+                        <h4 className="font-medium mb-3">Bundling Opportunities</h4>
+                        <div className="space-y-3">
+                          {pricingOptimization.bundlingOpportunities?.map((bundle, idx) => (
+                            <div key={idx} className="border rounded-lg p-4 bg-yellow-50">
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <h5 className="font-medium">Bundle: {bundle.services?.join(' + ')}</h5>
+                                  <div className="text-sm text-gray-600">Demand: {bundle.demandForecast}</div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-sm line-through text-gray-500">₹{bundle.individualTotal?.toLocaleString()}</div>
+                                  <div className="text-lg font-bold text-green-600">₹{bundle.bundlePrice?.toLocaleString()}</div>
+                                  <div className="text-sm text-green-600">Save ₹{bundle.savings?.toLocaleString()}</div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">Loading optimization data...</div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Revenue Optimization Actions */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Revenue Optimization Actions</CardTitle>
+                  <CardDescription>Actionable recommendations to boost revenue and efficiency</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-green-500" />
+                        Immediate Actions
+                      </h4>
+                      <ul className="text-sm space-y-1 text-gray-600">
+                        <li>• Implement dynamic pricing for premium services</li>
+                        <li>• Launch startup bundle campaign (15% discount)</li>
+                        <li>• Optimize monthly compliance package pricing</li>
+                        <li>• Introduce enterprise retainer plans</li>
+                      </ul>
+                    </div>
+                    
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-2 flex items-center gap-2">
+                        <Target className="h-4 w-4 text-blue-500" />
+                        Strategic Initiatives
+                      </h4>
+                      <ul className="text-sm space-y-1 text-gray-600">
+                        <li>• Develop AI-powered compliance automation</li>
+                        <li>• Expand into new compliance categories</li>
+                        <li>• Create white-label partnership program</li>
+                        <li>• Build predictive compliance analytics</li>
+                      </ul>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>
