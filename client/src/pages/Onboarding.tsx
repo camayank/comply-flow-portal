@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Building2, Users, FileText, Shield } from 'lucide-react';
+import DashboardNav from '@/components/DashboardNav';
 
 const Onboarding = () => {
   const [, setLocation] = useLocation();
@@ -57,6 +58,7 @@ const Onboarding = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-8">
+        <DashboardNav currentPath="/onboarding" />
         {/* Hero Section */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">

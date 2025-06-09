@@ -49,7 +49,7 @@ const PaymentGateway = () => {
       data: paymentData,
       timestamp: new Date().toISOString()
     }));
-    setLocation('/tracker');
+    setLocation('/compliance-tracker');
   };
 
   const formatCurrency = (amount: number) => {

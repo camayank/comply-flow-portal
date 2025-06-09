@@ -63,9 +63,9 @@ const LandingPage = () => {
             </div>
             <div className="hidden md:flex items-center gap-6">
               <nav className="flex gap-6">
-                <a href="#services" className="text-gray-600 hover:text-blue-600">Services</a>
-                <a href="#pricing" className="text-gray-600 hover:text-blue-600">Pricing</a>
-                <a href="#demo" className="text-gray-600 hover:text-blue-600">Demo</a>
+                <Link href="/service-selection" className="text-gray-600 hover:text-blue-600">Services</Link>
+                <Link href="/package-selection" className="text-gray-600 hover:text-blue-600">Pricing</Link>
+                <Link href="/platform-showcase" className="text-gray-600 hover:text-blue-600">Demo</Link>
               </nav>
               <Link href="/onboarding">
                 <Button size="sm">Get Started</Button>
