@@ -131,6 +131,10 @@ export class MemStorage implements IStorage {
       ...service,
       id,
       createdAt: new Date(),
+      deadline: service.deadline || null,
+      description: service.description || null,
+      isActive: service.isActive ?? true,
+      requiredDocs: service.requiredDocs || null,
     };
     this.services.set(service.serviceId, fullService);
     return fullService;

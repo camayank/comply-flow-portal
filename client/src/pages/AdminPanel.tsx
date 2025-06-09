@@ -629,7 +629,7 @@ const AdminPanel = () => {
                                     </FormControl>
                                     <SelectContent>
                                       {Array.isArray(services) && services.map((service) => (
-                                        <SelectItem key={service.id} value={service.serviceId || service.id}>
+                                        <SelectItem key={service.id} value={service.serviceId || service.id?.toString() || `service-${service.id}`}>
                                           {service.name}
                                         </SelectItem>
                                       ))}
