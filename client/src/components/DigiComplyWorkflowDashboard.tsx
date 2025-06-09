@@ -77,6 +77,8 @@ const DigiComplyWorkflowDashboard: React.FC = () => {
     switch (category) {
       case 'incorporation': return <Building2 className="h-5 w-5" />;
       case 'post_incorporation': return <CheckCircle className="h-5 w-5" />;
+      case 'monthly_compliance': return <Calendar className="h-5 w-5" />;
+      case 'quarterly_compliance': return <Clock className="h-5 w-5" />;
       case 'annual_compliance': return <Calendar className="h-5 w-5" />;
       case 'event_based': return <AlertTriangle className="h-5 w-5" />;
       case 'turnover_based': return <TrendingUp className="h-5 w-5" />;
@@ -93,11 +95,13 @@ const DigiComplyWorkflowDashboard: React.FC = () => {
     switch (category) {
       case 'incorporation': return 'bg-blue-100 text-blue-800 border-blue-300';
       case 'post_incorporation': return 'bg-green-100 text-green-800 border-green-300';
-      case 'annual_compliance': return 'bg-red-100 text-red-800 border-red-300';
+      case 'monthly_compliance': return 'bg-red-100 text-red-800 border-red-300';
+      case 'quarterly_compliance': return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'annual_compliance': return 'bg-purple-100 text-purple-800 border-purple-300';
       case 'event_based': return 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      case 'turnover_based': return 'bg-purple-100 text-purple-800 border-purple-300';
-      case 'condition_based': return 'bg-indigo-100 text-indigo-800 border-indigo-300';
-      case 'licenses': return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'turnover_based': return 'bg-indigo-100 text-indigo-800 border-indigo-300';
+      case 'condition_based': return 'bg-cyan-100 text-cyan-800 border-cyan-300';
+      case 'licenses': return 'bg-emerald-100 text-emerald-800 border-emerald-300';
       case 'voluntary': return 'bg-teal-100 text-teal-800 border-teal-300';
       case 'audit_services': return 'bg-gray-100 text-gray-800 border-gray-300';
       case 'industry_specific': return 'bg-pink-100 text-pink-800 border-pink-300';
@@ -109,6 +113,8 @@ const DigiComplyWorkflowDashboard: React.FC = () => {
     { id: 'all', name: 'All Services', icon: FileText },
     { id: 'incorporation', name: 'Incorporation', icon: Building2 },
     { id: 'post_incorporation', name: 'Post-Incorporation', icon: CheckCircle },
+    { id: 'monthly_compliance', name: 'Monthly Compliance', icon: Calendar },
+    { id: 'quarterly_compliance', name: 'Quarterly Compliance', icon: Clock },
     { id: 'annual_compliance', name: 'Annual Compliance', icon: Calendar },
     { id: 'event_based', name: 'Event-Based', icon: AlertTriangle },
     { id: 'turnover_based', name: 'Turnover-Based', icon: TrendingUp },
@@ -141,8 +147,9 @@ const DigiComplyWorkflowDashboard: React.FC = () => {
             DigiComply Workflow Hub
           </h1>
           <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-            Comprehensive Indian compliance workflows covering incorporation, post-incorporation, 
-            event-based, turnover-based, audit services, and all applicable licenses and registrations
+            Complete Indian business compliance solution covering monthly filings (TDS, EPF, ESI, GST), 
+            quarterly returns, annual compliance (ROC filings, ITR), and all regulatory requirements 
+            for seamless business operations throughout the lifecycle
           </p>
         </div>
 
@@ -165,7 +172,7 @@ const DigiComplyWorkflowDashboard: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Compliance Categories</p>
-                  <p className="text-2xl font-bold text-gray-900">10</p>
+                  <p className="text-2xl font-bold text-gray-900">12</p>
                 </div>
                 <Shield className="h-8 w-8 text-green-500" />
               </div>
@@ -199,15 +206,15 @@ const DigiComplyWorkflowDashboard: React.FC = () => {
 
         {/* Category Tabs */}
         <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="mb-8">
-          <TabsList className="grid w-full grid-cols-6 lg:grid-cols-11 mb-6">
+          <TabsList className="grid w-full grid-cols-4 md:grid-cols-7 lg:grid-cols-13 mb-6 h-auto">
             {categories.map((category) => (
               <TabsTrigger 
                 key={category.id} 
                 value={category.id}
-                className="flex flex-col gap-1 p-2 text-xs"
+                className="flex flex-col gap-1 p-2 text-xs h-16 md:h-14"
               >
                 <category.icon className="h-4 w-4" />
-                <span className="hidden lg:inline">{category.name}</span>
+                <span className="text-center leading-tight">{category.name}</span>
               </TabsTrigger>
             ))}
           </TabsList>

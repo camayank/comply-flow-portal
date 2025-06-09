@@ -100,60 +100,306 @@ export const DIGICOMPLY_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     ]
   },
 
-  // 3. ANNUAL COMPLIANCE WORKFLOWS
+  // 3. MONTHLY COMPLIANCE WORKFLOWS
+  {
+    id: 'monthly-compliance-package',
+    name: 'Monthly Compliance Package',
+    category: 'monthly_compliance',
+    type: 'recurring_monthly',
+    isStandard: true,
+    version: '1.0',
+    metadata: {
+      estimatedDuration: '15-20 days per month',
+      totalCost: 8000,
+      requiredPersonnel: ['CA', 'Tax Consultant', 'Payroll Executive'],
+      complianceDeadlines: ['TDS by 7th', 'EPF by 15th', 'ESI by 21st', 'GSTR-1 by 11th', 'GSTR-3B by 20th', 'PT by 15th']
+    },
+    steps: [
+      {
+        id: 'tds-filing',
+        name: 'TDS Return Filing (24Q/26Q/27Q)',
+        description: 'Monthly TDS deduction and deposit compliance',
+        type: 'filing',
+        isRequired: true,
+        canBeModified: false,
+        estimatedDays: 3,
+        dependencies: [],
+        requiredDocs: ['salary_register', 'tds_certificates', 'form_16', 'payment_challans'],
+        formType: 'Form 24Q/26Q/27Q',
+        deadlines: ['TDS deposit by 7th of next month', 'TDS return by 31st of next month'],
+        fees: 200,
+        eligibilityCriteria: ['Companies with employee salary > ₹2.5 lakhs annually', 'Professional payments > ₹30,000']
+      },
+      {
+        id: 'epf-compliance',
+        name: 'EPF Monthly Compliance',
+        description: 'Employee Provident Fund monthly returns and payments',
+        type: 'filing',
+        isRequired: true,
+        canBeModified: false,
+        estimatedDays: 2,
+        dependencies: [],
+        requiredDocs: ['salary_register', 'epf_challan', 'employee_joining_exit'],
+        formType: 'ECR Upload',
+        deadlines: ['EPF deposit by 15th of next month'],
+        eligibilityCriteria: ['Companies with 20+ employees', 'Monthly basic salary consideration']
+      },
+      {
+        id: 'esi-compliance',
+        name: 'ESI Monthly Compliance',
+        description: 'Employee State Insurance monthly contributions',
+        type: 'filing',
+        isRequired: true,
+        canBeModified: false,
+        estimatedDays: 2,
+        dependencies: [],
+        requiredDocs: ['salary_register', 'esi_challan', 'employee_medical_records'],
+        formType: 'Monthly ESI Return',
+        deadlines: ['ESI deposit by 21st of next month'],
+        eligibilityCriteria: ['Companies with 10+ employees', 'Salary up to ₹21,000 per month']
+      },
+      {
+        id: 'gstr1-filing',
+        name: 'GSTR-1 Monthly Filing',
+        description: 'GST outward supplies return',
+        type: 'filing',
+        isRequired: true,
+        canBeModified: false,
+        estimatedDays: 3,
+        dependencies: [],
+        requiredDocs: ['sales_invoices', 'tax_invoices', 'credit_debit_notes'],
+        formType: 'GSTR-1',
+        deadlines: ['By 11th of next month'],
+        eligibilityCriteria: ['GST registered businesses', 'Turnover > ₹1.5 crores']
+      },
+      {
+        id: 'gstr3b-filing',
+        name: 'GSTR-3B Monthly Filing',
+        description: 'GST monthly return and tax payment',
+        type: 'filing',
+        isRequired: true,
+        canBeModified: false,
+        estimatedDays: 2,
+        dependencies: ['gstr1-filing'],
+        requiredDocs: ['gstr1_data', 'purchase_register', 'input_tax_credit'],
+        formType: 'GSTR-3B',
+        deadlines: ['By 20th of next month'],
+        fees: 200
+      },
+      {
+        id: 'gstr2b-reconciliation',
+        name: 'GSTR-2B Reconciliation',
+        description: 'Auto-populated input tax credit reconciliation',
+        type: 'verification',
+        isRequired: true,
+        canBeModified: true,
+        estimatedDays: 2,
+        dependencies: [],
+        requiredDocs: ['gstr2b_data', 'purchase_invoices', 'input_tax_ledger'],
+        notes: ['Reconcile ITC with GSTR-2B', 'Identify mismatches']
+      },
+      {
+        id: 'professional-tax',
+        name: 'Professional Tax Filing',
+        description: 'State-wise professional tax compliance',
+        type: 'filing',
+        isRequired: true,
+        canBeModified: true,
+        estimatedDays: 1,
+        dependencies: [],
+        requiredDocs: ['employee_salary_details', 'pt_deduction_register'],
+        deadlines: ['By 15th of next month'],
+        notes: ['State-specific requirements']
+      }
+    ]
+  },
+
+  // 4. QUARTERLY COMPLIANCE WORKFLOWS
+  {
+    id: 'quarterly-compliance-package',
+    name: 'Quarterly Compliance Package',
+    category: 'quarterly_compliance',
+    type: 'recurring_quarterly',
+    isStandard: true,
+    version: '1.0',
+    metadata: {
+      estimatedDuration: '20-30 days per quarter',
+      totalCost: 12000,
+      requiredPersonnel: ['CA', 'Tax Consultant'],
+      complianceDeadlines: ['TDS returns by 31st of next month', 'Advance tax by 15th of quarter-end month']
+    },
+    steps: [
+      {
+        id: 'quarterly-tds-return',
+        name: 'Quarterly TDS Return Filing',
+        description: 'Comprehensive quarterly TDS compliance',
+        type: 'filing',
+        isRequired: true,
+        canBeModified: false,
+        estimatedDays: 5,
+        dependencies: [],
+        requiredDocs: ['quarterly_tds_register', 'form16_data', 'tds_certificates'],
+        formType: 'Form 24Q/26Q/27Q/27EQ',
+        deadlines: ['Q1: July 31', 'Q2: October 31', 'Q3: January 31', 'Q4: May 31'],
+        fees: 500
+      },
+      {
+        id: 'advance-tax-payment',
+        name: 'Advance Tax Payment',
+        description: 'Quarterly advance income tax installments',
+        type: 'payment',
+        isRequired: true,
+        canBeModified: true,
+        estimatedDays: 3,
+        dependencies: [],
+        requiredDocs: ['income_computation', 'advance_tax_calculation', 'previous_year_data'],
+        deadlines: ['June 15: 15%', 'September 15: 45%', 'December 15: 75%', 'March 15: 100%'],
+        notes: ['Based on estimated income for the year']
+      },
+      {
+        id: 'gst-quarterly-review',
+        name: 'GST Quarterly Review & Reconciliation',
+        description: 'Comprehensive GST compliance review',
+        type: 'verification',
+        isRequired: true,
+        canBeModified: true,
+        estimatedDays: 4,
+        dependencies: [],
+        requiredDocs: ['quarterly_gst_returns', 'itc_reconciliation', 'audit_trail'],
+        notes: ['Review all GSTR filings', 'ITC optimization']
+      }
+    ]
+  },
+
+  // 5. ANNUAL COMPLIANCE WORKFLOWS (Enhanced)
   {
     id: 'annual-compliance-package',
     name: 'Annual Compliance Package',
     category: 'annual_compliance',
-    type: 'recurring',
+    type: 'recurring_annual',
     isStandard: true,
     version: '1.0',
     metadata: {
-      estimatedDuration: '45-60 days',
-      totalCost: 25000,
-      requiredPersonnel: ['Auditor', 'CA/CS', 'Directors'],
-      complianceDeadlines: ['AGM by 30th September', 'ROC filings by 30th October']
+      estimatedDuration: '60-90 days',
+      totalCost: 35000,
+      requiredPersonnel: ['Statutory Auditor', 'CA/CS', 'Directors'],
+      complianceDeadlines: ['AGM by 30th September', 'ROC filings by 30th October', 'ITR by 31st October', 'DIR-3 KYC by 30th September']
     },
     steps: [
       {
+        id: 'auditor-appointment-adt1',
+        name: 'Auditor Appointment (ADT-1)',
+        description: 'Appoint statutory auditor within required timeline',
+        type: 'filing',
+        isRequired: true,
+        canBeModified: false,
+        estimatedDays: 7,
+        dependencies: [],
+        requiredDocs: ['auditor_consent_letter', 'auditor_eligibility_certificate', 'board_resolution'],
+        formType: 'ADT-1',
+        deadlines: ['Within 1 month of incorporation OR before 15th September'],
+        fees: 500,
+        notes: ['Auditor valid for 5 years', 'Late filing attracts double fee penalty']
+      },
+      {
+        id: 'commencement-business-inc20a',
+        name: 'Commencement of Business (INC-20A)',
+        description: 'Declaration of commencement of business activities',
+        type: 'filing',
+        isRequired: true,
+        canBeModified: false,
+        estimatedDays: 3,
+        dependencies: [],
+        requiredDocs: ['verification_declaration', 'office_address_proof', 'bank_account_details'],
+        formType: 'INC-20A',
+        deadlines: ['Within 180 days of incorporation'],
+        fees: 500,
+        notes: ['One-time filing', 'Mandatory for business operations']
+      },
+      {
+        id: 'financial-statements-preparation',
+        name: 'Financial Statements Preparation',
+        description: 'Prepare audited financial statements',
+        type: 'documentation',
+        isRequired: true,
+        canBeModified: true,
+        estimatedDays: 20,
+        dependencies: ['auditor-appointment-adt1'],
+        requiredDocs: ['books_of_accounts', 'trial_balance', 'supporting_vouchers', 'bank_statements'],
+        notes: ['Balance Sheet', 'Profit & Loss Statement', 'Cash Flow Statement', 'Notes to Accounts']
+      },
+      {
         id: 'agm-conduct',
-        name: 'Annual General Meeting',
-        description: 'Conduct mandatory AGM and board meetings',
+        name: 'Annual General Meeting (AGM)',
+        description: 'Conduct mandatory AGM with all statutory compliances',
         type: 'verification',
         isRequired: true,
         canBeModified: true,
-        estimatedDays: 15,
-        dependencies: [],
-        requiredDocs: ['agm_notice', 'board_resolutions', 'financial_statements'],
-        deadlines: ['Within 6 months of FY end, by 30th September']
+        estimatedDays: 10,
+        dependencies: ['financial-statements-preparation'],
+        requiredDocs: ['agm_notice', 'board_resolutions', 'audited_financials', 'directors_report'],
+        deadlines: ['Within 6 months of FY end, by 30th September'],
+        notes: ['First AGM within 18 months of incorporation']
       },
       {
         id: 'aoc-4-filing',
         name: 'AOC-4 Financial Statement Filing',
-        description: 'File annual financial statements with MCA',
+        description: 'File annual financial statements with ROC',
         type: 'filing',
         isRequired: true,
         canBeModified: false,
         estimatedDays: 5,
         dependencies: ['agm-conduct'],
-        requiredDocs: ['balance_sheet', 'profit_loss', 'auditor_report', 'directors_report'],
+        requiredDocs: ['balance_sheet', 'profit_loss_account', 'auditor_report', 'directors_report', 'agm_resolution'],
         formType: 'AOC-4',
         deadlines: ['Within 30 days of AGM'],
-        fees: 500
+        fees: 500,
+        notes: ['Financial information disclosure to ROC']
       },
       {
-        id: 'mgt-7-filing',
-        name: 'MGT-7 Annual Return Filing',
-        description: 'File annual return with shareholding details',
+        id: 'mgt-7a-filing',
+        name: 'MGT-7A Annual Return Filing',
+        description: 'File annual return with shareholding and directorship details',
+        type: 'filing',
+        isRequired: true,
+        canBeModified: false,
+        estimatedDays: 4,
+        dependencies: ['aoc-4-filing'],
+        requiredDocs: ['annual_return_data', 'shareholding_pattern', 'director_details', 'registered_office_details'],
+        formType: 'MGT-7A',
+        deadlines: ['Within 60 days of AGM'],
+        fees: 300,
+        notes: ['Comprehensive company information filing']
+      },
+      {
+        id: 'dir3-kyc-filing',
+        name: 'Director KYC (DIR-3 KYC)',
+        description: 'Annual KYC filing for all directors',
         type: 'filing',
         isRequired: true,
         canBeModified: false,
         estimatedDays: 3,
-        dependencies: ['aoc-4-filing'],
-        requiredDocs: ['annual_return', 'shareholding_pattern', 'board_composition'],
-        formType: 'MGT-7',
-        deadlines: ['Within 60 days of AGM'],
-        fees: 300
+        dependencies: [],
+        requiredDocs: ['director_identity_proof', 'address_proof', 'din_details', 'photograph'],
+        formType: 'DIR-3 KYC',
+        deadlines: ['By 30th September every year'],
+        fees: 0,
+        notes: ['₹5,000 penalty for non-filing', 'Required for DIN activation']
+      },
+      {
+        id: 'itr6-filing',
+        name: 'Income Tax Return Filing (ITR-6)',
+        description: 'Annual income tax return for companies',
+        type: 'filing',
+        isRequired: true,
+        canBeModified: false,
+        estimatedDays: 7,
+        dependencies: ['financial-statements-preparation'],
+        requiredDocs: ['audited_financials', 'tax_computation', 'advance_tax_payments', 'tds_certificates'],
+        formType: 'ITR-6',
+        deadlines: ['By 31st October (with extension)'],
+        fees: 1000,
+        notes: ['Carry forward losses', 'Tax computation disclosure']
       }
     ]
   },
