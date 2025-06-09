@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import DashboardNav from '@/components/DashboardNav';
 import { 
   Shield, 
   AlertTriangle, 
@@ -62,7 +63,7 @@ const ComplianceTrackerDashboard = () => {
   // Mark compliance as completed mutation
   const markCompletedMutation = useMutation({
     mutationFn: (complianceId: number) => 
-      apiRequest('POST', `/api/compliance-tracking/${complianceId}/complete`, {}),
+      apiRequest('POST', `/api/compliance-tracking/${complianceId}/complete`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/compliance-tracking'] });
       queryClient.invalidateQueries({ queryKey: ['/api/compliance-health-metrics'] });
@@ -151,6 +152,7 @@ const ComplianceTrackerDashboard = () => {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
+      <DashboardNav currentPath="/compliance-tracker" />
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Compliance Tracker Dashboard</h1>
         <p className="text-gray-600">
