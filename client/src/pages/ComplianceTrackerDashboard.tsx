@@ -397,7 +397,7 @@ const ComplianceTrackerDashboard = () => {
                           <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
                             <span>Due: {new Date(item.dueDate).toLocaleDateString()}</span>
                             <span>Health Score: {item.healthScore}%</span>
-                            {item.penaltyRisk && (
+                            {item.penaltyRisk && item.estimatedPenalty && (
                               <span className="text-red-600">
                                 Penalty Risk: ₹{item.estimatedPenalty.toLocaleString()}
                               </span>

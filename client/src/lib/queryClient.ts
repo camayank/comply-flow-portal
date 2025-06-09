@@ -26,13 +26,13 @@ export const queryClient = new QueryClient({
   },
 });
 
-export const apiRequest = async (url: string, options: RequestInit = {}) => {
+export const apiRequest = async (method: string, url: string, data?: any) => {
   const config: RequestInit = {
+    method,
     headers: {
       'Content-Type': 'application/json',
-      ...options.headers,
     },
-    ...options,
+    ...(data && { body: JSON.stringify(data) }),
   };
 
   const response = await fetch(url, config);
@@ -47,13 +47,10 @@ export const apiRequest = async (url: string, options: RequestInit = {}) => {
 
 // Utility functions for common API patterns
 export const createServiceRequest = async (serviceIds: string[], userId?: number) => {
-  return apiRequest('/api/service-requests', {
-    method: 'POST',
-    body: JSON.stringify({
-      serviceId: serviceIds.length === 1 ? serviceIds[0] : serviceIds,
-      userId,
-      status: 'initiated'
-    }),
+  return apiRequest('POST', '/api/service-requests', {
+    serviceId: serviceIds.length === 1 ? serviceIds[0] : serviceIds,
+    userId,
+    status: 'initiated'
   });
 };
 
