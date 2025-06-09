@@ -5,6 +5,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Router, Route, Switch } from "wouter";
 import Onboarding from "./pages/Onboarding";
+import BusinessType from "./pages/BusinessType";
+import PackageSelection from "./pages/PackageSelection";
+import FounderDetails from "./pages/FounderDetails";
+import IndustryClassification from "./pages/IndustryClassification";
 import ServiceSelection from "./pages/ServiceSelection";
 import DocumentUpload from "./pages/DocumentUpload";
 import ComplianceTracker from "./pages/ComplianceTracker";
@@ -27,6 +31,10 @@ const App = () => (
           <main className="flex-grow">
             <Switch>
               <Route path="/" component={Onboarding} />
+              <Route path="/business-type" component={BusinessType} />
+              <Route path="/package-selection" component={PackageSelection} />
+              <Route path="/founder-details" component={FounderDetails} />
+              <Route path="/industry-classification" component={IndustryClassification} />
               <Route path="/services" component={ServiceSelection} />
               <Route path="/documents" component={DocumentUpload} />
               <Route path="/tracker" component={ComplianceTracker} />

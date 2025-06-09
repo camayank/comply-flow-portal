@@ -29,7 +29,7 @@ const DocumentUpload = () => {
 
   const handleContinue = () => {
     localStorage.setItem('uploadedDocuments', JSON.stringify(uploadedFiles));
-    setLocation('/tracker');
+    setLocation('/esign-agreements');
   };
 
   const requiredUploaded = uploadedFiles.filter(id => 

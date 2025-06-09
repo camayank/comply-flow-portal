@@ -8,11 +8,9 @@ const Navbar = () => {
   const [location, setLocation] = useLocation();
 
   const navItems = [
-    { path: '/', label: 'Onboarding' },
-    { path: '/services', label: 'Services' },
-    { path: '/documents', label: 'Documents' },
-    { path: '/tracker', label: 'Tracker' },
-    { path: '/confirmation', label: 'Complete' }
+    { path: '/', label: 'Start Here' },
+    { path: '/tracker', label: 'Dashboard' },
+    { path: '/admin', label: 'Admin Panel' }
   ];
 
   return (

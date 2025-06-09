@@ -28,7 +28,7 @@ const Onboarding = () => {
     e.preventDefault();
     // Store data in localStorage for now
     localStorage.setItem('companyData', JSON.stringify(formData));
-    setLocation('/services');
+    setLocation('/business-type');
   };
 
   const features = [
