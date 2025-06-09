@@ -2,7 +2,7 @@
 import React from 'react';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { Shield, Menu } from 'lucide-react';
+import { Building2, Menu } from 'lucide-react';
 
 const Navbar = () => {
   const [location, setLocation] = useLocation();
@@ -21,9 +21,12 @@ const Navbar = () => {
           {/* Logo */}
           <div className="flex items-center gap-2">
             <div className="p-2 bg-blue-100 rounded-lg">
-              <Shield className="h-6 w-6 text-blue-600" />
+              <Building2 className="h-6 w-6 text-blue-600" />
             </div>
-            <span className="text-xl font-bold text-gray-900">DigiComply</span>
+            <div className="flex flex-col">
+              <span className="text-xl font-bold text-gray-900">DigiComply®</span>
+              <span className="text-xs text-gray-500">by LegalSuvidha.com</span>
+            </div>
           </div>
 
           {/* Navigation Items */}

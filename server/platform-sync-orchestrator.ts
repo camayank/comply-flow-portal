@@ -298,7 +298,7 @@ export class PlatformSyncOrchestrator {
     if (systemLoad > 85) {
       // Only log critical performance issues
       await this.optimizeBackendPerformance();
-    } else if (middlewareLoad > 80) {
+    } else if (middlewareLoad > 90) {
       await this.optimizeMiddlewarePerformance();
     } else if (systemLoad < 40) {
       // Only optimize cache when system is not under stress
@@ -318,12 +318,6 @@ export class PlatformSyncOrchestrator {
 
   private async optimizeMiddlewarePerformance() {
     // Implement middleware optimizations silently
-    // Only log if actual optimization is needed
-    const middlewareLoad = this.platformState.middleware.processingLoad;
-    if (middlewareLoad > 70) {
-      console.log('High middleware load detected, optimizing...');
-    }
-    
     // Optimizations:
     // - Batch event processing
     // - Optimize WebSocket message handling
