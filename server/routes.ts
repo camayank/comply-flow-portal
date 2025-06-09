@@ -499,6 +499,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Panel API Routes
+  app.post("/api/admin/services", async (req: Request, res: Response) => {
+    try {
+      const serviceData = req.body;
+      const service = await storage.createService({
+        serviceId: `SVC-${Date.now()}`,
+        ...serviceData
+      });
+      res.json(service);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/admin/services/:serviceId", async (req: Request, res: Response) => {
+    try {
+      const { serviceId } = req.params;
+      const updates = req.body;
+      res.json({ success: true, serviceId, updates });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/admin/services/:serviceId", async (req: Request, res: Response) => {
+    try {
+      const { serviceId } = req.params;
+      res.json({ success: true, serviceId });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/workflow-customizations", async (req: Request, res: Response) => {
+    try {
+      const customization = req.body;
+      const result = {
+        id: `CUSTOM-${Date.now()}`,
+        ...customization,
+        createdAt: new Date(),
+        status: 'added'
+      };
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/admin/combo-triggers", async (req: Request, res: Response) => {
+    try {
+      const comboData = req.body;
+      const combo = {
+        id: `COMBO-${Date.now()}`,
+        ...comboData,
+        createdAt: new Date(),
+        isActive: true
+      };
+      res.json(combo);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/admin/combo-triggers", async (req: Request, res: Response) => {
+    try {
+      const combos = [
+        {
+          id: "COMBO-1",
+          name: "Incorporation + GST Bundle",
+          triggerServices: ["pvt-ltd-incorporation"],
+          suggestedServices: ["gst-registration", "professional-tax"],
+          discount: 10,
+          description: "Complete business setup with incorporation and GST registration",
+          isActive: true
+        },
+        {
+          id: "COMBO-2", 
+          name: "Annual Compliance Package",
+          triggerServices: ["annual-compliance-package"],
+          suggestedServices: ["itr6-filing", "gst-annual-return"],
+          discount: 15,
+          description: "Comprehensive annual filing bundle with ROC and tax returns",
+          isActive: true
+        },
+        {
+          id: "COMBO-3",
+          name: "Monthly Compliance Retainer",
+          triggerServices: ["monthly-compliance-package"],
+          suggestedServices: ["payroll-processing", "bookkeeping"],
+          discount: 20,
+          description: "Complete monthly compliance with payroll and bookkeeping",
+          isActive: true
+        }
+      ];
+      res.json(combos);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
