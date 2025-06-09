@@ -89,6 +89,10 @@ export class MemStorage implements IStorage {
         ...service,
         id: index + 1,
         createdAt: new Date(),
+        deadline: service.deadline || null,
+        description: service.description || null,
+        isActive: service.isActive ?? true,
+        requiredDocs: service.requiredDocs || [],
       };
       this.services.set(service.serviceId, fullService);
     });
@@ -144,6 +148,12 @@ export class MemStorage implements IStorage {
       id,
       createdAt: new Date(),
       updatedAt: new Date(),
+      status: request.status || 'initiated',
+      userId: request.userId || null,
+      uploadedDocs: request.uploadedDocs || null,
+      documentHash: request.documentHash || null,
+      signatureData: request.signatureData || null,
+      paymentId: request.paymentId || null,
     };
     this.serviceRequests.set(id, fullRequest);
     return fullRequest;
@@ -178,6 +188,9 @@ export class MemStorage implements IStorage {
       id,
       createdAt: new Date(),
       completedAt: null,
+      status: payment.status || 'pending',
+      paymentMethod: payment.paymentMethod || null,
+      transactionId: payment.transactionId || null,
     };
     this.payments.set(payment.paymentId, fullPayment);
     return fullPayment;
