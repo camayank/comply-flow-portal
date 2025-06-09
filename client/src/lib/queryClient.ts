@@ -64,33 +64,24 @@ export const uploadDocuments = async (serviceRequestId: number, documents: File[
     }))
   );
 
-  return apiRequest(`/api/service-requests/${serviceRequestId}/documents`, {
-    method: 'POST',
-    body: JSON.stringify({ documents: documentData }),
-  });
+  return apiRequest('POST', `/api/service-requests/${serviceRequestId}/documents`, { documents: documentData });
 };
 
 export const verifyPaymentAmount = async (serviceRequestId: number) => {
-  return apiRequest(`/api/payment/verify/${serviceRequestId}`);
+  return apiRequest('GET', `/api/payment/verify/${serviceRequestId}`);
 };
 
 export const processPayment = async (serviceRequestId: number, paymentMethod: string, amount: number) => {
-  return apiRequest('/api/payments', {
-    method: 'POST',
-    body: JSON.stringify({
-      serviceRequestId,
-      paymentMethod,
-      amount,
-    }),
+  return apiRequest('POST', '/api/payments', {
+    serviceRequestId,
+    paymentMethod,
+    amount,
   });
 };
 
 export const signDocuments = async (serviceRequestId: number, signature: string, documentHash: string) => {
-  return apiRequest(`/api/service-requests/${serviceRequestId}/sign`, {
-    method: 'POST',
-    body: JSON.stringify({
-      signature,
-      documentHash,
-    }),
+  return apiRequest('POST', `/api/service-requests/${serviceRequestId}/sign`, {
+    signature,
+    documentHash,
   });
 };

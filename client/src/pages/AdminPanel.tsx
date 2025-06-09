@@ -168,10 +168,7 @@ const AdminPanel = () => {
   // Mutations
   const createServiceMutation = useMutation({
     mutationFn: async (data: ServiceConfig) => {
-      return apiRequest('/api/admin/services', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
+      return apiRequest('POST', '/api/admin/services', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
@@ -182,10 +179,7 @@ const AdminPanel = () => {
 
   const createChecklistMutation = useMutation({
     mutationFn: async (data: ChecklistItem) => {
-      return apiRequest('/api/admin/workflow-customizations', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
+      return apiRequest('POST', '/api/admin/workflow-customizations', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/workflow-templates'] });
@@ -196,10 +190,7 @@ const AdminPanel = () => {
 
   const createComboMutation = useMutation({
     mutationFn: async (data: ComboTrigger) => {
-      return apiRequest('/api/admin/combo-triggers', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
+      return apiRequest('POST', '/api/admin/combo-triggers', data);
     },
     onSuccess: () => {
       setIsComboDialogOpen(false);

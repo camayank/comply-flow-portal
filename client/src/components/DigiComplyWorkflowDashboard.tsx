@@ -52,14 +52,11 @@ const DigiComplyWorkflowDashboard: React.FC = () => {
   // Create workflow instance mutation
   const createWorkflowMutation = useMutation({
     mutationFn: async (templateId: string) => {
-      return apiRequest('/api/workflow-instances', {
-        method: 'POST',
-        body: JSON.stringify({
-          templateId,
-          userId: 1,
-          serviceRequestId: Date.now(),
-          customizations: []
-        })
+      return apiRequest('POST', '/api/workflow-instances', {
+        templateId,
+        userId: 1,
+        serviceRequestId: Date.now(),
+        customizations: []
       });
     },
     onSuccess: () => {

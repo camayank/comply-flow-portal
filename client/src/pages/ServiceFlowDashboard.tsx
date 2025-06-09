@@ -127,13 +127,10 @@ const ServiceFlowDashboard = () => {
   // Service request creation mutation
   const createServiceRequestMutation = useMutation({
     mutationFn: async (serviceIds: string[]) => {
-      return apiRequest('/api/service-requests', {
-        method: 'POST',
-        body: JSON.stringify({
-          serviceId: serviceIds.length === 1 ? serviceIds[0] : serviceIds,
-          userId: 1, // Default user for demo
-          status: 'initiated'
-        })
+      return apiRequest('POST', '/api/service-requests', {
+        serviceId: serviceIds.length === 1 ? serviceIds[0] : serviceIds,
+        userId: 1, // Default user for demo
+        status: 'initiated'
       });
     },
     onSuccess: (data) => {
