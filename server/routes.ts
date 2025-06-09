@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { createHash } from "crypto";
 import { nanoid } from "nanoid";
 import { storage } from "./storage";
+import { workflowEngine, type WorkflowCustomization } from "./workflow-engine";
 import { 
   insertServiceRequestSchema, 
   insertPaymentSchema,
@@ -289,133 +290,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Company Incorporation Workflow API
-  app.get("/api/workflows/company-incorporation", async (req: Request, res: Response) => {
+  // Workflow Templates API
+  app.get("/api/workflow-templates", async (req: Request, res: Response) => {
     try {
-      const workflow = {
-        serviceId: 'company-incorporation',
-        name: 'Company Incorporation',
-        totalSteps: 10,
-        estimatedDuration: '20 days from name approval',
-        totalCost: 15000,
-        steps: [
-          {
-            id: 'pre-incorporation-prep',
-            name: 'Pre-Incorporation Documentation',
-            status: 'pending',
-            estimatedDays: 2,
-            requiredDocs: [
-              'minimum_2_unique_names',
-              'minimum_2_directors',
-              'electricity_bill_not_older_2months',
-              'moa_objects',
-              'share_capital_info',
-              'director_pan_aadhaar_photos',
-              'noc_property_owner'
-            ]
-          },
-          {
-            id: 'name-reservation',
-            name: 'SPICE Part A - Name Reservation',
-            status: 'pending',
-            estimatedDays: 5,
-            formType: 'SPICE+ Part A',
-            mcaSteps: [
-              'Login to MCA portal',
-              'Select SPICE+ form',
-              'Enter company details',
-              'Pay ₹1,000 fee'
-            ]
-          },
-          {
-            id: 'dsc-application',
-            name: 'DSC Application',
-            status: 'pending',
-            estimatedDays: 3,
-            dscRequirements: ['directors', 'shareholders', 'professional']
-          },
-          {
-            id: 'spice-part-b',
-            name: 'SPICE Part B Filing',
-            status: 'pending',
-            estimatedDays: 1,
-            formType: 'SPICE+ Part B',
-            dscRequirements: ['one_director', 'professional']
-          },
-          {
-            id: 'agilepro',
-            name: 'Agilepro Form',
-            status: 'pending',
-            estimatedDays: 1,
-            dscRequirements: ['director_only']
-          },
-          {
-            id: 'aoa',
-            name: 'Articles of Association',
-            status: 'pending',
-            estimatedDays: 1,
-            dscRequirements: ['all_directors', 'all_shareholders', 'professional']
-          },
-          {
-            id: 'moa',
-            name: 'Memorandum of Association',
-            status: 'pending',
-            estimatedDays: 1,
-            dscRequirements: ['all_directors', 'all_shareholders', 'professional']
-          },
-          {
-            id: 'inc9',
-            name: 'INC-9 Form',
-            status: 'pending',
-            estimatedDays: 1,
-            dscRequirements: ['all_directors', 'all_shareholders']
-          },
-          {
-            id: 'upload-payment',
-            name: 'Form Upload & Payment',
-            status: 'pending',
-            estimatedDays: 1
-          },
-          {
-            id: 'certificate',
-            name: 'Certificate Issuance',
-            status: 'pending',
-            estimatedDays: 7
-          }
-        ],
-        criticalDeadlines: [
-          'All processes must complete within 20 days of name approval',
-          'Address proof must not be older than 2 months',
-          'DSC must be associated on V3 portal'
-        ],
-        mcaPortalLinks: {
-          main: 'https://www.mca.gov.in',
-          pan: 'https://tin.tin.nsdl.com/pan/servlet/AOSearch',
-          tan: 'https://tin.tin.nsdl.com/tan/servlet/TanAOSearch'
-        }
-      };
-      
-      res.json(workflow);
+      const templates = workflowEngine.getTemplates();
+      res.json(templates);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch workflow" });
+      res.status(500).json({ error: "Failed to fetch workflow templates" });
     }
   });
 
-  // Update workflow step status
-  app.patch("/api/workflows/company-incorporation/steps/:stepId", async (req: Request, res: Response) => {
+  app.get("/api/workflow-templates/:templateId", async (req: Request, res: Response) => {
     try {
-      const { stepId } = req.params;
-      const { status, documents, notes } = req.body;
+      const template = workflowEngine.getTemplate(req.params.templateId);
+      if (!template) {
+        return res.status(404).json({ error: "Workflow template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch workflow template" });
+    }
+  });
+
+  // Workflow Instances API
+  app.post("/api/workflow-instances", async (req: Request, res: Response) => {
+    try {
+      const { templateId, userId, serviceRequestId, customizations } = req.body;
       
-      // In a real implementation, this would update the workflow state in database
-      res.json({
-        stepId,
-        status,
-        updatedAt: new Date().toISOString(),
-        success: true
+      const instance = workflowEngine.createWorkflowInstance(
+        templateId,
+        userId || 1,
+        serviceRequestId,
+        customizations || []
+      );
+      
+      res.status(201).json(instance);
+    } catch (error) {
+      res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create workflow instance" });
+    }
+  });
+
+  app.get("/api/workflow-instances/:instanceId", async (req: Request, res: Response) => {
+    try {
+      const instance = workflowEngine.getInstance(req.params.instanceId);
+      if (!instance) {
+        return res.status(404).json({ error: "Workflow instance not found" });
+      }
+      res.json(instance);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch workflow instance" });
+    }
+  });
+
+  app.get("/api/workflow-instances/:instanceId/progress", async (req: Request, res: Response) => {
+    try {
+      const progress = workflowEngine.getProgress(req.params.instanceId);
+      res.json(progress);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch workflow progress" });
+    }
+  });
+
+  // Workflow Step Management
+  app.patch("/api/workflow-instances/:instanceId/steps/:stepId", async (req: Request, res: Response) => {
+    try {
+      const { instanceId, stepId } = req.params;
+      const { status, notes, uploadedDocs } = req.body;
+      
+      const success = workflowEngine.updateStepStatus(instanceId, stepId, status, notes);
+      if (!success) {
+        return res.status(404).json({ error: "Workflow instance or step not found" });
+      }
+      
+      res.json({ 
+        success: true, 
+        instanceId, 
+        stepId, 
+        status, 
+        updatedAt: new Date().toISOString() 
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to update workflow step" });
+    }
+  });
+
+  app.get("/api/workflow-instances/:instanceId/steps/:stepId/validate", async (req: Request, res: Response) => {
+    try {
+      const { instanceId, stepId } = req.params;
+      const isValid = workflowEngine.validateDependencies(instanceId, stepId);
+      
+      res.json({ 
+        valid: isValid,
+        canProceed: isValid,
+        instanceId,
+        stepId 
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to validate workflow dependencies" });
+    }
+  });
+
+  // Workflow Customization API
+  app.post("/api/workflow-instances/:instanceId/custom-steps", async (req: Request, res: Response) => {
+    try {
+      const { instanceId } = req.params;
+      const { afterStepId, stepData, reason } = req.body;
+      
+      const success = workflowEngine.addCustomStep(instanceId, afterStepId, stepData, reason);
+      if (!success) {
+        return res.status(404).json({ error: "Workflow instance not found" });
+      }
+      
+      res.status(201).json({ 
+        success: true, 
+        message: "Custom step added successfully",
+        instanceId 
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to add custom step" });
+    }
+  });
+
+  app.post("/api/workflow-instances/:instanceId/customizations", async (req: Request, res: Response) => {
+    try {
+      const { instanceId } = req.params;
+      const customization: WorkflowCustomization = {
+        ...req.body,
+        appliedAt: new Date()
+      };
+      
+      const instance = workflowEngine.getInstance(instanceId);
+      if (!instance) {
+        return res.status(404).json({ error: "Workflow instance not found" });
+      }
+      
+      instance.customizations.push(customization);
+      
+      res.status(201).json({ 
+        success: true, 
+        customization,
+        message: "Workflow customization applied" 
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to apply workflow customization" });
+    }
+  });
+
+  // Service-specific workflow endpoints
+  app.get("/api/services/:serviceId/workflow-template", async (req: Request, res: Response) => {
+    try {
+      const { serviceId } = req.params;
+      
+      // Map service IDs to workflow template IDs
+      const serviceToTemplateMap: Record<string, string> = {
+        'company-incorporation': 'company-incorporation-standard',
+        'llp-incorporation': 'llp-incorporation-standard',
+        'opc-incorporation': 'opc-incorporation-standard'
+      };
+      
+      const templateId = serviceToTemplateMap[serviceId];
+      if (!templateId) {
+        return res.status(404).json({ error: "No workflow template found for this service" });
+      }
+      
+      const template = workflowEngine.getTemplate(templateId);
+      if (!template) {
+        return res.status(404).json({ error: "Workflow template not found" });
+      }
+      
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch service workflow template" });
+    }
+  });
+
+  // Bulk workflow operations
+  app.get("/api/workflow-instances/user/:userId", async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const userInstances = Array.from(workflowEngine['instances'].values())
+        .filter(instance => instance.userId === userId);
+      
+      res.json(userInstances);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user workflows" });
+    }
+  });
+
+  app.get("/api/workflow-analytics", async (req: Request, res: Response) => {
+    try {
+      const allInstances = Array.from(workflowEngine['instances'].values());
+      
+      const analytics = {
+        totalWorkflows: allInstances.length,
+        completedWorkflows: allInstances.filter(w => w.status === 'completed').length,
+        inProgressWorkflows: allInstances.filter(w => w.status === 'in_progress').length,
+        averageCompletionTime: 0, // Calculate based on actual data
+        mostUsedTemplates: {}, // Calculate template usage statistics
+        customizationStats: {
+          totalCustomizations: allInstances.reduce((sum, w) => sum + w.customizations.length, 0),
+          mostCommonCustomizations: [] // Analyze customization patterns
+        }
+      };
+      
+      res.json(analytics);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch workflow analytics" });
     }
   });
 
