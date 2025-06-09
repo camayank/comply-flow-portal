@@ -19,6 +19,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { useSyncClient } from '@/lib/syncClient';
+import { usePlatformSync } from '@/hooks/usePlatformSync';
 import { useToast } from '@/hooks/use-toast';
 
 interface SyncEvent {
@@ -39,6 +40,18 @@ interface ConnectionMetrics {
 
 const SyncDashboard = () => {
   const { client, getStatus, getState, requestSync } = useSyncClient();
+  const { 
+    platformHealth, 
+    platformMetrics, 
+    platformState, 
+    forcePlatformSync, 
+    validateDataConsistency,
+    getPerformanceMetrics,
+    getDetailedHealthStatus,
+    isHealthy,
+    isConnected,
+    isSyncing
+  } = usePlatformSync();
   const { toast } = useToast();
   const [connectionStatus, setConnectionStatus] = useState(getStatus());
   const [clientState, setClientState] = useState(getState());
@@ -166,15 +179,15 @@ const SyncDashboard = () => {
         <Card>
           <CardContent className="flex items-center p-4">
             <div className="flex items-center space-x-2">
-              {connectionStatus.isConnected ? (
+              {isConnected ? (
                 <Wifi className="h-5 w-5 text-green-500" />
               ) : (
                 <WifiOff className="h-5 w-5 text-red-500" />
               )}
               <div>
-                <p className="text-sm font-medium">Connection</p>
+                <p className="text-sm font-medium">Platform Health</p>
                 <p className="text-xs text-gray-500">
-                  {connectionStatus.isConnected ? 'Connected' : 'Disconnected'}
+                  {isHealthy ? 'All Systems Operational' : 'Issues Detected'}
                 </p>
               </div>
             </div>
@@ -340,12 +353,12 @@ const SyncDashboard = () => {
               </CardHeader>
               <CardContent className="space-y-3">
                 <Button 
-                  onClick={requestSync} 
+                  onClick={forcePlatformSync} 
                   className="w-full"
-                  disabled={!connectionStatus.isConnected}
+                  disabled={!isConnected || isSyncing}
                 >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Force Full Sync
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                  {isSyncing ? 'Syncing...' : 'Force Platform Sync'}
                 </Button>
                 
                 <div className="grid grid-cols-2 gap-2">
