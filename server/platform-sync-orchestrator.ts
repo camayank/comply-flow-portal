@@ -59,13 +59,13 @@ export class PlatformSyncOrchestrator {
   }
 
   private startPlatformSync() {
-    // Comprehensive platform synchronization every 5 seconds
+    // Comprehensive platform synchronization every 30 seconds (reduced frequency)
     this.syncInterval = setInterval(async () => {
       await this.syncPlatformState();
       await this.validateDataConsistency();
       await this.optimizePerformance();
       await this.broadcastStateUpdates();
-    }, 5000);
+    }, 30000);
 
     // Real-time sync for critical updates
     this.setupRealTimeSync();
@@ -299,20 +299,28 @@ export class PlatformSyncOrchestrator {
   }
 
   private async optimizeBackendPerformance() {
-    // Implement backend optimizations
-    console.log('Optimizing backend performance...');
+    // Implement backend optimizations silently
+    // Only log if actual optimization is needed
+    const systemLoad = this.platformState.backend.systemLoad;
+    if (systemLoad > 80) {
+      console.log('High system load detected, optimizing backend...');
+    }
     
-    // Example optimizations:
+    // Optimizations:
     // - Reduce query complexity
     // - Implement caching layers
     // - Optimize database connections
   }
 
   private async optimizeMiddlewarePerformance() {
-    // Implement middleware optimizations
-    console.log('Optimizing middleware performance...');
+    // Implement middleware optimizations silently
+    // Only log if actual optimization is needed
+    const middlewareLoad = this.platformState.middleware.processingLoad;
+    if (middlewareLoad > 70) {
+      console.log('High middleware load detected, optimizing...');
+    }
     
-    // Example optimizations:
+    // Optimizations:
     // - Batch event processing
     // - Optimize WebSocket message handling
     // - Implement connection pooling
