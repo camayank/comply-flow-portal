@@ -9,15 +9,40 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileText, Upload, CheckCircle, Clock, AlertTriangle, PenTool, Building2, Receipt, Award, Users } from 'lucide-react';
 
-const availableServices = [
-  { id: 'aoc-4', name: 'AOC-4 Annual Filing', type: 'ROC', price: 1499, category: 'mandatory', deadline: '30 days', icon: FileText },
-  { id: 'mgt-7', name: 'MGT-7 Annual Return', type: 'ROC', price: 1299, category: 'mandatory', deadline: '60 days', icon: Receipt },
-  { id: 'gst-3b', name: 'GST-3B Monthly Return', type: 'Tax', price: 999, category: 'recurring', deadline: '20th of every month', icon: Receipt },
-  { id: 'dpt-3', name: 'DPT-3 Deposit Return', type: 'ROC', price: 799, category: 'conditional', deadline: '30 days', icon: FileText },
-  { id: 'ben-1', name: 'BEN-1 Beneficial Owner', type: 'ROC', price: 999, category: 'mandatory', deadline: '30 days', icon: Users },
-  { id: 'iso-9001', name: 'ISO-9001 Certification', type: 'Certification', price: 4999, category: 'optional', deadline: 'No deadline', icon: Award },
-  { id: 'inc-20a', name: 'INC-20A Commencement', type: 'ROC', price: 2999, category: 'mandatory', deadline: '180 days', icon: Building2 },
-  { id: 'adt-1', name: 'ADT-1 Auditor Appointment', type: 'ROC', price: 1999, category: 'mandatory', deadline: '30 days', icon: Users }
+// KOSHIKA Services SOPs - configured from Excel worksheets
+const koshikaServices = [
+  // Incorporation Services
+  { id: 'company-incorporation', name: 'Company Incorporation', type: 'Incorporation', price: 15000, category: 'business-setup', deadline: '20 days', formType: 'SPICE Part B', icon: Building2, requiredDocs: ['unique_company_names', 'director_pan_aadhaar', 'address_proof', 'moa_aoa'] },
+  { id: 'llp-incorporation', name: 'LLP Incorporation', type: 'Incorporation', price: 12000, category: 'business-setup', deadline: '3 months', formType: 'FiLLiP form', icon: Users, requiredDocs: ['unique_name', 'designated_partners', 'llp_agreement'] },
+  { id: 'opc-incorporation', name: 'OPC Incorporation', type: 'Incorporation', price: 13000, category: 'business-setup', deadline: '20 days', formType: 'SPICE Part B', icon: Users, requiredDocs: ['unique_names', 'director_details', 'nominee_details'] },
+  { id: 'section8-incorporation', name: 'Section 8 Company', type: 'Incorporation', price: 18000, category: 'business-setup', deadline: '20 days', formType: 'SPICE Part B', icon: Award, requiredDocs: ['charitable_objects', 'license_application'] },
+
+  // Director Change Services
+  { id: 'director-appointment', name: 'Director Appointment', type: 'Change', price: 4000, category: 'director-services', deadline: 'Within 1 month of board meeting', formType: 'DIR 12', icon: Users, requiredDocs: ['director_pan', 'aadhaar', 'board_resolution', 'consent_letter'] },
+  { id: 'director-resignation', name: 'Director Resignation', type: 'Change', price: 3500, category: 'director-services', deadline: 'Within 1 month of board meeting', formType: 'DIR 11 and 12', icon: Users, requiredDocs: ['board_resolution', 'resignation_letter'] },
+
+  // Annual Compliance Services
+  { id: 'commencement-business', name: 'Commencement of Business', type: 'Compliance', price: 3000, category: 'annual-compliance', deadline: 'Within 180 days after incorporation', formType: 'INC 20A', icon: Building2, requiredDocs: ['director_declaration', 'office_verification'] },
+  { id: 'auditor-appointment', name: 'Auditor Appointment', type: 'Compliance', price: 2500, category: 'annual-compliance', deadline: 'Within 15 days after appointment', formType: 'ADT 1', icon: Users, requiredDocs: ['auditor_consent', 'board_resolution'] },
+  { id: 'director-kyc', name: 'Director KYC', type: 'Compliance', price: 2000, category: 'annual-compliance', deadline: 'Before 30th September every year', formType: 'DIR 3 KYC', icon: Users, requiredDocs: ['director_pan', 'aadhaar', 'address_proof'] },
+  { id: 'aoc-4', name: 'AOC-4 Filing', type: 'Compliance', price: 5000, category: 'annual-compliance', deadline: 'Before 30th September every year', formType: 'AOC 4 Form', icon: FileText, requiredDocs: ['balance_sheet', 'pl_statement', 'auditor_report', 'board_resolution'] },
+  { id: 'mgt-7a', name: 'MGT-7A Filing (Small Companies)', type: 'Compliance', price: 3500, category: 'annual-compliance', deadline: 'Before 30th September every year', formType: 'MGT 7A Form', icon: Receipt, requiredDocs: ['annual_return_draft', 'board_resolution'] },
+  { id: 'mgt-7', name: 'MGT-7 Filing (Foundation)', type: 'Compliance', price: 4000, category: 'annual-compliance', deadline: 'Before 30th September every year', formType: 'MGT 7 Form', icon: Receipt, requiredDocs: ['annual_return', 'board_resolution', 'member_details'] },
+  { id: 'dpt-3', name: 'DPT-3 Filing', type: 'Compliance', price: 3000, category: 'annual-compliance', deadline: '30th June every year', formType: 'DPT 3 Form', icon: FileText, requiredDocs: ['deposit_details', 'board_resolution'] },
+  { id: 'itr-filing', name: 'ITR Filing (Companies)', type: 'Tax', price: 8000, category: 'tax-compliance', deadline: '31st October every year', formType: 'ITR 6 and 7', icon: Receipt, requiredDocs: ['financial_statements', 'tax_computation', 'audit_report'] },
+
+  // LLP Annual Compliance
+  { id: 'llp-form3', name: 'LLP Form-3 Filing', type: 'Compliance', price: 2500, category: 'llp-compliance', deadline: 'Within 1 month of LLP incorporation', formType: 'LLP Form 3', icon: FileText, requiredDocs: ['llp_agreement', 'partner_details'] },
+  { id: 'llp-form11', name: 'LLP Form-11 Filing', type: 'Compliance', price: 4000, category: 'llp-compliance', deadline: '30th May every year', formType: 'LLP Form 11', icon: Receipt, requiredDocs: ['annual_accounts', 'llp_agreement'] },
+  { id: 'llp-form8', name: 'LLP Form-8 Filing', type: 'Compliance', price: 5000, category: 'llp-compliance', deadline: '30th October every year', formType: 'LLP Form 8', icon: FileText, requiredDocs: ['statement_accounts', 'solvency_certificate'] },
+
+  // Additional Change Services
+  { id: 'company-address-change', name: 'Company Address Change', type: 'Change', price: 4500, category: 'company-changes', deadline: 'Within 1 month of board meeting', formType: 'INC 22', icon: Building2, requiredDocs: ['new_address_proof', 'board_resolution', 'noc_landlord'] },
+  { id: 'llp-address-change', name: 'LLP Address Change', type: 'Change', price: 4000, category: 'llp-changes', deadline: 'Within 1 month of resolution', formType: 'Form 15 and Form 3', icon: Building2, requiredDocs: ['new_address_proof', 'partner_resolution'] },
+  { id: 'llp-partner-change', name: 'LLP Partner Change', type: 'Change', price: 4500, category: 'llp-changes', deadline: 'Within 1 month of change', formType: 'Form 4 and 3', icon: Users, requiredDocs: ['new_partner_details', 'partner_agreement', 'consent_letter'] },
+
+  // Conversion Services
+  { id: 'pvt-to-opc-conversion', name: 'Private Limited to OPC Conversion', type: 'Conversion', price: 12000, category: 'conversion-services', deadline: '45 days', formType: 'Conversion Application', icon: Building2, requiredDocs: ['financial_statements', 'board_resolution', 'member_consent', 'compliance_certificate'] }
 ];
 
 const ServiceFlowDashboard = () => {
@@ -40,11 +65,41 @@ const ServiceFlowDashboard = () => {
     return (currentStep / steps.length) * 100;
   };
 
-  const handleServiceSelect = (svc: typeof availableServices[0]) => {
-    if (!selectedServices.includes(svc.id)) {
-      setSelectedServices([...selectedServices, svc.id]);
+  // Fetch services from backend
+  const { data: backendServices, isLoading: servicesLoading } = useQuery({
+    queryKey: ['/api/services'],
+    enabled: true
+  });
+
+  // Use backend services if available, fallback to KOSHIKA config
+  const availableServices = backendServices || koshikaServices;
+
+  // Service request creation mutation
+  const createServiceRequestMutation = useMutation({
+    mutationFn: async (serviceIds: string[]) => {
+      return apiRequest('/api/service-requests', {
+        method: 'POST',
+        body: JSON.stringify({
+          serviceId: serviceIds.length === 1 ? serviceIds[0] : serviceIds,
+          userId: 1, // Default user for demo
+          status: 'initiated'
+        })
+      });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/service-requests'] });
       setStatus('Document Checklist');
       setCurrentStep(2);
+    }
+  });
+
+  const handleServiceSelect = (svc: any) => {
+    if (!selectedServices.includes(svc.serviceId || svc.id)) {
+      const newSelectedServices = [...selectedServices, svc.serviceId || svc.id];
+      setSelectedServices(newSelectedServices);
+      
+      // Create service request in backend
+      createServiceRequestMutation.mutate(newSelectedServices);
     }
   };
 
