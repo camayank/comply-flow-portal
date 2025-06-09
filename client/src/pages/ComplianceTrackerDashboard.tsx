@@ -7,6 +7,8 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import DashboardNav from '@/components/DashboardNav';
+import UnifiedComplianceDashboard from '@/components/UnifiedComplianceDashboard';
+import TrustBar from '@/components/TrustBar';
 import { 
   Shield, 
   AlertTriangle, 
@@ -160,6 +162,9 @@ const ComplianceTrackerDashboard = () => {
         </p>
       </div>
 
+      {/* Trust Bar */}
+      <TrustBar />
+
       {/* Health Score Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card>
@@ -244,12 +249,18 @@ const ComplianceTrackerDashboard = () => {
       )}
 
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="unified">Smart Compliance</TabsTrigger>
           <TabsTrigger value="pending">Pending Tasks</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
+
+        {/* Unified Smart Compliance Tab */}
+        <TabsContent value="unified">
+          <UnifiedComplianceDashboard />
+        </TabsContent>
 
         {/* Dashboard Tab */}
         <TabsContent value="dashboard">
