@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { CreditCard, Shield, Lock, CheckCircle, Calendar, User, Building2 } from 'lucide-react';
+import TrustBar from '@/components/TrustBar';
+import DashboardNav from '@/components/DashboardNav';
 
 const PaymentGateway = () => {
   const [, setLocation] = useLocation();
@@ -86,6 +88,9 @@ const PaymentGateway = () => {
             <div className="bg-white rounded-full h-2 w-7/8 transition-all duration-300"></div>
           </div>
         </Card>
+
+        {/* Trust Bar */}
+        <TrustBar />
 
         <div className="max-w-6xl mx-auto grid lg:grid-cols-3 gap-8">
           {/* Payment Methods & Form */}
