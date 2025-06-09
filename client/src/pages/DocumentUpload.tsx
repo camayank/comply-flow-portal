@@ -1,13 +1,13 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 
 const DocumentUpload = () => {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
 
@@ -29,7 +29,7 @@ const DocumentUpload = () => {
 
   const handleContinue = () => {
     localStorage.setItem('uploadedDocuments', JSON.stringify(uploadedFiles));
-    navigate('/tracker');
+    setLocation('/tracker');
   };
 
   const requiredUploaded = uploadedFiles.filter(id => 

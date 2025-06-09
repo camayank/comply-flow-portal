@@ -141,7 +141,7 @@ const ServiceSelection = () => {
   };
 
   const handleContinue = () => {
-    navigate('/documents');
+    setLocation('/documents');
   };
 
   return (

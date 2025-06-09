@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Clock, CheckCircle, AlertTriangle, FileText, Calendar, Bell, Download, MessageSquare, User, AlertCircle, TrendingUp } from 'lucide-react';
 
 const ComplianceTracker = () => {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState('overview');
 
   const complianceItems = [
@@ -135,7 +135,7 @@ const ComplianceTracker = () => {
   };
 
   const handleComplete = () => {
-    navigate('/confirmation');
+    setLocation('/confirmation');
   };
 
   const completedCount = complianceItems.filter(item => item.status === 'completed').length;

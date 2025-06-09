@@ -1,12 +1,12 @@
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, Download, Mail, Calendar, ArrowRight } from 'lucide-react';
 
 const Confirmation = () => {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
 
   const completedServices = [
     { name: 'INC-20A Filing', status: 'Submitted', date: '2024-06-08' },
@@ -136,7 +136,7 @@ const Confirmation = () => {
                 Our compliance experts are here to help you every step of the way
               </p>
               <div className="flex gap-4 justify-center">
-                <Button onClick={() => navigate('/')}>
+                <Button onClick={() => setLocation('/')}>
                   Return to Dashboard
                 </Button>
                 <Button variant="outline">
