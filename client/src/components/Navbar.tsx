@@ -9,6 +9,7 @@ const Navbar = () => {
 
   const navItems = [
     { path: '/', label: 'Start Here' },
+    { path: '/service-flow', label: 'Services' },
     { path: '/tracker', label: 'Dashboard' },
     { path: '/admin', label: 'Admin Panel' }
   ];

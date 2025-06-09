@@ -67,16 +67,63 @@ const Onboarding = () => {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
-          {/* Company Information Form */}
+        <div className="max-w-6xl mx-auto">
+          {/* Quick Action Cards */}
+          <div className="grid md:grid-cols-2 gap-8 mb-12">
+            {/* Start Company Incorporation */}
+            <Card className="shadow-lg hover:shadow-xl transition-shadow cursor-pointer" onClick={() => setLocation('/business-type')}>
+              <CardHeader className="text-center">
+                <Building2 className="h-16 w-16 mx-auto mb-4 text-blue-600" />
+                <CardTitle className="text-xl">Start Company Incorporation</CardTitle>
+                <CardDescription>
+                  Complete end-to-end company incorporation with guided setup
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li>• Business type selection</li>
+                  <li>• Package and pricing options</li>
+                  <li>• Legal documentation</li>
+                  <li>• Government registrations</li>
+                </ul>
+                <Button className="w-full mt-4">
+                  Start Incorporation Process
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Individual Services */}
+            <Card className="shadow-lg hover:shadow-xl transition-shadow cursor-pointer" onClick={() => setLocation('/service-flow')}>
+              <CardHeader className="text-center">
+                <FileText className="h-16 w-16 mx-auto mb-4 text-green-600" />
+                <CardTitle className="text-xl">Individual Compliance Services</CardTitle>
+                <CardDescription>
+                  Handle specific compliance requirements and filings
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm text-gray-600">
+                  <li>• ROC annual filings</li>
+                  <li>• Tax return submissions</li>
+                  <li>• Certification services</li>
+                  <li>• Ongoing compliance</li>
+                </ul>
+                <Button variant="outline" className="w-full mt-4">
+                  Browse Services
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Alternative: Company Information Form */}
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Building2 className="h-6 w-6 text-blue-600" />
-                Company Information
+                Or Tell Us About Your Company
               </CardTitle>
               <CardDescription>
-                Tell us about your company to get started with compliance tracking
+                Provide basic information to get personalized recommendations
               </CardDescription>
             </CardHeader>
             <CardContent>

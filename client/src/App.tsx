@@ -10,6 +10,7 @@ import PackageSelection from "./pages/PackageSelection";
 import FounderDetails from "./pages/FounderDetails";
 import IndustryClassification from "./pages/IndustryClassification";
 import ServiceSelection from "./pages/ServiceSelection";
+import ServiceFlowDashboard from "./pages/ServiceFlowDashboard";
 import DocumentUpload from "./pages/DocumentUpload";
 import ESignAgreements from "./pages/ESignAgreements";
 import PaymentGateway from "./pages/PaymentGateway";
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/founder-details" component={FounderDetails} />
               <Route path="/industry-classification" component={IndustryClassification} />
               <Route path="/services" component={ServiceSelection} />
+              <Route path="/service-flow" component={ServiceFlowDashboard} />
               <Route path="/documents" component={DocumentUpload} />
               <Route path="/document-upload" component={DocumentUpload} />
               <Route path="/esign-agreements" component={ESignAgreements} />
