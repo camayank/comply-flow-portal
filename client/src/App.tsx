@@ -24,6 +24,7 @@ import ComplianceTrackerDashboard from "./pages/ComplianceTrackerDashboard";
 import RetainershipPlans from "./pages/RetainershipPlans";
 import SmartSuggestionsEngine from "./pages/SmartSuggestionsEngine";
 import DocumentVault from "./pages/DocumentVault";
+import LandingPage from "./pages/LandingPage";
 import DigiComplyWorkflowDashboard from "./components/DigiComplyWorkflowDashboard";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -42,7 +43,8 @@ const App = () => (
             <Navbar />
             <main className="flex-grow">
               <Switch>
-                <Route path="/" component={Onboarding} />
+                <Route path="/" component={LandingPage} />
+                <Route path="/onboarding" component={Onboarding} />
                 <Route path="/business-type" component={BusinessType} />
                 <Route path="/package-selection" component={PackageSelection} />
                 <Route path="/founder-details" component={FounderDetails} />
@@ -62,7 +64,7 @@ const App = () => (
                 <Route path="/compliance-dashboard" component={ComplianceTrackerDashboard} />
                 <Route path="/retainership" component={RetainershipPlans} />
                 <Route path="/suggestions" component={SmartSuggestionsEngine} />
-                <Route path="/documents" component={DocumentVault} />
+                <Route path="/vault" component={DocumentVault} />
                 <Route component={NotFound} />
               </Switch>
             </main>

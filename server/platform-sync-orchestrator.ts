@@ -32,7 +32,8 @@ export class PlatformSyncOrchestrator {
 
   constructor() {
     this.platformState = this.initializePlatformState();
-    this.startPlatformSync();
+    // Delay initialization to prevent immediate high load
+    setTimeout(() => this.startPlatformSync(), 5000);
   }
 
   private initializePlatformState(): PlatformState {
@@ -282,20 +283,30 @@ export class PlatformSyncOrchestrator {
   }
 
   private async optimizePerformance() {
-    // Dynamic performance optimization based on platform state
-    const systemLoad = this.platformState.backend.systemLoad;
+    // Throttled performance optimization to prevent excessive load
+    const now = Date.now();
+    const lastOptimization = this.platformState.backend.systemLoad || 0;
+    
+    // Only run optimization every 2 minutes to reduce system load
+    if (now - lastOptimization < 120000) {
+      return;
+    }
+
+    const systemLoad = this.calculateSystemLoad();
     const middlewareLoad = this.platformState.middleware.processingLoad;
     
     if (systemLoad > 70) {
+      console.log('High system load detected, optimizing backend...');
       await this.optimizeBackendPerformance();
-    }
-    
-    if (middlewareLoad > 60) {
+    } else if (middlewareLoad > 60) {
+      console.log('High middleware load detected, optimizing...');
       await this.optimizeMiddlewarePerformance();
+    } else if (systemLoad < 40) {
+      // Only optimize cache when system is not under stress
+      await this.optimizeFrontendCache();
     }
-    
-    // Optimize frontend cache based on usage patterns
-    await this.optimizeFrontendCache();
+
+    this.platformState.backend.systemLoad = now;
   }
 
   private async optimizeBackendPerformance() {
