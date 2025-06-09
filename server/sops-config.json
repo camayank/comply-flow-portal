@@ -1,0 +1,205 @@
+{
+  "Index": {
+    "name": "Index",
+    "headers": [
+      "Type of services",
+      "Form type",
+      "Time duration of filing form/ due date"
+    ],
+    "processes": [
+      {
+        "Type of services": "Incorporation services"
+      },
+      {
+        "Type of services": "Index"
+      },
+      {
+        "Type of services": "company Incorporation",
+        "Form type": "Spice part B",
+        "Time duration of filing form/ due date": "20 days"
+      },
+      {
+        "Type of services": "LLP Incorporation",
+        "Form type": "Fillip form",
+        "Time duration of filing form/ due date": "3 months"
+      },
+      {
+        "Type of services": "OPC incorporation",
+        "Form type": "Spice part B",
+        "Time duration of filing form/ due date": "20 days"
+      },
+      {
+        "Type of services": "Section 8 Incorpiration",
+        "Form type": "Spice part B",
+        "Time duration of filing form/ due date": "20 days"
+      },
+      {
+        "Type of services": "Change services"
+      },
+      {
+        "Type of services": "Director Change in company",
+        "Form type": "DIR 12",
+        "Time duration of filing form/ due date": "With in month of board meeting"
+      },
+      {
+        "Type of services": "Director Resignation in company",
+        "Form type": "DIR 11 and 12",
+        "Time duration of filing form/ due date": "With in month of board meeting"
+      },
+      {
+        "Type of services": "Partner change in LLP",
+        "Form type": "Form 4 and 3",
+        "Time duration of filing form/ due date": "With in month of board meeting"
+      },
+      {
+        "Type of services": "Company address change ",
+        "Form type": "INC 22",
+        "Time duration of filing form/ due date": "With in month of board meeting"
+      },
+      {
+        "Type of services": "Register address changed in LLP",
+        "Form type": "Form 15 and form 3",
+        "Time duration of filing form/ due date": "with in month of board meeting"
+      },
+      {
+        "Type of services": "Company annual compliance"
+      },
+      {
+        "Type of services": "Commancement of Business",
+        "Form type": "Form INC 20A",
+        "Time duration of filing form/ due date": "With in 180 days after incorporation"
+      },
+      {
+        "Type of services": "Auditor Appointment ",
+        "Form type": "Form ADT 1",
+        "Time duration of filing form/ due date": "With in 15 days after appointment of auditor"
+      },
+      {
+        "Type of services": "Director KYC",
+        "Form type": "DIR 3 KYC",
+        "Time duration of filing form/ due date": "before 30 September of every year"
+      },
+      {
+        "Type of services": "filing financial statement",
+        "Form type": "AOC 4 Form",
+        "Time duration of filing form/ due date": "before 30 September of every year/ or with in the month of AGM"
+      },
+      {
+        "Type of services": "Abridged Annual\r\nReturn for OPCs and\r\nSmall Companies",
+        "Form type": "MGT 7A Form: for company & OPC, MGT 7 form for Foundation",
+        "Time duration of filing form/ due date": "before 30 September of every year/ or with in the month of AGM"
+      },
+      {
+        "Type of services": "Any loan releted form",
+        "Form type": "DPT 3 Form",
+        "Time duration of filing form/ due date": "30th June of every year"
+      },
+      {
+        "Type of services": "ITR",
+        "Form type": "ITR 6 and 7",
+        "Time duration of filing form/ due date": "31st october of every year"
+      },
+      {
+        "Type of services": "LLP Annual Compliance"
+      },
+      {
+        "Type of services": "Information with regard to LLP",
+        "Form type": "LLP Form 3 ",
+        "Time duration of filing form/ due date": "With in the month of LLP Incorporation"
+      },
+      {
+        "Type of services": "Annual Return of LLP",
+        "Form type": "LLP Form 11",
+        "Time duration of filing form/ due date": "30th May for every year"
+      },
+      {
+        "Type of services": "Statement of Account & Solvency and Charge filing",
+        "Form type": "LLP form 8",
+        "Time duration of filing form/ due date": "30th October of every year"
+      },
+      {
+        "Type of services": "Director KYC",
+        "Form type": "DIR 3 KYC",
+        "Time duration of filing form/ due date": "before 30 September of every year"
+      },
+      {
+        "Type of services": "Conversion services"
+      },
+      {
+        "Type of services": "Private limited to OPC"
+      }
+    ]
+  },
+  "Company incorporation": {
+    "name": "Company incorporation",
+    "headers": [
+      null,
+      null,
+      "Company Incorporation"
+    ],
+    "processes": [
+      {
+        "Company Incorporation": "Attachment for company Incorporation"
+      }
+    ]
+  },
+  "LLP Incorporation": {
+    "name": "LLP Incorporation",
+    "headers": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      "LLP Incorporation"
+    ],
+    "processes": [
+      {
+        "LLP Incorporation": "Process of Name Approval/reservation"
+      }
+    ]
+  },
+  "OPC incorporation": {
+    "name": "OPC incorporation",
+    "headers": [
+      null,
+      null,
+      "OPC Incorporation"
+    ],
+    "processes": [
+      {
+        "OPC Incorporation": "Attachment for company Incorporation"
+      }
+    ]
+  },
+  "Sec - 8 Company": {
+    "name": "Sec - 8 Company",
+    "headers": [],
+    "processes": []
+  },
+  "Director Change in company": {
+    "name": "Director Change in company",
+    "headers": [
+      null,
+      null,
+      null,
+      "Director Change in company (appointment)"
+    ],
+    "processes": []
+  },
+  "DIrector resignation in company": {
+    "name": "DIrector resignation in company",
+    "headers": [
+      null,
+      null,
+      null,
+      "Director Resignation in Company"
+    ],
+    "processes": []
+  },
+  "Conversion PVT to OPC": {
+    "name": "Conversion PVT to OPC",
+    "headers": [],
+    "processes": []
+  }
+}
