@@ -314,6 +314,27 @@ const PaymentGateway = () => {
               </CardContent>
             </Card>
 
+            {/* Billing Information */}
+            <Card className="bg-blue-50 border-blue-200">
+              <CardHeader>
+                <CardTitle className="text-sm">Billing Details</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div>
+                  <p className="text-xs text-gray-600">Billing Entity</p>
+                  <p className="text-sm font-medium">DigiComply Solutions Private Limited</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600">GSTIN</p>
+                  <p className="text-sm font-medium">29AAJCD2314K1Z7</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-600">Part of</p>
+                  <p className="text-sm font-medium">LegalSuvidha.com Group</p>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Money Back Guarantee */}
             <Card className="bg-green-50 border-green-200">
               <CardContent className="pt-6">

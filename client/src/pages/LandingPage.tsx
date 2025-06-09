@@ -56,7 +56,10 @@ const LandingPage = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Building2 className="h-8 w-8 text-blue-600" />
-              <span className="text-2xl font-bold text-gray-900">DigiComply®</span>
+              <div className="flex flex-col">
+                <span className="text-2xl font-bold text-gray-900">DigiComply®</span>
+                <span className="text-xs text-gray-500">Part of LegalSuvidha.com Group</span>
+              </div>
             </div>
             <div className="hidden md:flex items-center gap-6">
               <nav className="flex gap-6">
@@ -210,7 +213,8 @@ const LandingPage = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-green-600 mb-2">₹15,000</div>
+                  <div className="text-2xl font-bold text-green-600 mb-1">₹15,000</div>
+                  <div className="text-sm text-gray-500 mb-2">+ 18% GST = ₹17,700</div>
                   <div className="text-sm text-red-600 mb-4">
                     <Clock className="h-4 w-4 inline mr-1" />
                     180-day deadline
@@ -231,7 +235,8 @@ const LandingPage = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-green-600 mb-2">₹7,499/year</div>
+                  <div className="text-2xl font-bold text-green-600 mb-1">₹7,499/year</div>
+                  <div className="text-sm text-gray-500 mb-2">+ 18% GST = ₹8,849</div>
                   <div className="text-sm text-red-600 mb-4">
                     <AlertTriangle className="h-4 w-4 inline mr-1" />
                     ₹200/day penalty
@@ -252,7 +257,8 @@ const LandingPage = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-green-600 mb-2">₹12,999</div>
+                  <div className="text-2xl font-bold text-green-600 mb-1">₹12,999</div>
+                  <div className="text-sm text-gray-500 mb-2">+ 18% GST = ₹15,339</div>
                   <div className="text-sm text-green-600 mb-4">
                     <TrendingUp className="h-4 w-4 inline mr-1" />
                     Tax savings: ₹10L+
@@ -551,7 +557,13 @@ const LandingPage = () => {
           
           <Separator className="my-8 bg-gray-700" />
           
-          <div className="text-center text-gray-400">
+          <div className="text-center text-gray-400 space-y-2">
+            <p className="text-sm">
+              <strong>Billing Entity:</strong> DigiComply Solutions Private Limited | GSTIN: 29AAJCD2314K1Z7
+            </p>
+            <p className="text-sm">
+              Part of <strong>LegalSuvidha.com Group</strong> | All prices inclusive of 18% GST
+            </p>
             <p>© 2024 DigiComply®. All rights reserved. | Privacy Policy | Terms of Service</p>
           </div>
         </div>
