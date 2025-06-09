@@ -141,7 +141,9 @@ const ServiceSelection = () => {
   };
 
   const handleContinue = () => {
-    setLocation('/documents');
+    // Store selected services for the next step
+    localStorage.setItem('selectedServices', JSON.stringify(selectedServices));
+    setLocation('/document-upload');
   };
 
   return (

@@ -29,7 +29,7 @@ const DocumentUpload = () => {
 
   const handleContinue = () => {
     localStorage.setItem('uploadedDocuments', JSON.stringify(uploadedFiles));
-    setLocation('/esign-agreements');
+    setLocation('/payment-gateway');
   };
 
   const requiredUploaded = uploadedFiles.filter(id => 

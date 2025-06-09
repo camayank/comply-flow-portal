@@ -93,7 +93,7 @@ const Onboarding = () => {
             </Card>
 
             {/* Individual Services */}
-            <Card className="shadow-lg hover:shadow-xl transition-shadow cursor-pointer" onClick={() => setLocation('/service-flow')}>
+            <Card className="shadow-lg hover:shadow-xl transition-shadow cursor-pointer" onClick={() => setLocation('/service-selection')}>
               <CardHeader className="text-center">
                 <FileText className="h-16 w-16 mx-auto mb-4 text-green-600" />
                 <CardTitle className="text-xl">Individual Compliance Services</CardTitle>

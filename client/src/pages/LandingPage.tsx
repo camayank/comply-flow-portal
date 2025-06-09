@@ -67,7 +67,9 @@ const LandingPage = () => {
                 <a href="#pricing" className="text-gray-600 hover:text-blue-600">Pricing</a>
                 <a href="#demo" className="text-gray-600 hover:text-blue-600">Demo</a>
               </nav>
-              <Button size="sm">Get Started</Button>
+              <Link href="/onboarding">
+                <Button size="sm">Get Started</Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -86,13 +88,17 @@ const LandingPage = () => {
             </p>
             
             <div className="flex flex-col md:flex-row gap-4 justify-center mb-8">
-              <Button size="lg" className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-4">
-                Start Free Compliance Check
-              </Button>
-              <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-blue-900 px-8 py-4">
-                <Play className="h-5 w-5 mr-2" />
-                Watch Demo (90s)
-              </Button>
+              <Link href="/onboarding">
+                <Button size="lg" className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-4">
+                  Start Free Compliance Check
+                </Button>
+              </Link>
+              <Link href="/platform-showcase">
+                <Button size="lg" variant="outline" className="border-white text-white hover:bg-white hover:text-blue-900 px-8 py-4">
+                  <Play className="h-5 w-5 mr-2" />
+                  Watch Demo (90s)
+                </Button>
+              </Link>
             </div>
 
             {/* Trust Badges */}
