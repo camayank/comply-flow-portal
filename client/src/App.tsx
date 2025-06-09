@@ -28,6 +28,7 @@ import LandingPage from "./pages/LandingPage";
 import DigiComplyWorkflowDashboard from "./components/DigiComplyWorkflowDashboard";
 import Footer from "./components/Footer";
 import NotFound from "./pages/NotFound";
+import StreamlinedOnboarding from "./pages/StreamlinedOnboarding";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App = () => (
               <Switch>
                 <Route path="/" component={LandingPage} />
                 <Route path="/onboarding" component={Onboarding} />
+                <Route path="/streamlined-onboarding" component={StreamlinedOnboarding} />
                 <Route path="/business-type" component={BusinessType} />
                 <Route path="/package-selection" component={PackageSelection} />
                 <Route path="/founder-details" component={FounderDetails} />

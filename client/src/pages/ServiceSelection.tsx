@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle, Clock, Shield, FileText, Calendar, Star, Zap, TrendingUp } from 'lucide-react';
 import DashboardNav from '@/components/DashboardNav';
+import EnhancedServiceCard from '@/components/EnhancedServiceCard';
+import TrustBar from '@/components/TrustBar';
 
 const ServiceSelection = () => {
   const [, setLocation] = useLocation();
@@ -171,6 +173,9 @@ const ServiceSelection = () => {
             <div className="bg-white rounded-full h-2 w-2/5 transition-all duration-300"></div>
           </div>
         </Card>
+
+        {/* Trust Bar */}
+        <TrustBar />
 
         <div className="max-w-7xl mx-auto">
           <Tabs defaultValue="recommended" className="space-y-6">
