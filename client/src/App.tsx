@@ -29,6 +29,7 @@ import DigiComplyWorkflowDashboard from "./components/DigiComplyWorkflowDashboar
 import Footer from "./components/Footer";
 import NotFound from "./pages/NotFound";
 import StreamlinedOnboarding from "./pages/StreamlinedOnboarding";
+import SmartStart from "./pages/SmartStart";
 
 const queryClient = new QueryClient();
 
@@ -43,25 +44,26 @@ const App = () => (
             <main className="flex-grow">
               <Switch>
                 <Route path="/" component={LandingPage} />
+                <Route path="/compliance-dashboard" component={ComplianceTrackerDashboard} />
+                <Route path="/services" component={ServiceSelection} />
+                <Route path="/workflows" component={DigiComplyWorkflowDashboard} />
+                <Route path="/smart-start" component={SmartStart} />
+                <Route path="/admin" component={AdminPanel} />
                 <Route path="/onboarding" component={Onboarding} />
                 <Route path="/streamlined-onboarding" component={StreamlinedOnboarding} />
                 <Route path="/business-type" component={BusinessType} />
                 <Route path="/package-selection" component={PackageSelection} />
                 <Route path="/founder-details" component={FounderDetails} />
                 <Route path="/industry-classification" component={IndustryClassification} />
-                <Route path="/services" component={ServiceSelection} />
                 <Route path="/service-flow" component={ServiceFlowDashboard} />
-                <Route path="/workflows" component={DigiComplyWorkflowDashboard} />
                 <Route path="/documents" component={DocumentUpload} />
                 <Route path="/document-upload" component={DocumentUpload} />
                 <Route path="/esign-agreements" component={ESignAgreements} />
                 <Route path="/payment-gateway" component={PaymentGateway} />
                 <Route path="/tracker" component={ComplianceTracker} />
                 <Route path="/confirmation" component={Confirmation} />
-                <Route path="/admin" component={AdminPanel} />
                 <Route path="/sync" component={SyncDashboard} />
                 <Route path="/excellence" component={PlatformShowcase} />
-                <Route path="/compliance-dashboard" component={ComplianceTrackerDashboard} />
                 <Route path="/retainership" component={RetainershipPlans} />
                 <Route path="/suggestions" component={SmartSuggestionsEngine} />
                 <Route path="/vault" component={DocumentVault} />

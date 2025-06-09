@@ -19,34 +19,39 @@ interface DashboardNavProps {
 const DashboardNav = ({ currentPath }: DashboardNavProps) => {
   const navigationItems = [
     { 
-      href: '/', 
-      label: 'Home', 
-      icon: Home,
-      description: 'Return to homepage'
-    },
-    { 
-      href: '/onboarding', 
-      label: 'Start Here', 
-      icon: Building2,
-      description: 'Begin incorporation process'
-    },
-    { 
-      href: '/service-selection', 
-      label: 'Services', 
-      icon: FileText,
-      description: 'Browse compliance services'
-    },
-    { 
-      href: '/compliance-tracker', 
+      href: '/compliance-dashboard', 
       label: 'Dashboard', 
       icon: BarChart3,
-      description: 'Track compliance status'
+      description: 'Compliance health & insights',
+      priority: 1
     },
     { 
-      href: '/admin-panel', 
-      label: 'Admin Panel', 
+      href: '/services', 
+      label: 'Services', 
+      icon: FileText,
+      description: 'Browse & select services',
+      priority: 2
+    },
+    { 
+      href: '/workflows', 
+      label: 'Workflows', 
+      icon: Building2,
+      description: 'Track service progress',
+      priority: 3
+    },
+    { 
+      href: '/smart-start', 
+      label: 'Smart Start', 
+      icon: Shield,
+      description: 'Intelligent onboarding',
+      priority: 4
+    },
+    { 
+      href: '/admin', 
+      label: 'Settings', 
       icon: Settings,
-      description: 'Administrative controls'
+      description: 'Profile & preferences',
+      priority: 5
     }
   ];
 
