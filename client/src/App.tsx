@@ -11,6 +11,8 @@ import FounderDetails from "./pages/FounderDetails";
 import IndustryClassification from "./pages/IndustryClassification";
 import ServiceSelection from "./pages/ServiceSelection";
 import DocumentUpload from "./pages/DocumentUpload";
+import ESignAgreements from "./pages/ESignAgreements";
+import PaymentGateway from "./pages/PaymentGateway";
 import ComplianceTracker from "./pages/ComplianceTracker";
 import Confirmation from "./pages/Confirmation";
 import AdminPanel from "./pages/AdminPanel";
@@ -37,6 +39,9 @@ const App = () => (
               <Route path="/industry-classification" component={IndustryClassification} />
               <Route path="/services" component={ServiceSelection} />
               <Route path="/documents" component={DocumentUpload} />
+              <Route path="/document-upload" component={DocumentUpload} />
+              <Route path="/esign-agreements" component={ESignAgreements} />
+              <Route path="/payment-gateway" component={PaymentGateway} />
               <Route path="/tracker" component={ComplianceTracker} />
               <Route path="/confirmation" component={Confirmation} />
               <Route path="/admin" component={AdminPanel} />
