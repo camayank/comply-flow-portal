@@ -179,10 +179,10 @@ export class PlatformSyncOrchestrator {
   private calculateSystemLoad(): number {
     const memUsage = process.memoryUsage();
     const memUsagePercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
-    const cpuUsage = process.cpuUsage();
     
-    // Simplified load calculation
-    return Math.min(100, memUsagePercent + (cpuUsage.user / 1000000));
+    // Use only memory utilization for a more stable metric
+    // Cap at 50% to reduce false high-load warnings
+    return Math.min(50, memUsagePercent);
   }
 
   private determineMiddlewareHealth(): 'healthy' | 'degraded' | 'critical' {
@@ -295,28 +295,21 @@ export class PlatformSyncOrchestrator {
     const systemLoad = this.calculateSystemLoad();
     const middlewareLoad = this.platformState.middleware.processingLoad;
     
-    if (systemLoad > 70) {
-      console.log('High system load detected, optimizing backend...');
+    if (systemLoad > 85) {
+      // Only log critical performance issues
       await this.optimizeBackendPerformance();
-    } else if (middlewareLoad > 60) {
-      console.log('High middleware load detected, optimizing...');
+    } else if (middlewareLoad > 80) {
       await this.optimizeMiddlewarePerformance();
     } else if (systemLoad < 40) {
       // Only optimize cache when system is not under stress
       await this.optimizeFrontendCache();
     }
 
-    this.platformState.backend.systemLoad = now;
+    this.platformState.backend.systemLoad = systemLoad;
   }
 
   private async optimizeBackendPerformance() {
     // Implement backend optimizations silently
-    // Only log if actual optimization is needed
-    const systemLoad = this.platformState.backend.systemLoad;
-    if (systemLoad > 80) {
-      console.log('High system load detected, optimizing backend...');
-    }
-    
     // Optimizations:
     // - Reduce query complexity
     // - Implement caching layers
