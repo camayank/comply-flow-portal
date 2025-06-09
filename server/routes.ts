@@ -289,6 +289,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Company Incorporation Workflow API
+  app.get("/api/workflows/company-incorporation", async (req: Request, res: Response) => {
+    try {
+      const workflow = {
+        serviceId: 'company-incorporation',
+        name: 'Company Incorporation',
+        totalSteps: 10,
+        estimatedDuration: '20 days from name approval',
+        totalCost: 15000,
+        steps: [
+          {
+            id: 'pre-incorporation-prep',
+            name: 'Pre-Incorporation Documentation',
+            status: 'pending',
+            estimatedDays: 2,
+            requiredDocs: [
+              'minimum_2_unique_names',
+              'minimum_2_directors',
+              'electricity_bill_not_older_2months',
+              'moa_objects',
+              'share_capital_info',
+              'director_pan_aadhaar_photos',
+              'noc_property_owner'
+            ]
+          },
+          {
+            id: 'name-reservation',
+            name: 'SPICE Part A - Name Reservation',
+            status: 'pending',
+            estimatedDays: 5,
+            formType: 'SPICE+ Part A',
+            mcaSteps: [
+              'Login to MCA portal',
+              'Select SPICE+ form',
+              'Enter company details',
+              'Pay ₹1,000 fee'
+            ]
+          },
+          {
+            id: 'dsc-application',
+            name: 'DSC Application',
+            status: 'pending',
+            estimatedDays: 3,
+            dscRequirements: ['directors', 'shareholders', 'professional']
+          },
+          {
+            id: 'spice-part-b',
+            name: 'SPICE Part B Filing',
+            status: 'pending',
+            estimatedDays: 1,
+            formType: 'SPICE+ Part B',
+            dscRequirements: ['one_director', 'professional']
+          },
+          {
+            id: 'agilepro',
+            name: 'Agilepro Form',
+            status: 'pending',
+            estimatedDays: 1,
+            dscRequirements: ['director_only']
+          },
+          {
+            id: 'aoa',
+            name: 'Articles of Association',
+            status: 'pending',
+            estimatedDays: 1,
+            dscRequirements: ['all_directors', 'all_shareholders', 'professional']
+          },
+          {
+            id: 'moa',
+            name: 'Memorandum of Association',
+            status: 'pending',
+            estimatedDays: 1,
+            dscRequirements: ['all_directors', 'all_shareholders', 'professional']
+          },
+          {
+            id: 'inc9',
+            name: 'INC-9 Form',
+            status: 'pending',
+            estimatedDays: 1,
+            dscRequirements: ['all_directors', 'all_shareholders']
+          },
+          {
+            id: 'upload-payment',
+            name: 'Form Upload & Payment',
+            status: 'pending',
+            estimatedDays: 1
+          },
+          {
+            id: 'certificate',
+            name: 'Certificate Issuance',
+            status: 'pending',
+            estimatedDays: 7
+          }
+        ],
+        criticalDeadlines: [
+          'All processes must complete within 20 days of name approval',
+          'Address proof must not be older than 2 months',
+          'DSC must be associated on V3 portal'
+        ],
+        mcaPortalLinks: {
+          main: 'https://www.mca.gov.in',
+          pan: 'https://tin.tin.nsdl.com/pan/servlet/AOSearch',
+          tan: 'https://tin.tin.nsdl.com/tan/servlet/TanAOSearch'
+        }
+      };
+      
+      res.json(workflow);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch workflow" });
+    }
+  });
+
+  // Update workflow step status
+  app.patch("/api/workflows/company-incorporation/steps/:stepId", async (req: Request, res: Response) => {
+    try {
+      const { stepId } = req.params;
+      const { status, documents, notes } = req.body;
+      
+      // In a real implementation, this would update the workflow state in database
+      res.json({
+        stepId,
+        status,
+        updatedAt: new Date().toISOString(),
+        success: true
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update workflow step" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
