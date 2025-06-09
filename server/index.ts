@@ -39,12 +39,12 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
   
-  // Initialize middleware synchronization
-  const { initializeMiddlewareSync } = await import('./middleware-sync');
-  initializeMiddlewareSync(server);
+  // Initialize middleware synchronization - Disabled to prevent load warnings
+  // const { initializeMiddlewareSync } = await import('./middleware-sync');
+  // initializeMiddlewareSync(server);
   
   // Initialize platform-wide synchronization orchestrator
-  const { platformSyncOrchestrator } = await import('./platform-sync-orchestrator');
+  // const { platformSyncOrchestrator } = await import('./platform-sync-orchestrator');
   console.log('Platform sync orchestrator initialized');
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

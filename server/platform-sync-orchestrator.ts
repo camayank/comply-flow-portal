@@ -60,15 +60,8 @@ export class PlatformSyncOrchestrator {
   }
 
   private startPlatformSync() {
-    // Comprehensive platform synchronization every 30 seconds (reduced frequency)
-    this.syncInterval = setInterval(async () => {
-      await this.syncPlatformState();
-      await this.validateDataConsistency();
-      await this.optimizePerformance();
-      await this.broadcastStateUpdates();
-    }, 30000);
-
-    // Real-time sync for critical updates
+    // Disable automatic sync to prevent middleware load warnings
+    // Platform sync can be triggered manually when needed
     this.setupRealTimeSync();
   }
 

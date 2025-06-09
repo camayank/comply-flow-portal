@@ -26,7 +26,6 @@ import SmartSuggestionsEngine from "./pages/SmartSuggestionsEngine";
 import DocumentVault from "./pages/DocumentVault";
 import LandingPage from "./pages/LandingPage";
 import DigiComplyWorkflowDashboard from "./components/DigiComplyWorkflowDashboard";
-import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import NotFound from "./pages/NotFound";
 
@@ -40,7 +39,6 @@ const App = () => (
         <Sonner />
         <Router>
           <div className="min-h-screen flex flex-col">
-            <Navbar />
             <main className="flex-grow">
               <Switch>
                 <Route path="/" component={LandingPage} />
