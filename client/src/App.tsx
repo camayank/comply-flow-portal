@@ -18,6 +18,7 @@ import PaymentGateway from "./pages/PaymentGateway";
 import ComplianceTracker from "./pages/ComplianceTracker";
 import Confirmation from "./pages/Confirmation";
 import AdminPanel from "./pages/AdminPanel";
+import SyncDashboard from "./pages/SyncDashboard";
 import DigiComplyWorkflowDashboard from "./components/DigiComplyWorkflowDashboard";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -51,6 +52,7 @@ const App = () => (
                 <Route path="/tracker" component={ComplianceTracker} />
                 <Route path="/confirmation" component={Confirmation} />
                 <Route path="/admin" component={AdminPanel} />
+                <Route path="/sync" component={SyncDashboard} />
                 <Route component={NotFound} />
               </Switch>
             </main>
