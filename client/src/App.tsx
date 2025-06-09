@@ -20,6 +20,10 @@ import Confirmation from "./pages/Confirmation";
 import AdminPanel from "./pages/AdminPanel";
 import SyncDashboard from "./pages/SyncDashboard";
 import PlatformShowcase from "./pages/PlatformShowcase";
+import ComplianceTrackerDashboard from "./pages/ComplianceTrackerDashboard";
+import RetainershipPlans from "./pages/RetainershipPlans";
+import SmartSuggestionsEngine from "./pages/SmartSuggestionsEngine";
+import DocumentVault from "./pages/DocumentVault";
 import DigiComplyWorkflowDashboard from "./components/DigiComplyWorkflowDashboard";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -55,6 +59,10 @@ const App = () => (
                 <Route path="/admin" component={AdminPanel} />
                 <Route path="/sync" component={SyncDashboard} />
                 <Route path="/excellence" component={PlatformShowcase} />
+                <Route path="/compliance-dashboard" component={ComplianceTrackerDashboard} />
+                <Route path="/retainership" component={RetainershipPlans} />
+                <Route path="/suggestions" component={SmartSuggestionsEngine} />
+                <Route path="/documents" component={DocumentVault} />
                 <Route component={NotFound} />
               </Switch>
             </main>
