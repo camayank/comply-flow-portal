@@ -68,7 +68,7 @@ const DigiComplyWorkflowDashboard: React.FC = () => {
   });
 
   const getWorkflowsByCategory = (category: string) => {
-    if (!workflows) return [];
+    if (!workflows || !Array.isArray(workflows)) return [];
     if (category === 'all') return workflows;
     return workflows.filter((w: WorkflowTemplate) => w.category === category);
   };
@@ -153,7 +153,7 @@ const DigiComplyWorkflowDashboard: React.FC = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Workflows</p>
-                  <p className="text-2xl font-bold text-gray-900">{workflows?.length || 0}</p>
+                  <p className="text-2xl font-bold text-gray-900">{Array.isArray(workflows) ? workflows.length : 0}</p>
                 </div>
                 <Building2 className="h-8 w-8 text-blue-500" />
               </div>

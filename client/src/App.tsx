@@ -18,6 +18,7 @@ import PaymentGateway from "./pages/PaymentGateway";
 import ComplianceTracker from "./pages/ComplianceTracker";
 import Confirmation from "./pages/Confirmation";
 import AdminPanel from "./pages/AdminPanel";
+import DigiComplyWorkflowDashboard from "./components/DigiComplyWorkflowDashboard";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import NotFound from "./pages/NotFound";
@@ -42,6 +43,7 @@ const App = () => (
                 <Route path="/industry-classification" component={IndustryClassification} />
                 <Route path="/services" component={ServiceSelection} />
                 <Route path="/service-flow" component={ServiceFlowDashboard} />
+                <Route path="/workflows" component={DigiComplyWorkflowDashboard} />
                 <Route path="/documents" component={DocumentUpload} />
                 <Route path="/document-upload" component={DocumentUpload} />
                 <Route path="/esign-agreements" component={ESignAgreements} />
