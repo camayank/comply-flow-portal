@@ -30,6 +30,7 @@ import Footer from "./components/Footer";
 import NotFound from "./pages/NotFound";
 import StreamlinedOnboarding from "./pages/StreamlinedOnboarding";
 import SmartStart from "./pages/SmartStart";
+import WhatsAppOnboarding from "./pages/WhatsAppOnboarding";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const App = () => (
                 <Route path="/services" component={ServiceSelection} />
                 <Route path="/workflows" component={DigiComplyWorkflowDashboard} />
                 <Route path="/smart-start" component={SmartStart} />
+                <Route path="/whatsapp-onboarding" component={WhatsAppOnboarding} />
                 <Route path="/admin" component={AdminPanel} />
                 <Route path="/onboarding" component={Onboarding} />
                 <Route path="/streamlined-onboarding" component={StreamlinedOnboarding} />
