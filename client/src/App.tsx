@@ -36,6 +36,10 @@ import ClientPortal from "./pages/ClientPortal";
 import OperationsPanel from "./pages/OperationsPanel";
 import AgentPortal from "./pages/AgentPortal";
 import MasterBlueprintDashboard from "./pages/MasterBlueprintDashboard";
+import UniversalAdminPanel from "./pages/UniversalAdminPanel";
+import UniversalClientPortal from "./pages/UniversalClientPortal";
+import UniversalOperationsPanel from "./pages/UniversalOperationsPanel";
+import UniversalLandingPage from "./pages/UniversalLandingPage";
 
 const queryClient = new QueryClient();
 
@@ -49,7 +53,8 @@ const App = () => (
           <div className="min-h-screen flex flex-col">
             <main className="flex-grow">
               <Switch>
-                <Route path="/" component={LandingPage} />
+                <Route path="/" component={UniversalLandingPage} />
+                <Route path="/landing" component={LandingPage} />
                 <Route path="/compliance-dashboard" component={ComplianceTrackerDashboard} />
                 <Route path="/services" component={ServiceSelection} />
                 <Route path="/workflows" component={DigiComplyWorkflowDashboard} />
@@ -65,6 +70,9 @@ const App = () => (
                 <Route path="/admin-control" component={AdminPanel} />
                 <Route path="/blueprint" component={MasterBlueprintDashboard} />
                 <Route path="/master-blueprint" component={MasterBlueprintDashboard} />
+                <Route path="/universal-admin" component={UniversalAdminPanel} />
+                <Route path="/universal-client" component={UniversalClientPortal} />
+                <Route path="/universal-ops" component={UniversalOperationsPanel} />
                 <Route path="/agent" component={AgentPortal} />
                 <Route path="/agents" component={AgentPortal} />
                 <Route path="/agent-portal" component={AgentPortal} />
