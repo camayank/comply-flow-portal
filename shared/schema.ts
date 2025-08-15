@@ -117,6 +117,43 @@ export const complianceTracking = pgTable("compliance_tracking", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// SLA Timers for enhanced monitoring
+export const slaTimers = pgTable("sla_timers", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  serviceCode: text("service_code").notNull(),
+  standardHours: integer("standard_hours").notNull(),
+  startTime: timestamp("start_time").notNull(),
+  pausedAt: timestamp("paused_at"),
+  totalPausedMinutes: integer("total_paused_minutes").default(0),
+  pauseReasons: json("pause_reasons"),
+  status: text("status").notNull().default("on_track"), // on_track, at_risk, warning, breached, paused
+  escalationLevel: text("escalation_level"), // t24_warning, t4_warning, breach, critical
+  lastEscalationAt: timestamp("last_escalation_at"),
+  completedAt: timestamp("completed_at"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// SLA Exceptions for handling special cases
+export const slaExceptions = pgTable("sla_exceptions", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  requestedBy: integer("requested_by").notNull(),
+  approvedBy: integer("approved_by"),
+  exceptionType: text("exception_type").notNull(), // client_delay, external_dependency, system_issue
+  reason: text("reason").notNull(),
+  requestedExtensionHours: integer("requested_extension_hours").notNull(),
+  approvedExtensionHours: integer("approved_extension_hours"),
+  status: text("status").default("pending"), // pending, approved, rejected
+  validFrom: timestamp("valid_from"),
+  validUntil: timestamp("valid_until"),
+  approvalNotes: text("approval_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  approvedAt: timestamp("approved_at"),
+});
+
 export const retainershipPlans = pgTable("retainership_plans", {
   id: serial("id").primaryKey(),
   planId: text("plan_id").notNull().unique(),
@@ -703,17 +740,7 @@ export const slaSettings = pgTable("sla_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const slaExceptions = pgTable("sla_exceptions", {
-  id: serial("id").primaryKey(),
-  serviceRequestId: integer("service_request_id").notNull(),
-  originalDeadline: timestamp("original_deadline").notNull(),
-  extendedDeadline: timestamp("extended_deadline").notNull(),
-  extensionReason: text("extension_reason").notNull(),
-  approvedBy: integer("approved_by").notNull(),
-  clientNotified: boolean("client_notified").default(false),
-  extensionHours: integer("extension_hours"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+// SLA Exceptions table moved to line 142 to avoid duplicates
 
 export const systemIntegrations = pgTable("system_integrations", {
   id: serial("id").primaryKey(),
@@ -784,9 +811,9 @@ export const agentPartners = pgTable("agent_partners", {
   userId: integer("user_id").notNull(),
   agentCode: text("agent_code").notNull().unique(),
   territory: text("territory"), // state, city, region
-  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default(15.00),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("15.00"),
   leadConversionRate: decimal("lead_conversion_rate", { precision: 5, scale: 2 }),
-  totalCommissionEarned: decimal("total_commission_earned", { precision: 10, scale: 2 }).default(0),
+  totalCommissionEarned: decimal("total_commission_earned", { precision: 10, scale: 2 }).default("0"),
   leadsGenerated: integer("leads_generated").default(0),
   leadsConverted: integer("leads_converted").default(0),
   performanceRating: decimal("performance_rating", { precision: 3, scale: 2 }),
