@@ -740,7 +740,55 @@ export const slaSettings = pgTable("sla_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// SLA Exceptions table moved to line 142 to avoid duplicates
+// Notification System Tables
+export const notificationRules = pgTable("notification_rules", {
+  id: serial("id").primaryKey(),
+  ruleKey: text("rule_key").unique().notNull(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // SCHEDULE, EVENT
+  scopeJson: text("scope_json").notNull(), // service types, entities, etc.
+  scheduleJson: text("schedule_json"), // cron expression and timezone
+  logicJson: text("logic_json"), // smart logic for T-7, T-3, T-1, etc.
+  filtersJson: text("filters_json"), // additional filters
+  channelsJson: text("channels_json").notNull(), // EMAIL, WHATSAPP, SMS
+  templateKey: text("template_key").notNull(),
+  dedupeWindowMins: integer("dedupe_window_mins").default(120),
+  respectQuietHours: boolean("respect_quiet_hours").default(true),
+  isEnabled: boolean("is_enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const notificationOutbox = pgTable("notification_outbox", {
+  id: serial("id").primaryKey(),
+  ruleKey: text("rule_key").notNull(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  entityId: integer("entity_id").notNull(),
+  recipientEmail: text("recipient_email"),
+  recipientPhone: text("recipient_phone"),
+  channel: text("channel").notNull(), // EMAIL, WHATSAPP, SMS, INAPP
+  templateKey: text("template_key").notNull(),
+  payloadJson: text("payload_json").notNull(),
+  dedupeFingerprint: text("dedupe_fingerprint"),
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  status: text("status").default("QUEUED"), // QUEUED, SENT, DELIVERED, FAILED, CANCELLED
+  error: text("error"),
+  providerId: text("provider_id"), // external provider reference
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const notificationTemplates = pgTable("notification_templates", {
+  templateKey: text("template_key").primaryKey(),
+  name: text("name").notNull(),
+  channel: text("channel").notNull(), // EMAIL, WHATSAPP, SMS
+  subject: text("subject"), // for email
+  body: text("body").notNull(),
+  variables: json("variables"), // available template variables
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
 
 export const systemIntegrations = pgTable("system_integrations", {
   id: serial("id").primaryKey(),
@@ -876,6 +924,12 @@ export type InsertWorkflowTemplate = z.infer<typeof insertWorkflowTemplateSchema
 export type SlaSettings = typeof slaSettings.$inferSelect;
 export type InsertSlaSettings = z.infer<typeof insertSlaSettingSchema>;
 export type SlaException = typeof slaExceptions.$inferSelect;
+
+// Export types for notification system
+export type NotificationRule = typeof notificationRules.$inferSelect;
+export type InsertNotificationRule = typeof notificationRules.$inferInsert;
+export type NotificationOutboxItem = typeof notificationOutbox.$inferSelect;
+export type NotificationTemplate = typeof notificationTemplates.$inferSelect;
 export type SystemIntegration = typeof systemIntegrations.$inferSelect;
 export type InsertSystemIntegration = z.infer<typeof insertSystemIntegrationSchema>;
 export type SystemNotification = typeof systemNotifications.$inferSelect;

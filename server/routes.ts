@@ -1086,6 +1086,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   console.log("Initializing Enhanced SLA Monitoring System...");
   SlaMonitoringService.startMonitoring(15); // Check every 15 minutes
 
+  // Register notification and workflow management routes
+  const { registerNotificationRoutes } = await import('./notification-routes');
+  const { registerWorkflowRoutes } = await import('./workflow-routes');
+  
+  registerNotificationRoutes(app);
+  registerWorkflowRoutes(app);
+
   const httpServer = createServer(app);
   return httpServer;
 }
