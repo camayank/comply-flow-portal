@@ -5,30 +5,294 @@
   <title>DigiComply – Client Portal (Lite)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: system-ui, sans-serif; margin: 24px; }
-    h1 { margin-bottom: 8px; }
-    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
-    input, select, button { padding:8px 10px; border-radius:8px; border:1px solid #e5e7eb; font-size:14px; }
-    button { background:#111827; color:#fff; border:none; cursor:pointer; }
-    .card { border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin:12px 0; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
-    table { border-collapse: collapse; width:100%; }
-    th, td { border-bottom:1px solid #eee; padding:8px; text-align:left; font-size:14px; vertical-align:top; }
-    .status { padding:2px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:12px; }
-    .muted { color:#6b7280; font-size:12px; }
-    .pill { padding:2px 8px; border-radius:999px; background:#f1f5f9; font-size:12px; }
-    details { margin-top:8px; }
-    .doc-status-approved { background:#d1fae5; color:#16a34a; }
-    .doc-status-pending { background:#fef3c7; color:#d97706; }
-    .doc-status-rejected { background:#fee2e2; color:#dc2626; }
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --secondary: #64748b;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --background: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --text-muted: #94a3b8;
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    }
+    
+    * { box-sizing: border-box; }
+    
+    body { 
+      font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+      margin: 0; 
+      padding: 24px;
+      background: var(--background);
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+    
+    h1 { 
+      font-size: 2rem; 
+      font-weight: 700; 
+      margin: 0 0 8px 0; 
+      color: var(--text-primary);
+    }
+    
+    .header-subtitle {
+      color: var(--text-secondary);
+      font-size: 1rem;
+      margin-bottom: 32px;
+    }
+    
+    .controls {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+    
+    .row { 
+      display: flex; 
+      gap: 16px; 
+      flex-wrap: wrap; 
+      align-items: flex-end; 
+    }
+    
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      min-width: 140px;
+    }
+    
+    label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+    
+    input, select, button { 
+      padding: 10px 12px; 
+      border-radius: 8px; 
+      border: 1px solid var(--border); 
+      font-size: 14px;
+      background: var(--surface);
+      transition: all 0.2s ease;
+    }
+    
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1);
+    }
+    
+    button { 
+      background: var(--primary); 
+      color: white; 
+      border: none; 
+      cursor: pointer;
+      font-weight: 500;
+      height: fit-content;
+    }
+    
+    button:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+    
+    .services-grid {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    }
+    
+    .service-card { 
+      background: var(--surface);
+      border: 1px solid var(--border); 
+      border-radius: 12px; 
+      padding: 24px; 
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+    }
+    
+    .service-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+    
+    .service-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+    
+    .service-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0;
+    }
+    
+    .service-period {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin: 4px 0 0 0;
+    }
+    
+    .service-due {
+      font-size: 12px;
+      color: var(--warning);
+      font-weight: 500;
+    }
+    
+    .service-meta {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 16px;
+      font-size: 13px;
+    }
+    
+    .status { 
+      padding: 4px 10px; 
+      border-radius: 20px; 
+      font-size: 12px; 
+      font-weight: 500;
+    }
+    
+    .status.created { background: #f1f5f9; color: var(--secondary); }
+    .status.in-progress { background: #eff6ff; color: var(--primary); }
+    .status.waiting-on-client { background: #fefce8; color: var(--warning); }
+    .status.completed { background: #f0fdf4; color: var(--success); }
+    
+    .doc-summary {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    
+    .document-section {
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+      margin-top: 16px;
+    }
+    
+    .upload-area {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    
+    .upload-area select {
+      flex: 1;
+      min-width: 140px;
+    }
+    
+    .upload-area input[type="file"] {
+      flex: 2;
+      min-width: 180px;
+    }
+    
+    .upload-area button {
+      background: var(--success);
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+    
+    .document-list {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .document-item {
+      background: var(--background);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 13px;
+    }
+    
+    .doc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    
+    .doc-name {
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    
+    .doc-version {
+      background: var(--border);
+      color: var(--text-secondary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    
+    .doc-details {
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    
+    .doc-status {
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    
+    .doc-status-approved { background: #d1fae5; color: #16a34a; }
+    .doc-status-pending { background: #fef3c7; color: #d97706; }
+    .doc-status-rejected { background: #fee2e2; color: #dc2626; }
+    
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-muted);
+    }
+    
+    .empty-state h3 {
+      margin: 0 0 8px 0;
+      color: var(--text-secondary);
+    }
+    
+    @media (max-width: 768px) {
+      body { padding: 16px; }
+      .services-grid { grid-template-columns: 1fr; }
+      .row { flex-direction: column; align-items: stretch; }
+      .upload-area { flex-direction: column; }
+      .upload-area select, .upload-area input { min-width: auto; }
+      h1 { font-size: 1.75rem; }
+    }
   </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <h1>Your Compliance Services</h1>
-  <p class="muted">Pick your business (entity), then manage documents and track status.</p>
+  <h1>Your Compliance Dashboard</h1>
+  <p class="header-subtitle">Track service progress, manage documents, and stay compliant with all regulatory requirements.</p>
 
-  <div class="row">
-    <div><label>Entity ID<br/><input id="entity" type="number" value="1" /></label></div>
-    <button onclick="loadSO()">Load Services</button>
+  <div class="controls">
+    <div class="row">
+      <div class="form-group">
+        <label>Business Entity</label>
+        <input id="entity" type="number" value="1" />
+      </div>
+      <button onclick="loadSO()">Load Services</button>
+    </div>
   </div>
 
   <div id="list"></div>
@@ -40,33 +304,46 @@ async function loadSO(){
   const entity = +document.getElementById('entity').value;
   const rows = await api(`/client/entities/${entity}/service-orders`);
   if (!Array.isArray(rows) || rows.length===0){
-    document.getElementById('list').innerHTML = '<p class="muted">No services yet.</p>';
+    document.getElementById('list').innerHTML = `
+      <div class="empty-state">
+        <h3>No Services Yet</h3>
+        <p>Your compliance services will appear here once configured by your service provider.</p>
+      </div>`;
     return;
   }
-  const html = ['<table><tr><th>Service</th><th>Period</th><th>Due</th><th>Status</th><th>Docs</th></tr>'];
-  html.push(...rows.map(r => `
-    <tr>
-      <td>${r.serviceType}</td>
-      <td>${r.periodLabel || '-'}</td>
-      <td>${r.dueDate || '-'}</td>
-      <td><span class="status">${r.status}</span><br/><span class="muted">Approved:${r.docsApproved} • Pending:${r.docsPending} • Rejected:${r.docsRejected}</span></td>
-      <td>
-        <details>
-          <summary>Upload / View</summary>
-          <div id="docs_${r.id}" class="muted">Loading...</div>
-          <div style="margin-top:8px;">
-            <label>Doctype&nbsp;
-              <select id="dt_${r.id}"></select>
-            </label>
-            <input type="file" id="file_${r.id}" />
-            <button onclick="upload(${r.id})">Upload</button>
-          </div>
-        </details>
-      </td>
-    </tr>
-  `));
-  html.push('</table>');
-  document.getElementById('list').innerHTML = html.join('');
+  
+  const cards = rows.map(r => `
+    <div class="service-card">
+      <div class="service-header">
+        <div>
+          <h3 class="service-title">${r.serviceType}</h3>
+          <p class="service-period">${r.periodLabel || 'One-time service'}</p>
+        </div>
+        <div class="service-due">
+          ${r.dueDate ? `Due: ${new Date(r.dueDate).toLocaleDateString()}` : ''}
+        </div>
+      </div>
+      
+      <div class="service-meta">
+        <span class="status ${r.status.toLowerCase().replace(/ /g, '-')}">${r.status}</span>
+        <span class="doc-summary">
+          📄 ${r.docsApproved} approved • ${r.docsPending} pending • ${r.docsRejected} rejected
+        </span>
+      </div>
+      
+      <div class="document-section">
+        <div id="docs_${r.id}" class="document-list">Loading documents...</div>
+        <div class="upload-area">
+          <select id="dt_${r.id}" placeholder="Select document type"></select>
+          <input type="file" id="file_${r.id}" />
+          <button onclick="upload(${r.id})">Upload Document</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+  
+  document.getElementById('list').innerHTML = `<div class="services-grid">${cards}</div>`;
+  
   // load required doctypes + current docs for each SO
   rows.forEach(async so => {
     const reqd = await api(`/client/service-orders/${so.id}/required-docs`);
@@ -79,13 +356,22 @@ async function loadSO(){
 async function refreshDocs(soId){
   const docs = await api(`/client/service-orders/${soId}/documents`);
   const c = document.getElementById(`docs_${soId}`);
-  if (!docs.length) { c.innerHTML = '<span class="muted">No documents uploaded yet.</span>'; return; }
+  if (!docs.length) { 
+    c.innerHTML = '<div class="empty-state" style="padding: 20px;"><p>No documents uploaded yet.</p></div>'; 
+    return; 
+  }
   c.innerHTML = docs.map(d => `
-    <div class="card">
-      <div><b>${d.doctype}</b> <span class="pill">v${d.version}</span></div>
-      <div>${d.filename} • ${(d.sizeBytes||0)/1024|0} KB • <i>${d.uploader}</i></div>
-      <div>Status: <span class="pill doc-status-${d.status.replace('_', '-')}">${d.status}</span> ${d.rejectionReason ? ' – ' + d.rejectionReason : ''}</div>
-      <div class="muted">${new Date(d.createdAt).toLocaleString()}</div>
+    <div class="document-item">
+      <div class="doc-header">
+        <span class="doc-name">${d.doctype}</span>
+        <span class="doc-version">v${d.version}</span>
+      </div>
+      <div class="doc-details">${d.filename} • ${(d.sizeBytes||0)/1024|0} KB • ${d.uploader}</div>
+      <div class="doc-details">${new Date(d.createdAt).toLocaleString()}</div>
+      <div>
+        <span class="doc-status doc-status-${d.status.replace('_', '-')}">${d.status}</span>
+        ${d.rejectionReason ? `<span style="color: var(--danger); font-size: 12px; margin-left: 8px;">${d.rejectionReason}</span>` : ''}
+      </div>
     </div>
   `).join('');
 }
