@@ -1100,6 +1100,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { registerServiceOrdersRoutes } = await import('./service-orders-routes');
   registerServiceOrdersRoutes(app);
   
+  // Register operations routes for ops team backend access
+  const { registerOperationsRoutes } = await import('./operations-routes');
+  registerOperationsRoutes(app);
+  
   // Register client portal routes
   const { registerClientRoutes } = await import('./client-routes-fixed');
   registerClientRoutes(app);
