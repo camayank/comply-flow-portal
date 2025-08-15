@@ -3,7 +3,9 @@ import { db } from './db';
 import { 
   services,
   serviceRequests,
-  businessEntities
+  businessEntities,
+  servicesCatalog,
+  documentsUploads
 } from '@shared/schema';
 import { eq, desc } from 'drizzle-orm';
 
@@ -12,14 +14,14 @@ export function registerAdminConfigRoutes(app: Express) {
   // ========== SERVICES CATALOG ==========
   app.get('/api/admin/services', async (req, res) => {
     try {
-      // Get services from the database - both catalog and seeded services
+      // Get services from the services_catalog table (real implementation)
       const servicesList = await db
         .select()
-        .from(services)
-        .where(eq(services.isActive, true))
-        .orderBy(services.category, services.name);
+        .from(servicesCatalog)
+        .where(eq(servicesCatalog.isActive, true))
+        .orderBy(servicesCatalog.category, servicesCatalog.name);
       
-      console.log('Found services:', servicesList.length);
+      console.log('Found services in catalog:', servicesList.length);
       
       res.json(servicesList);
     } catch (error) {
@@ -33,14 +35,14 @@ export function registerAdminConfigRoutes(app: Express) {
       const { serviceKey, name, periodicity, description, category, price } = req.body;
       
       const [service] = await db
-        .insert(services)
+        .insert(servicesCatalog)
         .values({
-          serviceId: serviceKey,
+          serviceKey,
           name,
-          type: periodicity || 'one-time',
+          periodicity: periodicity || 'ONE_TIME',
           description,
           category,
-          price: price || 0
+          basePrice: price || 0
         })
         .returning();
       
@@ -195,7 +197,7 @@ export function registerAdminConfigRoutes(app: Express) {
   app.get('/api/admin/stats', async (req, res) => {
     try {
       // Get accurate counts from database
-      const totalServices = await db.select().from(services).then(r => r.length);
+      const totalServices = await db.select().from(servicesCatalog).then(r => r.length);
       const totalEntities = await db.select().from(businessEntities).then(r => r.length);
       const activeRequests = await db.select().from(serviceRequests)
         .where(eq(serviceRequests.status, 'in_progress')).then(r => r.length);

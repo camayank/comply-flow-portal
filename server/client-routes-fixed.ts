@@ -3,7 +3,8 @@ import multer from 'multer';
 import { db } from './db';
 import { 
   serviceRequests,
-  businessEntities
+  businessEntities,
+  documentsUploads
 } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import path from 'path';
@@ -39,14 +40,25 @@ export function registerClientRoutes(app: Express) {
         .where(eq(serviceRequests.businessEntityId, entityId))
         .orderBy(serviceRequests.createdAt);
 
-      // Add mock document counts for working system
-      const ordersWithCounts = orders.map(order => ({
-        ...order,
-        docsApproved: 0,
-        docsPending: 0,
-        docsRejected: 0,
-        documentsRequired: 3,
-        documentsUploaded: 0
+      // Add real document counts from database
+      const ordersWithCounts = await Promise.all(orders.map(async (order) => {
+        const docs = await db
+          .select()
+          .from(documentsUploads)
+          .where(eq(documentsUploads.entityId, order.businessEntityId));
+
+        const docsApproved = docs.filter(d => d.status === 'approved').length;
+        const docsPending = docs.filter(d => d.status === 'pending_review').length;
+        const docsRejected = docs.filter(d => d.status === 'rejected').length;
+
+        return {
+          ...order,
+          docsApproved,
+          docsPending,
+          docsRejected,
+          documentsRequired: 3,
+          documentsUploaded: docs.length
+        };
       }));
 
       res.json(ordersWithCounts);
@@ -76,7 +88,7 @@ export function registerClientRoutes(app: Express) {
 
       // Return appropriate required docs based on service type
       const getRequiredDocsForService = (serviceId: string) => {
-        const docTypes = {
+        const docTypes: Record<string, Array<{doctype: string, label: string, mandatory: boolean}>> = {
           'gst_returns': [
             { doctype: 'sales_register', label: 'Sales Register', mandatory: true },
             { doctype: 'purchase_register', label: 'Purchase Register', mandatory: true },
@@ -110,22 +122,14 @@ export function registerClientRoutes(app: Express) {
     try {
       const soId = parseInt(req.params.soId);
       
-      // Mock uploaded documents for now
-      const mockDocuments = [
-        {
-          id: 1,
-          doctype: 'sales_register',
-          filename: 'sales_register_jan2024.xlsx',
-          sizeBytes: 25600,
-          uploader: 'client',
-          status: 'pending_review',
-          rejectionReason: null,
-          version: 1,
-          createdAt: new Date().toISOString()
-        }
-      ];
+      // Get real uploaded documents from database
+      const documents = await db
+        .select()
+        .from(documentsUploads)
+        .where(eq(documentsUploads.entityId, 1)) // Will be determined from service order
+        .orderBy(documentsUploads.createdAt);
 
-      res.json(mockDocuments);
+      res.json(documents);
     } catch (error) {
       console.error('Error fetching documents:', error);
       res.status(500).json({ error: 'Failed to fetch documents' });
@@ -150,19 +154,20 @@ export function registerClientRoutes(app: Express) {
         return res.status(400).json({ error: 'Document type is required' });
       }
 
-      // For now, just return success - file is saved to uploads/ directory
-      const uploadRecord = {
-        id: Date.now(),
-        serviceOrderId: soId,
-        doctype: doctype as string,
-        filename: file.originalname,
-        path: file.path,
-        sizeBytes: file.size,
-        uploader: 'client',
-        status: 'pending_review',
-        version: 1,
-        createdAt: new Date().toISOString()
-      };
+      // Save document record to database  
+      const [uploadRecord] = await db
+        .insert(documentsUploads)
+        .values({
+          entityId: 1, // Will be determined from service order
+          doctype: doctype as string,
+          filename: file.originalname,
+          path: file.path,
+          sizeBytes: file.size,
+          uploader: 'client',
+          status: 'pending_review',
+          version: 1
+        })
+        .returning();
 
       res.json({ 
         ok: true, 
