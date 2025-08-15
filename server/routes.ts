@@ -1098,6 +1098,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register service orders routes for ops board
   const { registerServiceOrdersRoutes } = await import('./service-orders-routes');
   registerServiceOrdersRoutes(app);
+  
+  // Register client portal routes
+  const { registerClientRoutes } = await import('./client-routes');
+  registerClientRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

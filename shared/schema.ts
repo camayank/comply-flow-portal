@@ -1000,6 +1000,23 @@ export type AgentPartner = typeof agentPartners.$inferSelect;
 export type WorkflowExecution = typeof workflowExecutions.$inferSelect;
 
 // Agent/Partner Portal - Additional Schema
+// Client document uploads table
+export const documentsUploads = pgTable("documents", {
+  id: serial("id").primaryKey(),
+  serviceOrderId: integer("service_order_id").notNull(),
+  entityId: integer("entity_id").notNull(),
+  doctype: text("doctype").notNull(),
+  filename: text("filename").notNull(),
+  path: text("path").notNull(),
+  sizeBytes: integer("size_bytes"),
+  uploader: text("uploader").notNull(), // 'client' | 'ops'
+  status: text("status").default("pending_review"), // 'pending_review' | 'approved' | 'rejected'
+  rejectionReason: text("rejection_reason"),
+  version: integer("version").default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const agentProfiles = pgTable("agent_profiles", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),

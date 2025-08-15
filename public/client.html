@@ -2,60 +2,118 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>DigiComply Client Portal</title>
+  <title>DigiComply – Client Portal (Lite)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: system-ui, sans-serif; margin: 0; background: #f8fafc; }
-    .header { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 16px 24px; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
-    .welcome { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
-    .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
-    .card-title { font-size: 16px; font-weight: 600; color: #111827; margin: 0; }
-    .status-badge { padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 500; }
-    .status-created { background: #f3f4f6; color: #374151; }
-    .status-progress { background: #dbeafe; color: #1d4ed8; }
-    .status-waiting { background: #fef3c7; color: #d97706; }
-    .status-completed { background: #d1fae5; color: #16a34a; }
-    .card-meta { font-size: 14px; color: #6b7280; margin-bottom: 12px; }
-    .card-due { font-size: 12px; color: #ef4444; font-weight: 500; }
-    .card-actions { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
-    .btn { padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 500; text-decoration: none; display: inline-block; }
-    .btn-primary { background: #3b82f6; color: #fff; }
-    .btn-outline { background: #fff; color: #374151; border: 1px solid #d1d5db; }
-    .progress-bar { background: #f3f4f6; border-radius: 4px; height: 6px; margin: 12px 0; }
-    .progress-fill { background: #3b82f6; height: 100%; border-radius: 4px; transition: width 0.3s; }
-    .docs-section { margin-top: 16px; }
-    .doc-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
-    .doc-name { font-size: 13px; color: #374151; }
-    .doc-status { font-size: 11px; padding: 2px 6px; border-radius: 4px; }
-    .doc-pending { background: #fef3c7; color: #d97706; }
-    .doc-uploaded { background: #d1fae5; color: #16a34a; }
-    .doc-approved { background: #dbeafe; color: #1d4ed8; }
-    .upload-btn { background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 12px; text-align: center; cursor: pointer; margin-top: 8px; }
-    .filters { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-    .filters input, .filters select, .filters button { padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; }
-    .filters button { background: #3b82f6; color: #fff; border: none; cursor: pointer; }
-    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 20px; }
-    .stat { background: #fff; padding: 16px; border-radius: 8px; text-align: center; }
-    .stat-number { font-size: 20px; font-weight: 600; color: #111827; }
-    .stat-label { font-size: 11px; color: #6b7280; text-transform: uppercase; margin-top: 4px; }
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
-    .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; border-radius: 12px; padding: 24px; width: 90%; max-width: 500px; }
-    .close { cursor: pointer; float: right; font-size: 24px; color: #6b7280; }
+    body { font-family: system-ui, sans-serif; margin: 24px; }
+    h1 { margin-bottom: 8px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+    input, select, button { padding:8px 10px; border-radius:8px; border:1px solid #e5e7eb; font-size:14px; }
+    button { background:#111827; color:#fff; border:none; cursor:pointer; }
+    .card { border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin:12px 0; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+    table { border-collapse: collapse; width:100%; }
+    th, td { border-bottom:1px solid #eee; padding:8px; text-align:left; font-size:14px; vertical-align:top; }
+    .status { padding:2px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:12px; }
+    .muted { color:#6b7280; font-size:12px; }
+    .pill { padding:2px 8px; border-radius:999px; background:#f1f5f9; font-size:12px; }
+    details { margin-top:8px; }
+    .doc-status-approved { background:#d1fae5; color:#16a34a; }
+    .doc-status-pending { background:#fef3c7; color:#d97706; }
+    .doc-status-rejected { background:#fee2e2; color:#dc2626; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1 style="margin: 0; color: #111827;">DigiComply Client Portal</h1>
+  <h1>Your Compliance Services</h1>
+  <p class="muted">Pick your business (entity), then manage documents and track status.</p>
+
+  <div class="row">
+    <div><label>Entity ID<br/><input id="entity" type="number" value="1" /></label></div>
+    <button onclick="loadSO()">Load Services</button>
   </div>
-  
-  <div class="container">
-    <div class="welcome">
-      <h2 style="margin: 0 0 8px 0; color: #111827;">Welcome back, <span id="client-name">Valued Client</span>!</h2>
-      <p style="margin: 0; color: #6b7280;">Track your compliance services, upload documents, and stay updated on deadlines.</p>
+
+  <div id="list"></div>
+
+<script>
+const api = (p, opt={}) => fetch(p, { headers: {'Accept':'application/json'}, ...opt }).then(r=>r.json());
+
+async function loadSO(){
+  const entity = +document.getElementById('entity').value;
+  const rows = await api(`/client/entities/${entity}/service-orders`);
+  if (!Array.isArray(rows) || rows.length===0){
+    document.getElementById('list').innerHTML = '<p class="muted">No services yet.</p>';
+    return;
+  }
+  const html = ['<table><tr><th>Service</th><th>Period</th><th>Due</th><th>Status</th><th>Docs</th></tr>'];
+  html.push(...rows.map(r => `
+    <tr>
+      <td>${r.serviceType}</td>
+      <td>${r.periodLabel || '-'}</td>
+      <td>${r.dueDate || '-'}</td>
+      <td><span class="status">${r.status}</span><br/><span class="muted">Approved:${r.docsApproved} • Pending:${r.docsPending} • Rejected:${r.docsRejected}</span></td>
+      <td>
+        <details>
+          <summary>Upload / View</summary>
+          <div id="docs_${r.id}" class="muted">Loading...</div>
+          <div style="margin-top:8px;">
+            <label>Doctype&nbsp;
+              <select id="dt_${r.id}"></select>
+            </label>
+            <input type="file" id="file_${r.id}" />
+            <button onclick="upload(${r.id})">Upload</button>
+          </div>
+        </details>
+      </td>
+    </tr>
+  `));
+  html.push('</table>');
+  document.getElementById('list').innerHTML = html.join('');
+  // load required doctypes + current docs for each SO
+  rows.forEach(async so => {
+    const reqd = await api(`/client/service-orders/${so.id}/required-docs`);
+    const sel = document.getElementById(`dt_${so.id}`);
+    sel.innerHTML = reqd.map(d => `<option value="${d.doctype}">${d.label}</option>`).join('');
+    await refreshDocs(so.id);
+  });
+}
+
+async function refreshDocs(soId){
+  const docs = await api(`/client/service-orders/${soId}/documents`);
+  const c = document.getElementById(`docs_${soId}`);
+  if (!docs.length) { c.innerHTML = '<span class="muted">No documents uploaded yet.</span>'; return; }
+  c.innerHTML = docs.map(d => `
+    <div class="card">
+      <div><b>${d.doctype}</b> <span class="pill">v${d.version}</span></div>
+      <div>${d.filename} • ${(d.sizeBytes||0)/1024|0} KB • <i>${d.uploader}</i></div>
+      <div>Status: <span class="pill doc-status-${d.status.replace('_', '-')}">${d.status}</span> ${d.rejectionReason ? ' – ' + d.rejectionReason : ''}</div>
+      <div class="muted">${new Date(d.createdAt).toLocaleString()}</div>
     </div>
+  `).join('');
+}
+
+async function upload(soId){
+  const fd = new FormData();
+  const f = document.getElementById(`file_${soId}`).files[0];
+  const dt = document.getElementById(`dt_${soId}`).value;
+  if (!f) { alert('Please choose a file'); return; }
+  const url = `/client/service-orders/${soId}/upload?doctype=${encodeURIComponent(dt)}`;
+  fd.append('file', f);
+  const res = await fetch(url, { method:'POST', body: fd });
+  const j = await res.json();
+  if (j.ok) { 
+    alert('✅ Uploaded successfully!'); 
+    await refreshDocs(soId); 
+    // Clear file input
+    document.getElementById(`file_${soId}`).value = '';
+  } else { 
+    alert('❌ ' + (j.error || 'Upload failed')); 
+  }
+}
+
+// Load data on page load
+window.addEventListener('load', loadSO);
+</script>
+</body>
+</html>
 
     <!-- DASHBOARD STATS -->
     <div class="stats">
