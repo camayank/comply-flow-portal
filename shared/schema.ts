@@ -481,6 +481,8 @@ export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
   createdAt: true,
 });
 
+// Tables are defined later in the file
+
 // Enhanced type exports for client portal
 export type BusinessEntity = typeof businessEntities.$inferSelect;
 export type InsertBusinessEntity = z.infer<typeof insertBusinessEntitySchema>;
