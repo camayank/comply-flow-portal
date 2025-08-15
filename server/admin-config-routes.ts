@@ -7,7 +7,8 @@ import {
   dueDateMaster,
   entityServices,
   serviceRequests,
-  businessEntities
+  businessEntities,
+  services
 } from '@shared/schema';
 import { eq, desc, sql, and } from 'drizzle-orm';
 
@@ -16,13 +17,14 @@ export function registerAdminConfigRoutes(app: Express) {
   // ========== SERVICES CATALOG ==========
   app.get('/api/admin/services', async (req, res) => {
     try {
-      const services = await db
+      // Use the existing services table until servicesCatalog is created
+      const servicesList = await db
         .select()
-        .from(servicesCatalog)
-        .where(eq(servicesCatalog.isActive, true))
-        .orderBy(servicesCatalog.category, servicesCatalog.name);
+        .from(services)
+        .where(eq(services.isActive, true))
+        .orderBy(services.category, services.name);
       
-      res.json(services);
+      res.json(servicesList);
     } catch (error) {
       console.error('Error fetching services catalog:', error);
       res.status(500).json({ error: 'Failed to fetch services catalog' });
@@ -34,13 +36,14 @@ export function registerAdminConfigRoutes(app: Express) {
       const { serviceKey, name, periodicity, description, category } = req.body;
       
       const [service] = await db
-        .insert(servicesCatalog)
+        .insert(services)
         .values({
-          serviceKey,
+          serviceId: serviceKey,
           name,
-          periodicity,
+          type: periodicity,
           description,
-          category
+          category,
+          price: 0 // Default price
         })
         .returning();
       

@@ -1089,10 +1089,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register notification and workflow management routes
   const { registerNotificationRoutes } = await import('./notification-routes');
   const { registerWorkflowRoutes } = await import('./workflow-routes');
-  const { registerAdminConfigRoutes } = await import('./admin-config-routes');
-  
   registerNotificationRoutes(app);
   registerWorkflowRoutes(app);
+  
+  // Use simplified admin config routes that work with existing DB
+  const { registerAdminConfigRoutes } = await import('./admin-config-routes-fixed');
   registerAdminConfigRoutes(app);
   
   // Register service orders routes for ops board
@@ -1100,7 +1101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerServiceOrdersRoutes(app);
   
   // Register client portal routes
-  const { registerClientRoutes } = await import('./client-routes');
+  const { registerClientRoutes } = await import('./client-routes-fixed');
   registerClientRoutes(app);
 
   const httpServer = createServer(app);

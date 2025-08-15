@@ -115,44 +115,7 @@ window.addEventListener('load', loadSO);
 </body>
 </html>
 
-    <!-- DASHBOARD STATS -->
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-number" id="stat-active">0</div>
-        <div class="stat-label">Active Services</div>
-      </div>
-      <div class="stat">
-        <div class="stat-number" id="stat-pending">0</div>
-        <div class="stat-label">Pending Actions</div>
-      </div>
-      <div class="stat">
-        <div class="stat-number" id="stat-upcoming">0</div>
-        <div class="stat-label">Upcoming Due</div>
-      </div>
-      <div class="stat">
-        <div class="stat-number" id="stat-completed">0</div>
-        <div class="stat-label">Completed</div>
-      </div>
-    </div>
 
-    <!-- FILTERS -->
-    <div class="filters">
-      <select id="filter-status">
-        <option value="">All Statuses</option>
-        <option value="Created">Created</option>
-        <option value="In Progress">In Progress</option>
-        <option value="Waiting on Client">Waiting on Client</option>
-        <option value="Completed">Completed</option>
-      </select>
-      <select id="filter-service">
-        <option value="">All Services</option>
-        <option value="gst_returns">GST Returns</option>
-        <option value="tds_quarterly">TDS Quarterly</option>
-        <option value="incorporation">Incorporation</option>
-        <option value="annual_filings_roc">Annual Filings</option>
-      </select>
-      <button onclick="loadServices()">Refresh</button>
-    </div>
 
     <!-- SERVICE CARDS -->
     <div class="cards" id="services-grid">
