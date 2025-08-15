@@ -1092,7 +1092,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerNotificationRoutes(app);
   registerWorkflowRoutes(app);
   
-  // Use simplified admin config routes that work with existing DB
+  // Register admin config routes BEFORE client routes to prevent conflicts
   const { registerAdminConfigRoutes } = await import('./admin-config-routes-fixed');
   registerAdminConfigRoutes(app);
   
