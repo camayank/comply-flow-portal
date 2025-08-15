@@ -21,14 +21,14 @@ A comprehensive white-label platform that can be deployed for ANY service provid
 - Target ₹10 Cr national scale-up
 - Agent-focused distribution model (Compliance Rakshaks)
 
-## Recent Changes - ENTERPRISE NOTIFICATION & WORKFLOW SYSTEM
-- **Enterprise Notification Engine**: Multi-channel (Email/WhatsApp/SMS) notification system with smart scheduling, event triggers, and delivery analytics
-- **Admin-Configurable Workflow Builder**: No-code visual workflow designer with drag-and-drop interface, live updates, and impact analysis
-- **Comprehensive Service Template Library**: 12+ pre-built workflows (Incorporation, GST, TDS, Accounting, Annual Filings, ITR, BS&PL)
-- **Real-Time Analytics Dashboard**: Notification performance metrics, workflow efficiency tracking, and business intelligence
-- **Smart Rule Engine**: Schedule-based and event-driven notifications with T-7/T-3/T-1 reminders, SLA escalations, and deduplication
-- **Enterprise Security**: AES-256 encryption, audit trails, role-based access, and compliance-ready data handling
-- **₹100 Cr+ Scale Verification**: Complete enterprise architecture validation with AWS/GCP/Azure deployment readiness
+## Recent Changes - ADMIN NO-CODE CONFIGURATION SYSTEM
+- **Complete Admin Configuration System**: No-code service management, workflow templates, document types, and due date master rules
+- **Automated Service Spawning**: Daily cron-based service order creation using jurisdiction-specific due date calculation rules
+- **Pre-Built Service Library**: 12+ comprehensive compliance workflows (Incorporation → Annual Filings) with Indian regulatory alignment
+- **Enterprise Workflow Builder**: Version-controlled template management with live updates, impact analysis, and publish control
+- **Smart Due Date Engine**: Automated period generation with T-7/T-3/T-1 reminders, QRMP support, and multi-jurisdiction rules
+- **Admin Interface**: Production-ready configuration dashboard at `/admin-config` with intuitive service management
+- **Database Architecture**: 5 new admin tables (services_catalog, workflow_templates_admin, service_doc_types, due_date_master, entity_services)
 
 ## Project Architecture
 - **Frontend**: React TypeScript with Tailwind CSS, shadcn/ui components

@@ -1089,9 +1089,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register notification and workflow management routes
   const { registerNotificationRoutes } = await import('./notification-routes');
   const { registerWorkflowRoutes } = await import('./workflow-routes');
+  const { registerAdminConfigRoutes } = await import('./admin-config-routes');
   
   registerNotificationRoutes(app);
   registerWorkflowRoutes(app);
+  registerAdminConfigRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

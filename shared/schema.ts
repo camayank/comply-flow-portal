@@ -790,6 +790,66 @@ export const notificationTemplates = pgTable("notification_templates", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Admin-Configurable Service Management Tables
+export const servicesCatalog = pgTable("services_catalog", {
+  id: serial("id").primaryKey(),
+  serviceKey: text("service_key").unique().notNull(), // e.g., 'gst_returns', 'tds_quarterly'
+  name: text("name").notNull(), // display name
+  periodicity: text("periodicity").notNull(), // ONE_TIME, MONTHLY, QUARTERLY, ANNUAL
+  description: text("description"),
+  category: text("category"), // incorporation, compliance, accounting, annual
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const workflowTemplatesAdmin = pgTable("workflow_templates_admin", {
+  id: serial("id").primaryKey(),
+  serviceKey: text("service_key").notNull(), // FK to services_catalog.service_key
+  version: integer("version").notNull().default(1),
+  templateJson: text("template_json").notNull(), // full JSON of steps, dependencies, doc rules, QA, SLA
+  isPublished: boolean("is_published").default(false), // true when live
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const serviceDocTypes = pgTable("service_doc_types", {
+  id: serial("id").primaryKey(),
+  serviceKey: text("service_key").notNull(),
+  doctype: text("doctype").notNull(), // e.g., 'sales_register_csv'
+  label: text("label").notNull(), // 'Sales Register (CSV)'
+  clientUploads: boolean("client_uploads").default(true), // client can upload?
+  versioned: boolean("versioned").default(true), // keep versions?
+  isDeliverable: boolean("is_deliverable").default(false), // visible to client as final output?
+  isInternal: boolean("is_internal").default(false), // ops-only workpaper
+  stepKey: text("step_key"), // which workflow step requires this doc
+  mandatory: boolean("mandatory").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const dueDateMaster = pgTable("due_date_master", {
+  id: serial("id").primaryKey(),
+  serviceKey: text("service_key").notNull(), // e.g., 'gst_returns'
+  jurisdiction: text("jurisdiction").default("IN"), // e.g., 'IN', 'IN-DL', 'IN-MH'
+  ruleJson: text("rule_json").notNull(), // JSON rules for computing due dates
+  effectiveFrom: timestamp("effective_from").notNull(), // '2025-04-01'
+  effectiveTo: timestamp("effective_to"), // nullable (current)
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const entityServices = pgTable("entity_services", {
+  id: serial("id").primaryKey(),
+  entityId: integer("entity_id").notNull(),
+  serviceKey: text("service_key").notNull(),
+  periodicityOverride: text("periodicity_override"), // optional override (e.g., 'QUARTERLY')
+  jurisdiction: text("jurisdiction").default("IN"),
+  metaJson: text("meta_json"), // { "scheme": "QRMP", "turnoverBand": "<5cr", ...}
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const systemIntegrations = pgTable("system_integrations", {
   id: serial("id").primaryKey(),
   integrationName: text("integration_name").notNull(), // MCA, GSTN, EPFO, etc

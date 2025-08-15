@@ -40,6 +40,7 @@ import UniversalAdminPanel from "./pages/UniversalAdminPanel";
 import UniversalClientPortal from "./pages/UniversalClientPortal";
 import UniversalOperationsPanel from "./pages/UniversalOperationsPanel";
 import UniversalLandingPage from "./pages/UniversalLandingPage";
+import AdminServiceConfig from "./pages/AdminServiceConfig";
 
 const queryClient = new QueryClient();
 
@@ -73,6 +74,7 @@ const App = () => (
                 <Route path="/universal-admin" component={UniversalAdminPanel} />
                 <Route path="/universal-client" component={UniversalClientPortal} />
                 <Route path="/universal-ops" component={UniversalOperationsPanel} />
+                <Route path="/admin-config" component={AdminServiceConfig} />
                 <Route path="/agent" component={AgentPortal} />
                 <Route path="/agents" component={AgentPortal} />
                 <Route path="/agent-portal" component={AgentPortal} />

@@ -39,9 +39,17 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
   
-  // Initialize middleware synchronization - Disabled to prevent load warnings
-  // const { initializeMiddlewareSync } = await import('./middleware-sync');
-  // initializeMiddlewareSync(server);
+  // Initialize service spawner and seeder
+  console.log('🌱 Initializing service management systems...');
+  const { serviceSpawner } = await import('./service-spawner');
+  const { serviceSeeder } = await import('./service-seeder');
+  
+  // Auto-seed services on startup (development only)
+  if (process.env.NODE_ENV === 'development') {
+    await serviceSeeder.seedAllServices();
+  }
+  
+  console.log('✅ Service management systems initialized');
   
   // Initialize platform-wide synchronization orchestrator
   // const { platformSyncOrchestrator } = await import('./platform-sync-orchestrator');
