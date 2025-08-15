@@ -460,3 +460,181 @@ export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type FAQ = typeof faqs.$inferSelect;
 export type DocumentTemplate = typeof documentTemplates.$inferSelect;
 export type UserSession = typeof userSessions.$inferSelect;
+
+// Operations Team Panel - Additional Schema
+export const operationsTeam = pgTable("operations_team", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  role: text("role").notNull(), // ops_executive, ops_lead, qa_reviewer, admin
+  specialization: json("specialization"), // service types they handle
+  workloadCapacity: integer("workload_capacity").default(10),
+  currentWorkload: integer("current_workload").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const taskTemplates = pgTable("task_templates", {
+  id: serial("id").primaryKey(),
+  serviceId: text("service_id").notNull(),
+  templateName: text("template_name").notNull(),
+  taskList: json("task_list").notNull(), // [{name, description, estimatedHours, dependencies, mandatory}]
+  defaultDeadlines: json("default_deadlines"), // days per task
+  qaRequired: boolean("qa_required").default(false),
+  instructions: text("instructions"),
+  requiredDocuments: json("required_documents"),
+  checklistItems: json("checklist_items"),
+  isActive: boolean("is_active").default(true),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const operationsTasks = pgTable("operations_tasks", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  assignedTo: integer("assigned_to"),
+  assignedBy: integer("assigned_by"),
+  taskName: text("task_name").notNull(),
+  description: text("description"),
+  status: text("status").default("to_do"), // to_do, in_progress, waiting, completed, rework_required
+  priority: text("priority").default("medium"), // low, medium, high, urgent
+  estimatedHours: integer("estimated_hours"),
+  actualHours: integer("actual_hours"),
+  dueDate: timestamp("due_date"),
+  completedAt: timestamp("completed_at"),
+  dependencies: json("dependencies"), // task IDs this depends on
+  isParallel: boolean("is_parallel").default(true),
+  qaRequired: boolean("qa_required").default(false),
+  qaStatus: text("qa_status").default("pending"), // pending, approved, rejected
+  reviewedBy: integer("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  reworkCount: integer("rework_count").default(0),
+  internalNotes: text("internal_notes"),
+  checklistCompleted: json("checklist_completed"), // completed checklist items
+  attachments: json("attachments"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const internalComments = pgTable("internal_comments", {
+  id: serial("id").primaryKey(),
+  entityType: text("entity_type").notNull(), // service_request, task, client
+  entityId: integer("entity_id").notNull(),
+  authorId: integer("author_id").notNull(),
+  content: text("content").notNull(),
+  mentions: json("mentions"), // user IDs mentioned
+  attachments: json("attachments"),
+  isPrivate: boolean("is_private").default(true),
+  parentCommentId: integer("parent_comment_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const handoverHistory = pgTable("handover_history", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id"),
+  taskId: integer("task_id"),
+  fromUserId: integer("from_user_id").notNull(),
+  toUserId: integer("to_user_id").notNull(),
+  handoverReason: text("handover_reason"),
+  handoverNotes: text("handover_notes"),
+  completedTasks: json("completed_tasks"),
+  pendingTasks: json("pending_tasks"),
+  contextNotes: text("context_notes"),
+  handoverDate: timestamp("handover_date").defaultNow(),
+  acceptedAt: timestamp("accepted_at"),
+  isAccepted: boolean("is_accepted").default(false),
+});
+
+export const performanceMetrics = pgTable("performance_metrics", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  period: text("period").notNull(), // daily, weekly, monthly
+  periodDate: timestamp("period_date").notNull(),
+  tasksCompleted: integer("tasks_completed").default(0),
+  tasksOnTime: integer("tasks_on_time").default(0),
+  tasksReworked: integer("tasks_reworked").default(0),
+  totalHoursWorked: integer("total_hours_worked").default(0),
+  avgTaskCompletionTime: integer("avg_task_completion_time"), // in hours
+  slaComplianceRate: decimal("sla_compliance_rate", { precision: 5, scale: 2 }),
+  errorRate: decimal("error_rate", { precision: 5, scale: 2 }),
+  serviceTypeMetrics: json("service_type_metrics"), // per service type performance
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const opsKnowledgeBase = pgTable("ops_knowledge_base", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  category: text("category").notNull(), // sop, reference, template, guide
+  serviceType: text("service_type"), // specific to service
+  tags: json("tags"),
+  attachments: json("attachments"),
+  quickLinks: json("quick_links"), // external links
+  viewCount: integer("view_count").default(0),
+  lastViewed: timestamp("last_viewed"),
+  isActive: boolean("is_active").default(true),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const taskAssignments = pgTable("task_assignments", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  assignedTo: integer("assigned_to").notNull(),
+  assignedBy: integer("assigned_by").notNull(),
+  assignmentType: text("assignment_type").default("manual"), // manual, auto
+  priority: text("priority").default("medium"),
+  estimatedWorkload: integer("estimated_workload"), // hours
+  assignmentNotes: text("assignment_notes"),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+  acceptedAt: timestamp("accepted_at"),
+  isAccepted: boolean("is_accepted").default(false),
+});
+
+// Insert schemas for operations
+export const insertOperationsTeamSchema = createInsertSchema(operationsTeam).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaskTemplateSchema = createInsertSchema(taskTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertOperationsTaskSchema = createInsertSchema(operationsTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertInternalCommentSchema = createInsertSchema(internalComments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertHandoverHistorySchema = createInsertSchema(handoverHistory).omit({
+  id: true,
+  handoverDate: true,
+});
+
+// Type exports for operations
+export type OperationsTeam = typeof operationsTeam.$inferSelect;
+export type InsertOperationsTeam = z.infer<typeof insertOperationsTeamSchema>;
+export type TaskTemplate = typeof taskTemplates.$inferSelect;
+export type InsertTaskTemplate = z.infer<typeof insertTaskTemplateSchema>;
+export type OperationsTask = typeof operationsTasks.$inferSelect;
+export type InsertOperationsTask = z.infer<typeof insertOperationsTaskSchema>;
+export type InternalComment = typeof internalComments.$inferSelect;
+export type InsertInternalComment = z.infer<typeof insertInternalCommentSchema>;
+export type HandoverHistory = typeof handoverHistory.$inferSelect;
+export type InsertHandoverHistory = z.infer<typeof insertHandoverHistorySchema>;
+export type PerformanceMetrics = typeof performanceMetrics.$inferSelect;
+export type OpsKnowledgeBase = typeof opsKnowledgeBase.$inferSelect;
+export type TaskAssignment = typeof taskAssignments.$inferSelect;

@@ -33,6 +33,7 @@ import SmartStart from "./pages/SmartStart";
 import WhatsAppOnboarding from "./pages/WhatsAppOnboarding";
 import ComplianceScorecard from "./pages/ComplianceScorecard";
 import ClientPortal from "./pages/ClientPortal";
+import OperationsPanel from "./pages/OperationsPanel";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,8 @@ const App = () => (
                 <Route path="/compliance-scorecard" component={ComplianceScorecard} />
                 <Route path="/portal" component={ClientPortal} />
                 <Route path="/client-portal" component={ClientPortal} />
+                <Route path="/operations" component={OperationsPanel} />
+                <Route path="/ops" component={OperationsPanel} />
                 <Route path="/admin" component={AdminPanel} />
                 <Route path="/onboarding" component={Onboarding} />
                 <Route path="/streamlined-onboarding" component={StreamlinedOnboarding} />
