@@ -638,3 +638,222 @@ export type InsertHandoverHistory = z.infer<typeof insertHandoverHistorySchema>;
 export type PerformanceMetrics = typeof performanceMetrics.$inferSelect;
 export type OpsKnowledgeBase = typeof opsKnowledgeBase.$inferSelect;
 export type TaskAssignment = typeof taskAssignments.$inferSelect;
+
+// Admin Control Panel - Additional Schema
+export const adminUsers = pgTable("admin_users", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  role: text("role").notNull(), // super_admin, sub_admin, viewer
+  permissions: json("permissions").notNull(), // detailed permission matrix
+  accessLevel: text("access_level").default("limited"), // full, limited, readonly
+  ipRestrictions: json("ip_restrictions"), // allowed IP addresses
+  sessionTimeout: integer("session_timeout").default(3600), // seconds
+  lastLogin: timestamp("last_login"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const serviceCatalogue = pgTable("service_catalogue", {
+  id: serial("id").primaryKey(),
+  serviceCode: text("service_code").notNull().unique(),
+  serviceName: text("service_name").notNull(),
+  description: text("description"),
+  category: text("category"), // incorporation, tax, license, compliance
+  documentsRequired: json("documents_required"), // list of required documents
+  standardSLA: integer("standard_sla_hours").default(72), // hours
+  estimatedCost: decimal("estimated_cost", { precision: 10, scale: 2 }),
+  complexity: text("complexity").default("medium"), // low, medium, high
+  isActive: boolean("is_active").default(true),
+  workflowTemplateId: integer("workflow_template_id"),
+  customFields: json("custom_fields"), // service-specific data fields
+  dependencies: json("dependencies"), // other services this depends on
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const workflowTemplates = pgTable("workflow_templates", {
+  id: serial("id").primaryKey(),
+  templateName: text("template_name").notNull(),
+  serviceCode: text("service_code").notNull(),
+  workflowSteps: json("workflow_steps").notNull(), // drag-drop workflow definition
+  version: integer("version").default(1),
+  isActive: boolean("is_active").default(true),
+  globalTemplate: boolean("global_template").default(true), // affects all services
+  customForms: json("custom_forms"), // custom data collection forms
+  approvalNodes: json("approval_nodes"), // QA checkpoints
+  escalationRules: json("escalation_rules"), // SLA escalation logic
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const slaSettings = pgTable("sla_settings", {
+  id: serial("id").primaryKey(),
+  serviceCode: text("service_code").notNull(),
+  taskType: text("task_type"), // specific task or entire service
+  standardHours: integer("standard_hours").notNull(),
+  escalationTiers: json("escalation_tiers"), // multi-level escalation
+  clientNotificationHours: integer("client_notification_hours").default(24),
+  exceptionRules: json("exception_rules"), // holiday adjustments, etc
+  isActive: boolean("is_active").default(true),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const slaExceptions = pgTable("sla_exceptions", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  originalDeadline: timestamp("original_deadline").notNull(),
+  extendedDeadline: timestamp("extended_deadline").notNull(),
+  extensionReason: text("extension_reason").notNull(),
+  approvedBy: integer("approved_by").notNull(),
+  clientNotified: boolean("client_notified").default(false),
+  extensionHours: integer("extension_hours"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const systemIntegrations = pgTable("system_integrations", {
+  id: serial("id").primaryKey(),
+  integrationName: text("integration_name").notNull(), // MCA, GSTN, EPFO, etc
+  apiEndpoint: text("api_endpoint"),
+  authType: text("auth_type"), // oauth, api_key, certificate
+  credentials: text("credentials"), // encrypted credentials
+  isActive: boolean("is_active").default(true),
+  lastSync: timestamp("last_sync"),
+  syncStatus: text("sync_status").default("healthy"), // healthy, error, syncing
+  errorDetails: text("error_details"),
+  rateLimits: json("rate_limits"), // API rate limiting info
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const systemNotifications = pgTable("system_notifications", {
+  id: serial("id").primaryKey(),
+  notificationType: text("notification_type").notNull(), // sla_breach, client_delay, etc
+  triggerConditions: json("trigger_conditions"), // when to trigger
+  recipients: json("recipients"), // who gets notified
+  channels: json("channels"), // email, whatsapp, in_app
+  messageTemplate: text("message_template"),
+  isActive: boolean("is_active").default(true),
+  priority: text("priority").default("medium"), // low, medium, high, critical
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  action: text("action").notNull(), // create, update, delete, login, etc
+  entityType: text("entity_type").notNull(), // user, service, client, etc
+  entityId: text("entity_id"),
+  oldValue: json("old_value"),
+  newValue: json("new_value"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  sessionId: text("session_id"),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+export const systemConfiguration = pgTable("system_configuration", {
+  id: serial("id").primaryKey(),
+  configKey: text("config_key").notNull().unique(),
+  configValue: json("config_value").notNull(),
+  category: text("category").notNull(), // branding, security, integration, etc
+  description: text("description"),
+  isEncrypted: boolean("is_encrypted").default(false),
+  lastModifiedBy: integer("last_modified_by"),
+  lastModified: timestamp("last_modified").defaultNow(),
+});
+
+export const performanceDashboard = pgTable("performance_dashboard", {
+  id: serial("id").primaryKey(),
+  metricType: text("metric_type").notNull(), // sla_compliance, team_performance, etc
+  period: text("period").notNull(), // daily, weekly, monthly
+  periodDate: timestamp("period_date").notNull(),
+  metricData: json("metric_data").notNull(), // aggregated performance data
+  generatedAt: timestamp("generated_at").defaultNow(),
+});
+
+export const agentPartners = pgTable("agent_partners", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  agentCode: text("agent_code").notNull().unique(),
+  territory: text("territory"), // state, city, region
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default(15.00),
+  leadConversionRate: decimal("lead_conversion_rate", { precision: 5, scale: 2 }),
+  totalCommissionEarned: decimal("total_commission_earned", { precision: 10, scale: 2 }).default(0),
+  leadsGenerated: integer("leads_generated").default(0),
+  leadsConverted: integer("leads_converted").default(0),
+  performanceRating: decimal("performance_rating", { precision: 3, scale: 2 }),
+  isActive: boolean("is_active").default(true),
+  onboardedAt: timestamp("onboarded_at").defaultNow(),
+  lastActivity: timestamp("last_activity"),
+});
+
+export const workflowExecutions = pgTable("workflow_executions", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  workflowTemplateId: integer("workflow_template_id").notNull(),
+  currentStep: integer("current_step").default(0),
+  executionData: json("execution_data"), // current state and variables
+  bottleneckDetected: boolean("bottleneck_detected").default(false),
+  averageStepTime: json("average_step_time"), // timing analytics per step
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  status: text("status").default("in_progress"), // in_progress, completed, failed, paused
+});
+
+// Insert schemas for admin
+export const insertAdminUserSchema = createInsertSchema(adminUsers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertServiceCatalogueSchema = createInsertSchema(serviceCatalogue).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertWorkflowTemplateSchema = createInsertSchema(workflowTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSlaSettingSchema = createInsertSchema(slaSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSystemIntegrationSchema = createInsertSchema(systemIntegrations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Type exports for admin
+export type AdminUser = typeof adminUsers.$inferSelect;
+export type InsertAdminUser = z.infer<typeof insertAdminUserSchema>;
+export type ServiceCatalogue = typeof serviceCatalogue.$inferSelect;
+export type InsertServiceCatalogue = z.infer<typeof insertServiceCatalogueSchema>;
+export type WorkflowTemplate = typeof workflowTemplates.$inferSelect;
+export type InsertWorkflowTemplate = z.infer<typeof insertWorkflowTemplateSchema>;
+export type SlaSettings = typeof slaSettings.$inferSelect;
+export type InsertSlaSettings = z.infer<typeof insertSlaSettingSchema>;
+export type SlaException = typeof slaExceptions.$inferSelect;
+export type SystemIntegration = typeof systemIntegrations.$inferSelect;
+export type InsertSystemIntegration = z.infer<typeof insertSystemIntegrationSchema>;
+export type SystemNotification = typeof systemNotifications.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type SystemConfiguration = typeof systemConfiguration.$inferSelect;
+export type PerformanceDashboard = typeof performanceDashboard.$inferSelect;
+export type AgentPartner = typeof agentPartners.$inferSelect;
+export type WorkflowExecution = typeof workflowExecutions.$inferSelect;

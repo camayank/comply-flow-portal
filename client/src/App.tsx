@@ -60,6 +60,7 @@ const App = () => (
                 <Route path="/operations" component={OperationsPanel} />
                 <Route path="/ops" component={OperationsPanel} />
                 <Route path="/admin" component={AdminPanel} />
+                <Route path="/admin-control" component={AdminPanel} />
                 <Route path="/onboarding" component={Onboarding} />
                 <Route path="/streamlined-onboarding" component={StreamlinedOnboarding} />
                 <Route path="/business-type" component={BusinessType} />
