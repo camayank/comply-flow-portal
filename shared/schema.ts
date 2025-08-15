@@ -857,3 +857,240 @@ export type SystemConfiguration = typeof systemConfiguration.$inferSelect;
 export type PerformanceDashboard = typeof performanceDashboard.$inferSelect;
 export type AgentPartner = typeof agentPartners.$inferSelect;
 export type WorkflowExecution = typeof workflowExecutions.$inferSelect;
+
+// Agent/Partner Portal - Additional Schema
+export const agentProfiles = pgTable("agent_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  agentCode: text("agent_code").notNull().unique(),
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  assignedTerritory: text("assigned_territory"), // state, city, region
+  joiningDate: timestamp("joining_date").defaultNow(),
+  role: text("role").default("agent"), // agent, regional_manager
+  isActive: boolean("is_active").default(true),
+  deviceRestrictions: json("device_restrictions"), // allowed devices/IPs
+  performanceRating: decimal("performance_rating", { precision: 3, scale: 2 }),
+  totalCommissionEarned: decimal("total_commission_earned", { precision: 10, scale: 2 }).default(0),
+  pendingPayouts: decimal("pending_payouts", { precision: 10, scale: 2 }).default(0),
+  clearedPayouts: decimal("cleared_payouts", { precision: 10, scale: 2 }).default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const leads = pgTable("leads", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  clientName: text("client_name").notNull(),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone").notNull(),
+  entityType: text("entity_type"), // pvt_ltd, partnership, proprietorship, etc
+  requiredServices: json("required_services"), // array of service codes
+  leadSource: text("lead_source"), // whatsapp, referral, cold_call, etc
+  status: text("status").default("new"), // new, contacted, converted, in_progress, closed, lost
+  priority: text("priority").default("medium"), // low, medium, high
+  kycDocuments: json("kyc_documents"), // uploaded document references
+  leadLocation: json("lead_location"), // geo-tagging data
+  estimatedValue: decimal("estimated_value", { precision: 10, scale: 2 }),
+  conversionProbability: integer("conversion_probability"), // AI lead scoring 0-100
+  lastContactDate: timestamp("last_contact_date"),
+  nextFollowupDate: timestamp("next_followup_date"),
+  notes: text("notes"),
+  convertedAt: timestamp("converted_at"),
+  closedAt: timestamp("closed_at"),
+  lostReason: text("lost_reason"),
+  assignedTo: integer("assigned_to"), // for lead transfer
+  transferApprovalStatus: text("transfer_approval_status").default("pending"), // pending, approved, rejected
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const commissionRecords = pgTable("commission_records", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  leadId: integer("lead_id"),
+  serviceRequestId: integer("service_request_id"),
+  serviceCode: text("service_code").notNull(),
+  clientName: text("client_name").notNull(),
+  commissionType: text("commission_type").default("direct"), // direct, override, bonus
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }),
+  serviceValue: decimal("service_value", { precision: 10, scale: 2 }),
+  commissionAmount: decimal("commission_amount", { precision: 10, scale: 2 }),
+  status: text("status").default("pending"), // pending, cleared, disputed
+  earnedDate: timestamp("earned_date").defaultNow(),
+  payoutDate: timestamp("payout_date"),
+  disputeReason: text("dispute_reason"),
+  disputeStatus: text("dispute_status"), // raised, under_review, resolved, rejected
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const marketingResources = pgTable("marketing_resources", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category").notNull(), // brochure, presentation, creative, training, case_study
+  fileType: text("file_type"), // pdf, pptx, jpg, mp4, etc
+  fileUrl: text("file_url").notNull(),
+  fileSize: integer("file_size"), // in bytes
+  downloadCount: integer("download_count").default(0),
+  isActive: boolean("is_active").default(true),
+  targetAudience: text("target_audience"), // new_agents, experienced, all
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  uploadedBy: integer("uploaded_by"),
+  tags: json("tags"), // searchable tags
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const agentCommunications = pgTable("agent_communications", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  adminUserId: integer("admin_user_id"),
+  messageType: text("message_type").notNull(), // chat, announcement, support_ticket
+  subject: text("subject"),
+  message: text("message").notNull(),
+  attachments: json("attachments"),
+  status: text("status").default("open"), // open, in_progress, resolved, closed
+  priority: text("priority").default("medium"), // low, medium, high, urgent
+  isRead: boolean("is_read").default(false),
+  responseTime: integer("response_time"), // in minutes
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const agentPerformanceMetrics = pgTable("agent_performance_metrics", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  period: text("period").notNull(), // daily, weekly, monthly
+  periodDate: timestamp("period_date").notNull(),
+  leadsSubmitted: integer("leads_submitted").default(0),
+  leadsContacted: integer("leads_contacted").default(0),
+  leadsConverted: integer("leads_converted").default(0),
+  leadsLost: integer("leads_lost").default(0),
+  conversionRate: decimal("conversion_rate", { precision: 5, scale: 2 }),
+  totalCommissionEarned: decimal("total_commission_earned", { precision: 10, scale: 2 }).default(0),
+  topServices: json("top_services"), // service breakdown
+  averageLeadValue: decimal("average_lead_value", { precision: 10, scale: 2 }),
+  responseTime: integer("response_time"), // average response time in hours
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const agentAnnouncements = pgTable("agent_announcements", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  announcementType: text("announcement_type").default("general"), // general, promotion, compliance, training
+  priority: text("priority").default("medium"), // low, medium, high, urgent
+  targetAudience: json("target_audience"), // specific agents or all
+  isActive: boolean("is_active").default(true),
+  validUntil: timestamp("valid_until"),
+  readByAgents: json("read_by_agents"), // array of agent IDs who read it
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const leadAutomation = pgTable("lead_automation", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id").notNull(),
+  automationType: text("automation_type").notNull(), // nurturing, reminder, revival
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  executedAt: timestamp("executed_at"),
+  status: text("status").default("scheduled"), // scheduled, executed, failed, cancelled
+  messageChannel: text("message_channel"), // whatsapp, email, sms
+  messageContent: text("message_content"),
+  responseReceived: boolean("response_received").default(false),
+  nextActionScheduled: timestamp("next_action_scheduled"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const agentReferrals = pgTable("agent_referrals", {
+  id: serial("id").primaryKey(),
+  parentAgentId: integer("parent_agent_id").notNull(),
+  subAgentId: integer("sub_agent_id").notNull(),
+  referralCode: text("referral_code").notNull().unique(),
+  referralStatus: text("referral_status").default("active"), // active, inactive, suspended
+  overrideCommissionRate: decimal("override_commission_rate", { precision: 5, scale: 2 }).default(5.00),
+  totalOverrideEarned: decimal("total_override_earned", { precision: 10, scale: 2 }).default(0),
+  onboardedAt: timestamp("onboarded_at").defaultNow(),
+  lastActivityAt: timestamp("last_activity_at"),
+});
+
+export const incentivePrograms = pgTable("incentive_programs", {
+  id: serial("id").primaryKey(),
+  programName: text("program_name").notNull(),
+  description: text("description"),
+  programType: text("program_type").notNull(), // monthly_target, quarterly_bonus, annual_award
+  qualificationCriteria: json("qualification_criteria"), // targets and conditions
+  rewardStructure: json("reward_structure"), // rewards and amounts
+  validFrom: timestamp("valid_from").notNull(),
+  validUntil: timestamp("valid_until").notNull(),
+  isActive: boolean("is_active").default(true),
+  participatingAgents: json("participating_agents"), // eligible agent IDs
+  winnersRecord: json("winners_record"), // historical winners
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const agentAuditLogs = pgTable("agent_audit_logs", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(),
+  action: text("action").notNull(), // login, lead_submit, commission_view, etc
+  entityType: text("entity_type"), // lead, commission, resource, etc
+  entityId: text("entity_id"),
+  details: json("details"), // action-specific details
+  ipAddress: text("ip_address"),
+  deviceInfo: text("device_info"),
+  userAgent: text("user_agent"),
+  sessionId: text("session_id"),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+// Insert schemas for agent portal
+export const insertAgentProfileSchema = createInsertSchema(agentProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLeadSchema = createInsertSchema(leads).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCommissionRecordSchema = createInsertSchema(commissionRecords).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertMarketingResourceSchema = createInsertSchema(marketingResources).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAgentCommunicationSchema = createInsertSchema(agentCommunications).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Type exports for agent portal
+export type AgentProfile = typeof agentProfiles.$inferSelect;
+export type InsertAgentProfile = z.infer<typeof insertAgentProfileSchema>;
+export type Lead = typeof leads.$inferSelect;
+export type InsertLead = z.infer<typeof insertLeadSchema>;
+export type CommissionRecord = typeof commissionRecords.$inferSelect;
+export type InsertCommissionRecord = z.infer<typeof insertCommissionRecordSchema>;
+export type MarketingResource = typeof marketingResources.$inferSelect;
+export type InsertMarketingResource = z.infer<typeof insertMarketingResourceSchema>;
+export type AgentCommunication = typeof agentCommunications.$inferSelect;
+export type InsertAgentCommunication = z.infer<typeof insertAgentCommunicationSchema>;
+export type AgentPerformanceMetrics = typeof agentPerformanceMetrics.$inferSelect;
+export type AgentAnnouncement = typeof agentAnnouncements.$inferSelect;
+export type LeadAutomation = typeof leadAutomation.$inferSelect;
+export type AgentReferral = typeof agentReferrals.$inferSelect;
+export type IncentiveProgram = typeof incentivePrograms.$inferSelect;
+export type AgentAuditLog = typeof agentAuditLogs.$inferSelect;

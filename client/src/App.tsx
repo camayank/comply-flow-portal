@@ -34,6 +34,7 @@ import WhatsAppOnboarding from "./pages/WhatsAppOnboarding";
 import ComplianceScorecard from "./pages/ComplianceScorecard";
 import ClientPortal from "./pages/ClientPortal";
 import OperationsPanel from "./pages/OperationsPanel";
+import AgentPortal from "./pages/AgentPortal";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +62,11 @@ const App = () => (
                 <Route path="/ops" component={OperationsPanel} />
                 <Route path="/admin" component={AdminPanel} />
                 <Route path="/admin-control" component={AdminPanel} />
+                <Route path="/agent" component={AgentPortal} />
+                <Route path="/agents" component={AgentPortal} />
+                <Route path="/agent-portal" component={AgentPortal} />
+                <Route path="/partner" component={AgentPortal} />
+                <Route path="/partners" component={AgentPortal} />
                 <Route path="/onboarding" component={Onboarding} />
                 <Route path="/streamlined-onboarding" component={StreamlinedOnboarding} />
                 <Route path="/business-type" component={BusinessType} />
