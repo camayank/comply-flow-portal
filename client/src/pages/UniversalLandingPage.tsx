@@ -36,11 +36,11 @@ import {
 
 const UniversalLandingPage = () => {
   const industries = [
-    { icon: Shield, name: "Legal Services", desc: "Law firms, legal consultants, compliance specialists" },
-    { icon: Calculator, name: "Accounting", desc: "CA firms, tax consultants, bookkeeping services" },
-    { icon: Briefcase, name: "Consulting", desc: "Business consultants, management advisors" },
+    { icon: Shield, name: "Legal & Compliance", desc: "DigiComply's core: Indian startup compliance, legal services" },
+    { icon: Calculator, name: "Accounting", desc: "CA firms, tax consultants, GST registration, ROC filing" },
+    { icon: Briefcase, name: "Business Consulting", desc: "Management advisors, strategy consultants" },
     { icon: Heart, name: "Healthcare", desc: "Clinics, diagnostic centers, wellness services" },
-    { icon: Code, name: "Technology", desc: "IT services, software development, tech support" },
+    { icon: Code, name: "Technology Services", desc: "IT consulting, software development, tech support" },
     { icon: GraduationCap, name: "Education", desc: "Training institutes, online courses, coaching" },
     { icon: Building, name: "Real Estate", desc: "Property consultants, real estate agencies" },
     { icon: DollarSign, name: "Financial Services", desc: "Insurance, loans, investment advisory" }
@@ -119,15 +119,15 @@ const UniversalLandingPage = () => {
               Universal Service Provider Platform
             </Badge>
             <h1 className="text-4xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
-              Transform Any Service Business
+              Universal Service Provider Platform
               <span className="block text-blue-600 dark:text-blue-400 mt-2">
-                Into a Digital Powerhouse
+                Built on DigiComply Foundation
               </span>
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
-              White-label platform that adapts to ANY service provider business. 
-              From legal firms to healthcare clinics, accounting practices to consulting agencies - 
-              deploy enterprise-grade client management, operations orchestration, and growth systems.
+              Originally built for legal compliance management for Indian founders, now evolved into a 
+              comprehensive white-label platform for ANY service provider business. Deploy enterprise-grade 
+              client management, operations orchestration, and compliance workflows across industries.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/universal-admin">
@@ -178,6 +178,46 @@ const UniversalLandingPage = () => {
                 </Card>
               </Link>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* DigiComply Heritage Section */}
+      <div className="py-16 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900 dark:to-blue-900">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <Badge className="mb-4 bg-green-100 text-green-800 border-green-200">
+            Built on DigiComply Foundation
+          </Badge>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            From Indian Startup Compliance to Universal Platform
+          </h2>
+          <p className="text-lg text-gray-600 dark:text-gray-300 leading-relaxed">
+            Originally developed as <strong>DigiComply</strong> - a comprehensive legal compliance management platform 
+            specifically designed for Indian founders and startups. Now evolved into a universal white-label solution 
+            that powers service provider businesses across industries while maintaining its compliance expertise foundation.
+          </p>
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="bg-white/80 backdrop-blur">
+              <CardContent className="p-4 text-center">
+                <Shield className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                <h3 className="font-semibold mb-1">Compliance Heritage</h3>
+                <p className="text-sm text-gray-600">Company incorporation, GST, ROC filing expertise</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-white/80 backdrop-blur">
+              <CardContent className="p-4 text-center">
+                <Globe className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                <h3 className="font-semibold mb-1">Universal Evolution</h3>
+                <p className="text-sm text-gray-600">Expanded to serve ANY service provider business</p>
+              </CardContent>
+            </Card>
+            <Card className="bg-white/80 backdrop-blur">
+              <CardContent className="p-4 text-center">
+                <Rocket className="w-8 h-8 text-purple-600 mx-auto mb-2" />
+                <h3 className="font-semibold mb-1">₹10 Cr+ Scale</h3>
+                <p className="text-sm text-gray-600">Enterprise platform ready for national deployment</p>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

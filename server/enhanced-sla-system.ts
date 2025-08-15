@@ -1,5 +1,6 @@
 import { eq, and, lt } from "drizzle-orm";
 import { db } from "./db";
+import { serviceRequests, slaTimers, slaExceptions, notifications } from "@shared/schema";
 
 // Enhanced SLA System for DigiComply
 // Implements advanced timer management, escalations, and exceptions
