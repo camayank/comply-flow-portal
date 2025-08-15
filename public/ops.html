@@ -1,0 +1,380 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>DigiComply Ops Board</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 16px; background: #f8fafc; }
+    h1 { margin-bottom: 24px; }
+    .board { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .column { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .column h3 { margin: 0 0 12px 0; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
+    .card:hover { border-color: #3b82f6; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1); }
+    .card-header { display: flex; justify-content: between; align-items: flex-start; margin-bottom: 8px; }
+    .card-title { font-weight: 500; font-size: 14px; color: #111827; margin: 0; }
+    .card-entity { font-size: 12px; color: #6b7280; margin: 0; }
+    .card-meta { font-size: 11px; color: #9ca3af; display: flex; justify-content: space-between; margin-top: 8px; }
+    .badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 500; }
+    .high { background: #fef2f2; color: #b91c1c; }
+    .medium { background: #fffbeb; color: #d97706; }
+    .low { background: #f0fdf4; color: #16a34a; }
+    .overdue { background: #fef2f2; color: #b91c1c; border-left: 4px solid #ef4444; }
+    .filters { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .filters input, .filters select, .filters button { padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; }
+    .filters button { background: #3b82f6; color: #fff; border: none; cursor: pointer; }
+    .status-actions { margin-top: 8px; display: flex; gap: 4px; flex-wrap: wrap; }
+    .status-btn { padding: 4px 8px; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: 500; }
+    .status-btn.created { background: #e5e7eb; color: #374151; }
+    .status-btn.progress { background: #dbeafe; color: #1d4ed8; }
+    .status-btn.waiting { background: #fef3c7; color: #d97706; }
+    .status-btn.completed { background: #d1fae5; color: #16a34a; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+    .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; border-radius: 12px; padding: 24px; width: 90%; max-width: 500px; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .close { cursor: pointer; font-size: 24px; color: #6b7280; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 12px; color: #374151; margin-bottom: 4px; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px; }
+    .btn-primary { background: #3b82f6; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .stat { background: #fff; padding: 12px; border-radius: 8px; text-align: center; }
+    .stat-number { font-size: 24px; font-weight: 600; color: #111827; }
+    .stat-label { font-size: 11px; color: #6b7280; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <h1>DigiComply Operations Board</h1>
+  
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-number" id="stat-total">0</div>
+      <div class="stat-label">Total Orders</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number" id="stat-pending">0</div>
+      <div class="stat-label">Pending</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number" id="stat-progress">0</div>
+      <div class="stat-label">In Progress</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number" id="stat-overdue">0</div>
+      <div class="stat-label">Overdue</div>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filters">
+    <input id="filter-entity" placeholder="Filter by entity..." />
+    <select id="filter-service">
+      <option value="">All Services</option>
+      <option value="gst_returns">GST Returns</option>
+      <option value="tds_quarterly">TDS Quarterly</option>
+      <option value="incorporation">Incorporation</option>
+      <option value="annual_filings_roc">Annual Filings</option>
+    </select>
+    <select id="filter-priority">
+      <option value="">All Priorities</option>
+      <option value="HIGH">High</option>
+      <option value="MEDIUM">Medium</option>
+      <option value="LOW">Low</option>
+    </select>
+    <button onclick="loadBoard()">Refresh</button>
+    <button onclick="spawnDemo()">Spawn Demo Orders</button>
+  </div>
+
+  <!-- KANBAN BOARD -->
+  <div class="board">
+    <div class="column">
+      <h3>📋 Created</h3>
+      <div id="col-created"></div>
+    </div>
+    <div class="column">
+      <h3>⚡ In Progress</h3>
+      <div id="col-progress"></div>
+    </div>
+    <div class="column">
+      <h3>⏳ Waiting on Client</h3>
+      <div id="col-waiting"></div>
+    </div>
+    <div class="column">
+      <h3>✅ Completed</h3>
+      <div id="col-completed"></div>
+    </div>
+  </div>
+
+  <!-- MODAL FOR ORDER DETAILS -->
+  <div id="order-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Service Order Details</h3>
+        <span class="close" onclick="closeModal()">&times;</span>
+      </div>
+      <div class="form-group">
+        <label>Service Type</label>
+        <input id="modal-service" readonly />
+      </div>
+      <div class="form-group">
+        <label>Entity</label>
+        <input id="modal-entity" readonly />
+      </div>
+      <div class="form-group">
+        <label>Period</label>
+        <input id="modal-period" readonly />
+      </div>
+      <div class="form-group">
+        <label>Due Date</label>
+        <input id="modal-due" readonly />
+      </div>
+      <div class="form-group">
+        <label>Current Status</label>
+        <select id="modal-status">
+          <option value="Created">Created</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Waiting on Client">Waiting on Client</option>
+          <option value="QA Review">QA Review</option>
+          <option value="Completed">Completed</option>
+          <option value="On Hold">On Hold</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="modal-notes" placeholder="Add status update notes..." rows="3"></textarea>
+      </div>
+      <div style="text-align: right;">
+        <button class="btn-primary" onclick="updateOrderStatus()">Update Status</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+let currentOrder = null;
+const api = (p, opt={}) => fetch(p, { headers:{'Content-Type':'application/json'}, ...opt }).then(r=>r.json());
+
+async function loadBoard() {
+  try {
+    const orders = await api('/api/service-orders');
+    
+    // Calculate stats
+    updateStats(orders);
+    
+    // Group by status
+    const groups = {
+      'Created': [],
+      'In Progress': [],
+      'Waiting on Client': [],
+      'Completed': []
+    };
+    
+    orders.forEach(order => {
+      const status = order.status || 'Created';
+      if (groups[status]) {
+        groups[status].push(order);
+      } else {
+        groups['Created'].push(order); // fallback
+      }
+    });
+    
+    // Apply filters
+    const entityFilter = document.getElementById('filter-entity').value.toLowerCase();
+    const serviceFilter = document.getElementById('filter-service').value;
+    const priorityFilter = document.getElementById('filter-priority').value;
+    
+    Object.keys(groups).forEach(status => {
+      groups[status] = groups[status].filter(order => {
+        if (entityFilter && !order.entityName?.toLowerCase().includes(entityFilter)) return false;
+        if (serviceFilter && order.serviceType !== serviceFilter) return false;
+        if (priorityFilter && order.priority !== priorityFilter) return false;
+        return true;
+      });
+    });
+    
+    // Render columns
+    renderColumn('created', groups['Created']);
+    renderColumn('progress', groups['In Progress']);
+    renderColumn('waiting', groups['Waiting on Client']);
+    renderColumn('completed', groups['Completed']);
+    
+  } catch (error) {
+    console.error('Error loading board:', error);
+  }
+}
+
+function updateStats(orders) {
+  const total = orders.length;
+  const pending = orders.filter(o => o.status === 'Created').length;
+  const progress = orders.filter(o => o.status === 'In Progress').length;
+  const overdue = orders.filter(o => new Date(o.dueDate) < new Date() && o.status !== 'Completed').length;
+  
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-pending').textContent = pending;
+  document.getElementById('stat-progress').textContent = progress;
+  document.getElementById('stat-overdue').textContent = overdue;
+}
+
+function renderColumn(colId, orders) {
+  const column = document.getElementById(`col-${colId}`);
+  
+  if (orders.length === 0) {
+    column.innerHTML = '<div style="color: #9ca3af; text-align: center; padding: 20px; font-size: 13px;">No orders</div>';
+    return;
+  }
+  
+  column.innerHTML = orders.map(order => {
+    const isOverdue = new Date(order.dueDate) < new Date() && order.status !== 'Completed';
+    const priorityClass = (order.priority || 'MEDIUM').toLowerCase();
+    
+    return `
+      <div class="card ${isOverdue ? 'overdue' : ''}" onclick="openOrderModal(${order.id})">
+        <div class="card-header">
+          <h4 class="card-title">${order.serviceType}</h4>
+          <span class="badge ${priorityClass}">${order.priority || 'MEDIUM'}</span>
+        </div>
+        <p class="card-entity">${order.entityName || 'Unknown Entity'}</p>
+        <div class="card-meta">
+          <span>${order.periodLabel || 'N/A'}</span>
+          <span>Due: ${formatDate(order.dueDate)}</span>
+        </div>
+        <div class="status-actions">
+          ${getStatusButtons(order)}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function getStatusButtons(order) {
+  const currentStatus = order.status || 'Created';
+  const buttons = [];
+  
+  if (currentStatus === 'Created') {
+    buttons.push('<button class="status-btn progress" onclick="quickStatusChange(event, ' + order.id + ', \'In Progress\')">Start</button>');
+  }
+  
+  if (currentStatus === 'In Progress') {
+    buttons.push('<button class="status-btn waiting" onclick="quickStatusChange(event, ' + order.id + ', \'Waiting on Client\')">Wait Client</button>');
+    buttons.push('<button class="status-btn completed" onclick="quickStatusChange(event, ' + order.id + ', \'Completed\')">Complete</button>');
+  }
+  
+  if (currentStatus === 'Waiting on Client') {
+    buttons.push('<button class="status-btn progress" onclick="quickStatusChange(event, ' + order.id + ', \'In Progress\')">Resume</button>');
+  }
+  
+  return buttons.join('');
+}
+
+async function quickStatusChange(event, orderId, newStatus) {
+  event.stopPropagation();
+  
+  try {
+    await api(`/api/service-orders/${orderId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        from: 'current',
+        to: newStatus,
+        timestamp: new Date().toISOString()
+      })
+    });
+    
+    // Reload board
+    await loadBoard();
+    
+  } catch (error) {
+    console.error('Error updating status:', error);
+    alert('Failed to update status');
+  }
+}
+
+async function openOrderModal(orderId) {
+  try {
+    const order = await api(`/api/service-orders/${orderId}`);
+    currentOrder = order;
+    
+    document.getElementById('modal-service').value = order.serviceType || '';
+    document.getElementById('modal-entity').value = order.entityName || '';
+    document.getElementById('modal-period').value = order.periodLabel || '';
+    document.getElementById('modal-due').value = formatDate(order.dueDate);
+    document.getElementById('modal-status').value = order.status || 'Created';
+    document.getElementById('modal-notes').value = '';
+    
+    document.getElementById('order-modal').style.display = 'block';
+    
+  } catch (error) {
+    console.error('Error loading order details:', error);
+  }
+}
+
+async function updateOrderStatus() {
+  if (!currentOrder) return;
+  
+  const newStatus = document.getElementById('modal-status').value;
+  const notes = document.getElementById('modal-notes').value;
+  
+  try {
+    await api(`/api/service-orders/${currentOrder.id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        from: currentOrder.status,
+        to: newStatus,
+        notes,
+        timestamp: new Date().toISOString()
+      })
+    });
+    
+    closeModal();
+    await loadBoard();
+    
+  } catch (error) {
+    console.error('Error updating order:', error);
+    alert('Failed to update order');
+  }
+}
+
+function closeModal() {
+  document.getElementById('order-modal').style.display = 'none';
+  currentOrder = null;
+}
+
+async function spawnDemo() {
+  try {
+    const response = await api('/api/admin/spawn-periods', {
+      method: 'POST',
+      body: JSON.stringify({
+        forceSpawn: true
+      })
+    });
+    
+    alert(`Demo orders spawned: ${response.spawned?.length || 0} orders created`);
+    await loadBoard();
+    
+  } catch (error) {
+    console.error('Error spawning demo orders:', error);
+    alert('Failed to spawn demo orders');
+  }
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return 'N/A';
+  return new Date(dateStr).toLocaleDateString('en-IN');
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+  const modal = document.getElementById('order-modal');
+  if (event.target === modal) {
+    closeModal();
+  }
+}
+
+// Auto-refresh every 30 seconds
+setInterval(loadBoard, 30000);
+
+// Load initial data
+window.addEventListener('load', loadBoard);
+</script>
+</body>
+</html>

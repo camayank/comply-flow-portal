@@ -1094,6 +1094,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerNotificationRoutes(app);
   registerWorkflowRoutes(app);
   registerAdminConfigRoutes(app);
+  
+  // Register service orders routes for ops board
+  const { registerServiceOrdersRoutes } = await import('./service-orders-routes');
+  registerServiceOrdersRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

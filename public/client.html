@@ -1,0 +1,406 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>DigiComply Client Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f8fafc; }
+    .header { background: #fff; border-bottom: 1px solid #e5e7eb; padding: 16px 24px; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .welcome { background: #fff; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+    .card-title { font-size: 16px; font-weight: 600; color: #111827; margin: 0; }
+    .status-badge { padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+    .status-created { background: #f3f4f6; color: #374151; }
+    .status-progress { background: #dbeafe; color: #1d4ed8; }
+    .status-waiting { background: #fef3c7; color: #d97706; }
+    .status-completed { background: #d1fae5; color: #16a34a; }
+    .card-meta { font-size: 14px; color: #6b7280; margin-bottom: 12px; }
+    .card-due { font-size: 12px; color: #ef4444; font-weight: 500; }
+    .card-actions { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn { padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 500; text-decoration: none; display: inline-block; }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-outline { background: #fff; color: #374151; border: 1px solid #d1d5db; }
+    .progress-bar { background: #f3f4f6; border-radius: 4px; height: 6px; margin: 12px 0; }
+    .progress-fill { background: #3b82f6; height: 100%; border-radius: 4px; transition: width 0.3s; }
+    .docs-section { margin-top: 16px; }
+    .doc-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
+    .doc-name { font-size: 13px; color: #374151; }
+    .doc-status { font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+    .doc-pending { background: #fef3c7; color: #d97706; }
+    .doc-uploaded { background: #d1fae5; color: #16a34a; }
+    .doc-approved { background: #dbeafe; color: #1d4ed8; }
+    .upload-btn { background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 12px; text-align: center; cursor: pointer; margin-top: 8px; }
+    .filters { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .filters input, .filters select, .filters button { padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; }
+    .filters button { background: #3b82f6; color: #fff; border: none; cursor: pointer; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .stat { background: #fff; padding: 16px; border-radius: 8px; text-align: center; }
+    .stat-number { font-size: 20px; font-weight: 600; color: #111827; }
+    .stat-label { font-size: 11px; color: #6b7280; text-transform: uppercase; margin-top: 4px; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+    .modal-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; border-radius: 12px; padding: 24px; width: 90%; max-width: 500px; }
+    .close { cursor: pointer; float: right; font-size: 24px; color: #6b7280; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1 style="margin: 0; color: #111827;">DigiComply Client Portal</h1>
+  </div>
+  
+  <div class="container">
+    <div class="welcome">
+      <h2 style="margin: 0 0 8px 0; color: #111827;">Welcome back, <span id="client-name">Valued Client</span>!</h2>
+      <p style="margin: 0; color: #6b7280;">Track your compliance services, upload documents, and stay updated on deadlines.</p>
+    </div>
+
+    <!-- DASHBOARD STATS -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-number" id="stat-active">0</div>
+        <div class="stat-label">Active Services</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number" id="stat-pending">0</div>
+        <div class="stat-label">Pending Actions</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number" id="stat-upcoming">0</div>
+        <div class="stat-label">Upcoming Due</div>
+      </div>
+      <div class="stat">
+        <div class="stat-number" id="stat-completed">0</div>
+        <div class="stat-label">Completed</div>
+      </div>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="filters">
+      <select id="filter-status">
+        <option value="">All Statuses</option>
+        <option value="Created">Created</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Waiting on Client">Waiting on Client</option>
+        <option value="Completed">Completed</option>
+      </select>
+      <select id="filter-service">
+        <option value="">All Services</option>
+        <option value="gst_returns">GST Returns</option>
+        <option value="tds_quarterly">TDS Quarterly</option>
+        <option value="incorporation">Incorporation</option>
+        <option value="annual_filings_roc">Annual Filings</option>
+      </select>
+      <button onclick="loadServices()">Refresh</button>
+    </div>
+
+    <!-- SERVICE CARDS -->
+    <div class="cards" id="services-grid">
+      <!-- Dynamic content will be loaded here -->
+    </div>
+  </div>
+
+  <!-- DOCUMENT UPLOAD MODAL -->
+  <div id="upload-modal" class="modal">
+    <div class="modal-content">
+      <span class="close" onclick="closeModal()">&times;</span>
+      <h3>Upload Document</h3>
+      <div style="margin: 16px 0;">
+        <label style="display: block; margin-bottom: 4px; font-size: 12px; color: #374151;">Document Type:</label>
+        <input id="upload-doctype" readonly style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px;" />
+      </div>
+      <div style="margin: 16px 0;">
+        <label style="display: block; margin-bottom: 4px; font-size: 12px; color: #374151;">Select File:</label>
+        <input type="file" id="upload-file" style="width: 100%; padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px;" />
+      </div>
+      <div style="text-align: right; margin-top: 20px;">
+        <button onclick="uploadDocument()" style="background: #3b82f6; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer;">Upload</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const api = (p, opt={}) => fetch(p, { headers:{'Content-Type':'application/json'}, ...opt }).then(r=>r.json());
+
+let currentUpload = null;
+
+async function loadServices() {
+  try {
+    // For demo purposes, we'll use entity ID 1
+    const entityId = 1;
+    const orders = await api('/api/service-orders');
+    
+    // Filter orders for this entity (in real app, this would be user-specific)
+    const myOrders = orders.filter(order => order.entityId === entityId || true); // For demo, show all
+    
+    updateStats(myOrders);
+    renderServices(myOrders);
+    
+  } catch (error) {
+    console.error('Error loading services:', error);
+    document.getElementById('services-grid').innerHTML = 
+      '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #6b7280;">Unable to load services. Please try again.</div>';
+  }
+}
+
+function updateStats(orders) {
+  const active = orders.filter(o => o.status !== 'Completed').length;
+  const pending = orders.filter(o => o.status === 'Waiting on Client').length;
+  const upcoming = orders.filter(o => {
+    const dueDate = new Date(o.dueDate);
+    const now = new Date();
+    const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+    return diffDays <= 7 && diffDays > 0 && o.status !== 'Completed';
+  }).length;
+  const completed = orders.filter(o => o.status === 'Completed').length;
+  
+  document.getElementById('stat-active').textContent = active;
+  document.getElementById('stat-pending').textContent = pending;
+  document.getElementById('stat-upcoming').textContent = upcoming;
+  document.getElementById('stat-completed').textContent = completed;
+}
+
+function renderServices(orders) {
+  const grid = document.getElementById('services-grid');
+  
+  if (orders.length === 0) {
+    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #6b7280;">No services found.</div>';
+    return;
+  }
+  
+  const statusFilter = document.getElementById('filter-status').value;
+  const serviceFilter = document.getElementById('filter-service').value;
+  
+  const filteredOrders = orders.filter(order => {
+    if (statusFilter && order.status !== statusFilter) return false;
+    if (serviceFilter && order.serviceType !== serviceFilter) return false;
+    return true;
+  });
+  
+  grid.innerHTML = filteredOrders.map(order => createServiceCard(order)).join('');
+}
+
+function createServiceCard(order) {
+  const dueDate = new Date(order.dueDate);
+  const now = new Date();
+  const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+  const isOverdue = diffDays < 0 && order.status !== 'Completed';
+  const isUpcoming = diffDays <= 7 && diffDays > 0;
+  
+  const statusClass = getStatusClass(order.status);
+  const progress = getProgressPercentage(order.status);
+  
+  return `
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">${formatServiceName(order.serviceType)}</h3>
+        <span class="status-badge ${statusClass}">${order.status || 'Created'}</span>
+      </div>
+      
+      <div class="card-meta">
+        Period: ${order.periodLabel || 'N/A'} | Priority: ${order.priority || 'Medium'}
+      </div>
+      
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: ${progress}%"></div>
+      </div>
+      
+      <div class="card-due ${isOverdue ? 'style="color: #ef4444; font-weight: 600;"' : isUpcoming ? 'style="color: #f59e0b; font-weight: 600;"' : ''}">
+        Due: ${formatDate(order.dueDate)} ${diffDays < 0 ? `(${Math.abs(diffDays)} days overdue)` : diffDays <= 7 ? `(${diffDays} days left)` : ''}
+      </div>
+      
+      ${getDocumentsSection(order)}
+      
+      <div class="card-actions">
+        ${getActionButtons(order)}
+      </div>
+    </div>
+  `;
+}
+
+function getStatusClass(status) {
+  const classes = {
+    'Created': 'status-created',
+    'In Progress': 'status-progress',
+    'Waiting on Client': 'status-waiting',
+    'Completed': 'status-completed'
+  };
+  return classes[status] || 'status-created';
+}
+
+function getProgressPercentage(status) {
+  const progress = {
+    'Created': 10,
+    'In Progress': 60,
+    'Waiting on Client': 80,
+    'QA Review': 90,
+    'Completed': 100
+  };
+  return progress[status] || 0;
+}
+
+function formatServiceName(serviceType) {
+  const names = {
+    'gst_returns': 'GST Returns Filing',
+    'tds_quarterly': 'TDS Quarterly Returns',
+    'incorporation': 'Company Incorporation',
+    'annual_filings_roc': 'Annual ROC Filings',
+    'itr_annual': 'Income Tax Returns',
+    'accounting_monthly': 'Monthly Accounting'
+  };
+  return names[serviceType] || serviceType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function getDocumentsSection(order) {
+  // Mock document requirements based on service type
+  const docs = getMockDocuments(order.serviceType, order.status);
+  
+  if (docs.length === 0) return '';
+  
+  return `
+    <div class="docs-section">
+      <h4 style="margin: 0 0 8px 0; font-size: 13px; color: #374151;">Required Documents:</h4>
+      ${docs.map(doc => `
+        <div class="doc-item">
+          <span class="doc-name">${doc.name}</span>
+          <div>
+            <span class="doc-status ${doc.statusClass}">${doc.status}</span>
+            ${doc.canUpload ? `<button onclick="openUploadModal('${doc.type}', ${order.id})" style="margin-left: 8px; padding: 2px 6px; font-size: 10px; border: none; background: #f3f4f6; border-radius: 3px; cursor: pointer;">Upload</button>` : ''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function getMockDocuments(serviceType, status) {
+  const docTypes = {
+    'gst_returns': [
+      { type: 'sales_register', name: 'Sales Register (CSV)', required: true },
+      { type: 'purchase_register', name: 'Purchase Register (CSV)', required: true },
+      { type: 'bank_statements', name: 'Bank Statements', required: false }
+    ],
+    'tds_quarterly': [
+      { type: 'payroll_register', name: 'Payroll Register', required: true },
+      { type: 'vendor_payments', name: 'Vendor Payment Details', required: true }
+    ],
+    'incorporation': [
+      { type: 'director_pan', name: 'Director PAN Cards', required: true },
+      { type: 'address_proof', name: 'Address Proof', required: true }
+    ]
+  };
+  
+  const docs = docTypes[serviceType] || [];
+  
+  return docs.map(doc => {
+    let docStatus = 'Pending';
+    let statusClass = 'doc-pending';
+    let canUpload = true;
+    
+    // Mock logic for document status based on service status
+    if (status === 'Completed') {
+      docStatus = 'Approved';
+      statusClass = 'doc-approved';
+      canUpload = false;
+    } else if (status === 'In Progress' && Math.random() > 0.5) {
+      docStatus = 'Uploaded';
+      statusClass = 'doc-uploaded';
+      canUpload = false;
+    }
+    
+    return {
+      ...doc,
+      status: docStatus,
+      statusClass,
+      canUpload
+    };
+  });
+}
+
+function getActionButtons(order) {
+  const buttons = [];
+  
+  if (order.status === 'Waiting on Client') {
+    buttons.push('<a href="#" class="btn btn-primary" onclick="viewDetails(' + order.id + ')">Action Required</a>');
+  }
+  
+  if (order.status === 'Completed') {
+    buttons.push('<a href="#" class="btn btn-outline" onclick="downloadDeliverables(' + order.id + ')">Download Files</a>');
+  } else {
+    buttons.push('<a href="#" class="btn btn-outline" onclick="viewDetails(' + order.id + ')">View Details</a>');
+  }
+  
+  return buttons.join('');
+}
+
+function openUploadModal(docType, orderId) {
+  currentUpload = { docType, orderId };
+  document.getElementById('upload-doctype').value = docType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  document.getElementById('upload-modal').style.display = 'block';
+}
+
+function closeModal() {
+  document.getElementById('upload-modal').style.display = 'none';
+  document.getElementById('upload-file').value = '';
+  currentUpload = null;
+}
+
+async function uploadDocument() {
+  if (!currentUpload) return;
+  
+  const file = document.getElementById('upload-file').files[0];
+  if (!file) {
+    alert('Please select a file to upload');
+    return;
+  }
+  
+  // Mock upload (in real app, this would upload to actual storage)
+  try {
+    // Simulate upload delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    alert(`Document "${file.name}" uploaded successfully!`);
+    closeModal();
+    loadServices(); // Refresh the view
+    
+  } catch (error) {
+    console.error('Upload error:', error);
+    alert('Upload failed. Please try again.');
+  }
+}
+
+function viewDetails(orderId) {
+  alert(`Viewing details for order ${orderId}. In the full app, this would show detailed workflow status, communication history, and next steps.`);
+}
+
+function downloadDeliverables(orderId) {
+  alert(`Downloading deliverables for order ${orderId}. In the full app, this would provide download links for completed documents.`);
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return 'N/A';
+  return new Date(dateStr).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+  const modal = document.getElementById('upload-modal');
+  if (event.target === modal) {
+    closeModal();
+  }
+}
+
+// Auto-refresh every 60 seconds
+setInterval(loadServices, 60000);
+
+// Load initial data
+window.addEventListener('load', loadServices);
+</script>
+</body>
+</html>

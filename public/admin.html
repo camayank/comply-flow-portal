@@ -1,0 +1,245 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>DigiComply Admin (No-Code)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 24px; }
+    h2 { margin-top: 32px; }
+    .card { border:1px solid #e5e7eb; border-radius:12px; padding:16px; margin:12px 0; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+    input, select, textarea, button { padding:8px 10px; border-radius:8px; border:1px solid #e5e7eb; font-size:14px; }
+    button { background:#111827; color:#fff; border:none; cursor:pointer; }
+    label { font-size:12px; color:#374151; }
+    textarea { width:100%; min-height:160px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .muted { color:#6b7280; font-size:12px; }
+    table { border-collapse: collapse; width:100%; }
+    th, td { border-bottom:1px solid #eee; padding:8px; text-align:left; font-size:14px; }
+    .pill { padding:2px 8px; border-radius:999px; background:#eef2ff; color:#3730a3; font-size:12px; }
+    .ok { color:#059669; }
+    .err { color:#b91c1c; }
+    .grid { display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  </style>
+</head>
+<body>
+  <h1>DigiComply Admin (No-Code)</h1>
+  <p class="muted">Create default services, attach document types, publish workflow JSON, and define Due Date Master rules. Bind services to clients and let the system spawn periods + reminders.</p>
+
+  <!-- SERVICES CATALOG -->
+  <h2>1) Services Catalog</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Service Key<br/><input id="svc_key" placeholder="gst_returns"/></label></div>
+      <div><label>Name<br/><input id="svc_name" placeholder="GST Returns Filing"/></label></div>
+      <div><label>Periodicity<br/>
+        <select id="svc_periodicity">
+          <option>ONE_TIME</option><option>MONTHLY</option><option>QUARTERLY</option><option>ANNUAL</option>
+        </select></label>
+      </div>
+      <div><label>Description<br/><input id="svc_desc" placeholder="Periodic GST return filings"/></label></div>
+      <button onclick="addService()">Add Service</button>
+      <button onclick="loadServices()">Refresh</button>
+    </div>
+    <div id="svc_list" style="margin-top:12px;"></div>
+  </div>
+
+  <!-- DOC TYPES -->
+  <h2>2) Service Doc Types</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Service Key<br/><input id="doc_service_key" placeholder="gst_returns"/></label></div>
+      <div><label>Doc Type<br/><input id="doc_doctype" placeholder="sales_register_csv"/></label></div>
+      <div><label>Label<br/><input id="doc_label" placeholder="Sales Register (CSV)"/></label></div>
+      <div><label>Client Uploads?<br/><select id="doc_client"><option value="1">Yes</option><option value="0">No</option></select></label></div>
+      <div><label>Versioned?<br/><select id="doc_versioned"><option value="1">Yes</option><option value="0">No</option></select></label></div>
+      <div><label>Deliverable?<br/><select id="doc_deliv"><option value="0">No</option><option value="1">Yes</option></select></label></div>
+      <div><label>Internal?<br/><select id="doc_internal"><option value="0">No</option><option value="1">Yes</option></select></label></div>
+      <button onclick="addDocType()">Add Doc Type</button>
+      <button onclick="listDocTypes()">List Doc Types</button>
+    </div>
+    <div id="doc_list" style="margin-top:12px;"></div>
+  </div>
+
+  <!-- WORKFLOW TEMPLATE JSON -->
+  <h2>3) Workflow Template (JSON)</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Service Key<br/><input id="wf_service_key" placeholder="gst_returns"/></label></div>
+      <button onclick="loadWorkflow()">Load</button>
+    </div>
+    <textarea id="wf_json" placeholder='{"steps":[...], "dependencies":[...], "slas":{...}}'></textarea>
+    <div class="row">
+      <button onclick="saveWorkflow()">Save New Version</button>
+      <div><label>Version to Publish<br/><input id="wf_version" type="number" min="1" /></label></div>
+      <button onclick="publishWorkflow()">Publish Version</button>
+    </div>
+    <div id="wf_info" class="muted"></div>
+  </div>
+
+  <!-- DUE DATE MASTER -->
+  <h2>4) Due Date Master</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Service Key<br/><input id="dd_service_key" placeholder="gst_returns"/></label></div>
+      <div><label>Jurisdiction<br/><input id="dd_juris" value="IN"/></label></div>
+      <div><label>Effective From (YYYY-MM-DD)<br/><input id="dd_from" placeholder="2025-04-01"/></label></div>
+      <div><label>Effective To (optional)<br/><input id="dd_to" placeholder=""/></label></div>
+      <button onclick="listDueDates()">List</button>
+    </div>
+    <textarea id="dd_rule" placeholder='{"periodicity":"MONTHLY","dueDayOfMonth":20,"nudges":{"tMinus":[7,3,1],"fixedDays":[1,2]}}'></textarea>
+    <div class="row">
+      <button onclick="addDueRule()">Add Rule</button>
+    </div>
+    <div id="dd_list" class="muted"></div>
+  </div>
+
+  <!-- BIND SERVICE TO CLIENT -->
+  <h2>5) Bind Service → Entity</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Entity ID<br/><input id="bind_entity" type="number" value="1"/></label></div>
+      <div><label>Service Key<br/><input id="bind_service" placeholder="gst_returns"/></label></div>
+      <div><label>Periodicity Override (optional)<br/>
+        <select id="bind_period_override"><option></option><option>MONTHLY</option><option>QUARTERLY</option><option>ANNUAL</option></select></label></div>
+      <div><label>Jurisdiction<br/><input id="bind_juris" value="IN"/></label></div>
+      <div><label>Meta JSON (optional)<br/><input id="bind_meta" placeholder='{"scheme":"QRMP"}'/></label></div>
+      <button onclick="bindService()">Bind</button>
+    </div>
+    <p class="muted">Spawner will create the period Service Orders automatically at 06:30 IST daily. Adjust cron if you want instant spawn for demo.</p>
+  </div>
+
+  <!-- QUICK PREVIEW OF SERVICE ORDERS -->
+  <h2>6) Preview Service Orders</h2>
+  <div class="card">
+    <div class="row">
+      <div><label>Filter Status<br/>
+        <select id="so_status"><option></option><option>Created</option><option>In Progress</option><option>Waiting on Client</option><option>Completed</option></select></label></div>
+      <div><label>Service Type<br/><input id="so_type" placeholder="gst_returns"/></label></div>
+      <button onclick="loadOrders()">Load</button>
+    </div>
+    <div id="so_list"></div>
+  </div>
+
+<script>
+const api = (p, opt={}) => fetch(p, { headers:{'Content-Type':'application/json'}, ...opt }).then(r=>r.json());
+
+async function addService(){
+  const body = {
+    serviceKey: v('svc_key'), name: v('svc_name'),
+    periodicity: v('svc_periodicity'), description: v('svc_desc')
+  };
+  const res = await api('/api/admin/services', { method:'POST', body: JSON.stringify(body) });
+  ok(res, 'Service added');
+  await loadServices();
+}
+async function loadServices(){
+  const rows = await api('/api/admin/services');
+  const html = ['<table><tr><th>Key</th><th>Name</th><th>Periodicity</th><th>Active</th></tr>']
+    .concat(rows.map(r=>`<tr><td>${r.serviceKey}</td><td>${r.name}</td><td><span class="pill">${r.periodicity}</span></td><td>${r.isActive?'Yes':'No'}</td></tr>`))
+    .concat('</table>').join('');
+  document.getElementById('svc_list').innerHTML = html;
+}
+async function addDocType(){
+  const key = v('doc_service_key');
+  const body = {
+    doctype: v('doc_doctype'),
+    label: v('doc_label'),
+    clientUploads: +v('doc_client'),
+    versioned: +v('doc_versioned'),
+    isDeliverable: +v('doc_deliv'),
+    isInternal: +v('doc_internal')
+  };
+  const res = await api(`/api/admin/services/${key}/doc-types`, { method:'POST', body: JSON.stringify(body) });
+  ok(res, 'Doc type added'); await listDocTypes();
+}
+async function listDocTypes(){
+  const key = v('doc_service_key');
+  const rows = await api(`/api/admin/services/${key}/doc-types`);
+  const html = ['<table><tr><th>Doctype</th><th>Label</th><th>Client</th><th>Deliverable</th><th>Internal</th></tr>']
+    .concat(rows.map(r=>`<tr><td>${r.doctype}</td><td>${r.label}</td><td>${r.clientUploads?'Yes':'No'}</td><td>${r.isDeliverable?'Yes':'No'}</td><td>${r.isInternal?'Yes':'No'}</td></tr>`))
+    .concat('</table>').join('');
+  document.getElementById('doc_list').innerHTML = html;
+}
+async function loadWorkflow(){
+  const key = v('wf_service_key');
+  const rows = await api(`/api/admin/workflows/${key}`);
+  if(!rows.length){ document.getElementById('wf_info').textContent='No versions yet'; return; }
+  document.getElementById('wf_json').value = JSON.stringify(JSON.parse(rows[0].templateJson), null, 2);
+  document.getElementById('wf_info').textContent = `Latest version: ${rows[0].version} | Published: ${rows[0].isPublished?'Yes':'No'}`;
+}
+async function saveWorkflow(){
+  try {
+    const key = v('wf_service_key');
+    const json = JSON.parse(document.getElementById('wf_json').value);
+    const res = await api(`/api/admin/workflows/${key}`, { method:'POST', body: JSON.stringify({templateJson:json}) });
+    ok(res, 'Version saved');
+    await loadWorkflow();
+  } catch(e){
+    err(e.message);
+  }
+}
+async function publishWorkflow(){
+  const key = v('wf_service_key');
+  const version = +v('wf_version');
+  const res = await api(`/api/admin/workflows/${key}/publish`, { method:'POST', body: JSON.stringify({version}) });
+  ok(res, 'Published');
+  await loadWorkflow();
+}
+async function listDueDates(){
+  const key = v('dd_service_key');
+  const rows = await api(`/api/admin/due-dates/${key}`);
+  const html = ['<table><tr><th>Jurisdiction</th><th>Rule JSON</th><th>Effective From</th><th>Active</th></tr>']
+    .concat(rows.map(r=>`<tr><td>${r.jurisdiction}</td><td>${r.ruleJson}</td><td>${r.effectiveFrom}</td><td>${r.isActive?'Yes':'No'}</td></tr>`))
+    .concat('</table>').join('');
+  document.getElementById('dd_list').innerHTML = html;
+}
+async function addDueRule(){
+  try {
+    const key = v('dd_service_key');
+    const ruleJson = JSON.parse(document.getElementById('dd_rule').value);
+    const body = {
+      jurisdiction: v('dd_juris'),
+      ruleJson,
+      effectiveFrom: v('dd_from'),
+      effectiveTo: v('dd_to') || null
+    };
+    const res = await api(`/api/admin/due-dates/${key}`, { method:'POST', body: JSON.stringify(body) });
+    ok(res, 'Rule added');
+    await listDueDates();
+  } catch(e){
+    err(e.message);
+  }
+}
+async function bindService(){
+  const body = {
+    serviceKey: v('bind_service'),
+    periodicityOverride: v('bind_period_override') || null,
+    jurisdiction: v('bind_juris'),
+    metaJson: v('bind_meta') ? JSON.parse(v('bind_meta')) : null
+  };
+  const res = await api(`/api/admin/entities/${v('bind_entity')}/services`, { method:'POST', body: JSON.stringify(body) });
+  ok(res, 'Service bound to entity');
+}
+async function loadOrders(){
+  const params = new URLSearchParams();
+  if(v('so_status')) params.set('status', v('so_status'));
+  if(v('so_type')) params.set('service_type', v('so_type'));
+  const rows = await api(`/api/service-orders?${params}`);
+  const html = ['<table><tr><th>ID</th><th>Entity</th><th>Service</th><th>Period</th><th>Status</th><th>Due Date</th></tr>']
+    .concat(rows.map(r=>`<tr><td>${r.id}</td><td>${r.entityName||'N/A'}</td><td>${r.serviceType}</td><td>${r.periodLabel}</td><td><span class="pill">${r.status}</span></td><td>${r.dueDate}</td></tr>`))
+    .concat('</table>').join('');
+  document.getElementById('so_list').innerHTML = html;
+}
+
+function v(id) { return document.getElementById(id).value; }
+function ok(res, msg) { console.log(msg, res); }
+function err(msg) { console.error('Error:', msg); }
+
+// Load initial data
+window.addEventListener('load', () => {
+  loadServices();
+});
+</script>
+</body>
+</html>
