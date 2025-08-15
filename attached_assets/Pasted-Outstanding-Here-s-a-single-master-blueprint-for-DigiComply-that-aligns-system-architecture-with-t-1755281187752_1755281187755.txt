@@ -1,0 +1,463 @@
+Outstanding. Here’s a single, master blueprint for DigiComply that aligns system architecture with the end-user experience. It’s structured to be directly actionable for product, design, and engineering teams.
+
+
+---
+
+DigiComply – Master System & User Blueprint
+
+0) North Star
+
+Promise to users: “One secure place to manage every compliance task—clear status, zero chasing.”
+
+System mandate: “Configurable compliance factory”—no-code workflows, strict SLAs, deep auditability.
+
+
+
+---
+
+1) Personas (Primary Users & Goals)
+
+1. Client (Business Owner/Authorized Rep)
+
+Goals: upload/approve docs, track service status, download deliverables, receive alerts.
+
+Success: fewer follow-ups, on-time filings, single secure vault.
+
+
+
+2. Ops Executive / Ops Lead (Fulfilment)
+
+Goals: execute tasks, collaborate, meet SLAs, minimize rework.
+
+Success: clear queue, low error/rework ratio, predictable throughput.
+
+
+
+3. Admin (Orchestrator)
+
+Goals: design/modify workflows, allocate resources, monitor health, enforce QA.
+
+Success: SLA compliance, bottleneck elimination, faster time-to-change.
+
+
+
+4. Agent/Partner
+
+Goals: submit leads, view high-level progress, get paid commissions.
+
+Success: clean handovers, clear visibility, on-time payouts.
+
+
+
+
+
+---
+
+2) System Architecture (High Level)
+
+Frontend: React TS + Tailwind + Radix UI
+Backend: Node/Express, WebSocket, Job Queue (e.g., BullMQ), RDBMS (Postgres), Object Storage (S3-compatible), Search (OpenSearch/PG trigram), Cache (Redis)
+Services:
+
+Auth & RBAC (JWT, OTP, 2FA)
+
+Workflow Engine (state machine, dependencies, versioning)
+
+Task Service (assignment, SLA timers, checklists)
+
+Document Service (vault, versioning, approvals, OCR)
+
+Notification Service (WhatsApp/email/in-app, preference mgmt)
+
+Integration Hub (MCA/GSTN/EPFO, payment, WhatsApp Business)
+
+Analytics & BI (event pipeline, aggregates, exports)
+
+Audit & Compliance (immutable logs, e-trails)
+
+
+Event Bus (internal): service.created, task.completed, doc.approved, sla.at_risk, govt.status_update, etc.
+
+
+---
+
+3) Core Domain Model (Entities & Key Fields)
+
+User: id, roles[], 2FA, status
+
+BusinessEntity: id, ownerUserId, type (Pvt/LLP/etc.), identifiers (CIN/GSTIN/PAN)
+
+ServiceOrder: id, entityId, serviceType, status (state machine), SLA dates, workflowVersion
+
+Task: id, serviceOrderId, type, status, assigneeId, dueAt, checklist[], dependencies[]
+
+Document: id, serviceOrderId, type, status (uploaded/approved/rejected), version, tags, expiryAt
+
+MessageThread: id, scope (serviceOrderId), participants[], messages[]
+
+Agent: id, territory, hierarchy, wallet
+
+Commission: id, agentId, serviceOrderId, amount, status
+
+NotificationPreference: userId, channels, quietHours
+
+AuditLog: actor, action, target, timestamp, metadata
+
+
+
+---
+
+4) End-to-End User Journeys (Happy Paths)
+
+A) Client Journey
+
+1. Login & Entity Select → 2) Services Overview (cards) →
+
+
+2. Open Service (progress + next actions) →
+
+
+3. Upload Docs (service-tagged → pending approval) →
+
+
+4. Track Tasks Requiring Client Action →
+
+
+5. Receive Alerts (status changes, rejections, SLA risk) →
+
+
+6. Review & Download Deliverables →
+
+
+7. Archive & Renewals (auto-spawn recurring).
+
+
+
+Acceptance criteria (client):
+
+Max 2 clicks to find any service’s status.
+
+100% actions traceable via activity timeline.
+
+All deliverables downloadable 24×7.
+
+
+B) Ops Journey
+
+1. Assigned Queue → 2) Open Task (instructions, checklist) →
+
+
+2. Use Internal Files & Notes → 4) Move Status (dependency unlocks) →
+
+
+3. QA if required → 6) Trigger Client Notification.
+
+
+
+Acceptance criteria (ops):
+
+Kanban + list views, <3s load for “My Tasks”.
+
+SLA timers visible on every task.
+
+Rework reason mandatory, reportable.
+
+
+C) Admin Journey
+
+1. Health Dashboard (SLA, backlog, bottlenecks) →
+
+
+2. Workflow Builder (drag/drop, fields, dependencies, versioning) →
+
+
+3. Reassign & Balance Load →
+
+
+4. Escalations & Exceptions →
+
+
+5. Regulatory change → Global push.
+
+
+
+Acceptance criteria (admin):
+
+Workflow changes go live without deploys.
+
+Global push updates only steps not yet executed.
+
+Forecast view of next 90 days workload.
+
+
+D) Agent Journey
+
+1. Lead Submission → 2) Status Watch → 3) Commission Ledger → 4) Payouts/Disputes.
+
+
+
+Acceptance criteria (agent):
+
+Agents never see internal docs/notes.
+
+Commission visibility real-time.
+
+
+
+---
+
+5) Workflow Engine (Service State Machine)
+
+Service States: Created → Intake → Docs Pending → Review → Filing → Govt Pending → Completed → Archived
+
+Guards: dependencies resolved, approvals complete, required docs present.
+
+Actions: assignment, notifications, SLA timers, API pulls (govt status), auto-spawn renewals.
+
+
+Task States: Open → In Progress → Waiting (client/govt) → QA Review → Done → Rework
+
+Checklists: per task, enforced completion.
+
+Dependencies: DAG validated at creation; cyclic checks.
+
+
+
+---
+
+6) Document Lifecycle
+
+1. Upload (client/ops) → virus scan → type detection (ML rules) → service tag → version set
+
+
+2. Approval (ops/admin) → approve/reject (with reason), auto-notify client
+
+
+3. Expiry (optional): reminders T-30/T-7/T-1; bulk campaigns
+
+
+4. Storage & Security: AES-256 at rest, presigned URLs, watermarking for sensitive downloads
+
+
+5. Audit: every view/download logged.
+
+
+
+Acceptance criteria:
+
+99% successful upload <10s for 25MB.
+
+Version history retrievable per document.
+
+Rejections must include a reason.
+
+
+
+---
+
+7) Notifications & Messaging
+
+Channels: WhatsApp Business, Email, In-app.
+
+Templates: status change, approvals, rejections, SLA risk, govt update, renewal.
+
+Preferences: per user; quiet hours; escalation overrides for critical alerts.
+
+Messaging: threaded per service, attachments, role-visibility (client vs internal).
+
+
+Acceptance criteria:
+
+All notifications idempotent & traceable (delivery receipts).
+
+SLA breach alerts escalate to Ops Lead & Admin.
+
+
+
+---
+
+8) SLA & Escalation Engine
+
+Definitions: per service & per task (base SLA, grace).
+
+Timers: background jobs set on create/update; pause when waiting on client/government.
+
+Escalations: T-24/T-4 warnings → breach → incident id → assignment to lead.
+
+Exceptions: admin can approve one-time extensions with reason.
+
+
+KPIs: SLA compliance %, average delay, top breach reasons, time-to-recover.
+
+
+---
+
+9) Analytics & BI (Operational, Experience, Revenue-agnostic)
+
+Ops: throughput by service, AHT, rework %, queue aging, capacity heatmap.
+
+Client CX: NPS/CSAT (post-completion), response latency, doc rejection causes.
+
+Compliance Health: upcoming renewals, risk clusters (by sector/region).
+
+Agent: lead → conversion funnel, time to first contact.
+
+
+Data: fact tables from AuditLog + denormalized aggregates.
+Exports: CSV/XLSX/PDF; scheduled email reports.
+
+
+---
+
+10) Security, Privacy, Audit
+
+Auth: 2FA, device/IP restriction (admin), session management.
+
+RBAC: least privilege; scoped by entity, service, document.
+
+Data: field-level encryption for identifiers; backups + KMS rotation.
+
+Audit: WORM log store for critical events; tamper-evident chains.
+
+Compliance: data retention policies; right-to-be-forgotten where applicable.
+
+
+Acceptance criteria:
+
+Security review gate before each major release.
+
+All PII access event-logged.
+
+
+
+---
+
+11) Integrations & Extensibility
+
+Govt Portals: MCA, GSTN, EPFO (polling → webhooks when available; captchas handled out-of-band).
+
+Messaging: WhatsApp (templates, HSM), SMTP provider.
+
+Storage: S3-compatible, lifecycle rules.
+
+Payments: (if needed for add-ons) Razorpay/Stripe—webhooks hardened.
+
+API Gateway: REST (GraphQL optional later), OAuth scopes for partners.
+
+
+Integration pattern: Adapter per system + common mapping; circuit breaker + retries; observability per adapter.
+
+
+---
+
+12) Admin No-Code Controls (Productization)
+
+Workflow Builder: steps, dependencies, default assignees, SLAs, client tasks, required docs.
+
+Global Edits: push to in-flight orders at eligible steps; “what will change” preview.
+
+Field Builder: per service custom fields (validated, typed).
+
+Notification Rules: who/when/channel; content tokens.
+
+QA Gates: per step review roles & checklists.
+
+
+Acceptance criteria:
+
+Non-tech admin can design a new service in <60 minutes end-to-end.
+
+Rollback of workflow version with one click.
+
+
+
+---
+
+13) Non-Functional Requirements (NFRs)
+
+Performance: P95 page load <2.5s; P95 task ops <300ms (cached).
+
+Uptime: 99.9% core services; graceful degradation (notifications queue, retries).
+
+Scalability: linear scale on queue workers & read replicas.
+
+Observability: tracing + metrics + structured logs; red/amber/green health.
+
+Data residency: selectable buckets/regions if required.
+
+
+
+---
+
+14) Phased Delivery Plan (Build in Blocks)
+
+Phase 1 (0–8 weeks):
+
+Client: dashboard, service cards, doc locker, basic messaging.
+
+Ops: kanban, task templates, internal notes, checklists.
+
+Admin: service catalog, basic workflow builder, RBAC.
+
+Infra: audit log, notifications v1, object storage, backups.
+
+
+Phase 2 (8–16 weeks):
+
+SLA engine, escalations, approvals, versioned workflows, doc approvals, advanced search/filters, agent portal v1, analytics v1.
+
+
+Phase 3 (16–28 weeks):
+
+Govt polling adapters, auto-assignment, renewals auto-spawn, OCR & AI doc checks, performance routing, BI dashboards, forecasting.
+
+
+Phase 4 (28+ weeks):
+
+Predictive compliance suggestions, partner APIs/marketplace, fine-grained data residency, advanced anomaly detection.
+
+
+
+---
+
+15) Success Metrics (System & User)
+
+Client: 60–70% drop in “status update” queries; 95% deliverables retrieved self-serve; CSAT ≥ 4.6/5.
+
+Ops: SLA compliance ≥ 90%; rework ≤ 5%; throughput +30% without headcount growth.
+
+Admin: new service setup ≤ 60 min; incident MTTD < 10 min, MTTR < 2 hrs.
+
+System: 99.9% uptime; zero P1 security incidents; P95 latency targets met.
+
+
+
+---
+
+16) Acceptance Test Scenarios (Spot Checks)
+
+Client cannot access other entities’ data (RBAC).
+
+Uploading wrong doc → rejection with reason → client re-upload → approval (doc workflow).
+
+SLA breach triggers escalation & messaging (timer + notification).
+
+Admin edits a step label & checklist → safely updates in-flight orders at that step only (global change).
+
+Govt status flips to “approved” → service auto-advances → deliverable posted (integration adapter + workflow action).
+
+Audit export shows full chronological chain for a service (completeness).
+
+
+
+---
+
+This blueprint gives your teams what to build, why it matters for users, and how it all fits together. If you’d like, I can convert this into:
+
+a C4 architecture sketch,
+
+swimlane sequence diagrams (Client/Ops/Admin), and
+
+a requirements traceability matrix (RTM) mapping features → KPIs → phases.
+
+

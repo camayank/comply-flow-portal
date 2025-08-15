@@ -35,6 +35,7 @@ import ComplianceScorecard from "./pages/ComplianceScorecard";
 import ClientPortal from "./pages/ClientPortal";
 import OperationsPanel from "./pages/OperationsPanel";
 import AgentPortal from "./pages/AgentPortal";
+import MasterBlueprintDashboard from "./pages/MasterBlueprintDashboard";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +63,8 @@ const App = () => (
                 <Route path="/ops" component={OperationsPanel} />
                 <Route path="/admin" component={AdminPanel} />
                 <Route path="/admin-control" component={AdminPanel} />
+                <Route path="/blueprint" component={MasterBlueprintDashboard} />
+                <Route path="/master-blueprint" component={MasterBlueprintDashboard} />
                 <Route path="/agent" component={AgentPortal} />
                 <Route path="/agents" component={AgentPortal} />
                 <Route path="/agent-portal" component={AgentPortal} />
