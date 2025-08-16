@@ -106,15 +106,15 @@ const MobileResponsiveLanding = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-6 sm:mb-8 px-4">
-              <Link href="/portal">
-                <Button size="lg" className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-6 py-3 text-sm sm:text-base">
-                  Start Free Trial
+              <Link href="/onboarding-flow">
+                <Button size="lg" className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-4 text-base sm:text-lg">
+                  Start Free Trial → Setup Your Platform
                 </Button>
               </Link>
-              <Link href="/admin">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto border-white text-white hover:bg-white hover:text-blue-900 px-6 py-3 text-sm sm:text-base">
-                  <Play className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                  View Demo
+              <Link href="/platform-demo">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto border-white text-white hover:bg-white hover:text-blue-900 px-8 py-4 text-base sm:text-lg">
+                  <Play className="h-5 w-5 mr-2" />
+                  Watch 2-Min Demo
                 </Button>
               </Link>
             </div>

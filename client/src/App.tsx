@@ -45,6 +45,8 @@ import UniversalClientPortal from "./pages/UniversalClientPortal";
 import UniversalOperationsPanel from "./pages/UniversalOperationsPanel";
 import UniversalLandingPage from "./pages/UniversalLandingPage";
 import MobileResponsiveLanding from "./pages/MobileResponsiveLanding";
+import OnboardingFlow from "./pages/OnboardingFlow";
+import PlatformDemo from "./pages/PlatformDemo";
 import AdminServiceConfig from "./pages/AdminServiceConfig";
 
 const queryClient = new QueryClient();
@@ -61,6 +63,8 @@ const App = () => (
               <Switch>
                 <Route path="/" component={MobileResponsiveLanding} />
                 <Route path="/landing" component={LandingPage} />
+                <Route path="/onboarding-flow" component={OnboardingFlow} />
+                <Route path="/platform-demo" component={PlatformDemo} />
                 <Route path="/compliance-dashboard" component={ComplianceTrackerDashboard} />
                 <Route path="/services" component={ServiceSelection} />
                 <Route path="/workflows" component={DigiComplyWorkflowDashboard} />

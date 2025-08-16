@@ -65,11 +65,13 @@ const MobileAdminPanel = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" className="text-xs">
-              <Search className="h-4 w-4" />
+            <Button size="sm" variant="outline" className="text-xs px-3">
+              <Search className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Search</span>
             </Button>
-            <Button size="sm" variant="outline" className="text-xs">
-              <Settings className="h-4 w-4" />
+            <Button size="sm" variant="outline" className="text-xs px-3">
+              <Settings className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Settings</span>
             </Button>
           </div>
         </div>
@@ -305,9 +307,9 @@ const MobileAdminPanel = () => {
                   <h2 className="text-xl lg:text-2xl font-bold mb-2">Service Management</h2>
                   <p className="text-sm lg:text-base text-gray-600">Configure and manage platform services</p>
                 </div>
-                <Button size="sm" className="w-full sm:w-auto">
+                <Button size="sm" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2">
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Service
+                  <span>Add Service</span>
                 </Button>
               </div>
 
@@ -342,13 +344,13 @@ const MobileAdminPanel = () => {
                             <Badge variant="outline" className="text-xs">{service.periodicity}</Badge>
                           </div>
                           <div className="flex gap-2">
-                            <Button size="sm" variant="outline" className="flex-1 text-xs">
+                            <Button size="sm" variant="outline" className="flex-1 text-xs px-2 py-2">
                               <Eye className="h-3 w-3 mr-1" />
-                              View
+                              <span>Preview</span>
                             </Button>
-                            <Button size="sm" variant="outline" className="flex-1 text-xs">
+                            <Button size="sm" className="flex-1 text-xs px-2 py-2 bg-blue-600 hover:bg-blue-700 text-white">
                               <Settings className="h-3 w-3 mr-1" />
-                              Edit
+                              <span>Configure</span>
                             </Button>
                           </div>
                         </div>
@@ -360,9 +362,9 @@ const MobileAdminPanel = () => {
                     <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No services configured</h3>
                     <p className="text-sm text-gray-600 mb-4">Add your first service to start building workflows</p>
-                    <Button>
+                    <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3">
                       <Plus className="h-4 w-4 mr-2" />
-                      Add First Service
+                      <span>Configure Your First Service</span>
                     </Button>
                   </div>
                 )}
@@ -377,9 +379,9 @@ const MobileAdminPanel = () => {
                   <h2 className="text-xl lg:text-2xl font-bold mb-2">Workflow Builder</h2>
                   <p className="text-sm lg:text-base text-gray-600">Create and manage service workflows with no-code builder</p>
                 </div>
-                <Button size="sm" className="w-full sm:w-auto">
+                <Button size="sm" className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-4 py-2">
                   <Plus className="h-4 w-4 mr-2" />
-                  Create Workflow
+                  <span>Build Workflow</span>
                 </Button>
               </div>
 
@@ -399,7 +401,9 @@ const MobileAdminPanel = () => {
                       <p className="text-xs text-gray-600">Complete company incorporation process</p>
                       <div className="flex justify-between items-center mt-3">
                         <Badge variant="outline" className="text-xs">5 Steps</Badge>
-                        <Button size="sm" variant="outline" className="text-xs">Use Template</Button>
+                        <Button size="sm" variant="outline" className="text-xs px-3 py-1">
+                          <span>Use Template</span>
+                        </Button>
                       </div>
                     </div>
 
@@ -411,7 +415,9 @@ const MobileAdminPanel = () => {
                       <p className="text-xs text-gray-600">GST registration and compliance setup</p>
                       <div className="flex justify-between items-center mt-3">
                         <Badge variant="outline" className="text-xs">3 Steps</Badge>
-                        <Button size="sm" variant="outline" className="text-xs">Use Template</Button>
+                        <Button size="sm" variant="outline" className="text-xs px-3 py-1">
+                          <span>Use Template</span>
+                        </Button>
                       </div>
                     </div>
 
@@ -423,7 +429,9 @@ const MobileAdminPanel = () => {
                       <p className="text-xs text-gray-600">Annual compliance and ROC filing</p>
                       <div className="flex justify-between items-center mt-3">
                         <Badge variant="outline" className="text-xs">4 Steps</Badge>
-                        <Button size="sm" variant="outline" className="text-xs">Use Template</Button>
+                        <Button size="sm" variant="outline" className="text-xs px-3 py-1">
+                          <span>Use Template</span>
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -441,9 +449,9 @@ const MobileAdminPanel = () => {
                     <Workflow className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">Visual Workflow Builder</h3>
                     <p className="text-sm text-gray-600 mb-4">Drag and drop components to build custom service workflows</p>
-                    <Button>
+                    <Button className="bg-green-600 hover:bg-green-700 text-white px-6 py-3">
                       <Plus className="h-4 w-4 mr-2" />
-                      Start Building
+                      <span>Start Building Your Workflow</span>
                     </Button>
                   </div>
                 </CardContent>

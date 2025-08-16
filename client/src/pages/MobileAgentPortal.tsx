@@ -54,11 +54,13 @@ const MobileAgentPortal = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" className="text-xs">
-              <Phone className="h-4 w-4" />
+            <Button size="sm" variant="outline" className="text-xs px-3">
+              <Phone className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Call</span>
             </Button>
-            <Button size="sm" variant="outline" className="text-xs">
-              <Mail className="h-4 w-4" />
+            <Button size="sm" variant="outline" className="text-xs px-3">
+              <Mail className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Email</span>
             </Button>
           </div>
         </div>
@@ -279,9 +281,9 @@ const MobileAgentPortal = () => {
                   <h2 className="text-xl lg:text-2xl font-bold mb-2">Lead Management</h2>
                   <p className="text-sm lg:text-base text-gray-600">Track and manage your client leads</p>
                 </div>
-                <Button size="sm" className="w-full sm:w-auto">
+                <Button size="sm" className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 text-white px-4 py-2">
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Lead
+                  <span>Add Lead</span>
                 </Button>
               </div>
 

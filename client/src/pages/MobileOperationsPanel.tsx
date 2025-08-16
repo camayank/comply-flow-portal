@@ -79,11 +79,13 @@ const MobileOperationsPanel = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" className="text-xs">
-              <Search className="h-4 w-4" />
+            <Button size="sm" variant="outline" className="text-xs px-3">
+              <Search className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Search</span>
             </Button>
-            <Button size="sm" variant="outline" className="text-xs">
-              <Filter className="h-4 w-4" />
+            <Button size="sm" variant="outline" className="text-xs px-3">
+              <Filter className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Filter</span>
             </Button>
           </div>
         </div>
@@ -298,9 +300,9 @@ const MobileOperationsPanel = () => {
                   <h2 className="text-xl lg:text-2xl font-bold mb-2">Service Orders</h2>
                   <p className="text-sm lg:text-base text-gray-600">Manage client service requests and workflows</p>
                 </div>
-                <Button size="sm" className="w-full sm:w-auto">
+                <Button size="sm" className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white px-4 py-2">
                   <Plus className="h-4 w-4 mr-2" />
-                  New Order
+                  <span>Create Order</span>
                 </Button>
               </div>
 
@@ -349,13 +351,13 @@ const MobileOperationsPanel = () => {
                             <Progress value={order.progress || 0} className="w-full" />
                           </div>
                           <div className="flex gap-2">
-                            <Button size="sm" variant="outline" className="flex-1 text-xs">
+                            <Button size="sm" variant="outline" className="flex-1 text-xs px-2 py-2">
                               <Eye className="h-3 w-3 mr-1" />
-                              View Details
+                              <span>View Details</span>
                             </Button>
-                            <Button size="sm" variant="outline" className="flex-1 text-xs">
+                            <Button size="sm" className="flex-1 text-xs px-2 py-2 bg-purple-600 hover:bg-purple-700 text-white">
                               <Settings className="h-3 w-3 mr-1" />
-                              Update Status
+                              <span>Update</span>
                             </Button>
                           </div>
                         </div>
@@ -380,9 +382,9 @@ const MobileOperationsPanel = () => {
                   <h2 className="text-xl lg:text-2xl font-bold mb-2">Task Management</h2>
                   <p className="text-sm lg:text-base text-gray-600">Organize and track team tasks across all projects</p>
                 </div>
-                <Button size="sm" className="w-full sm:w-auto">
+                <Button size="sm" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2">
                   <Plus className="h-4 w-4 mr-2" />
-                  Create Task
+                  <span>Create Task</span>
                 </Button>
               </div>
 

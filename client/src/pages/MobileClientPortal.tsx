@@ -79,9 +79,10 @@ const MobileClientPortal = () => {
               </div>
             </div>
           </div>
-          <Button size="sm" variant="outline" className="text-xs">
+          <Button size="sm" variant="outline" className="text-xs px-3">
             <Bell className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">Notifications</span>
+            <span className="hidden sm:inline">Alerts</span>
+            <Badge className="ml-1 bg-red-500 text-white text-xs px-1 py-0 min-w-[16px] h-4">3</Badge>
           </Button>
         </div>
 
@@ -255,9 +256,9 @@ const MobileClientPortal = () => {
                   <h2 className="text-xl lg:text-2xl font-bold mb-2">Business Entities</h2>
                   <p className="text-sm lg:text-base text-gray-600">Manage your business entities and compliance</p>
                 </div>
-                <Button size="sm" className="w-full sm:w-auto">
+                <Button size="sm" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2">
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Entity
+                  Add New Business
                 </Button>
               </div>
 
@@ -294,13 +295,13 @@ const MobileClientPortal = () => {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <Button size="sm" variant="outline" className="flex-1 text-xs">
+                            <Button size="sm" variant="outline" className="flex-1 text-xs px-3 py-2">
                               <Eye className="h-3 w-3 mr-1" />
-                              View
+                              <span>View Details</span>
                             </Button>
-                            <Button size="sm" variant="outline" className="flex-1 text-xs">
+                            <Button size="sm" className="flex-1 text-xs px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white">
                               <Settings className="h-3 w-3 mr-1" />
-                              Manage
+                              <span>Configure</span>
                             </Button>
                           </div>
                         </div>
@@ -312,9 +313,9 @@ const MobileClientPortal = () => {
                     <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No entities found</h3>
                     <p className="text-sm text-gray-600 mb-4">Add your first business entity to get started</p>
-                    <Button>
+                    <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3">
                       <Plus className="h-4 w-4 mr-2" />
-                      Add First Entity
+                      <span>Add Your First Business</span>
                     </Button>
                   </div>
                 )}
@@ -329,9 +330,9 @@ const MobileClientPortal = () => {
                   <h2 className="text-xl lg:text-2xl font-bold mb-2">Service Requests</h2>
                   <p className="text-sm lg:text-base text-gray-600">Track all your service requests and progress</p>
                 </div>
-                <Button size="sm" className="w-full sm:w-auto">
+                <Button size="sm" className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-4 py-2">
                   <Plus className="h-4 w-4 mr-2" />
-                  New Request
+                  <span>Request Service</span>
                 </Button>
               </div>
 
@@ -376,13 +377,13 @@ const MobileClientPortal = () => {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <Button size="sm" variant="outline" className="flex-1 text-xs">
+                            <Button size="sm" variant="outline" className="flex-1 text-xs px-2 py-2">
                               <Eye className="h-3 w-3 mr-1" />
-                              View Details
+                              <span>Track Progress</span>
                             </Button>
-                            <Button size="sm" variant="outline" className="flex-1 text-xs">
+                            <Button size="sm" className="flex-1 text-xs px-2 py-2 bg-blue-600 hover:bg-blue-700 text-white">
                               <Upload className="h-3 w-3 mr-1" />
-                              Upload Docs
+                              <span>Upload Files</span>
                             </Button>
                           </div>
                         </div>
@@ -394,9 +395,9 @@ const MobileClientPortal = () => {
                     <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No service requests</h3>
                     <p className="text-sm text-gray-600 mb-4">Start your first service request to get going</p>
-                    <Button>
+                    <Button className="bg-green-600 hover:bg-green-700 text-white px-6 py-3">
                       <Plus className="h-4 w-4 mr-2" />
-                      Create Request
+                      <span>Start Your First Service Request</span>
                     </Button>
                   </div>
                 )}
@@ -411,9 +412,9 @@ const MobileClientPortal = () => {
                   <h2 className="text-xl lg:text-2xl font-bold mb-2">Document Management</h2>
                   <p className="text-sm lg:text-base text-gray-600">Upload and manage your business documents</p>
                 </div>
-                <Button size="sm" className="w-full sm:w-auto">
+                <Button size="sm" className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 text-white px-4 py-2">
                   <Upload className="h-4 w-4 mr-2" />
-                  Upload Document
+                  <span>Upload Documents</span>
                 </Button>
               </div>
 
@@ -423,8 +424,9 @@ const MobileClientPortal = () => {
                   <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">Upload Documents</h3>
                   <p className="text-sm text-gray-600 mb-4">Drag and drop files here, or click to browse</p>
-                  <Button variant="outline" size="sm">
-                    Choose Files
+                  <Button variant="outline" size="sm" className="px-6 py-2">
+                    <Upload className="h-4 w-4 mr-2" />
+                    <span>Choose Files to Upload</span>
                   </Button>
                 </CardContent>
               </Card>
