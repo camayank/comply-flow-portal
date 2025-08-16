@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -32,7 +32,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import { Plus, X, FileText, Clock, DollarSign } from 'lucide-react';
+import { Plus, X, FileText, Clock, DollarSign, Lightbulb, RefreshCw } from 'lucide-react';
+import { getIntelligentSuggestions } from '@/utils/serviceIntelligence';
 
 const serviceConfigSchema = z.object({
   serviceName: z.string().min(3, 'Service name must be at least 3 characters'),
@@ -74,6 +75,7 @@ export function ServiceConfigForm({ open, onOpenChange, service, mode }: Service
   const [selectedSteps, setSelectedSteps] = useState<string[]>(service?.workflowSteps || []);
   const [customDoc, setCustomDoc] = useState('');
   const [customStep, setCustomStep] = useState('');
+  const [hasAutoSuggested, setHasAutoSuggested] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -94,13 +96,37 @@ export function ServiceConfigForm({ open, onOpenChange, service, mode }: Service
     },
   });
 
+  // Auto-suggest documents and workflow steps when service name or type changes
+  useEffect(() => {
+    const serviceName = form.watch('serviceName');
+    const serviceType = form.watch('serviceType');
+    
+    if (serviceName && serviceType && mode === 'create' && !hasAutoSuggested) {
+      const suggestions = getIntelligentSuggestions(serviceName, serviceType);
+      
+      if (suggestions.documents.length > 0 || suggestions.workflowSteps.length > 0) {
+        setSelectedDocs(suggestions.documents);
+        setSelectedSteps(suggestions.workflowSteps);
+        setHasAutoSuggested(true);
+        
+        toast({
+          title: "Smart Suggestions Applied",
+          description: `Auto-suggested ${suggestions.documents.length} documents and ${suggestions.workflowSteps.length} workflow steps based on your service type.`,
+        });
+      }
+    }
+  }, [form.watch('serviceName'), form.watch('serviceType'), mode, hasAutoSuggested, toast]);
+
   const createServiceMutation = useMutation({
     mutationFn: async (data: ServiceConfigData) => {
       const endpoint = mode === 'create' ? '/api/admin/services' : `/api/admin/services/${service.id}`;
       const method = mode === 'create' ? 'POST' : 'PUT';
       
-      return apiRequest(endpoint, {
+      return fetch(endpoint, {
         method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           ...data,
           basePrice: parseFloat(data.basePrice),
@@ -108,7 +134,7 @@ export function ServiceConfigForm({ open, onOpenChange, service, mode }: Service
           requiredDocuments: selectedDocs,
           workflowSteps: selectedSteps,
         }),
-      });
+      }).then(res => res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/services'] });
@@ -120,6 +146,7 @@ export function ServiceConfigForm({ open, onOpenChange, service, mode }: Service
       form.reset();
       setSelectedDocs([]);
       setSelectedSteps([]);
+      setHasAutoSuggested(false);
     },
     onError: (error) => {
       toast({
@@ -172,6 +199,22 @@ export function ServiceConfigForm({ open, onOpenChange, service, mode }: Service
 
   const removeStep = (step: string) => {
     setSelectedSteps(selectedSteps.filter(s => s !== step));
+  };
+
+  const refreshSuggestions = () => {
+    const serviceName = form.getValues('serviceName');
+    const serviceType = form.getValues('serviceType');
+    
+    if (serviceName && serviceType) {
+      const suggestions = getIntelligentSuggestions(serviceName, serviceType);
+      setSelectedDocs(suggestions.documents);
+      setSelectedSteps(suggestions.workflowSteps);
+      
+      toast({
+        title: "Suggestions Refreshed",
+        description: `Applied ${suggestions.documents.length} documents and ${suggestions.workflowSteps.length} workflow steps.`,
+      });
+    }
   };
 
   return (
@@ -338,7 +381,32 @@ export function ServiceConfigForm({ open, onOpenChange, service, mode }: Service
 
             {/* Required Documents */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Required Documents</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Required Documents</h3>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={refreshSuggestions}
+                  disabled={!form.watch('serviceName') || !form.watch('serviceType')}
+                >
+                  <Lightbulb className="h-4 w-4 mr-2" />
+                  Smart Suggest
+                </Button>
+              </div>
+              
+              {mode === 'create' && (
+                <div className="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm text-blue-800 font-medium">AI-Powered Smart Suggestions</span>
+                  </div>
+                  <p className="text-xs text-blue-600 mt-1">
+                    Our intelligent system automatically suggests relevant documents and workflow steps based on your service name and type. 
+                    Try entering "GST Registration" or "Company Incorporation" to see it in action!
+                  </p>
+                </div>
+              )}
               
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {documentTypes.map((doc) => (
@@ -393,7 +461,14 @@ export function ServiceConfigForm({ open, onOpenChange, service, mode }: Service
 
             {/* Workflow Steps */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Workflow Steps</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Workflow Steps</h3>
+                {selectedSteps.length > 0 && (
+                  <Badge variant="outline" className="text-xs">
+                    {selectedSteps.length} steps configured
+                  </Badge>
+                )}
+              </div>
               
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {commonWorkflowSteps.map((step) => (
