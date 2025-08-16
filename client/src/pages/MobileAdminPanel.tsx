@@ -15,15 +15,21 @@ import {
   Plus,
   CheckCircle,
   Eye,
-  Home
+  Home,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ServiceConfigForm } from '@/components/ServiceConfigForm';
 
 const MobileAdminPanel = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [serviceFormOpen, setServiceFormOpen] = useState(false);
+  const [selectedService, setSelectedService] = useState(null);
+  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
 
   // Fetch admin config stats
   const { data: configStats, isLoading: statsLoading } = useQuery({
@@ -34,6 +40,18 @@ const MobileAdminPanel = () => {
   const { data: services = [], isLoading: servicesLoading } = useQuery({
     queryKey: ['/api/admin/services'],
   });
+
+  const openCreateServiceForm = () => {
+    setSelectedService(null);
+    setFormMode('create');
+    setServiceFormOpen(true);
+  };
+
+  const openEditServiceForm = (service: any) => {
+    setSelectedService(service);
+    setFormMode('edit');
+    setServiceFormOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -161,103 +179,103 @@ const MobileAdminPanel = () => {
         <main className="flex-1 p-4 lg:p-6">
           {activeTab === 'overview' && (
             <div className="space-y-6">
-              {/* Welcome Hero Section */}
-              <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-lg">
+              {/* Admin Dashboard Header */}
+              <div className="bg-white border border-gray-200 p-6 rounded-lg">
                 <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                   <div>
-                    <h2 className="text-xl lg:text-2xl font-bold mb-2">Welcome to Your Practice Control Center</h2>
-                    <p className="text-sm lg:text-base text-blue-100 mb-4 lg:mb-0">Configure services, manage workflows, and monitor your entire operation from one dashboard</p>
+                    <h2 className="text-xl lg:text-2xl font-bold mb-2">Admin Dashboard</h2>
+                    <p className="text-sm lg:text-base text-gray-600 mb-4 lg:mb-0">Configure services, set up workflows, and manage platform operations</p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3">
-                    <Button className="bg-white text-blue-600 hover:bg-blue-50 px-4 py-2" onClick={() => setActiveTab('services')}>
+                    <Button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2" onClick={openCreateServiceForm}>
                       <Plus className="h-4 w-4 mr-2" />
-                      Quick Setup Guide
+                      Add New Service
                     </Button>
-                    <Button variant="outline" className="border-white text-white hover:bg-white hover:text-blue-600 px-4 py-2">
-                      <FileText className="h-4 w-4 mr-2" />
-                      Documentation
+                    <Button variant="outline" className="border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2" onClick={() => setActiveTab('system')}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      System Settings
                     </Button>
                   </div>
                 </div>
               </div>
 
-              {/* Quick Actions - Clear CTAs */}
+              {/* System Configuration Status */}
               <div>
-                <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
+                <h3 className="text-lg font-semibold mb-4">System Configuration</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <Card 
-                    className="border-l-4 border-l-blue-500 hover:shadow-lg transition-shadow cursor-pointer"
-                    onClick={() => setActiveTab('services')}
-                  >
+                  <Card className="border border-gray-200">
                     <CardContent className="p-4">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="p-2 bg-blue-100 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
                           <FileText className="h-5 w-5 text-blue-600" />
+                          <h4 className="font-semibold text-sm">Services</h4>
                         </div>
-                        <div>
-                          <h4 className="font-semibold text-sm">Configure Services</h4>
-                          <p className="text-xs text-gray-600">Add & manage your service offerings</p>
-                        </div>
+                        <Badge variant="outline" className="text-xs">{(services as any[]).length} configured</Badge>
                       </div>
-                      <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                        Manage Services ({(services as any[]).length} active)
+                      <p className="text-xs text-gray-600 mb-3">Manage service offerings and pricing</p>
+                      <Button 
+                        size="sm" 
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={() => setActiveTab('services')}
+                      >
+                        Configure Services
                       </Button>
                     </CardContent>
                   </Card>
 
-                  <Card 
-                    className="border-l-4 border-l-green-500 hover:shadow-lg transition-shadow cursor-pointer"
-                    onClick={() => setActiveTab('workflows')}
-                  >
+                  <Card className="border border-gray-200">
                     <CardContent className="p-4">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="p-2 bg-green-100 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
                           <Workflow className="h-5 w-5 text-green-600" />
+                          <h4 className="font-semibold text-sm">Workflows</h4>
                         </div>
-                        <div>
-                          <h4 className="font-semibold text-sm">Build Workflows</h4>
-                          <p className="text-xs text-gray-600">Design automated service processes</p>
-                        </div>
+                        <Badge variant="outline" className="text-xs">3 templates</Badge>
                       </div>
-                      <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white">
-                        Workflow Builder
+                      <p className="text-xs text-gray-600 mb-3">Set up automated process flows</p>
+                      <Button 
+                        size="sm" 
+                        className="w-full bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => setActiveTab('workflows')}
+                      >
+                        Build Workflows
                       </Button>
                     </CardContent>
                   </Card>
 
-                  <Card 
-                    className="border-l-4 border-l-purple-500 hover:shadow-lg transition-shadow cursor-pointer"
-                    onClick={() => setActiveTab('analytics')}
-                  >
+                  <Card className="border border-gray-200">
                     <CardContent className="p-4">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="p-2 bg-purple-100 rounded-lg">
-                          <BarChart3 className="h-5 w-5 text-purple-600" />
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-5 w-5 text-purple-600" />
+                          <h4 className="font-semibold text-sm">Team</h4>
                         </div>
-                        <div>
-                          <h4 className="font-semibold text-sm">View Analytics</h4>
-                          <p className="text-xs text-gray-600">Monitor performance & insights</p>
-                        </div>
+                        <Badge variant="outline" className="text-xs">24 users</Badge>
                       </div>
-                      <Button size="sm" className="w-full bg-purple-600 hover:bg-purple-700 text-white">
-                        View Reports
+                      <p className="text-xs text-gray-600 mb-3">Manage team members and roles</p>
+                      <Button 
+                        size="sm" 
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                        onClick={() => setActiveTab('system')}
+                      >
+                        Manage Team
                       </Button>
                     </CardContent>
                   </Card>
                 </div>
               </div>
 
-              {/* Platform Status Dashboard */}
+              {/* Current Operations Status */}
               <div>
-                <h3 className="text-lg font-semibold mb-4">Platform Status</h3>
+                <h3 className="text-lg font-semibold mb-4">Current Operations</h3>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <Card>
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-xs lg:text-sm text-gray-600">Active Services</p>
+                          <p className="text-xs lg:text-sm text-gray-600">Services Configured</p>
                           <p className="text-xl lg:text-2xl font-bold text-blue-600">{(services as any[]).length}</p>
-                          <p className="text-xs text-green-600">Ready to use</p>
+                          <p className="text-xs text-gray-600">Available for use</p>
                         </div>
                         <FileText className="h-6 w-6 lg:h-8 lg:w-8 text-blue-600" />
                       </div>
@@ -268,9 +286,9 @@ const MobileAdminPanel = () => {
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-xs lg:text-sm text-gray-600">Platform Users</p>
+                          <p className="text-xs lg:text-sm text-gray-600">Active Users</p>
                           <p className="text-xl lg:text-2xl font-bold text-green-600">24</p>
-                          <p className="text-xs text-green-600">Active team members</p>
+                          <p className="text-xs text-gray-600">Team members</p>
                         </div>
                         <Users className="h-6 w-6 lg:h-8 lg:w-8 text-green-600" />
                       </div>
@@ -281,9 +299,9 @@ const MobileAdminPanel = () => {
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-xs lg:text-sm text-gray-600">System Health</p>
-                          <p className="text-xl lg:text-2xl font-bold text-green-600">99.7%</p>
-                          <p className="text-xs text-green-600">All systems operational</p>
+                          <p className="text-xs lg:text-sm text-gray-600">System Status</p>
+                          <p className="text-xl lg:text-2xl font-bold text-green-600">Online</p>
+                          <p className="text-xs text-gray-600">All services running</p>
                         </div>
                         <Shield className="h-6 w-6 lg:h-8 lg:w-8 text-green-600" />
                       </div>
@@ -294,30 +312,30 @@ const MobileAdminPanel = () => {
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-xs lg:text-sm text-gray-600">Revenue Capacity</p>
-                          <p className="text-xl lg:text-2xl font-bold text-purple-600">₹10Cr+</p>
-                          <p className="text-xs text-purple-600">Scale ready</p>
+                          <p className="text-xs lg:text-sm text-gray-600">Workflows</p>
+                          <p className="text-xl lg:text-2xl font-bold text-purple-600">3</p>
+                          <p className="text-xs text-gray-600">Templates ready</p>
                         </div>
-                        <Target className="h-6 w-6 lg:h-8 lg:w-8 text-purple-600" />
+                        <Workflow className="h-6 w-6 lg:h-8 lg:w-8 text-purple-600" />
                       </div>
                     </CardContent>
                   </Card>
                 </div>
               </div>
 
-              {/* Getting Started Checklist */}
+              {/* Configuration Tasks */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Platform Setup Checklist</CardTitle>
-                  <CardDescription>Complete these steps to get your practice management platform running</CardDescription>
+                  <CardTitle className="text-lg">Required Configuration</CardTitle>
+                  <CardDescription>Complete these essential setup tasks</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-200">
                       <CheckCircle className="h-5 w-5 text-green-600" />
                       <div className="flex-1">
-                        <p className="font-medium text-sm text-green-800">Platform Initialized</p>
-                        <p className="text-xs text-green-600">Your practice management platform is ready</p>
+                        <p className="font-medium text-sm text-green-800">Database Setup</p>
+                        <p className="text-xs text-green-600">PostgreSQL database configured and running</p>
                       </div>
                       <Badge className="bg-green-500 text-white text-xs">Complete</Badge>
                     </div>
@@ -327,30 +345,34 @@ const MobileAdminPanel = () => {
                         <div className="h-2 w-2 bg-blue-600 rounded-full"></div>
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-sm text-blue-800">Configure Your Services</p>
-                        <p className="text-xs text-blue-600">Set up the services you offer to clients</p>
+                        <p className="font-medium text-sm text-blue-800">Service Configuration</p>
+                        <p className="text-xs text-blue-600">Add services your business offers ({(services as any[]).length} configured)</p>
                       </div>
                       <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white text-xs">
-                        Start Now
+                        Configure
                       </Button>
                     </div>
 
-                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer" onClick={() => setActiveTab('workflows')}>
                       <div className="h-5 w-5 border-2 border-gray-400 rounded-full"></div>
                       <div className="flex-1">
-                        <p className="font-medium text-sm text-gray-600">Build Workflows</p>
-                        <p className="text-xs text-gray-500">Create automated processes for your services</p>
+                        <p className="font-medium text-sm text-gray-600">Workflow Setup</p>
+                        <p className="text-xs text-gray-500">Define step-by-step processes for each service</p>
                       </div>
-                      <Badge variant="outline" className="text-xs">Pending</Badge>
+                      <Button size="sm" variant="outline" className="text-xs">
+                        Set Up
+                      </Button>
                     </div>
 
-                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer" onClick={() => setActiveTab('system')}>
                       <div className="h-5 w-5 border-2 border-gray-400 rounded-full"></div>
                       <div className="flex-1">
-                        <p className="font-medium text-sm text-gray-600">Invite Team Members</p>
-                        <p className="text-xs text-gray-500">Add your staff and assign roles</p>
+                        <p className="font-medium text-sm text-gray-600">Team Setup</p>
+                        <p className="text-xs text-gray-500">Add team members and assign roles</p>
                       </div>
-                      <Badge variant="outline" className="text-xs">Pending</Badge>
+                      <Button size="sm" variant="outline" className="text-xs">
+                        Add Users
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -365,7 +387,7 @@ const MobileAdminPanel = () => {
                   <h2 className="text-xl lg:text-2xl font-bold mb-2">Service Management</h2>
                   <p className="text-sm lg:text-base text-gray-600">Configure and manage platform services</p>
                 </div>
-                <Button size="sm" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2">
+                <Button size="sm" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2" onClick={openCreateServiceForm}>
                   <Plus className="h-4 w-4 mr-2" />
                   <span>Add Service</span>
                 </Button>
@@ -396,9 +418,13 @@ const MobileAdminPanel = () => {
                               <Eye className="h-3 w-3 mr-1" />
                               <span>Preview</span>
                             </Button>
-                            <Button size="sm" className="flex-1 text-xs px-2 py-2 bg-blue-600 hover:bg-blue-700 text-white">
-                              <Settings className="h-3 w-3 mr-1" />
-                              <span>Configure</span>
+                            <Button 
+                              size="sm" 
+                              className="flex-1 text-xs px-2 py-2 bg-blue-600 hover:bg-blue-700 text-white"
+                              onClick={() => openEditServiceForm(service)}
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              <span>Edit</span>
                             </Button>
                           </div>
                         </div>
@@ -411,7 +437,7 @@ const MobileAdminPanel = () => {
                   <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No services configured</h3>
                   <p className="text-sm text-gray-600 mb-4">Add your first service to start building workflows</p>
-                  <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3">
+                  <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3" onClick={openCreateServiceForm}>
                     <Plus className="h-4 w-4 mr-2" />
                     <span>Configure Your First Service</span>
                   </Button>
@@ -687,6 +713,14 @@ const MobileAdminPanel = () => {
 
       {/* Spacer for bottom navigation on mobile */}
       <div className="lg:hidden h-16"></div>
+
+      {/* Service Configuration Form */}
+      <ServiceConfigForm
+        open={serviceFormOpen}
+        onOpenChange={setServiceFormOpen}
+        service={selectedService}
+        mode={formMode}
+      />
     </div>
   );
 };
