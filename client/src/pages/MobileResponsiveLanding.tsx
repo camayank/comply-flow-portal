@@ -37,20 +37,20 @@ const MobileResponsiveLanding = () => {
             <div className="flex items-center gap-2">
               <Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
               <div className="flex flex-col">
-                <span className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">ServicePro</span>
-                <span className="text-xs text-gray-500 hidden sm:block">Universal Service Provider Platform</span>
+                <span className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">DigiComply</span>
+                <span className="text-xs text-gray-500 hidden sm:block">End-to-End Practice Management Platform</span>
               </div>
             </div>
 
             {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center gap-6">
               <nav className="flex gap-6">
-                <Link href="/portal" className="text-gray-600 hover:text-blue-600 transition-colors">Client Portal</Link>
-                <Link href="/operations" className="text-gray-600 hover:text-blue-600 transition-colors">Operations</Link>
-                <Link href="/admin" className="text-gray-600 hover:text-blue-600 transition-colors">Admin</Link>
-                <Link href="/agent" className="text-gray-600 hover:text-blue-600 transition-colors">Partners</Link>
+                <Link href="/pre-sales" className="text-gray-600 hover:text-blue-600 transition-colors">Pre-Sales</Link>
+                <Link href="/proposals" className="text-gray-600 hover:text-blue-600 transition-colors">Sales</Link>
+                <Link href="/operations-manager" className="text-gray-600 hover:text-blue-600 transition-colors">Operations</Link>
+                <Link href="/executive-dashboard" className="text-gray-600 hover:text-blue-600 transition-colors">Dashboard</Link>
               </nav>
-              <Link href="/portal">
+              <Link href="/pre-sales">
                 <Button size="sm" className="bg-blue-600 hover:bg-blue-700">Get Started</Button>
               </Link>
             </div>
@@ -70,20 +70,20 @@ const MobileResponsiveLanding = () => {
           {mobileMenuOpen && (
             <div className="lg:hidden py-4 border-t bg-white">
               <nav className="flex flex-col gap-3">
-                <Link href="/portal" className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded">
-                  Client Portal
+                <Link href="/pre-sales" className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded">
+                  Pre-Sales Management
                 </Link>
-                <Link href="/operations" className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded">
-                  Operations Panel
+                <Link href="/proposals" className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded">
+                  Sales Proposals
                 </Link>
-                <Link href="/admin" className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded">
-                  Admin Control
+                <Link href="/operations-manager" className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded">
+                  Operations Management
                 </Link>
-                <Link href="/agent" className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded">
-                  Partner Network
+                <Link href="/executive-dashboard" className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded">
+                  Executive Dashboard
                 </Link>
                 <div className="px-3 pt-2">
-                  <Link href="/portal">
+                  <Link href="/pre-sales">
                     <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700">Get Started</Button>
                   </Link>
                 </div>
@@ -98,23 +98,23 @@ const MobileResponsiveLanding = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold mb-4 sm:mb-6 leading-tight">
-              Universal Service Provider <br className="hidden sm:block" />
-              <span className="text-yellow-400">Platform</span>
+              Complete Practice Management <br className="hidden sm:block" />
+              <span className="text-yellow-400">Solution</span>
             </h1>
             <p className="text-base sm:text-lg lg:text-xl mb-6 sm:mb-8 text-blue-100 px-2">
-              Complete client management, operations orchestration, and workflow automation for ANY service business
+              End-to-end practice management from Lead Generation to Post-Sales Growth - built for professional service providers
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-6 sm:mb-8 px-4">
-              <Link href="/onboarding-flow">
+              <Link href="/pre-sales">
                 <Button size="lg" className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-4 text-base sm:text-lg">
-                  Start Free Trial → Setup Your Platform
+                  Start Managing Leads → Begin Free Trial
                 </Button>
               </Link>
-              <Link href="/platform-demo">
+              <Link href="/executive-dashboard">
                 <Button size="lg" variant="outline" className="w-full sm:w-auto border-white text-white hover:bg-white hover:text-blue-900 px-8 py-4 text-base sm:text-lg">
-                  <Play className="h-5 w-5 mr-2" />
-                  Watch 2-Min Demo
+                  <TrendingUp className="h-5 w-5 mr-2" />
+                  View Executive Dashboard
                 </Button>
               </Link>
             </div>
