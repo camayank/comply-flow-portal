@@ -336,7 +336,7 @@ async function getClientAnalytics(dateFilter: any) {
 
   const [satisfactionScore] = await db
     .select({
-      avgRating: sql<number>`COALESCE(AVG(${clientFeedback.rating}), 0)::numeric`,
+      avgRating: sql<number>`COALESCE(AVG(${clientFeedback.overallRating}), 0)::numeric`,
       responseCount: sql<number>`COUNT(*)::int`
     })
     .from(clientFeedback)
@@ -408,11 +408,11 @@ async function getLeadAnalytics(dateFilter: any) {
     const leadStats = await storage.getLeadStats();
     return {
       totalLeads: leadStats.totalLeads || 0,
-      hotLeads: leadStats.hotLeads || 0,
-      convertedLeads: leadStats.convertedLeads || 0,
+      hotLeads: leadStats.stageDistribution?.['Hot Lead'] || 0,
+      convertedLeads: Math.round((leadStats.totalLeads * leadStats.conversionRate) / 100) || 0,
       conversionRate: leadStats.conversionRate || 0,
       stageDistribution: leadStats.stageDistribution || {},
-      sourceAnalysis: leadStats.sourceAnalysis || {}
+      sourceAnalysis: leadStats.sourceDistribution || {}
     };
   } catch {
     return {
