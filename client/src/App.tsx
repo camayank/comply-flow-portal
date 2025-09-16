@@ -60,6 +60,7 @@ import FinancialManagementDashboard from "./pages/FinancialManagementDashboard";
 import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import BusinessIntelligence from "./pages/BusinessIntelligence";
 import MobileDashboard from "./pages/MobileDashboard";
+import DesignSystemShowcase from "./components/DesignSystemShowcase";
 
 const queryClient = new QueryClient();
 
@@ -74,6 +75,7 @@ const App = () => (
             <main className="flex-grow">
               <Switch>
                 <Route path="/" component={MobileResponsiveLanding} />
+                <Route path="/design-system" component={DesignSystemShowcase} />
                 <Route path="/landing" component={LandingPage} />
                 <Route path="/onboarding-flow" component={OnboardingFlow} />
                 <Route path="/platform-demo" component={PlatformDemo} />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,23 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
+import {
+  DashboardHeader,
+  DashboardContent,
+  DashboardGrid,
+  DashboardTabs,
+  MetricCard,
+  AlertCard,
+  StatusBadge,
+  DashboardFilters
+} from "@/components/ui/dashboard-layout";
+import {
+  MobileHeader,
+  MobileNavigationMenu,
+  MobileTabs,
+  MobileLayout,
+  MobileContent
+} from "@/components/ui/mobile-navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
