@@ -48,6 +48,7 @@ import MobileResponsiveLanding from "./pages/MobileResponsiveLanding";
 import OnboardingFlow from "./pages/OnboardingFlow";
 import PlatformDemo from "./pages/PlatformDemo";
 import AdminServiceConfig from "./pages/AdminServiceConfig";
+import PreSalesManager from "./pages/PreSalesManager";
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,7 @@ const App = () => (
                 <Route path="/universal-client" component={UniversalClientPortal} />
                 <Route path="/universal-ops" component={UniversalOperationsPanel} />
                 <Route path="/admin-config" component={AdminServiceConfig} />
+                <Route path="/pre-sales" component={PreSalesManager} />
                 <Route path="/agent" component={MobileAgentPortal} />
                 <Route path="/agents" component={AgentPortal} />
                 <Route path="/agent-portal" component={AgentPortal} />

@@ -1,9 +1,11 @@
 import { 
-  users, services, serviceRequests, payments,
+  users, services, serviceRequests, payments, leads, salesProposals,
   type User, type InsertUser,
   type Service, type InsertService,
   type ServiceRequest, type InsertServiceRequest,
-  type Payment, type InsertPayment
+  type Payment, type InsertPayment,
+  type LeadEnhanced, type InsertLeadEnhanced,
+  type SalesProposal, type InsertSalesProposal
 } from "@shared/schema";
 
 export interface IStorage {
@@ -27,6 +29,36 @@ export interface IStorage {
   getPayment(paymentId: string): Promise<Payment | undefined>;
   createPayment(payment: InsertPayment): Promise<Payment>;
   updatePayment(paymentId: string, updates: Partial<Payment>): Promise<Payment | undefined>;
+  
+  // Lead methods
+  getAllLeads(filters?: {
+    search?: string;
+    stage?: string;
+    source?: string;
+    executive?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    leads: LeadEnhanced[];
+    total: number;
+  }>;
+  getLead(id: number): Promise<LeadEnhanced | undefined>;
+  createLead(lead: InsertLeadEnhanced): Promise<LeadEnhanced>;
+  updateLead(id: number, updates: Partial<LeadEnhanced>): Promise<LeadEnhanced | undefined>;
+  deleteLead(id: number): Promise<boolean>;
+  addLeadInteraction(id: number, interaction: { type: string; notes: string; executive: string }): Promise<LeadEnhanced | undefined>;
+  getLeadStats(): Promise<{
+    stageDistribution: Record<string, number>;
+    sourceDistribution: Record<string, number>;
+    totalLeads: number;
+    recentLeads: number;
+    conversionRate: number;
+  }>;
+  getPreSalesExecutives(): Promise<string[]>;
+  
+  // Sales Proposal methods
+  getSalesProposalsByLead(leadId: string): Promise<SalesProposal[]>;
+  createSalesProposal(proposal: InsertSalesProposal): Promise<SalesProposal>;
 }
 
 export class MemStorage implements IStorage {
@@ -34,17 +66,26 @@ export class MemStorage implements IStorage {
   private services: Map<string, Service>;
   private serviceRequests: Map<number, ServiceRequest>;
   private payments: Map<string, Payment>;
+  private leads: Map<number, LeadEnhanced>;
+  private salesProposals: Map<number, SalesProposal>;
   private userIdCounter: number;
   private requestIdCounter: number;
+  private leadIdCounter: number;
+  private proposalIdCounter: number;
 
   constructor() {
     this.users = new Map();
     this.services = new Map();
     this.serviceRequests = new Map();
     this.payments = new Map();
+    this.leads = new Map();
+    this.salesProposals = new Map();
     this.userIdCounter = 1;
     this.requestIdCounter = 1;
+    this.leadIdCounter = 1;
+    this.proposalIdCounter = 1;
     this.initializeServices();
+    this.initializeLeads();
   }
 
   private initializeServices() {
@@ -95,6 +136,126 @@ export class MemStorage implements IStorage {
         requiredDocs: service.requiredDocs || [],
       };
       this.services.set(service.serviceId, fullService);
+    });
+  }
+
+  private initializeLeads() {
+    // Sample leads data for testing and development
+    const sampleLeads: InsertLeadEnhanced[] = [
+      {
+        leadId: 'L0001',
+        clientName: 'Rajesh Kumar',
+        contactEmail: 'rajesh.kumar@email.com',
+        contactPhone: '+91-9876543210',
+        state: 'Maharashtra',
+        entityType: 'pvt_ltd',
+        serviceInterested: 'Company Incorporation',
+        leadSource: 'Google Ads',
+        preSalesExecutive: 'Priya Sharma',
+        leadStage: 'hot_lead',
+        priority: 'high',
+        estimatedValue: '15000.00',
+        conversionProbability: 85,
+        notes: 'Interested in quick incorporation for new tech startup',
+        interactionHistory: [
+          {
+            date: new Date().toISOString(),
+            type: 'call',
+            notes: 'Initial consultation call - very interested',
+            executive: 'Priya Sharma'
+          }
+        ]
+      },
+      {
+        leadId: 'L0002',
+        clientName: 'Suresh Patel',
+        contactEmail: 'suresh.patel@business.com',
+        contactPhone: '+91-9987654321',
+        state: 'Gujarat',
+        entityType: 'llp',
+        serviceInterested: 'LLP Incorporation',
+        leadSource: 'Referral',
+        preSalesExecutive: 'Amit Singh',
+        leadStage: 'warm_lead',
+        priority: 'medium',
+        estimatedValue: '12000.00',
+        conversionProbability: 60,
+        notes: 'Partnership business, needs LLP for tax benefits'
+      },
+      {
+        leadId: 'L0003',
+        clientName: 'Kavya Reddy',
+        contactEmail: 'kavya.reddy@startup.com',
+        contactPhone: '+91-8765432109',
+        state: 'Karnataka',
+        entityType: 'opc',
+        serviceInterested: 'OPC Incorporation',
+        leadSource: 'Website',
+        preSalesExecutive: 'Priya Sharma',
+        leadStage: 'new',
+        priority: 'medium',
+        estimatedValue: '13000.00',
+        conversionProbability: 45,
+        notes: 'Single founder startup, exploring incorporation options'
+      },
+      {
+        leadId: 'L0004',
+        clientName: 'Vikram Singh',
+        contactEmail: 'vikram.singh@corp.com',
+        contactPhone: '+91-7654321098',
+        state: 'Delhi',
+        entityType: 'pvt_ltd',
+        serviceInterested: 'Director Appointment',
+        leadSource: 'Facebook Ads',
+        preSalesExecutive: 'Amit Singh',
+        leadStage: 'cold_lead',
+        priority: 'low',
+        estimatedValue: '4000.00',
+        conversionProbability: 30,
+        notes: 'Existing company needs additional director'
+      },
+      {
+        leadId: 'L0005',
+        clientName: 'Anita Desai',
+        contactEmail: 'anita.desai@consulting.com',
+        contactPhone: '+91-6543210987',
+        state: 'Maharashtra',
+        entityType: 'pvt_ltd',
+        serviceInterested: 'Annual Compliance',
+        leadSource: 'Google Ads',
+        preSalesExecutive: 'Priya Sharma',
+        leadStage: 'converted',
+        status: 'converted',
+        priority: 'high',
+        estimatedValue: '8000.00',
+        conversionProbability: 100,
+        convertedAt: new Date(),
+        notes: 'Converted to client - needs complete compliance package'
+      }
+    ];
+
+    sampleLeads.forEach((leadData, index) => {
+      const id = this.leadIdCounter++;
+      const lead: LeadEnhanced = {
+        ...leadData,
+        id,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        status: leadData.status || leadData.leadStage || 'new',
+        agentId: null,
+        contactEmail: leadData.contactEmail || null,
+        requiredServices: null,
+        kycDocuments: null,
+        leadLocation: null,
+        lastContactDate: null,
+        nextFollowupDate: null,
+        remarks: null,
+        closedAt: null,
+        lostReason: null,
+        assignedTo: null,
+        transferApprovalStatus: 'pending'
+      };
+      this.leads.set(id, lead);
     });
   }
 
@@ -211,6 +372,232 @@ export class MemStorage implements IStorage {
     };
     this.payments.set(paymentId, updated);
     return updated;
+  }
+
+  // Lead methods
+  async getAllLeads(filters: {
+    search?: string;
+    stage?: string;
+    source?: string;
+    executive?: string;
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<{ leads: LeadEnhanced[]; total: number }> {
+    let allLeads = Array.from(this.leads.values());
+    
+    // Apply search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      allLeads = allLeads.filter(lead =>
+        lead.clientName.toLowerCase().includes(searchLower) ||
+        (lead.contactEmail && lead.contactEmail.toLowerCase().includes(searchLower)) ||
+        lead.contactPhone.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Apply stage filter
+    if (filters.stage && filters.stage !== 'all_stages') {
+      allLeads = allLeads.filter(lead => lead.leadStage === filters.stage);
+    }
+    
+    // Apply source filter
+    if (filters.source && filters.source !== 'all_sources') {
+      allLeads = allLeads.filter(lead => lead.leadSource === filters.source);
+    }
+    
+    // Apply executive filter
+    if (filters.executive) {
+      allLeads = allLeads.filter(lead => lead.preSalesExecutive === filters.executive);
+    }
+    
+    const total = allLeads.length;
+    
+    // Apply pagination
+    const offset = filters.offset || 0;
+    const limit = filters.limit || 10;
+    const paginatedLeads = allLeads.slice(offset, offset + limit);
+    
+    return {
+      leads: paginatedLeads,
+      total
+    };
+  }
+
+  async getLead(id: number): Promise<LeadEnhanced | undefined> {
+    return this.leads.get(id);
+  }
+
+  async createLead(leadData: InsertLeadEnhanced): Promise<LeadEnhanced> {
+    const id = this.leadIdCounter++;
+    
+    // Generate leadId if not provided
+    let leadId = leadData.leadId;
+    if (!leadId) {
+      const lastLeadId = Array.from(this.leads.values())
+        .map(l => l.leadId)
+        .filter(id => id.startsWith('L'))
+        .sort()
+        .pop();
+        
+      if (lastLeadId) {
+        const lastNumber = parseInt(lastLeadId.substring(1));
+        const nextNumber = lastNumber + 1;
+        leadId = `L${nextNumber.toString().padStart(4, '0')}`;
+      } else {
+        leadId = 'L0001';
+      }
+    }
+    
+    const lead: LeadEnhanced = {
+      ...leadData,
+      id,
+      leadId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      status: leadData.status || leadData.leadStage || 'new',
+      agentId: leadData.agentId || null,
+      contactEmail: leadData.contactEmail || null,
+      requiredServices: leadData.requiredServices || null,
+      kycDocuments: leadData.kycDocuments || null,
+      leadLocation: leadData.leadLocation || null,
+      estimatedValue: leadData.estimatedValue || null,
+      conversionProbability: leadData.conversionProbability || null,
+      lastContactDate: leadData.lastContactDate || null,
+      nextFollowupDate: leadData.nextFollowupDate || null,
+      remarks: leadData.remarks || null,
+      notes: leadData.notes || null,
+      interactionHistory: leadData.interactionHistory || null,
+      convertedAt: leadData.convertedAt || null,
+      closedAt: leadData.closedAt || null,
+      lostReason: leadData.lostReason || null,
+      assignedTo: leadData.assignedTo || null,
+      transferApprovalStatus: leadData.transferApprovalStatus || 'pending'
+    };
+    
+    this.leads.set(id, lead);
+    return lead;
+  }
+
+  async updateLead(id: number, updates: Partial<LeadEnhanced>): Promise<LeadEnhanced | undefined> {
+    const existing = this.leads.get(id);
+    if (!existing) return undefined;
+    
+    const updated: LeadEnhanced = {
+      ...existing,
+      ...updates,
+      updatedAt: new Date(),
+    };
+    
+    this.leads.set(id, updated);
+    return updated;
+  }
+
+  async deleteLead(id: number): Promise<boolean> {
+    return this.leads.delete(id);
+  }
+
+  async addLeadInteraction(id: number, interaction: { type: string; notes: string; executive: string }): Promise<LeadEnhanced | undefined> {
+    const existing = this.leads.get(id);
+    if (!existing) return undefined;
+    
+    const currentHistory = (existing.interactionHistory as any[]) || [];
+    const newInteraction = {
+      date: new Date().toISOString(),
+      ...interaction
+    };
+    
+    const updated: LeadEnhanced = {
+      ...existing,
+      interactionHistory: [...currentHistory, newInteraction],
+      lastContactDate: new Date(),
+      updatedAt: new Date()
+    };
+    
+    this.leads.set(id, updated);
+    return updated;
+  }
+
+  async getLeadStats(): Promise<{
+    stageDistribution: Record<string, number>;
+    sourceDistribution: Record<string, number>;
+    totalLeads: number;
+    recentLeads: number;
+    conversionRate: number;
+  }> {
+    const allLeads = Array.from(this.leads.values());
+    
+    // Stage distribution
+    const stageDistribution: Record<string, number> = {};
+    allLeads.forEach(lead => {
+      if (lead.leadStage) {
+        stageDistribution[lead.leadStage] = (stageDistribution[lead.leadStage] || 0) + 1;
+      }
+    });
+    
+    // Source distribution
+    const sourceDistribution: Record<string, number> = {};
+    allLeads.forEach(lead => {
+      sourceDistribution[lead.leadSource] = (sourceDistribution[lead.leadSource] || 0) + 1;
+    });
+    
+    // Recent leads (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recentLeads = allLeads.filter(lead => 
+      lead.createdAt && lead.createdAt >= sevenDaysAgo
+    ).length;
+    
+    // Total leads
+    const totalLeads = allLeads.length;
+    
+    // Conversion rate
+    const convertedLeads = allLeads.filter(lead => lead.status === 'converted').length;
+    const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
+    
+    return {
+      stageDistribution,
+      sourceDistribution,
+      totalLeads,
+      recentLeads,
+      conversionRate: Math.round(conversionRate * 100) / 100
+    };
+  }
+
+  async getPreSalesExecutives(): Promise<string[]> {
+    const executives = Array.from(this.leads.values())
+      .map(lead => lead.preSalesExecutive)
+      .filter((executive, index, array) => executive && array.indexOf(executive) === index);
+    
+    return executives as string[];
+  }
+
+  // Sales Proposal methods
+  async getSalesProposalsByLead(leadId: string): Promise<SalesProposal[]> {
+    return Array.from(this.salesProposals.values()).filter(proposal => proposal.leadId === leadId);
+  }
+
+  async createSalesProposal(proposalData: InsertSalesProposal): Promise<SalesProposal> {
+    const id = this.proposalIdCounter++;
+    
+    const proposal: SalesProposal = {
+      ...proposalData,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      qualifiedLeadStatus: proposalData.qualifiedLeadStatus || null,
+      proposalStatus: proposalData.proposalStatus || null,
+      proposalAmount: proposalData.proposalAmount || null,
+      requiredServices: proposalData.requiredServices || null,
+      nextFollowupDate: proposalData.nextFollowupDate || null,
+      interactionLog: proposalData.interactionLog || null,
+      finalRemark: proposalData.finalRemark || null,
+      documentsLink: proposalData.documentsLink || null,
+      paymentReceived: proposalData.paymentReceived || 'pending',
+      paymentPending: proposalData.paymentPending || '0.00'
+    };
+    
+    this.salesProposals.set(id, proposal);
+    return proposal;
   }
 }
 

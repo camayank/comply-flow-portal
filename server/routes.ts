@@ -1107,6 +1107,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register client portal routes
   const { registerClientRoutes } = await import('./client-routes-working');
   registerClientRoutes(app);
+  
+  // Register leads management routes for Practice Management System
+  const { registerLeadsRoutes } = await import('./leads-routes');
+  registerLeadsRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;
