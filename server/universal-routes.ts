@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { UniversalServiceEngine } from "./universal-service-engine";
+import { registerTeamManagementRoutes } from './team-management-routes';
 import { db } from "./db";
 import { eq, and, desc, asc, like, inArray, isNull, sql, or } from "drizzle-orm";
 import {
@@ -718,6 +719,9 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Register team management routes
+  registerTeamManagementRoutes(app);
+  
   const httpServer = createServer(app);
   return httpServer;
 }

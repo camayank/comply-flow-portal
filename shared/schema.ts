@@ -472,6 +472,240 @@ export const documentTemplates = pgTable("document_templates", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ============================================================================
+// QC AND DELIVERY TRACKING TABLES
+// ============================================================================
+
+export const QC_REVIEW_STATUS = {
+  PENDING: 'pending',
+  IN_PROGRESS: 'in_progress', 
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  REWORK_REQUIRED: 'rework_required',
+  ESCALATED: 'escalated'
+} as const;
+
+export const QUALITY_SCORE = {
+  EXCELLENT: 95,
+  GOOD: 85,
+  SATISFACTORY: 75,
+  NEEDS_IMPROVEMENT: 65,
+  POOR: 50
+} as const;
+
+export const DELIVERY_STATUS = {
+  PENDING_QC: 'pending_qc',
+  QC_APPROVED: 'qc_approved',
+  READY_FOR_DELIVERY: 'ready_for_delivery',
+  DELIVERED: 'delivered',
+  CLIENT_CONFIRMED: 'client_confirmed',
+  DELIVERY_REJECTED: 'delivery_rejected'
+} as const;
+
+// Quality Control Reviews
+export const qualityReviews = pgTable("quality_reviews", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  reviewerId: integer("reviewer_id").notNull(), // QC team member
+  assignedAt: timestamp("assigned_at").defaultNow(),
+  status: text("status").notNull().default(QC_REVIEW_STATUS.PENDING),
+  priority: text("priority").notNull().default("medium"), // low, medium, high, urgent
+  
+  // Quality assessment
+  qualityScore: integer("quality_score"), // 0-100
+  checklist: json("checklist").notNull(), // quality checklist items with completion status
+  checklistCompleted: boolean("checklist_completed").default(false),
+  
+  // Document review
+  documentsReviewed: json("documents_reviewed"), // document IDs and their review status
+  documentIssues: json("document_issues"), // issues found in documents
+  
+  // Review details
+  reviewNotes: text("review_notes"),
+  internalComments: text("internal_comments"),
+  clientFacingNotes: text("client_facing_notes"),
+  
+  // Approval workflow
+  approvalLevel: integer("approval_level").default(1), // multi-level approvals
+  approvedBy: json("approved_by"), // array of approver user IDs
+  rejectionReason: text("rejection_reason"),
+  reworkInstructions: text("rework_instructions"),
+  
+  // Timing
+  reviewStartedAt: timestamp("review_started_at"),
+  reviewCompletedAt: timestamp("review_completed_at"),
+  slaDeadline: timestamp("sla_deadline"),
+  
+  // Issue tracking
+  issuesFound: json("issues_found"), // categorized issues
+  criticalIssues: integer("critical_issues").default(0),
+  minorIssues: integer("minor_issues").default(0),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Client Delivery Confirmations
+export const deliveryConfirmations = pgTable("delivery_confirmations", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  qualityReviewId: integer("quality_review_id").notNull(),
+  clientId: integer("client_id").notNull(),
+  
+  // Delivery details
+  deliveryMethod: text("delivery_method").notNull(), // email, portal_download, physical_delivery
+  deliveredBy: integer("delivered_by").notNull(), // ops team member
+  deliveredAt: timestamp("delivered_at").defaultNow(),
+  
+  // Client confirmation
+  clientConfirmedAt: timestamp("client_confirmed_at"),
+  confirmationMethod: text("confirmation_method"), // portal_click, email_reply, phone_call
+  clientSignature: text("client_signature"), // digital signature data
+  
+  // Delivery status
+  status: text("status").notNull().default(DELIVERY_STATUS.READY_FOR_DELIVERY),
+  deliveryNotes: text("delivery_notes"),
+  clientInstructions: text("client_instructions"),
+  
+  // Handoff documentation
+  handoffDocument: json("handoff_document"), // structured handoff details
+  deliverables: json("deliverables").notNull(), // list of delivered items
+  accessInstructions: text("access_instructions"),
+  
+  // Follow-up
+  followUpRequired: boolean("follow_up_required").default(false),
+  followUpDate: timestamp("follow_up_date"),
+  followUpNotes: text("follow_up_notes"),
+  
+  // Client satisfaction
+  satisfactionRating: integer("satisfaction_rating"), // 1-5 stars
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Quality Metrics and Analytics
+export const qualityMetrics = pgTable("quality_metrics", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  qualityReviewId: integer("quality_review_id"),
+  
+  // Performance metrics
+  timeToQc: integer("time_to_qc"), // minutes from completion to QC start
+  qcDuration: integer("qc_duration"), // minutes for QC review
+  timeToDelivery: integer("time_to_delivery"), // minutes from QC approval to delivery
+  totalProcessingTime: integer("total_processing_time"), // end-to-end time
+  
+  // Quality scores
+  overallQualityScore: integer("overall_quality_score"), // 0-100
+  documentQuality: integer("document_quality"), // 0-100
+  processAdherence: integer("process_adherence"), // 0-100
+  clientCommunication: integer("client_communication"), // 0-100
+  
+  // Issue metrics
+  defectCount: integer("defect_count").default(0),
+  reworkCount: integer("rework_count").default(0),
+  escalationCount: integer("escalation_count").default(0),
+  
+  // SLA performance
+  slaCompliance: boolean("sla_compliance").default(true),
+  slaVariance: integer("sla_variance"), // minutes over/under SLA
+  
+  // Team performance
+  reviewerEfficiency: integer("reviewer_efficiency"), // 0-100
+  firstPassSuccess: boolean("first_pass_success").default(true),
+  
+  // Client satisfaction
+  clientSatisfaction: integer("client_satisfaction"), // 1-5
+  npsScore: integer("nps_score"), // Net Promoter Score
+  
+  // Benchmarking
+  performanceCategory: text("performance_category"), // excellent, good, average, poor
+  improvementAreas: json("improvement_areas"),
+  
+  calculatedAt: timestamp("calculated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Client Feedback System
+export const clientFeedback = pgTable("client_feedback", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  deliveryConfirmationId: integer("delivery_confirmation_id"),
+  clientId: integer("client_id").notNull(),
+  
+  // Feedback details
+  overallRating: integer("overall_rating").notNull(), // 1-5 stars
+  serviceQuality: integer("service_quality"), // 1-5
+  timeliness: integer("timeliness"), // 1-5
+  communication: integer("communication"), // 1-5
+  documentation: integer("documentation"), // 1-5
+  
+  // Written feedback
+  positiveAspects: text("positive_aspects"),
+  improvementSuggestions: text("improvement_suggestions"),
+  additionalComments: text("additional_comments"),
+  
+  // NPS and recommendation
+  npsScore: integer("nps_score"), // 0-10 likelihood to recommend
+  wouldRecommend: boolean("would_recommend"),
+  referralPotential: text("referral_potential"), // high, medium, low
+  
+  // Service specific
+  serviceCategory: text("service_category"), // incorporation, compliance, tax, etc.
+  specificService: text("specific_service"),
+  
+  // Follow-up
+  requestsFollowUp: boolean("requests_follow_up").default(false),
+  followUpType: text("follow_up_type"), // call, meeting, email
+  followUpCompleted: boolean("follow_up_completed").default(false),
+  
+  // Resolution
+  hasIssues: boolean("has_issues").default(false),
+  issuesDescription: text("issues_description"),
+  issueResolved: boolean("issue_resolved").default(false),
+  resolutionNotes: text("resolution_notes"),
+  
+  // Metadata
+  feedbackChannel: text("feedback_channel").default("portal"), // portal, email, call, survey
+  isAnonymous: boolean("is_anonymous").default(false),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Quality Checklist Templates
+export const qualityChecklists = pgTable("quality_checklists", {
+  id: serial("id").primaryKey(),
+  serviceType: text("service_type").notNull(),
+  checklistName: text("checklist_name").notNull(),
+  version: text("version").default("1.0"),
+  
+  // Checklist structure
+  checklistItems: json("checklist_items").notNull(), // array of checklist items
+  mandatoryItems: json("mandatory_items"), // items that must pass
+  scoringCriteria: json("scoring_criteria"), // how to calculate quality score
+  
+  // Configuration
+  approvalThreshold: integer("approval_threshold").default(80), // minimum score to approve
+  escalationThreshold: integer("escalation_threshold").default(60), // score below which to escalate
+  
+  // Metadata
+  isActive: boolean("is_active").default(true),
+  isDefault: boolean("is_default").default(false),
+  category: text("category"),
+  description: text("description"),
+  
+  createdBy: integer("created_by"),
+  approvedBy: integer("approved_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -1338,6 +1572,37 @@ export const insertCommissionRecordSchema = createInsertSchema(commissionRecords
   createdAt: true,
 });
 
+// QC and Delivery Insert Schemas
+export const insertQualityReviewSchema = createInsertSchema(qualityReviews).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDeliveryConfirmationSchema = createInsertSchema(deliveryConfirmations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertQualityMetricsSchema = createInsertSchema(qualityMetrics).omit({
+  id: true,
+  createdAt: true,
+  calculatedAt: true,
+});
+
+export const insertClientFeedbackSchema = createInsertSchema(clientFeedback).omit({
+  id: true,
+  createdAt: true,
+  submittedAt: true,
+});
+
+export const insertQualityChecklistSchema = createInsertSchema(qualityChecklists).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertMarketingResourceSchema = createInsertSchema(marketingResources).omit({
   id: true,
   createdAt: true,
@@ -1429,6 +1694,203 @@ export const postSalesManagement = pgTable("post_sales_management", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Client Health Scoring and Relationship Tracking
+export const clientHealthScores = pgTable("client_health_scores", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  businessEntityId: integer("business_entity_id").notNull(),
+  
+  // Health Score Components (0-100 each)
+  overallHealthScore: integer("overall_health_score").default(100),
+  engagementScore: integer("engagement_score").default(100), // login frequency, portal usage
+  satisfactionScore: integer("satisfaction_score").default(100), // from feedback ratings
+  paymentHealthScore: integer("payment_health_score").default(100), // payment timeliness
+  communicationScore: integer("communication_score").default(100), // response rates
+  complianceScore: integer("compliance_score").default(100), // compliance adherence
+  
+  // Risk Indicators
+  churnRisk: text("churn_risk").default("low"), // low, medium, high, critical
+  riskFactors: json("risk_factors"), // array of identified risk factors
+  lastInteractionDate: timestamp("last_interaction_date"),
+  daysInactive: integer("days_inactive").default(0),
+  missedDeadlines: integer("missed_deadlines").default(0),
+  overduePayments: integer("overdue_payments").default(0),
+  
+  // Engagement Metrics
+  totalLogins: integer("total_logins").default(0),
+  avgResponseTime: integer("avg_response_time"), // hours
+  documentsSubmittedOnTime: integer("documents_submitted_on_time").default(0),
+  totalDocumentsRequired: integer("total_documents_required").default(0),
+  
+  // Financial Health
+  totalRevenue: decimal("total_revenue", { precision: 12, scale: 2 }).default("0.00"),
+  averageOrderValue: decimal("average_order_value", { precision: 10, scale: 2 }).default("0.00"),
+  paymentDelays: integer("payment_delays").default(0),
+  outstandingAmount: decimal("outstanding_amount", { precision: 10, scale: 2 }).default("0.00"),
+  
+  // Calculated Metrics
+  predictedLifetimeValue: decimal("predicted_lifetime_value", { precision: 12, scale: 2 }).default("0.00"),
+  churnProbability: decimal("churn_probability", { precision: 5, scale: 4 }).default("0.0000"),
+  
+  calculatedAt: timestamp("calculated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Upselling Opportunities Management
+export const upsellOpportunities = pgTable("upsell_opportunities", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  businessEntityId: integer("business_entity_id").notNull(),
+  
+  // Opportunity Details
+  opportunityType: text("opportunity_type").notNull(), // cross_sell, up_sell, renewal, add_on
+  suggestedServices: json("suggested_services").notNull(), // array of service IDs with reasons
+  currentServices: json("current_services"), // services client already has
+  
+  // Scoring and Priority
+  confidenceScore: integer("confidence_score").default(0), // 0-100 confidence in opportunity
+  priority: text("priority").default("medium"), // low, medium, high, urgent
+  potentialRevenue: decimal("potential_revenue", { precision: 10, scale: 2 }).default("0.00"),
+  
+  // Trigger Information
+  triggerEvent: text("trigger_event"), // service_completion, compliance_due, business_growth
+  triggerData: json("trigger_data"), // contextual data that triggered the opportunity
+  identifiedAt: timestamp("identified_at").defaultNow(),
+  
+  // Engagement Tracking
+  status: text("status").default("identified"), // identified, contacted, presented, negotiating, won, lost, ignored
+  contactAttempts: integer("contact_attempts").default(0),
+  lastContactDate: timestamp("last_contact_date"),
+  nextFollowUpDate: timestamp("next_follow_up_date"),
+  
+  // Proposal Information
+  proposalSent: boolean("proposal_sent").default(false),
+  proposalSentDate: timestamp("proposal_sent_date"),
+  proposalValue: decimal("proposal_value", { precision: 10, scale: 2 }).default("0.00"),
+  proposalId: integer("proposal_id"), // link to sales proposal
+  
+  // Outcome Tracking
+  conversionDate: timestamp("conversion_date"),
+  actualRevenue: decimal("actual_revenue", { precision: 10, scale: 2 }).default("0.00"),
+  lostReason: text("lost_reason"),
+  
+  // Automated Follow-up
+  automatedFollowUp: boolean("automated_follow_up").default(true),
+  maxFollowUpAttempts: integer("max_follow_up_attempts").default(3),
+  
+  // Assignment
+  assignedTo: integer("assigned_to"), // sales person/relationship manager
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Loyalty Programs and Retention Management
+export const loyaltyPrograms = pgTable("loyalty_programs", {
+  id: serial("id").primaryKey(),
+  programId: text("program_id").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  
+  // Program Configuration
+  programType: text("program_type").notNull(), // points, tiers, cashback, discounts
+  isActive: boolean("is_active").default(true),
+  startDate: timestamp("start_date").defaultNow(),
+  endDate: timestamp("end_date"),
+  
+  // Earning Rules
+  pointsPerRupee: decimal("points_per_rupee", { precision: 5, scale: 2 }).default("0.00"),
+  bonusPointsServices: json("bonus_points_services"), // services that earn bonus points
+  referralBonus: integer("referral_bonus").default(0),
+  
+  // Redemption Rules
+  redemptionThreshold: integer("redemption_threshold").default(100),
+  redemptionValue: decimal("redemption_value", { precision: 5, scale: 2 }).default("1.00"), // points to rupee conversion
+  
+  // Tier Configuration
+  tiers: json("tiers"), // tier definitions with benefits
+  tierUpgradeThreshold: json("tier_upgrade_threshold"), // revenue/points needed for each tier
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Client Loyalty Status and Points
+export const clientLoyaltyStatus = pgTable("client_loyalty_status", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  programId: text("program_id").notNull(),
+  
+  // Current Status
+  currentTier: text("current_tier").default("bronze"), // bronze, silver, gold, platinum
+  totalPoints: integer("total_points").default(0),
+  availablePoints: integer("available_points").default(0),
+  lifetimePoints: integer("lifetime_points").default(0),
+  
+  // Tier Progress
+  nextTier: text("next_tier"),
+  pointsToNextTier: integer("points_to_next_tier").default(0),
+  revenueToNextTier: decimal("revenue_to_next_tier", { precision: 10, scale: 2 }).default("0.00"),
+  
+  // Engagement
+  enrolledDate: timestamp("enrolled_date").defaultNow(),
+  lastActivity: timestamp("last_activity"),
+  totalRedemptions: integer("total_redemptions").default(0),
+  totalReferrals: integer("total_referrals").default(0),
+  
+  // Benefits Tracking
+  currentBenefits: json("current_benefits"), // active benefits for current tier
+  usedBenefits: json("used_benefits"), // benefits used this period
+  
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Relationship Events and Touchpoint Tracking
+export const relationshipEvents = pgTable("relationship_events", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  businessEntityId: integer("business_entity_id"),
+  
+  // Event Details
+  eventType: text("event_type").notNull(), // call, email, meeting, service_completion, complaint, compliment, renewal
+  eventTitle: text("event_title").notNull(),
+  eventDescription: text("event_description"),
+  
+  // Classification
+  category: text("category").default("general"), // sales, support, billing, service, relationship
+  sentiment: text("sentiment").default("neutral"), // positive, negative, neutral
+  importance: text("importance").default("medium"), // low, medium, high, critical
+  
+  // Context
+  serviceRequestId: integer("service_request_id"),
+  triggerEvent: text("trigger_event"), // what caused this interaction
+  channel: text("channel").default("portal"), // portal, phone, email, whatsapp, in_person
+  
+  // People Involved
+  initiatedBy: text("initiated_by").default("client"), // client, team, system
+  handledBy: integer("handled_by"), // team member who handled
+  participantIds: json("participant_ids"), // other people involved
+  
+  // Outcome and Follow-up
+  outcome: text("outcome"), // resolved, escalated, follow_up_needed, information_provided
+  actionItems: json("action_items"), // tasks that came out of this interaction
+  followUpRequired: boolean("follow_up_required").default(false),
+  followUpDate: timestamp("follow_up_date"),
+  followUpCompleted: boolean("follow_up_completed").default(false),
+  
+  // Metadata
+  duration: integer("duration"), // minutes for calls/meetings
+  attachments: json("attachments"),
+  tags: json("tags"), // custom tags for categorization
+  
+  eventDate: timestamp("event_date").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 
 
 
@@ -1472,6 +1934,40 @@ export const insertPostSalesManagementSchema = createInsertSchema(postSalesManag
   updatedAt: true,
 });
 
+export const insertClientHealthScoreSchema = createInsertSchema(clientHealthScores).omit({
+  id: true,
+  calculatedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertUpsellOpportunitySchema = createInsertSchema(upsellOpportunities).omit({
+  id: true,
+  identifiedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLoyaltyProgramSchema = createInsertSchema(loyaltyPrograms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertClientLoyaltyStatusSchema = createInsertSchema(clientLoyaltyStatus).omit({
+  id: true,
+  enrolledDate: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertRelationshipEventSchema = createInsertSchema(relationshipEvents).omit({
+  id: true,
+  eventDate: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 
 
 
@@ -1506,6 +2002,16 @@ export type QcDeliveryTracking = typeof qcDeliveryTracking.$inferSelect;
 export type InsertQcDeliveryTracking = z.infer<typeof insertQcDeliveryTrackingSchema>;
 export type PostSalesManagement = typeof postSalesManagement.$inferSelect;
 export type InsertPostSalesManagement = z.infer<typeof insertPostSalesManagementSchema>;
+export type ClientHealthScore = typeof clientHealthScores.$inferSelect;
+export type InsertClientHealthScore = z.infer<typeof insertClientHealthScoreSchema>;
+export type UpsellOpportunity = typeof upsellOpportunities.$inferSelect;
+export type InsertUpsellOpportunity = z.infer<typeof insertUpsellOpportunitySchema>;
+export type LoyaltyProgram = typeof loyaltyPrograms.$inferSelect;
+export type InsertLoyaltyProgram = z.infer<typeof insertLoyaltyProgramSchema>;
+export type ClientLoyaltyStatus = typeof clientLoyaltyStatus.$inferSelect;
+export type InsertClientLoyaltyStatus = z.infer<typeof insertClientLoyaltyStatusSchema>;
+export type RelationshipEvent = typeof relationshipEvents.$inferSelect;
+export type InsertRelationshipEvent = z.infer<typeof insertRelationshipEventSchema>;
 export type DashboardMetrics = typeof dashboardMetrics.$inferSelect;
 export type InsertDashboardMetrics = z.infer<typeof insertDashboardMetricsSchema>;
 
@@ -1516,3 +2022,1469 @@ export type OperationsTeamEnhanced = typeof operationsTeam.$inferSelect;
 export type InsertOperationsTeamEnhanced = z.infer<typeof insertOperationsTeamEnhancedSchema>;
 export type LeadEnhanced = typeof leads.$inferSelect;
 export type InsertLeadEnhanced = z.infer<typeof insertLeadEnhancedSchema>;
+
+// QC and Delivery Type Exports
+export type QualityReview = typeof qualityReviews.$inferSelect;
+export type InsertQualityReview = z.infer<typeof insertQualityReviewSchema>;
+export type DeliveryConfirmation = typeof deliveryConfirmations.$inferSelect;
+export type InsertDeliveryConfirmation = z.infer<typeof insertDeliveryConfirmationSchema>;
+export type QualityMetrics = typeof qualityMetrics.$inferSelect;
+export type InsertQualityMetrics = z.infer<typeof insertQualityMetricsSchema>;
+export type ClientFeedback = typeof clientFeedback.$inferSelect;
+export type InsertClientFeedback = z.infer<typeof insertClientFeedbackSchema>;
+export type QualityChecklist = typeof qualityChecklists.$inferSelect;
+export type InsertQualityChecklist = z.infer<typeof insertQualityChecklistSchema>;
+
+// ============================================================================
+// COMPREHENSIVE HR MANAGEMENT SYSTEM
+// ============================================================================
+
+// Employee Skills and Competencies
+export const employeeSkills = pgTable("employee_skills", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull(),
+  skillCategory: text("skill_category").notNull(), // technical, soft_skills, domain_expertise, certifications
+  skillName: text("skill_name").notNull(),
+  proficiencyLevel: integer("proficiency_level").notNull().default(1), // 1-5 scale
+  experienceYears: decimal("experience_years", { precision: 4, scale: 1 }).default("0.0"),
+  lastAssessed: timestamp("last_assessed"),
+  assessedBy: integer("assessed_by"),
+  certificationLevel: text("certification_level"), // beginner, intermediate, advanced, expert
+  isVerified: boolean("is_verified").default(false),
+  verificationDate: timestamp("verification_date"),
+  skillTags: json("skill_tags"), // array of related tags
+  practicalExperience: text("practical_experience"), // description of real-world usage
+  developmentPlan: text("development_plan"), // next steps for improvement
+  targetProficiency: integer("target_proficiency"), // goal level
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Skills Master Database
+export const skillsMaster = pgTable("skills_master", {
+  id: serial("id").primaryKey(),
+  skillName: text("skill_name").notNull().unique(),
+  category: text("category").notNull(), // technical, soft_skills, domain_expertise
+  subCategory: text("sub_category"),
+  description: text("description"),
+  levelDescriptions: json("level_descriptions"), // descriptions for each proficiency level
+  assessmentCriteria: json("assessment_criteria"), // how to evaluate this skill
+  relatedSkills: json("related_skills"), // complementary skills
+  industryRelevance: json("industry_relevance"), // which industries use this skill
+  marketDemand: text("market_demand").default("medium"), // low, medium, high
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Training Programs and Learning Management
+export const trainingPrograms = pgTable("training_programs", {
+  id: serial("id").primaryKey(),
+  programCode: text("program_code").notNull().unique(),
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category").notNull(), // technical, compliance, leadership, soft_skills
+  level: text("level").notNull(), // beginner, intermediate, advanced
+  duration: integer("duration").notNull(), // hours
+  format: text("format").notNull(), // online, offline, hybrid, self_paced
+  provider: text("provider"), // internal, external provider name
+  cost: decimal("cost", { precision: 10, scale: 2 }).default("0.00"),
+  maxParticipants: integer("max_participants"),
+  prerequisites: json("prerequisites"), // required skills/certifications
+  learningObjectives: json("learning_objectives"),
+  curriculum: json("curriculum"), // modules and topics
+  assessmentMethod: text("assessment_method"), // test, project, presentation, practical
+  certificationOffered: boolean("certification_offered").default(false),
+  certificationValidityMonths: integer("certification_validity_months"),
+  targetSkills: json("target_skills"), // skills this program develops
+  isActive: boolean("is_active").default(true),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Employee Training Enrollments
+export const trainingEnrollments = pgTable("training_enrollments", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull(),
+  programId: integer("program_id").notNull(),
+  enrollmentDate: timestamp("enrollment_date").defaultNow(),
+  startDate: timestamp("start_date"),
+  completionDate: timestamp("completion_date"),
+  status: text("status").notNull().default("enrolled"), // enrolled, in_progress, completed, failed, withdrawn
+  progress: integer("progress").default(0), // 0-100%
+  attendanceRate: decimal("attendance_rate", { precision: 5, scale: 2 }),
+  assessmentScore: decimal("assessment_score", { precision: 5, scale: 2 }),
+  passingScore: decimal("passing_score", { precision: 5, scale: 2 }).default("70.00"),
+  attempts: integer("attempts").default(1),
+  feedback: text("feedback"), // employee feedback
+  instructorNotes: text("instructor_notes"),
+  certificationIssued: boolean("certification_issued").default(false),
+  certificationNumber: text("certification_number"),
+  certificationExpiryDate: timestamp("certification_expiry_date"),
+  skillsGained: json("skills_gained"), // skills acquired through this training
+  postTrainingAssessment: json("post_training_assessment"),
+  isPriority: boolean("is_priority").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Performance Reviews and Goal Setting
+export const performanceReviews = pgTable("performance_reviews", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull(),
+  reviewerId: integer("reviewer_id").notNull(),
+  reviewPeriod: text("review_period").notNull(), // Q1_2024, H1_2024, ANNUAL_2024
+  reviewType: text("review_type").notNull(), // quarterly, annual, probation, promotion
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  status: text("status").default("draft"), // draft, in_progress, completed, approved, published
+  overallRating: decimal("overall_rating", { precision: 3, scale: 2 }),
+  
+  // Performance Categories
+  technicalCompetency: decimal("technical_competency", { precision: 3, scale: 2 }),
+  qualityOfWork: decimal("quality_of_work", { precision: 3, scale: 2 }),
+  productivity: decimal("productivity", { precision: 3, scale: 2 }),
+  communication: decimal("communication", { precision: 3, scale: 2 }),
+  teamwork: decimal("teamwork", { precision: 3, scale: 2 }),
+  leadership: decimal("leadership", { precision: 3, scale: 2 }),
+  innovation: decimal("innovation", { precision: 3, scale: 2 }),
+  punctuality: decimal("punctuality", { precision: 3, scale: 2 }),
+  
+  // Detailed Assessments
+  achievements: text("achievements"),
+  strengthsIdentified: text("strengths_identified"),
+  areasForImprovement: text("areas_for_improvement"),
+  trainingRecommendations: json("training_recommendations"),
+  careerDevelopmentPlan: text("career_development_plan"),
+  promotionReadiness: text("promotion_readiness"), // ready, needs_development, not_ready
+  
+  // Goal Setting
+  previousGoalsAchieved: json("previous_goals_achieved"),
+  newGoals: json("new_goals"), // for next period
+  kpiTargets: json("kpi_targets"),
+  
+  // Manager Comments
+  managerComments: text("manager_comments"),
+  employeeSelfAssessment: text("employee_self_assessment"),
+  employeeComments: text("employee_comments"),
+  developmentDiscussion: text("development_discussion"),
+  
+  // Final Actions
+  salaryRecommendation: decimal("salary_recommendation", { precision: 10, scale: 2 }),
+  bonusRecommendation: decimal("bonus_recommendation", { precision: 10, scale: 2 }),
+  actionPlan: text("action_plan"),
+  followUpDate: timestamp("follow_up_date"),
+  
+  submittedAt: timestamp("submitted_at"),
+  approvedBy: integer("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Employee Goals and KPIs
+export const employeeGoals = pgTable("employee_goals", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull(),
+  goalType: text("goal_type").notNull(), // performance, learning, project, behavior, career
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category"), // productivity, quality, skills, leadership, innovation
+  priority: text("priority").default("medium"), // low, medium, high, critical
+  targetValue: decimal("target_value", { precision: 15, scale: 2 }),
+  currentValue: decimal("current_value", { precision: 15, scale: 2 }).default("0.00"),
+  unit: text("unit"), // hours, percentage, count, rating
+  startDate: timestamp("start_date").notNull(),
+  targetDate: timestamp("target_date").notNull(),
+  status: text("status").default("active"), // active, achieved, failed, cancelled, on_hold
+  progress: integer("progress").default(0), // 0-100%
+  milestones: json("milestones"), // intermediate checkpoints
+  resources: json("resources"), // resources needed to achieve goal
+  barriers: text("barriers"), // challenges faced
+  supportNeeded: text("support_needed"),
+  managerId: integer("manager_id"),
+  linkedToReview: integer("linked_to_review"),
+  measurementCriteria: text("measurement_criteria"),
+  achievementNotes: text("achievement_notes"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Attendance and Time Tracking
+export const attendanceRecords = pgTable("attendance_records", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull(),
+  attendanceDate: timestamp("attendance_date").notNull(),
+  checkInTime: timestamp("check_in_time"),
+  checkOutTime: timestamp("check_out_time"),
+  totalHours: decimal("total_hours", { precision: 4, scale: 2 }),
+  breakHours: decimal("break_hours", { precision: 4, scale: 2 }).default("0.00"),
+  overtimeHours: decimal("overtime_hours", { precision: 4, scale: 2 }).default("0.00"),
+  status: text("status").notNull(), // present, absent, late, half_day, work_from_home, on_leave
+  workLocation: text("work_location").default("office"), // office, home, client_site, field
+  lateMinutes: integer("late_minutes").default(0),
+  earlyLeaveMinutes: integer("early_leave_minutes").default(0),
+  productiveHours: decimal("productive_hours", { precision: 4, scale: 2 }),
+  tasksCompleted: integer("tasks_completed").default(0),
+  notes: text("notes"),
+  isHoliday: boolean("is_holiday").default(false),
+  holidayType: text("holiday_type"), // national, regional, company
+  approvedBy: integer("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  systemGenerated: boolean("system_generated").default(false),
+  ipAddress: text("ip_address"),
+  deviceInfo: text("device_info"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Leave Management System
+export const leaveTypes = pgTable("leave_types", {
+  id: serial("id").primaryKey(),
+  typeName: text("type_name").notNull().unique(),
+  description: text("description"),
+  maxDaysPerYear: integer("max_days_per_year"),
+  maxConsecutiveDays: integer("max_consecutive_days"),
+  minNoticeDays: integer("min_notice_days").default(1),
+  isCarryForward: boolean("is_carry_forward").default(false),
+  maxCarryForwardDays: integer("max_carry_forward_days"),
+  isPaid: boolean("is_paid").default(true),
+  requiresApproval: boolean("requires_approval").default(true),
+  requiresDocuments: boolean("requires_documents").default(false),
+  applicableGender: text("applicable_gender").default("all"), // all, male, female
+  minimumServiceMonths: integer("minimum_service_months").default(0),
+  isActive: boolean("is_active").default(true),
+  approvalWorkflow: json("approval_workflow"), // approval hierarchy
+  autoApprovalConditions: json("auto_approval_conditions"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Employee Leave Balances
+export const leaveBalances = pgTable("leave_balance", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull(),
+  leaveTypeId: integer("leave_type_id").notNull(),
+  year: integer("year").notNull(),
+  totalAllocated: decimal("total_allocated", { precision: 4, scale: 2 }).notNull(),
+  utilized: decimal("utilized", { precision: 4, scale: 2 }).default("0.00"),
+  pending: decimal("pending", { precision: 4, scale: 2 }).default("0.00"),
+  available: decimal("available", { precision: 4, scale: 2 }).notNull(),
+  carriedForward: decimal("carried_forward", { precision: 4, scale: 2 }).default("0.00"),
+  expired: decimal("expired", { precision: 4, scale: 2 }).default("0.00"),
+  encashed: decimal("encashed", { precision: 4, scale: 2 }).default("0.00"),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Leave Applications
+export const leaveApplications = pgTable("leave_applications", {
+  id: serial("id").primaryKey(),
+  applicationNumber: text("application_number").notNull().unique(),
+  employeeId: integer("employee_id").notNull(),
+  leaveTypeId: integer("leave_type_id").notNull(),
+  fromDate: timestamp("from_date").notNull(),
+  toDate: timestamp("to_date").notNull(),
+  totalDays: decimal("total_days", { precision: 4, scale: 2 }).notNull(),
+  reason: text("reason").notNull(),
+  status: text("status").default("pending"), // pending, approved, rejected, cancelled, withdrawn
+  priority: text("priority").default("normal"), // low, normal, high, emergency
+  appliedDate: timestamp("applied_date").defaultNow(),
+  approvedBy: integer("approved_by"),
+  approvedDate: timestamp("approved_date"),
+  rejectionReason: text("rejection_reason"),
+  emergencyContact: text("emergency_contact"),
+  alternateContactNumber: text("alternate_contact_number"),
+  addressDuringLeave: text("address_during_leave"),
+  workHandoverNotes: text("work_handover_notes"),
+  delegatedTo: integer("delegated_to"),
+  supportingDocuments: json("supporting_documents"),
+  managerComments: text("manager_comments"),
+  hrComments: text("hr_comments"),
+  isHalfDay: boolean("is_half_day").default(false),
+  halfDayPeriod: text("half_day_period"), // first_half, second_half
+  leaveBalanceAfter: decimal("leave_balance_after", { precision: 4, scale: 2 }),
+  approvalWorkflowStatus: json("approval_workflow_status"),
+  notificationsSent: json("notifications_sent"),
+  cancelledBy: integer("cancelled_by"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancellationReason: text("cancellation_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Career Development and Progression
+export const careerPaths = pgTable("career_paths", {
+  id: serial("id").primaryKey(),
+  pathName: text("path_name").notNull(),
+  department: text("department").notNull(),
+  fromRole: text("from_role").notNull(),
+  toRole: text("to_role").notNull(),
+  minimumExperience: integer("minimum_experience").notNull(), // months
+  requiredSkills: json("required_skills"),
+  requiredCertifications: json("required_certifications"),
+  requiredPerformanceRating: decimal("required_performance_rating", { precision: 3, scale: 2 }),
+  developmentPrograms: json("development_programs"),
+  approximateTimeframe: integer("approximate_timeframe"), // months
+  salaryGrowthPercentage: decimal("salary_growth_percentage", { precision: 5, scale: 2 }),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Employee Career Progress Tracking
+export const careerProgress = pgTable("career_progress", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull(),
+  careerPathId: integer("career_path_id").notNull(),
+  currentStage: text("current_stage"), // skills_development, experience_building, assessment, promotion_ready
+  progressPercentage: integer("progress_percentage").default(0),
+  skillsAchieved: json("skills_achieved"),
+  skillsRemaining: json("skills_remaining"),
+  certificationsCompleted: json("certifications_completed"),
+  certificationsRequired: json("certifications_required"),
+  performanceMetric: decimal("performance_metric", { precision: 3, scale: 2 }),
+  mentorId: integer("mentor_id"),
+  targetPromotionDate: timestamp("target_promotion_date"),
+  estimatedReadiness: timestamp("estimated_readiness"),
+  developmentPlan: text("development_plan"),
+  mentorNotes: text("mentor_notes"),
+  managerAssessment: text("manager_assessment"),
+  selfAssessment: text("self_assessment"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Workload and Capacity Management
+export const workloadMetrics = pgTable("workload_metrics", {
+  id: serial("id").primaryKey(),
+  employeeId: integer("employee_id").notNull(),
+  metricDate: timestamp("metric_date").notNull(),
+  totalCapacity: integer("total_capacity").notNull(), // hours per week
+  allocatedHours: integer("allocated_hours").default(0),
+  actualHours: integer("actual_hours").default(0),
+  utilizationRate: decimal("utilization_rate", { precision: 5, scale: 2 }),
+  overloadIndicator: boolean("overload_indicator").default(false),
+  burnoutRisk: text("burnout_risk").default("low"), // low, medium, high, critical
+  activeProjects: integer("active_projects").default(0),
+  averageTaskComplexity: decimal("average_task_complexity", { precision: 3, scale: 2 }),
+  stressLevel: integer("stress_level"), // 1-10 self-reported
+  workLifeBalance: integer("work_life_balance"), // 1-10 self-reported
+  overtimeHours: integer("overtime_hours").default(0),
+  breaksTaken: integer("breaks_taken").default(0),
+  focusTimeHours: decimal("focus_time_hours", { precision: 4, scale: 2 }),
+  meetingHours: decimal("meeting_hours", { precision: 4, scale: 2 }),
+  interruptionCount: integer("interruption_count").default(0),
+  productivityScore: decimal("productivity_score", { precision: 3, scale: 2 }),
+  qualityScore: decimal("quality_score", { precision: 3, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Team Analytics and Reporting
+export const teamMetrics = pgTable("team_metrics", {
+  id: serial("id").primaryKey(),
+  department: text("department").notNull(),
+  teamLead: integer("team_lead"),
+  metricPeriod: text("metric_period").notNull(), // daily, weekly, monthly, quarterly
+  periodDate: timestamp("period_date").notNull(),
+  teamSize: integer("team_size").notNull(),
+  averageExperience: decimal("average_experience", { precision: 4, scale: 2 }),
+  totalCapacity: integer("total_capacity"),
+  totalUtilization: decimal("total_utilization", { precision: 5, scale: 2 }),
+  averagePerformance: decimal("average_performance", { precision: 3, scale: 2 }),
+  turnoverRate: decimal("turnover_rate", { precision: 5, scale: 2 }),
+  absenteeismRate: decimal("absenteeism_rate", { precision: 5, scale: 2 }),
+  trainingHours: integer("training_hours").default(0),
+  skillsGapIndex: decimal("skills_gap_index", { precision: 3, scale: 2 }),
+  teamSatisfaction: decimal("team_satisfaction", { precision: 3, scale: 2 }),
+  collaborationScore: decimal("collaboration_score", { precision: 3, scale: 2 }),
+  innovationIndex: decimal("innovation_index", { precision: 3, scale: 2 }),
+  costPerEmployee: decimal("cost_per_employee", { precision: 10, scale: 2 }),
+  revenuePerEmployee: decimal("revenue_per_employee", { precision: 10, scale: 2 }),
+  customerSatisfactionImpact: decimal("customer_satisfaction_impact", { precision: 3, scale: 2 }),
+  keyInsights: json("key_insights"),
+  recommendedActions: json("recommended_actions"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ============================================================================
+// HR SCHEMA EXPORTS AND TYPES
+// ============================================================================
+
+// Insert schemas for HR tables
+export const insertEmployeeSkillsSchema = createInsertSchema(employeeSkills).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSkillsMasterSchema = createInsertSchema(skillsMaster).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTrainingProgramsSchema = createInsertSchema(trainingPrograms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTrainingEnrollmentsSchema = createInsertSchema(trainingEnrollments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPerformanceReviewsSchema = createInsertSchema(performanceReviews).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEmployeeGoalsSchema = createInsertSchema(employeeGoals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAttendanceRecordsSchema = createInsertSchema(attendanceRecords).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLeaveTypesSchema = createInsertSchema(leaveTypes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLeaveBalancesSchema = createInsertSchema(leaveBalances).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertLeaveApplicationsSchema = createInsertSchema(leaveApplications).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCareerPathsSchema = createInsertSchema(careerPaths).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCareerProgressSchema = createInsertSchema(careerProgress).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertWorkloadMetricsSchema = createInsertSchema(workloadMetrics).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTeamMetricsSchema = createInsertSchema(teamMetrics).omit({
+  id: true,
+  createdAt: true,
+});
+
+// ============================================================================
+// ENHANCED KNOWLEDGE BASE SYSTEM
+// ============================================================================
+
+export const CONTENT_STATUS = {
+  DRAFT: 'draft',
+  PENDING_REVIEW: 'pending_review', 
+  APPROVED: 'approved',
+  PUBLISHED: 'published',
+  ARCHIVED: 'archived',
+  REJECTED: 'rejected'
+} as const;
+
+export const CONTENT_TYPES = {
+  ARTICLE: 'article',
+  GUIDE: 'guide',
+  PROCEDURE: 'procedure',
+  BEST_PRACTICE: 'best_practice',
+  FAQ: 'faq',
+  TEMPLATE: 'template',
+  CHECKLIST: 'checklist'
+} as const;
+
+// Enhanced Knowledge Base Articles with version control
+export const knowledgeArticles = pgTable("knowledge_articles", {
+  id: serial("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+  title: text("title").notNull(),
+  summary: text("summary"),
+  content: text("content").notNull(),
+  contentType: text("content_type").notNull().default(CONTENT_TYPES.ARTICLE),
+  category: text("category").notNull(),
+  subcategory: text("subcategory"),
+  tags: json("tags").$type<string[]>().notNull().default([]),
+  
+  // SEO and organization
+  metaDescription: text("meta_description"),
+  keywords: text("keywords"),
+  difficulty: text("difficulty").default("beginner"), // beginner, intermediate, advanced
+  estimatedReadTime: integer("estimated_read_time"), // minutes
+  
+  // Status and workflow
+  status: text("status").notNull().default(CONTENT_STATUS.DRAFT),
+  publishedVersion: integer("published_version"),
+  
+  // Authoring and approval
+  authorId: integer("author_id").notNull(),
+  reviewerId: integer("reviewer_id"),
+  approvedBy: integer("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  reviewNotes: text("review_notes"),
+  
+  // Analytics and tracking
+  viewCount: integer("view_count").default(0),
+  helpfulVotes: integer("helpful_votes").default(0),
+  unhelpfulVotes: integer("unhelpful_votes").default(0),
+  searchScore: decimal("search_score", { precision: 5, scale: 2 }).default("0.00"),
+  
+  // Dependencies and relations
+  relatedArticles: json("related_articles").$type<number[]>().default([]),
+  prerequisites: json("prerequisites").$type<number[]>().default([]),
+  attachments: json("attachments"),
+  
+  // Scheduling
+  publishedAt: timestamp("published_at"),
+  lastReviewedAt: timestamp("last_reviewed_at"),
+  nextReviewDue: timestamp("next_review_due"),
+  
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Article version history for complete version control
+export const articleVersions = pgTable("article_versions", {
+  id: serial("id").primaryKey(),
+  articleId: integer("article_id").notNull(),
+  versionNumber: integer("version_number").notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  summary: text("summary"),
+  changeLog: text("change_log"),
+  
+  // Version metadata
+  versionType: text("version_type").default("minor"), // major, minor, patch
+  isPublished: boolean("is_published").default(false),
+  publishedAt: timestamp("published_at"),
+  
+  // Author tracking
+  createdBy: integer("created_by").notNull(),
+  reviewedBy: integer("reviewed_by"),
+  approvedBy: integer("approved_by"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Knowledge categories with hierarchical structure
+export const knowledgeCategories = pgTable("knowledge_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  description: text("description"),
+  parentId: integer("parent_id"),
+  level: integer("level").default(1), // for hierarchy depth
+  
+  // Display and organization
+  displayOrder: integer("display_order").default(0),
+  icon: text("icon"),
+  color: text("color"),
+  
+  // Access control
+  isPublic: boolean("is_public").default(true),
+  requiredRole: text("required_role"), // minimum role to access
+  
+  // Metrics
+  articleCount: integer("article_count").default(0),
+  totalViews: integer("total_views").default(0),
+  
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Knowledge base analytics and usage tracking
+export const knowledgeAnalytics = pgTable("knowledge_analytics", {
+  id: serial("id").primaryKey(),
+  articleId: integer("article_id").notNull(),
+  userId: integer("user_id"),
+  sessionId: text("session_id"),
+  
+  // Event tracking
+  eventType: text("event_type").notNull(), // view, search, helpful_vote, unhelpful_vote, share, download
+  searchQuery: text("search_query"),
+  referrer: text("referrer"),
+  timeOnPage: integer("time_on_page"), // seconds
+  
+  // User context
+  userRole: text("user_role"),
+  deviceType: text("device_type"), // desktop, tablet, mobile
+  ipAddress: text("ip_address"),
+  
+  // Engagement metrics
+  scrollDepth: integer("scroll_depth"), // percentage
+  actionsPerformed: json("actions_performed"), // clicks, copies, etc.
+  
+  metadata: json("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Knowledge gaps identification
+export const knowledgeGaps = pgTable("knowledge_gaps", {
+  id: serial("id").primaryKey(),
+  topic: text("topic").notNull(),
+  description: text("description"),
+  category: text("category"),
+  
+  // Gap analysis
+  priority: text("priority").default("medium"), // low, medium, high, critical
+  impactLevel: text("impact_level").default("medium"), // low, medium, high
+  effortEstimate: text("effort_estimate"), // small, medium, large
+  
+  // Source tracking
+  identifiedBy: integer("identified_by"),
+  identificationSource: text("identification_source"), // user_request, analytics, audit, feedback
+  relatedSearches: json("related_searches").$type<string[]>().default([]),
+  frequencyCount: integer("frequency_count").default(1),
+  
+  // Resolution tracking
+  status: text("status").default("identified"), // identified, assigned, in_progress, resolved, declined
+  assignedTo: integer("assigned_to"),
+  assignedAt: timestamp("assigned_at"),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedByArticleId: integer("resolved_by_article_id"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Content approval workflow
+export const contentApprovals = pgTable("content_approvals", {
+  id: serial("id").primaryKey(),
+  articleId: integer("article_id").notNull(),
+  versionId: integer("version_id").notNull(),
+  
+  // Workflow details
+  workflowStage: text("workflow_stage").notNull(), // initial_review, expert_review, final_approval
+  currentReviewerId: integer("current_reviewer_id").notNull(),
+  reviewerRole: text("reviewer_role").notNull(), // editor, subject_matter_expert, admin
+  
+  // Approval status
+  status: text("status").default("pending"), // pending, approved, rejected, needs_revision
+  feedback: text("feedback"),
+  changes_requested: json("changes_requested"),
+  
+  // Timing
+  requestedAt: timestamp("requested_at").defaultNow(),
+  responseAt: timestamp("response_at"),
+  deadline: timestamp("deadline"),
+  
+  // Escalation
+  escalationLevel: integer("escalation_level").default(0),
+  escalatedTo: integer("escalated_to"),
+  escalatedAt: timestamp("escalated_at"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ============================================================================
+// ENHANCED SERVICES & TASKS MANAGEMENT SYSTEM
+// ============================================================================
+
+// Enhanced service definitions with advanced configuration
+export const serviceDefinitions = pgTable("service_definitions", {
+  id: serial("id").primaryKey(),
+  serviceCode: text("service_code").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  detailedDescription: text("detailed_description"),
+  
+  // Classification
+  category: text("category").notNull(),
+  subcategory: text("subcategory"),
+  businessLine: text("business_line"), // incorporation, tax, compliance, etc.
+  serviceType: text("service_type").default("standard"), // standard, custom, premium, enterprise
+  
+  // Pricing and commercial details
+  basePrice: decimal("base_price", { precision: 10, scale: 2 }),
+  pricingModel: text("pricing_model").default("fixed"), // fixed, hourly, milestone, custom
+  currency: text("currency").default("INR"),
+  taxCategory: text("tax_category"),
+  discountEligible: boolean("discount_eligible").default(true),
+  
+  // Service configuration
+  isConfigurable: boolean("is_configurable").default(false),
+  configurationSchema: json("configuration_schema"), // JSON schema for configuration options
+  defaultConfiguration: json("default_configuration"),
+  variations: json("variations"), // service variations/packages
+  
+  // Operational details
+  averageDuration: integer("average_duration"), // hours
+  slaHours: integer("sla_hours").notNull(),
+  complexityLevel: text("complexity_level").default("medium"), // low, medium, high, expert
+  resourceRequirements: json("resource_requirements"),
+  
+  // Prerequisites and dependencies
+  prerequisites: json("prerequisites").$type<string[]>().default([]),
+  serviceDependencies: json("service_dependencies").$type<string[]>().default([]),
+  documentRequirements: json("document_requirements"),
+  clientEligibility: json("client_eligibility"),
+  
+  // Automation and workflow
+  workflowTemplateId: integer("workflow_template_id"),
+  isAutomated: boolean("is_automated").default(false),
+  automationLevel: text("automation_level").default("manual"), // manual, semi_automated, fully_automated
+  
+  // Quality and compliance
+  qualityChecklist: json("quality_checklist"),
+  complianceRequirements: json("compliance_requirements"),
+  deliverables: json("deliverables"),
+  
+  // Performance tracking
+  averageRating: decimal("average_rating", { precision: 3, scale: 2 }),
+  completionRate: decimal("completion_rate", { precision: 5, scale: 2 }).default("0.00"),
+  onTimeDeliveryRate: decimal("on_time_delivery_rate", { precision: 5, scale: 2 }).default("0.00"),
+  clientSatisfactionScore: decimal("client_satisfaction_score", { precision: 3, scale: 2 }),
+  
+  // Metadata
+  tags: json("tags").$type<string[]>().default([]),
+  keywords: text("keywords"),
+  isActive: boolean("is_active").default(true),
+  isPublic: boolean("is_public").default(true),
+  
+  createdBy: integer("created_by").notNull(),
+  lastModifiedBy: integer("last_modified_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Advanced task templates with dependencies and conditions
+export const advancedTaskTemplates = pgTable("advanced_task_templates", {
+  id: serial("id").primaryKey(),
+  templateCode: text("template_code").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  
+  // Task classification
+  taskType: text("task_type").notNull(), // data_collection, document_preparation, review, approval, delivery
+  category: text("category").notNull(),
+  skillLevel: text("skill_level").default("intermediate"), // beginner, intermediate, advanced, expert
+  
+  // Task configuration
+  estimatedDuration: integer("estimated_duration"), // minutes
+  estimatedEffort: text("estimated_effort"), // low, medium, high
+  priority: text("priority").default("medium"),
+  
+  // Dependencies and conditions
+  dependencies: json("dependencies"), // task dependencies with conditions
+  prerequisiteConditions: json("prerequisite_conditions"),
+  triggerConditions: json("trigger_conditions"),
+  
+  // Task definition
+  instructions: text("instructions").notNull(),
+  checklistItems: json("checklist_items"),
+  inputFields: json("input_fields"), // custom form fields
+  validationRules: json("validation_rules"),
+  
+  // Resources and tools
+  requiredSkills: json("required_skills").$type<string[]>().default([]),
+  requiredTools: json("required_tools").$type<string[]>().default([]),
+  referenceDocuments: json("reference_documents"),
+  templateFiles: json("template_files"),
+  
+  // Quality control
+  qualityGates: json("quality_gates"),
+  approvalRequired: boolean("approval_required").default(false),
+  reviewerRole: text("reviewer_role"),
+  
+  // Automation
+  isAutomatable: boolean("is_automatable").default(false),
+  automationScript: text("automation_script"),
+  apiIntegrations: json("api_integrations"),
+  
+  // Performance tracking
+  usageCount: integer("usage_count").default(0),
+  averageCompletionTime: integer("average_completion_time"), // minutes
+  successRate: decimal("success_rate", { precision: 5, scale: 2 }).default("0.00"),
+  
+  tags: json("tags").$type<string[]>().default([]),
+  isActive: boolean("is_active").default(true),
+  
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Service configuration instances
+export const serviceConfigurations = pgTable("service_configurations", {
+  id: serial("id").primaryKey(),
+  serviceDefinitionId: integer("service_definition_id").notNull(),
+  configurationName: text("configuration_name").notNull(),
+  
+  // Configuration details
+  configurationData: json("configuration_data").notNull(),
+  pricingOverrides: json("pricing_overrides"),
+  slaOverrides: json("sla_overrides"),
+  workflowOverrides: json("workflow_overrides"),
+  
+  // Applicability
+  clientTypes: json("client_types").$type<string[]>().default([]),
+  entityTypes: json("entity_types").$type<string[]>().default([]),
+  jurisdictions: json("jurisdictions").$type<string[]>().default(["IN"]),
+  
+  // Versioning
+  version: text("version").default("1.0"),
+  parentConfigurationId: integer("parent_configuration_id"),
+  
+  // Status
+  isActive: boolean("is_active").default(true),
+  isDefault: boolean("is_default").default(false),
+  
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Service performance metrics
+export const servicePerformanceMetrics = pgTable("service_performance_metrics", {
+  id: serial("id").primaryKey(),
+  serviceCode: text("service_code").notNull(),
+  metricDate: timestamp("metric_date").notNull(),
+  
+  // Volume metrics
+  requestsReceived: integer("requests_received").default(0),
+  requestsCompleted: integer("requests_completed").default(0),
+  requestsPending: integer("requests_pending").default(0),
+  requestsCancelled: integer("requests_cancelled").default(0),
+  
+  // Performance metrics
+  averageCompletionTime: decimal("average_completion_time", { precision: 8, scale: 2 }), // hours
+  onTimeDeliveryCount: integer("on_time_delivery_count").default(0),
+  lateDeliveryCount: integer("late_delivery_count").default(0),
+  slaBreaches: integer("sla_breaches").default(0),
+  
+  // Quality metrics
+  qualityScore: decimal("quality_score", { precision: 5, scale: 2 }),
+  reworkRequired: integer("rework_required").default(0),
+  clientSatisfactionTotal: integer("client_satisfaction_total").default(0),
+  clientSatisfactionCount: integer("client_satisfaction_count").default(0),
+  
+  // Revenue metrics
+  totalRevenue: decimal("total_revenue", { precision: 12, scale: 2 }).default("0.00"),
+  averageOrderValue: decimal("average_order_value", { precision: 10, scale: 2 }),
+  
+  // Resource utilization
+  totalHoursSpent: decimal("total_hours_spent", { precision: 8, scale: 2 }),
+  resourceEfficiency: decimal("resource_efficiency", { precision: 5, scale: 2 }),
+  
+  // Trends and analysis
+  monthOverMonthGrowth: decimal("month_over_month_growth", { precision: 5, scale: 2 }),
+  trendDirection: text("trend_direction"), // improving, stable, declining
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Task execution tracking
+export const taskExecutions = pgTable("task_executions", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id").notNull(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  taskInstanceId: text("task_instance_id").notNull().unique(),
+  
+  // Execution context
+  executionContext: json("execution_context"),
+  inputData: json("input_data"),
+  outputData: json("output_data"),
+  
+  // Status and progress
+  status: text("status").default("pending"), // pending, in_progress, completed, failed, cancelled
+  progress: integer("progress").default(0), // 0-100
+  currentStep: text("current_step"),
+  
+  // Assignment and execution
+  assignedTo: integer("assigned_to"),
+  assignedAt: timestamp("assigned_at"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  
+  // Quality and validation
+  qualityChecksPassed: json("quality_checks_passed"),
+  validationErrors: json("validation_errors"),
+  reviewRequired: boolean("review_required").default(false),
+  reviewedBy: integer("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  
+  // Performance tracking
+  actualDuration: integer("actual_duration"), // minutes
+  effortSpent: decimal("effort_spent", { precision: 6, scale: 2 }), // hours
+  resourcesUsed: json("resources_used"),
+  
+  // Issue tracking
+  issuesEncountered: json("issues_encountered"),
+  resolutionNotes: text("resolution_notes"),
+  escalationLevel: integer("escalation_level").default(0),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ============================================================================
+// CONTENT SEARCH AND INDEXING
+// ============================================================================
+
+// Search index for full-text search across all content
+export const contentSearchIndex = pgTable("content_search_index", {
+  id: serial("id").primaryKey(),
+  contentType: text("content_type").notNull(), // article, faq, template, procedure
+  contentId: integer("content_id").notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  
+  // Search optimization
+  searchVector: text("search_vector"), // Full-text search vector
+  keywords: text("keywords"),
+  tags: json("tags").$type<string[]>().default([]),
+  category: text("category"),
+  
+  // Relevance scoring
+  searchScore: decimal("search_score", { precision: 5, scale: 2 }).default("0.00"),
+  popularityScore: decimal("popularity_score", { precision: 5, scale: 2 }).default("0.00"),
+  freshnessScore: decimal("freshness_score", { precision: 5, scale: 2 }).default("1.00"),
+  
+  // Content metadata
+  lastIndexedAt: timestamp("last_indexed_at").defaultNow(),
+  contentUpdatedAt: timestamp("content_updated_at"),
+  
+  isActive: boolean("is_active").default(true),
+});
+
+// ============================================================================
+// CLIENT MASTER AND FINANCIAL MANAGEMENT EXTENSIONS
+// ============================================================================
+
+// Client Contracts and Agreements Management
+export const clientContracts = pgTable("client_contracts", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  businessEntityId: integer("business_entity_id").notNull(),
+  contractType: text("contract_type").notNull(), // service_agreement, retainer, project_based, maintenance
+  contractNumber: text("contract_number").notNull().unique(),
+  title: text("title").notNull(),
+  description: text("description"),
+  
+  // Contract details
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"),
+  renewalType: text("renewal_type").default("manual"), // manual, automatic, conditional
+  renewalPeriod: integer("renewal_period"), // months
+  noticePeriod: integer("notice_period").default(30), // days
+  
+  // Financial terms
+  contractValue: decimal("contract_value", { precision: 12, scale: 2 }).notNull(),
+  billingCycle: text("billing_cycle").default("monthly"), // monthly, quarterly, annually, one_time
+  paymentTerms: integer("payment_terms").default(30), // days
+  lateFeePercentage: decimal("late_fee_percentage", { precision: 5, scale: 2 }).default("0.00"),
+  
+  // Services and scope
+  includedServices: json("included_services").notNull(),
+  serviceLevel: text("service_level").default("standard"), // basic, standard, premium, enterprise
+  maxServiceRequests: integer("max_service_requests"), // per billing cycle
+  
+  // Contract status
+  status: text("status").notNull().default("draft"), // draft, pending_approval, active, suspended, terminated, expired
+  signedByClient: boolean("signed_by_client").default(false),
+  signedByCompany: boolean("signed_by_company").default(false),
+  clientSignedAt: timestamp("client_signed_at"),
+  companySignedAt: timestamp("company_signed_at"),
+  
+  // Document management
+  contractDocument: text("contract_document"), // file path
+  signedDocument: text("signed_document"), // file path
+  amendments: json("amendments"), // contract amendments
+  
+  // Terms and conditions
+  specificTerms: json("specific_terms"),
+  slaTerms: json("sla_terms"),
+  cancellationClause: text("cancellation_clause"),
+  
+  // Tracking
+  createdBy: integer("created_by").notNull(),
+  approvedBy: integer("approved_by"),
+  lastReviewedAt: timestamp("last_reviewed_at"),
+  nextReviewDate: timestamp("next_review_date"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Enhanced Invoice Management System
+export const invoices = pgTable("invoices", {
+  id: serial("id").primaryKey(),
+  invoiceNumber: text("invoice_number").notNull().unique(),
+  clientId: integer("client_id").notNull(),
+  businessEntityId: integer("business_entity_id").notNull(),
+  contractId: integer("contract_id"), // linked to contract if applicable
+  
+  // Invoice details
+  invoiceDate: timestamp("invoice_date").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  billingPeriodStart: timestamp("billing_period_start"),
+  billingPeriodEnd: timestamp("billing_period_end"),
+  
+  // Amounts
+  subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
+  taxAmount: decimal("tax_amount", { precision: 12, scale: 2 }).default("0.00"),
+  discountAmount: decimal("discount_amount", { precision: 12, scale: 2 }).default("0.00"),
+  totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
+  paidAmount: decimal("paid_amount", { precision: 12, scale: 2 }).default("0.00"),
+  outstandingAmount: decimal("outstanding_amount", { precision: 12, scale: 2 }).notNull(),
+  
+  // Invoice items
+  lineItems: json("line_items").notNull(), // array of {description, quantity, rate, amount, serviceId}
+  
+  // Status and payment
+  status: text("status").notNull().default("draft"), // draft, sent, viewed, paid, partially_paid, overdue, cancelled
+  paymentStatus: text("payment_status").notNull().default("pending"), // pending, paid, partially_paid, failed, refunded
+  paymentMethod: text("payment_method"), // bank_transfer, card, cheque, online
+  paymentReference: text("payment_reference"),
+  
+  // Tracking
+  sentAt: timestamp("sent_at"),
+  viewedAt: timestamp("viewed_at"),
+  paidAt: timestamp("paid_at"),
+  lastReminderSent: timestamp("last_reminder_sent"),
+  reminderCount: integer("reminder_count").default(0),
+  
+  // Additional details
+  currency: text("currency").default("INR"),
+  exchangeRate: decimal("exchange_rate", { precision: 10, scale: 4 }).default("1.0000"),
+  notes: text("notes"),
+  terms: text("terms"),
+  
+  // File management
+  documentPath: text("document_path"),
+  
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Client Communication Logs
+export const clientCommunications = pgTable("client_communications", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  businessEntityId: integer("business_entity_id"),
+  serviceRequestId: integer("service_request_id"),
+  
+  // Communication details
+  communicationType: text("communication_type").notNull(), // call, email, meeting, whatsapp, portal_message, sms
+  direction: text("direction").notNull(), // inbound, outbound
+  subject: text("subject"),
+  summary: text("summary").notNull(),
+  fullContent: text("full_content"),
+  
+  // Participants
+  contactedBy: integer("contacted_by"), // staff member
+  contactedPerson: text("contacted_person"), // client person name
+  contactMethod: text("contact_method"), // phone, email address, etc.
+  
+  // Timing
+  scheduledAt: timestamp("scheduled_at"),
+  actualAt: timestamp("actual_at").notNull(),
+  duration: integer("duration"), // minutes
+  
+  // Categorization
+  purpose: text("purpose"), // follow_up, issue_resolution, service_discussion, payment_reminder, relationship_building
+  priority: text("priority").default("medium"), // low, medium, high, urgent
+  sentiment: text("sentiment").default("neutral"), // positive, neutral, negative
+  
+  // Outcome and follow-up
+  outcome: text("outcome"), // resolved, pending, escalated, no_action_needed
+  actionItems: json("action_items"), // array of follow-up actions
+  nextFollowUpDate: timestamp("next_follow_up_date"),
+  tags: json("tags"), // for categorization
+  
+  // Attachments and references
+  attachments: json("attachments"),
+  relatedDocuments: json("related_documents"),
+  
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Financial Analytics and KPIs
+export const financialAnalytics = pgTable("financial_analytics", {
+  id: serial("id").primaryKey(),
+  period: text("period").notNull(), // daily, weekly, monthly, quarterly, yearly
+  periodDate: timestamp("period_date").notNull(), // specific date for the period
+  
+  // Revenue metrics
+  totalRevenue: decimal("total_revenue", { precision: 12, scale: 2 }).default("0.00"),
+  recurringRevenue: decimal("recurring_revenue", { precision: 12, scale: 2 }).default("0.00"),
+  oneTimeRevenue: decimal("one_time_revenue", { precision: 12, scale: 2 }).default("0.00"),
+  upsellRevenue: decimal("upsell_revenue", { precision: 12, scale: 2 }).default("0.00"),
+  
+  // Collection metrics
+  invoicesGenerated: integer("invoices_generated").default(0),
+  invoicesPaid: integer("invoices_paid").default(0),
+  totalInvoiced: decimal("total_invoiced", { precision: 12, scale: 2 }).default("0.00"),
+  totalCollected: decimal("total_collected", { precision: 12, scale: 2 }).default("0.00"),
+  outstandingAmount: decimal("outstanding_amount", { precision: 12, scale: 2 }).default("0.00"),
+  
+  // Client metrics
+  newClientsAcquired: integer("new_clients_acquired").default(0),
+  clientsChurned: integer("clients_churned").default(0),
+  activeClients: integer("active_clients").default(0),
+  avgRevenuePerClient: decimal("avg_revenue_per_client", { precision: 12, scale: 2 }).default("0.00"),
+  
+  // Service metrics
+  servicesCompleted: integer("services_completed").default(0),
+  avgServiceValue: decimal("avg_service_value", { precision: 12, scale: 2 }).default("0.00"),
+  profitMargin: decimal("profit_margin", { precision: 5, scale: 2 }).default("0.00"), // percentage
+  
+  // Performance indicators
+  collectionEfficiency: decimal("collection_efficiency", { precision: 5, scale: 2 }).default("0.00"), // percentage
+  avgPaymentDays: integer("avg_payment_days").default(0),
+  overdueRate: decimal("overdue_rate", { precision: 5, scale: 2 }).default("0.00"), // percentage
+  
+  // Growth metrics
+  revenueGrowth: decimal("revenue_growth", { precision: 5, scale: 2 }).default("0.00"), // percentage
+  clientGrowth: decimal("client_growth", { precision: 5, scale: 2 }).default("0.00"), // percentage
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Budget and Forecasting
+export const budgetPlan = pgTable("budget_plan", {
+  id: serial("id").primaryKey(),
+  planName: text("plan_name").notNull(),
+  fiscalYear: text("fiscal_year").notNull(), // 2024-25, 2025-26, etc.
+  planType: text("plan_type").notNull(), // annual, quarterly, monthly
+  
+  // Budget categories
+  revenueTarget: decimal("revenue_target", { precision: 12, scale: 2 }).notNull(),
+  clientAcquisitionTarget: integer("client_acquisition_target").default(0),
+  retentionTarget: decimal("retention_target", { precision: 5, scale: 2 }).default("0.00"), // percentage
+  
+  // Service-wise targets
+  serviceTargets: json("service_targets"), // {serviceId, target_revenue, target_count}
+  
+  // Expense categories
+  operatingExpenses: decimal("operating_expenses", { precision: 12, scale: 2 }).default("0.00"),
+  marketingBudget: decimal("marketing_budget", { precision: 12, scale: 2 }).default("0.00"),
+  technologyBudget: decimal("technology_budget", { precision: 12, scale: 2 }).default("0.00"),
+  staffCosts: decimal("staff_costs", { precision: 12, scale: 2 }).default("0.00"),
+  
+  // Profit projections
+  grossProfitTarget: decimal("gross_profit_target", { precision: 12, scale: 2 }).default("0.00"),
+  netProfitTarget: decimal("net_profit_target", { precision: 12, scale: 2 }).default("0.00"),
+  profitMarginTarget: decimal("profit_margin_target", { precision: 5, scale: 2 }).default("0.00"),
+  
+  status: text("status").default("draft"), // draft, approved, active, archived
+  approvedBy: integer("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Client Portfolio Segmentation
+export const clientPortfolios = pgTable("client_portfolios", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  businessEntityId: integer("business_entity_id").notNull(),
+  
+  // Segmentation
+  valueSegment: text("value_segment").notNull(), // high_value, medium_value, low_value, strategic
+  riskLevel: text("risk_level").default("low"), // low, medium, high
+  loyaltyTier: text("loyalty_tier").default("bronze"), // bronze, silver, gold, platinum, diamond
+  
+  // Financial classification  
+  lifetimeValue: decimal("lifetime_value", { precision: 12, scale: 2 }).default("0.00"),
+  avgMonthlyValue: decimal("avg_monthly_value", { precision: 12, scale: 2 }).default("0.00"),
+  paymentBehavior: text("payment_behavior").default("prompt"), // prompt, delayed, irregular, defaulter
+  creditLimit: decimal("credit_limit", { precision: 12, scale: 2 }).default("0.00"),
+  
+  // Relationship metrics
+  relationshipLength: integer("relationship_length").default(0), // months
+  serviceUtilization: decimal("service_utilization", { precision: 5, scale: 2 }).default("0.00"), // percentage
+  satisfactionScore: integer("satisfaction_score").default(0), // 0-100
+  engagementLevel: text("engagement_level").default("medium"), // low, medium, high
+  
+  // Growth potential
+  expansionPotential: text("expansion_potential").default("medium"), // low, medium, high
+  upsellReadiness: text("upsell_readiness").default("neutral"), // not_ready, neutral, ready, eager
+  referralPotential: text("referral_potential").default("medium"), // low, medium, high
+  
+  // Strategic importance
+  industryInfluence: text("industry_influence").default("low"), // low, medium, high
+  referencePotential: boolean("reference_potential").default(false),
+  strategicValue: text("strategic_value").default("standard"), // standard, important, strategic, key_account
+  
+  // Portfolio manager
+  portfolioManager: integer("portfolio_manager").notNull(),
+  lastReviewDate: timestamp("last_review_date"),
+  nextReviewDate: timestamp("next_review_date"),
+  
+  // Notes and strategy
+  portfolioNotes: text("portfolio_notes"),
+  retentionStrategy: json("retention_strategy"),
+  growthStrategy: json("growth_strategy"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ============================================================================
+// SCHEMA EXTENSIONS AND IMPROVEMENTS
+// ============================================================================
+
+// Extend existing FAQs table with enhanced features (via new columns)
+// This would be done via migration in practice, but showing the intent here
+export const enhancedFaqs = pgTable("enhanced_faqs", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").notNull(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  
+  // Enhanced features
+  difficulty: text("difficulty").default("beginner"),
+  answerFormat: text("answer_format").default("text"), // text, video, image, link
+  videoUrl: text("video_url"),
+  relatedArticles: json("related_articles").$type<number[]>().default([]),
+  
+  // Analytics and feedback
+  viewCount: integer("view_count").default(0),
+  helpfulVotes: integer("helpful_votes").default(0),
+  unhelpfulVotes: integer("unhelpful_votes").default(0),
+  avgRating: decimal("avg_rating", { precision: 3, scale: 2 }),
+  
+  // SEO and search
+  tags: json("tags").$type<string[]>().default([]),
+  keywords: text("keywords"),
+  searchableContent: text("searchable_content"),
+  
+  // Workflow
+  status: text("status").default("published"), // draft, pending_review, published, archived
+  approvedBy: integer("approved_by"),
+  lastReviewedAt: timestamp("last_reviewed_at"),
+  
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ============================================================================
+// INSERT SCHEMAS AND TYPE EXPORTS FOR ENHANCED SYSTEMS
+// ============================================================================
+
+// Knowledge Base Insert Schemas
+export const insertKnowledgeArticleSchema = createInsertSchema(knowledgeArticles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertArticleVersionSchema = createInsertSchema(articleVersions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertKnowledgeCategorySchema = createInsertSchema(knowledgeCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertKnowledgeAnalyticsSchema = createInsertSchema(knowledgeAnalytics).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertKnowledgeGapSchema = createInsertSchema(knowledgeGaps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertContentApprovalSchema = createInsertSchema(contentApprovals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Service Management Insert Schemas
+export const insertServiceDefinitionSchema = createInsertSchema(serviceDefinitions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAdvancedTaskTemplateSchema = createInsertSchema(advancedTaskTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertServiceConfigurationSchema = createInsertSchema(serviceConfigurations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertServicePerformanceMetricsSchema = createInsertSchema(servicePerformanceMetrics).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTaskExecutionSchema = createInsertSchema(taskExecutions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertContentSearchIndexSchema = createInsertSchema(contentSearchIndex).omit({
+  id: true,
+});
+
+export const insertEnhancedFaqSchema = createInsertSchema(enhancedFaqs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Client Master and Financial Management Insert Schemas
+export const insertClientContractSchema = createInsertSchema(clientContracts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertClientCommunicationSchema = createInsertSchema(clientCommunications).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertFinancialAnalyticsSchema = createInsertSchema(financialAnalytics).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertBudgetPlanSchema = createInsertSchema(budgetPlan).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertClientPortfolioSchema = createInsertSchema(clientPortfolios).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// ============================================================================
+// TYPE EXPORTS FOR ENHANCED SYSTEMS
+// ============================================================================
+
+// Knowledge Base Types
+export type KnowledgeArticle = typeof knowledgeArticles.$inferSelect;
+export type InsertKnowledgeArticle = z.infer<typeof insertKnowledgeArticleSchema>;
+export type ArticleVersion = typeof articleVersions.$inferSelect;
+export type InsertArticleVersion = z.infer<typeof insertArticleVersionSchema>;
+export type KnowledgeCategory = typeof knowledgeCategories.$inferSelect;
+export type InsertKnowledgeCategory = z.infer<typeof insertKnowledgeCategorySchema>;
+export type KnowledgeAnalytics = typeof knowledgeAnalytics.$inferSelect;
+export type InsertKnowledgeAnalytics = z.infer<typeof insertKnowledgeAnalyticsSchema>;
+export type KnowledgeGap = typeof knowledgeGaps.$inferSelect;
+export type InsertKnowledgeGap = z.infer<typeof insertKnowledgeGapSchema>;
+export type ContentApproval = typeof contentApprovals.$inferSelect;
+export type InsertContentApproval = z.infer<typeof insertContentApprovalSchema>;
+
+// Service Management Types
+export type ServiceDefinition = typeof serviceDefinitions.$inferSelect;
+export type InsertServiceDefinition = z.infer<typeof insertServiceDefinitionSchema>;
+export type AdvancedTaskTemplate = typeof advancedTaskTemplates.$inferSelect;
+export type InsertAdvancedTaskTemplate = z.infer<typeof insertAdvancedTaskTemplateSchema>;
+export type ServiceConfiguration = typeof serviceConfigurations.$inferSelect;
+export type InsertServiceConfiguration = z.infer<typeof insertServiceConfigurationSchema>;
+export type ServicePerformanceMetrics = typeof servicePerformanceMetrics.$inferSelect;
+export type InsertServicePerformanceMetrics = z.infer<typeof insertServicePerformanceMetricsSchema>;
+export type TaskExecution = typeof taskExecutions.$inferSelect;
+export type InsertTaskExecution = z.infer<typeof insertTaskExecutionSchema>;
+export type ContentSearchIndex = typeof contentSearchIndex.$inferSelect;
+export type InsertContentSearchIndex = z.infer<typeof insertContentSearchIndexSchema>;
+export type EnhancedFaq = typeof enhancedFaqs.$inferSelect;
+export type InsertEnhancedFaq = z.infer<typeof insertEnhancedFaqSchema>;
+
+// Client Master and Financial Management Types
+export type ClientContract = typeof clientContracts.$inferSelect;
+export type InsertClientContract = z.infer<typeof insertClientContractSchema>;
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type ClientCommunication = typeof clientCommunications.$inferSelect;
+export type InsertClientCommunication = z.infer<typeof insertClientCommunicationSchema>;
+export type FinancialAnalytics = typeof financialAnalytics.$inferSelect;
+export type InsertFinancialAnalytics = z.infer<typeof insertFinancialAnalyticsSchema>;
+export type BudgetPlan = typeof budgetPlan.$inferSelect;
+export type InsertBudgetPlan = z.infer<typeof insertBudgetPlanSchema>;
+export type ClientPortfolio = typeof clientPortfolios.$inferSelect;
+export type InsertClientPortfolio = z.infer<typeof insertClientPortfolioSchema>;
+
+// Type exports for HR system
+export type EmployeeSkill = typeof employeeSkills.$inferSelect;
+export type InsertEmployeeSkill = z.infer<typeof insertEmployeeSkillsSchema>;
+export type SkillMaster = typeof skillsMaster.$inferSelect;
+export type InsertSkillMaster = z.infer<typeof insertSkillsMasterSchema>;
+export type TrainingProgram = typeof trainingPrograms.$inferSelect;
+export type InsertTrainingProgram = z.infer<typeof insertTrainingProgramsSchema>;
+export type TrainingEnrollment = typeof trainingEnrollments.$inferSelect;
+export type InsertTrainingEnrollment = z.infer<typeof insertTrainingEnrollmentsSchema>;
+export type PerformanceReview = typeof performanceReviews.$inferSelect;
+export type InsertPerformanceReview = z.infer<typeof insertPerformanceReviewsSchema>;
+export type EmployeeGoal = typeof employeeGoals.$inferSelect;
+export type InsertEmployeeGoal = z.infer<typeof insertEmployeeGoalsSchema>;
+export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
+export type InsertAttendanceRecord = z.infer<typeof insertAttendanceRecordsSchema>;
+export type LeaveType = typeof leaveTypes.$inferSelect;
+export type InsertLeaveType = z.infer<typeof insertLeaveTypesSchema>;
+export type LeaveBalance = typeof leaveBalances.$inferSelect;
+export type InsertLeaveBalance = z.infer<typeof insertLeaveBalancesSchema>;
+export type LeaveApplication = typeof leaveApplications.$inferSelect;
+export type InsertLeaveApplication = z.infer<typeof insertLeaveApplicationsSchema>;
+export type CareerPath = typeof careerPaths.$inferSelect;
+export type InsertCareerPath = z.infer<typeof insertCareerPathsSchema>;
+export type CareerProgress = typeof careerProgress.$inferSelect;
+export type InsertCareerProgress = z.infer<typeof insertCareerProgressSchema>;
+export type WorkloadMetric = typeof workloadMetrics.$inferSelect;
+export type InsertWorkloadMetric = z.infer<typeof insertWorkloadMetricsSchema>;
+export type TeamMetric = typeof teamMetrics.$inferSelect;
+export type InsertTeamMetric = z.infer<typeof insertTeamMetricsSchema>;

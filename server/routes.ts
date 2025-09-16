@@ -11,6 +11,8 @@ import {
   insertPaymentSchema,
   type Service 
 } from "@shared/schema";
+import { registerProposalRoutes } from "./proposals-routes";
+import { registerDashboardAnalyticsRoutes } from "./dashboard-analytics-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -1111,6 +1113,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register leads management routes for Practice Management System
   const { registerLeadsRoutes } = await import('./leads-routes');
   registerLeadsRoutes(app);
+
+  // Register proposal management routes for Sales Proposal System
+  registerProposalRoutes(app);
+
+  // Register QC routes for Quality Control and Delivery System
+  const { registerQCRoutes } = await import('./qc-routes');
+  registerQCRoutes(app);
+
+  // Register Delivery routes for Client Delivery Confirmation
+  const { registerDeliveryRoutes } = await import('./delivery-routes');
+  registerDeliveryRoutes(app);
+
+  // Register HR Management routes for Human Resources System
+  const { registerHRRoutes } = await import('./hr-routes');
+  registerHRRoutes(app);
+
+  // Register Client Master Management routes
+  const clientMasterRoutes = await import('./client-master-routes');
+  app.use('/api/client-master', clientMasterRoutes.default);
+
+  // Register Financial Management routes
+  const financialManagementRoutes = await import('./financial-management-routes');
+  app.use('/api/financial', financialManagementRoutes.default);
+
+  console.log('✅ Client Master and Financial Management routes registered');
+
+  // Register Dashboard Analytics routes for Executive Dashboard, Business Intelligence, and Mobile Command Center
+  registerDashboardAnalyticsRoutes(app);
+  console.log('✅ Dashboard Analytics routes registered');
 
   const httpServer = createServer(app);
   return httpServer;

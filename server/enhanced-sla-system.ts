@@ -139,6 +139,16 @@ export class EnhancedSlaSystem {
     }
   }
 
+  // Get existing timer for a service request
+  static async getTimer(serviceRequestId: number): Promise<EnhancedSlaTimer | null> {
+    return this.activeTimers.get(serviceRequestId) || null;
+  }
+
+  // Get all active timers
+  static getAllActiveTimers(): Map<number, EnhancedSlaTimer> {
+    return this.activeTimers;
+  }
+
   // Get SLA configuration from database or defaults
   private static async getSlaConfiguration(serviceCode: string): Promise<{ standardHours: number; escalationTiers: any }> {
     try {

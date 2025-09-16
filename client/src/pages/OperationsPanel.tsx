@@ -51,6 +51,11 @@ import {
   Settings,
   Shield,
   Lock,
+  Star,
+  ThumbsUp,
+  ThumbsDown,
+  Package,
+  ExternalLink,
 } from "lucide-react";
 
 // Types for Operations Panel
@@ -771,7 +776,7 @@ export default function OperationsPanel() {
 
       <div className="container mx-auto px-4 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="dashboard" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               Dashboard
@@ -779,6 +784,10 @@ export default function OperationsPanel() {
             <TabsTrigger value="kanban" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Board
+            </TabsTrigger>
+            <TabsTrigger value="qc" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Quality Control
             </TabsTrigger>
             <TabsTrigger value="performance" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
@@ -800,6 +809,10 @@ export default function OperationsPanel() {
 
           <TabsContent value="kanban" className="mt-6">
             <KanbanBoard />
+          </TabsContent>
+
+          <TabsContent value="qc" className="mt-6">
+            <QualityControlPanel />
           </TabsContent>
 
           <TabsContent value="performance" className="mt-6">
@@ -834,6 +847,304 @@ export default function OperationsPanel() {
             </Card>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// QC Panel Component integrated into Operations
+function QualityControlPanel() {
+  const { data: qcStats, isLoading } = useQuery({
+    queryKey: ['qc-stats'],
+    queryFn: async () => {
+      const response = await fetch('/api/qc/dashboard?tab=overview');
+      return response.json();
+    }
+  });
+
+  const { data: pendingReviews } = useQuery({
+    queryKey: ['qc-pending'],
+    queryFn: async () => {
+      const response = await fetch('/api/qc/queue?status=pending');
+      return response.json();
+    }
+  });
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {[...Array(6)].map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-6">
+              <div className="animate-pulse space-y-3">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* QC Overview Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Pending Reviews</p>
+                <p className="text-3xl font-bold text-orange-600">
+                  {qcStats?.stats?.totalPending || 0}
+                </p>
+              </div>
+              <Clock className="h-8 w-8 text-orange-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Avg Quality Score</p>
+                <p className="text-3xl font-bold text-green-600">
+                  {qcStats?.stats?.qualityScore || 0}%
+                </p>
+              </div>
+              <Star className="h-8 w-8 text-yellow-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-300">SLA Compliance</p>
+                <p className="text-3xl font-bold text-blue-600">
+                  {qcStats?.stats?.slaCompliance || 0}%
+                </p>
+              </div>
+              <Target className="h-8 w-8 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Completed Today</p>
+                <p className="text-3xl font-bold text-purple-600">
+                  {qcStats?.stats?.completedToday || 0}
+                </p>
+              </div>
+              <CheckCircle2 className="h-8 w-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              QC Dashboard
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600 dark:text-gray-300 mb-4">
+              Access the full QC dashboard to review pending items, manage quality checklists, and track metrics.
+            </p>
+            <Button asChild className="w-full">
+              <a href="/qc-dashboard" target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open QC Dashboard
+              </a>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Quality Metrics
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600 dark:text-gray-300 mb-4">
+              View detailed quality metrics, performance analytics, and trend analysis.
+            </p>
+            <Button asChild variant="outline" className="w-full">
+              <a href="/quality-metrics" target="_blank" rel="noopener noreferrer">
+                <BarChart3 className="h-4 w-4 mr-2" />
+                View Metrics
+              </a>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Delivery Management
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600 dark:text-gray-300 mb-4">
+              Monitor service deliveries, client confirmations, and feedback collection.
+            </p>
+            <Button asChild variant="outline" className="w-full">
+              <a href="/universal-ops" target="_blank" rel="noopener noreferrer">
+                <Package className="h-4 w-4 mr-2" />
+                Delivery Queue
+              </a>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent QC Activity */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Recent QC Activity
+            </span>
+            <Button size="sm" asChild>
+              <a href="/qc-dashboard">
+                View All
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </a>
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {pendingReviews?.items?.slice(0, 5).map((review: any) => (
+              <div key={review.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 dark:bg-orange-900 rounded-lg">
+                    <FileText className="h-4 w-4 text-orange-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-medium">{review.clientName}</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">{review.serviceName}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-orange-100 text-orange-800">
+                    {review.priority}
+                  </Badge>
+                  <Button size="sm" asChild>
+                    <a href={`/qc-dashboard`}>
+                      <Eye className="h-4 w-4" />
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            )) || (
+              <div className="text-center py-8">
+                <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                  All Caught Up!
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300">
+                  No pending QC reviews at this time.
+                </p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* QC Performance Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Quality Trends
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Quality Score Trend</span>
+                <div className="flex items-center gap-1 text-green-600">
+                  <TrendingUp className="h-4 w-4" />
+                  <span className="text-sm">+3.2%</span>
+                </div>
+              </div>
+              <Progress value={87} className="h-2" />
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Review Time Efficiency</span>
+                <div className="flex items-center gap-1 text-green-600">
+                  <TrendingUp className="h-4 w-4" />
+                  <span className="text-sm">+8.1%</span>
+                </div>
+              </div>
+              <Progress value={92} className="h-2" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Team Performance
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback>QM</AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-medium">QC Manager</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                  <span className="text-sm">95%</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback>SA</AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-medium">Senior Analyst</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                  <span className="text-sm">89%</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback>QA</AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-medium">QC Analyst</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                  <span className="text-sm">91%</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -37,6 +37,7 @@ import ComplianceScorecard from "./pages/ComplianceScorecard";
 import ClientPortal from "./pages/ClientPortal";
 import MobileClientPortal from "./pages/MobileClientPortal";
 import OperationsPanel from "./pages/OperationsPanel";
+import OperationsManager from "./components/OperationsManager";
 import AgentPortal from "./pages/AgentPortal";
 import MobileAgentPortal from "./pages/MobileAgentPortal";
 import MasterBlueprintDashboard from "./pages/MasterBlueprintDashboard";
@@ -49,6 +50,16 @@ import OnboardingFlow from "./pages/OnboardingFlow";
 import PlatformDemo from "./pages/PlatformDemo";
 import AdminServiceConfig from "./pages/AdminServiceConfig";
 import PreSalesManager from "./pages/PreSalesManager";
+import SalesProposalManager from "./pages/SalesProposalManager";
+import QCDashboard from "./pages/QCDashboard";
+import QualityMetricsDashboard from "./pages/QualityMetricsDashboard";
+import DeliveryConfirmation from "./pages/DeliveryConfirmation";
+import HRDashboard from "./pages/HRDashboard";
+import ClientMasterDashboard from "./pages/ClientMasterDashboard";
+import FinancialManagementDashboard from "./pages/FinancialManagementDashboard";
+import ExecutiveDashboard from "./pages/ExecutiveDashboard";
+import BusinessIntelligence from "./pages/BusinessIntelligence";
+import MobileDashboard from "./pages/MobileDashboard";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +88,8 @@ const App = () => (
                 <Route path="/client-portal" component={MobileClientPortal} />
                 <Route path="/operations" component={MobileOperationsPanel} />
                 <Route path="/ops" component={MobileOperationsPanel} />
+                <Route path="/operations-manager" component={OperationsManager} />
+                <Route path="/ops-manager" component={OperationsManager} />
                 <Route path="/admin" component={MobileAdminPanel} />
                 <Route path="/admin-control" component={MobileAdminPanel} />
                 <Route path="/blueprint" component={MasterBlueprintDashboard} />
@@ -86,6 +99,31 @@ const App = () => (
                 <Route path="/universal-ops" component={UniversalOperationsPanel} />
                 <Route path="/admin-config" component={AdminServiceConfig} />
                 <Route path="/pre-sales" component={PreSalesManager} />
+                <Route path="/proposals" component={SalesProposalManager} />
+                <Route path="/sales-proposals" component={SalesProposalManager} />
+                <Route path="/qc" component={QCDashboard} />
+                <Route path="/qc-dashboard" component={QCDashboard} />
+                <Route path="/quality-control" component={QCDashboard} />
+                <Route path="/quality-metrics" component={QualityMetricsDashboard} />
+                <Route path="/qc-metrics" component={QualityMetricsDashboard} />
+                <Route path="/delivery/:deliveryId" component={DeliveryConfirmation} />
+                <Route path="/hr" component={HRDashboard} />
+                <Route path="/hr-dashboard" component={HRDashboard} />
+                <Route path="/human-resources" component={HRDashboard} />
+                <Route path="/client-master" component={ClientMasterDashboard} />
+                <Route path="/clients" component={ClientMasterDashboard} />
+                <Route path="/client-management" component={ClientMasterDashboard} />
+                <Route path="/financial-management" component={FinancialManagementDashboard} />
+                <Route path="/financials" component={FinancialManagementDashboard} />
+                <Route path="/revenue-analytics" component={FinancialManagementDashboard} />
+                <Route path="/executive-dashboard" component={ExecutiveDashboard} />
+                <Route path="/analytics" component={ExecutiveDashboard} />
+                <Route path="/business-intelligence" component={BusinessIntelligence} />
+                <Route path="/bi" component={BusinessIntelligence} />
+                <Route path="/insights" component={BusinessIntelligence} />
+                <Route path="/mobile-dashboard" component={MobileDashboard} />
+                <Route path="/mobile" component={MobileDashboard} />
+                <Route path="/command-center" component={MobileDashboard} />
                 <Route path="/agent" component={MobileAgentPortal} />
                 <Route path="/agents" component={AgentPortal} />
                 <Route path="/agent-portal" component={AgentPortal} />
