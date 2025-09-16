@@ -3,6 +3,82 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
+// ============================================================================
+// SHARED ENUMS AND CONSTANTS
+// ============================================================================
+
+export const USER_ROLES = {
+  CLIENT: 'client',
+  ADMIN: 'admin',
+  OPS: 'ops',
+  CA: 'ca',
+  AGENT: 'agent'
+} as const;
+
+export const LEAD_STAGES = {
+  NEW: 'new',
+  HOT: 'hot_lead',
+  WARM: 'warm_lead',
+  COLD: 'cold_lead',
+  NOT_ANSWERED: 'not_answered',
+  NOT_INTERESTED: 'not_interested',
+  CONVERTED: 'converted',
+  LOST: 'lost'
+} as const;
+
+export const SERVICE_REQUEST_STATUS = {
+  INITIATED: 'initiated',
+  DOCS_UPLOADED: 'docs_uploaded',
+  IN_PROGRESS: 'in_progress',
+  READY_FOR_SIGN: 'ready_for_sign',
+  QC_REVIEW: 'qc_review',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  ON_HOLD: 'on_hold'
+} as const;
+
+export const PAYMENT_STATUS = {
+  PENDING: 'pending',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  REFUNDED: 'refunded',
+  PARTIAL: 'partial'
+} as const;
+
+export const PRIORITY_LEVELS = {
+  LOW: 'low',
+  MEDIUM: 'medium',
+  HIGH: 'high',
+  URGENT: 'urgent',
+  CRITICAL: 'critical'
+} as const;
+
+export const ENTITY_TYPES = {
+  PVT_LTD: 'pvt_ltd',
+  LLP: 'llp',
+  OPC: 'opc',
+  PARTNERSHIP: 'partnership',
+  PROPRIETORSHIP: 'proprietorship',
+  PUBLIC_LIMITED: 'public_limited'
+} as const;
+
+export const CLIENT_STATUS = {
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  DORMANT: 'dormant',
+  CHURNED: 'churned'
+} as const;
+
+export const DEPARTMENTS = {
+  PRE_SALES: 'pre_sales',
+  SALES: 'sales',
+  OPERATIONS: 'operations',
+  QC: 'qc',
+  ADMIN: 'admin',
+  HR: 'hr',
+  FINANCE: 'finance'
+} as const;
+
 // Enhanced user system with multi-business support and security
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -19,10 +95,11 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Business entities managed by users
+// Enhanced business entities with client master functionality
 export const businessEntities = pgTable("business_entities", {
   id: serial("id").primaryKey(),
   ownerId: integer("owner_id").notNull(),
+  clientId: text("client_id").notNull().unique(), // C0001, C0002, etc.
   name: text("name").notNull(),
   entityType: text("entity_type").notNull(), // pvt_ltd, llp, opc, partnership, proprietorship
   cin: text("cin"),
@@ -30,6 +107,22 @@ export const businessEntities = pgTable("business_entities", {
   pan: text("pan"),
   registrationDate: timestamp("registration_date"),
   complianceScore: integer("compliance_score").default(100),
+  // Enhanced client master fields
+  alternatePhone: text("alternate_phone"),
+  state: text("state"),
+  city: text("city"),
+  address: text("address"),
+  industryType: text("industry_type"),
+  leadSource: text("lead_source"),
+  acquisitionDate: timestamp("acquisition_date").defaultNow(),
+  totalServicesAvailed: integer("total_services_availed").default(0),
+  totalRevenue: decimal("total_revenue", { precision: 12, scale: 2 }).default("0.00"),
+  lastServiceDate: timestamp("last_service_date"),
+  clientStatus: text("client_status").default(CLIENT_STATUS.ACTIVE),
+  relationshipManager: text("relationship_manager"),
+  communicationPreference: json("communication_preference"), // {email: true, whatsapp: true, call: false}
+  documents: json("documents"), // stored document references
+  notes: text("notes"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -500,14 +593,25 @@ export type FAQ = typeof faqs.$inferSelect;
 export type DocumentTemplate = typeof documentTemplates.$inferSelect;
 export type UserSession = typeof userSessions.$inferSelect;
 
-// Operations Team Panel - Additional Schema
+// Enhanced operations team with HR functionality
 export const operationsTeam = pgTable("operations_team", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
-  role: text("role").notNull(), // ops_executive, ops_lead, qa_reviewer, admin
+  employeeId: text("employee_id").notNull().unique(), // EMP001, EMP002, etc.
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  phone: text("phone"),
+  department: text("department").notNull(), // Pre-Sales, Sales, Operations, QC, Admin, etc.
+  role: text("role").notNull(), // ops_executive, ops_lead, qa_reviewer, admin, executive, manager
+  joiningDate: timestamp("joining_date").notNull(),
   specialization: json("specialization"), // service types they handle
   workloadCapacity: integer("workload_capacity").default(10),
   currentWorkload: integer("current_workload").default(0),
+  performanceRating: decimal("performance_rating", { precision: 3, scale: 2 }),
+  targetAchievement: decimal("target_achievement", { precision: 5, scale: 2 }),
+  managerId: integer("manager_id"),
+  salary: decimal("salary", { precision: 10, scale: 2 }),
+  incentives: decimal("incentives", { precision: 10, scale: 2 }).default("0.00"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -1032,31 +1136,39 @@ export const agentProfiles = pgTable("agent_profiles", {
   isActive: boolean("is_active").default(true),
   deviceRestrictions: json("device_restrictions"), // allowed devices/IPs
   performanceRating: decimal("performance_rating", { precision: 3, scale: 2 }),
-  totalCommissionEarned: decimal("total_commission_earned", { precision: 10, scale: 2 }).default(0),
-  pendingPayouts: decimal("pending_payouts", { precision: 10, scale: 2 }).default(0),
-  clearedPayouts: decimal("cleared_payouts", { precision: 10, scale: 2 }).default(0),
+  totalCommissionEarned: decimal("total_commission_earned", { precision: 10, scale: 2 }).default("0.00"),
+  pendingPayouts: decimal("pending_payouts", { precision: 10, scale: 2 }).default("0.00"),
+  clearedPayouts: decimal("cleared_payouts", { precision: 10, scale: 2 }).default("0.00"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Enhanced leads table with pre-sales functionality
 export const leads = pgTable("leads", {
   id: serial("id").primaryKey(),
-  agentId: integer("agent_id").notNull(),
+  leadId: text("lead_id").notNull().unique(), // L0001, L0002, etc.
+  agentId: integer("agent_id"),
   clientName: text("client_name").notNull(),
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone").notNull(),
+  state: text("state"),
   entityType: text("entity_type"), // pvt_ltd, partnership, proprietorship, etc
   requiredServices: json("required_services"), // array of service codes
-  leadSource: text("lead_source"), // whatsapp, referral, cold_call, etc
-  status: text("status").default("new"), // new, contacted, converted, in_progress, closed, lost
-  priority: text("priority").default("medium"), // low, medium, high
+  serviceInterested: text("service_interested").notNull(),
+  leadSource: text("lead_source").notNull(), // Google Ads, Referral, Facebook Ads, Website, etc
+  preSalesExecutive: text("pre_sales_executive"),
+  leadStage: text("lead_stage").default(LEAD_STAGES.NEW), // Hot Lead, Warm Lead, Cold Lead, Not Answered, Not Interested
+  status: text("status").default(LEAD_STAGES.NEW), // new, contacted, converted, in_progress, closed, lost
+  priority: text("priority").default(PRIORITY_LEVELS.MEDIUM), // low, medium, high
   kycDocuments: json("kyc_documents"), // uploaded document references
   leadLocation: json("lead_location"), // geo-tagging data
   estimatedValue: decimal("estimated_value", { precision: 10, scale: 2 }),
   conversionProbability: integer("conversion_probability"), // AI lead scoring 0-100
   lastContactDate: timestamp("last_contact_date"),
   nextFollowupDate: timestamp("next_followup_date"),
+  remarks: text("remarks"),
   notes: text("notes"),
+  interactionHistory: json("interaction_history"), // [{date, type, notes, executive}]
   convertedAt: timestamp("converted_at"),
   closedAt: timestamp("closed_at"),
   lostReason: text("lost_reason"),
@@ -1129,7 +1241,7 @@ export const agentPerformanceMetrics = pgTable("agent_performance_metrics", {
   leadsConverted: integer("leads_converted").default(0),
   leadsLost: integer("leads_lost").default(0),
   conversionRate: decimal("conversion_rate", { precision: 5, scale: 2 }),
-  totalCommissionEarned: decimal("total_commission_earned", { precision: 10, scale: 2 }).default(0),
+  totalCommissionEarned: decimal("total_commission_earned", { precision: 10, scale: 2 }).default("0.00"),
   topServices: json("top_services"), // service breakdown
   averageLeadValue: decimal("average_lead_value", { precision: 10, scale: 2 }),
   responseTime: integer("response_time"), // average response time in hours
@@ -1171,8 +1283,8 @@ export const agentReferrals = pgTable("agent_referrals", {
   subAgentId: integer("sub_agent_id").notNull(),
   referralCode: text("referral_code").notNull().unique(),
   referralStatus: text("referral_status").default("active"), // active, inactive, suspended
-  overrideCommissionRate: decimal("override_commission_rate", { precision: 5, scale: 2 }).default(5.00),
-  totalOverrideEarned: decimal("total_override_earned", { precision: 10, scale: 2 }).default(0),
+  overrideCommissionRate: decimal("override_commission_rate", { precision: 5, scale: 2 }).default("5.00"),
+  totalOverrideEarned: decimal("total_override_earned", { precision: 10, scale: 2 }).default("0.00"),
   onboardedAt: timestamp("onboarded_at").defaultNow(),
   lastActivityAt: timestamp("last_activity_at"),
 });
@@ -1254,3 +1366,153 @@ export type LeadAutomation = typeof leadAutomation.$inferSelect;
 export type AgentReferral = typeof agentReferrals.$inferSelect;
 export type IncentiveProgram = typeof incentivePrograms.$inferSelect;
 export type AgentAuditLog = typeof agentAuditLogs.$inferSelect;
+
+// ============================================================================
+// PRACTICE MANAGEMENT SYSTEM EXTENSIONS
+// New tables that add functionality not covered by existing tables
+// ============================================================================
+
+// Sales Proposal and Conversion Management
+export const salesProposals = pgTable("sales_proposals", {
+  id: serial("id").primaryKey(),
+  leadId: text("lead_id").notNull(),
+  salesExecutive: text("sales_executive").notNull(),
+  qualifiedLeadStatus: text("qualified_lead_status"), // Proposal Sent, Payment Pending, etc.
+  proposalStatus: text("proposal_status"), // Sent, Revised Sent, Approved, etc.
+  proposalAmount: decimal("proposal_amount", { precision: 10, scale: 2 }),
+  requiredServices: json("required_services"), // services they need
+  nextFollowupDate: timestamp("next_followup_date"),
+  interactionLog: json("interaction_log"), // sales interaction history
+  finalRemark: text("final_remark"),
+  documentsLink: text("documents_link"),
+  paymentReceived: text("payment_received").default("pending"), // Pending, Partial, Full
+  paymentPending: decimal("payment_pending", { precision: 10, scale: 2 }).default("0.00"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// QC and Delivery Management (enhances existing service management)
+export const qcDeliveryTracking = pgTable("qc_delivery_tracking", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  assignedQcManager: text("assigned_qc_manager"),
+  qcStatus: text("qc_status").default("pending"), // pending, in_review, approved, rejected
+  deliveryStatus: text("delivery_status").default("pending"), // pending, in_progress, delivered, delayed
+  clientDeliveryDate: timestamp("client_delivery_date"),
+  qcNotes: text("qc_notes"),
+  deliveryNotes: text("delivery_notes"),
+  clientFeedback: text("client_feedback"),
+  deliveryMethod: text("delivery_method"), // email, portal, physical, etc.
+  documentsDelivered: json("documents_delivered"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Post-Sales Management (Client Feedback, Upselling, Relationship Management)
+export const postSalesManagement = pgTable("post_sales_management", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  clientId: integer("client_id").notNull(),
+  servicesAvailed: json("services_availed"),
+  upsellOpportunityIdentified: boolean("upsell_opportunity_identified").default(false),
+  feedbackStatus: text("feedback_status").default("pending"), // pending, collected, analyzed
+  feedbackLink: text("feedback_link"),
+  feedbackRating: integer("feedback_rating"), // 1-5 stars
+  feedbackComments: text("feedback_comments"),
+  upsellNotes: text("upsell_notes"),
+  upsellStatus: text("upsell_status").default("none"), // none, identified, proposed, converted
+  complianceDeadlines: json("compliance_deadlines"), // upcoming renewals/deadlines
+  reconnectDate: timestamp("reconnect_date"),
+  relationshipNotes: text("relationship_notes"),
+  lifetimeValue: decimal("lifetime_value", { precision: 10, scale: 2 }).default("0.00"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+
+
+
+// Dashboard Analytics and KPIs
+export const dashboardMetrics = pgTable("dashboard_metrics", {
+  id: serial("id").primaryKey(),
+  metricDate: timestamp("metric_date").defaultNow(),
+  totalLeads: integer("total_leads").default(0),
+  convertedLeads: integer("converted_leads").default(0),
+  conversionRate: decimal("conversion_rate", { precision: 5, scale: 2 }).default("0.00"),
+  activeClients: integer("active_clients").default(0),
+  servicesInProgress: integer("services_in_progress").default(0),
+  servicesCompleted: integer("services_completed").default(0),
+  pendingQcItems: integer("pending_qc_items").default(0),
+  pendingDeliveries: integer("pending_deliveries").default(0),
+  employeeUtilization: decimal("employee_utilization", { precision: 5, scale: 2 }).default("0.00"),
+  averageServiceTime: integer("average_service_time").default(0), // in days
+  clientSatisfactionScore: decimal("client_satisfaction_score", { precision: 3, scale: 2 }).default("0.00"),
+  slaBreaches: integer("sla_breaches").default(0),
+  monthlyRecurringRevenue: decimal("monthly_recurring_revenue", { precision: 12, scale: 2 }).default("0.00"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Insert Schemas for new tables
+
+export const insertSalesProposalSchema = createInsertSchema(salesProposals).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertQcDeliveryTrackingSchema = createInsertSchema(qcDeliveryTracking).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPostSalesManagementSchema = createInsertSchema(postSalesManagement).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+
+
+
+export const insertDashboardMetricsSchema = createInsertSchema(dashboardMetrics).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Add missing insert schemas for enhanced tables
+export const insertBusinessEntityEnhancedSchema = createInsertSchema(businessEntities).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertOperationsTeamEnhancedSchema = createInsertSchema(operationsTeam).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLeadEnhancedSchema = createInsertSchema(leads).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Type exports for Practice Management System (new tables only)
+export type SalesProposal = typeof salesProposals.$inferSelect;
+export type InsertSalesProposal = z.infer<typeof insertSalesProposalSchema>;
+export type QcDeliveryTracking = typeof qcDeliveryTracking.$inferSelect;
+export type InsertQcDeliveryTracking = z.infer<typeof insertQcDeliveryTrackingSchema>;
+export type PostSalesManagement = typeof postSalesManagement.$inferSelect;
+export type InsertPostSalesManagement = z.infer<typeof insertPostSalesManagementSchema>;
+export type DashboardMetrics = typeof dashboardMetrics.$inferSelect;
+export type InsertDashboardMetrics = z.infer<typeof insertDashboardMetricsSchema>;
+
+// Enhanced type exports for existing tables with new functionality
+export type BusinessEntityEnhanced = typeof businessEntities.$inferSelect;
+export type InsertBusinessEntityEnhanced = z.infer<typeof insertBusinessEntityEnhancedSchema>;
+export type OperationsTeamEnhanced = typeof operationsTeam.$inferSelect;
+export type InsertOperationsTeamEnhanced = z.infer<typeof insertOperationsTeamEnhancedSchema>;
+export type LeadEnhanced = typeof leads.$inferSelect;
+export type InsertLeadEnhanced = z.infer<typeof insertLeadEnhancedSchema>;
