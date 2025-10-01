@@ -1,11 +1,13 @@
 import { QueryClient } from '@tanstack/react-query';
+import { toast } from '@/hooks/use-toast';
 
 const DEFAULT_QUERY_FN = async ({ queryKey }: { queryKey: readonly unknown[] }) => {
   const url = queryKey[0] as string;
   const response = await fetch(url);
   
   if (!response.ok) {
-    throw new Error(`Network error: ${response.status}`);
+    const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+    throw new Error(errorData.error || `Network error: ${response.status}`);
   }
   
   return response.json();
@@ -21,6 +23,15 @@ export const queryClient = new QueryClient({
           return false;
         }
         return failureCount < 3;
+      },
+    },
+    mutations: {
+      onError: (error: Error) => {
+        toast({
+          title: 'Error',
+          description: error.message || 'An error occurred. Please try again.',
+          variant: 'destructive',
+        });
       },
     },
   },

@@ -2,9 +2,11 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { Router, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { GlobalErrorHandler } from "./components/GlobalErrorHandler";
+import { queryClient } from "@/lib/queryClient";
 import Onboarding from "./pages/Onboarding";
 import BusinessType from "./pages/BusinessType";
 import PackageSelection from "./pages/PackageSelection";
@@ -62,11 +64,10 @@ import BusinessIntelligence from "./pages/BusinessIntelligence";
 import MobileDashboard from "./pages/MobileDashboard";
 import DesignSystemShowcase from "./components/DesignSystemShowcase";
 
-const queryClient = new QueryClient();
-
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
+      <GlobalErrorHandler />
       <TooltipProvider>
         <Toaster />
         <Sonner />
