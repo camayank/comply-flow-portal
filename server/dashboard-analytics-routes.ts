@@ -31,7 +31,7 @@ export function registerDashboardAnalyticsRoutes(app: Express) {
         dateFilter = gte(serviceRequests.createdAt, fromDate);
       }
 
-      // Parallel execution of all analytics queries
+      // Parallel execution of all analytics queries with error handling
       const [
         revenueMetrics,
         operationalMetrics,
@@ -43,28 +43,52 @@ export function registerDashboardAnalyticsRoutes(app: Express) {
         performanceTrends
       ] = await Promise.all([
         // Revenue Analytics
-        getRevenueAnalytics(dateFilter),
+        getRevenueAnalytics(dateFilter).catch(() => ({
+          totalRevenue: 0, monthlyRevenue: 0, pendingAmount: 0,
+          transactionCount: 0, pendingCount: 0, averageTransactionValue: 0
+        })),
         
         // Operational Analytics
-        getOperationalAnalytics(dateFilter),
+        getOperationalAnalytics(dateFilter).catch(() => ({
+          activeServices: 0, completedServices: 0, totalServices: 0,
+          completionRate: 0, averageProgress: 0, slaCompliance: 100
+        })),
         
         // Client Analytics
-        getClientAnalytics(dateFilter),
+        getClientAnalytics(dateFilter).catch(() => ({
+          totalClients: 0, totalActiveClients: 0, newClientsThisMonth: 0,
+          averageSatisfactionScore: '0.0', satisfactionResponseCount: 0, clientRetentionRate: 0
+        })),
         
         // Quality Analytics
-        getQualityAnalytics(dateFilter),
+        getQualityAnalytics(dateFilter).catch(() => ({
+          averageQualityScore: '0.0', approvalRate: 0, rejectionRate: 0,
+          totalReviews: 0, approvedReviews: 0, rejectedReviews: 0
+        })),
         
         // HR Analytics
-        getHRAnalytics(),
+        getHRAnalytics().catch(() => ({
+          totalEmployees: 0, activeEmployees: 0, utilization: '0.0',
+          averagePerformanceRating: '0.0', pendingLeaves: 0,
+          approvedLeaves: 0, employeeRetentionRate: 100
+        })),
         
         // Lead Analytics
         getLeadAnalytics(dateFilter),
         
         // Compliance Analytics
-        getComplianceAnalytics(dateFilter),
+        getComplianceAnalytics(dateFilter).catch(() => ({
+          totalCompliances: 0, completedCompliances: 0, overdueCompliances: 0,
+          overallScore: '0.0', complianceRate: 100
+        })),
         
         // Performance Trends
-        getPerformanceTrends(dateFilter)
+        getPerformanceTrends(dateFilter).catch(() => ({
+          revenue: { trend: 'stable', change: '0%', data: [0, 0, 0, 0, 0, 0] },
+          efficiency: { trend: 'stable', change: '0%', data: [0, 0, 0, 0, 0, 0] },
+          quality: { trend: 'stable', change: '0%', data: [0, 0, 0, 0, 0, 0] },
+          satisfaction: { trend: 'stable', change: '0%', data: [0, 0, 0, 0, 0, 0] }
+        }))
       ]);
 
       const dashboard = {
@@ -86,8 +110,8 @@ export function registerDashboardAnalyticsRoutes(app: Express) {
         leads: leadMetrics,
         compliance: complianceMetrics,
         trends: performanceTrends,
-        alerts: await getCriticalAlerts(),
-        insights: await getBusinessInsights()
+        alerts: await getCriticalAlerts().catch(() => []),
+        insights: await getBusinessInsights().catch(() => [])
       };
 
       res.json(dashboard);
