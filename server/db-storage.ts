@@ -1,7 +1,13 @@
 import { db } from './db';
-import { leads, salesProposals } from '../shared/schema';
+import { leads, salesProposals, serviceRequests, businessEntities, payments } from '../shared/schema';
 import { eq, desc, ilike, and, or, sql } from 'drizzle-orm';
-import type { LeadEnhanced, InsertLeadEnhanced, SalesProposal, InsertSalesProposal } from '../shared/schema';
+import type { 
+  LeadEnhanced, InsertLeadEnhanced, 
+  SalesProposal, InsertSalesProposal,
+  ServiceRequest, InsertServiceRequest,
+  BusinessEntity, InsertBusinessEntity,
+  Payment, InsertPayment
+} from '../shared/schema';
 
 // Database-backed storage for critical entities (Leads & Proposals)
 // This ensures data persists across server restarts
@@ -256,6 +262,196 @@ export class DbProposalsStorage {
   }
 }
 
+// Service Requests Storage
+export class DbServiceRequestsStorage {
+  async getAllServiceRequests(filters?: {
+    search?: string;
+    status?: string;
+    clientId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ requests: ServiceRequest[]; total: number }> {
+    const conditions = [];
+    
+    if (filters?.search) {
+      conditions.push(ilike(serviceRequests.serviceId, `%${filters.search}%`));
+    }
+    
+    if (filters?.status) {
+      conditions.push(eq(serviceRequests.status, filters.status));
+    }
+    
+    if (filters?.clientId) {
+      conditions.push(eq(serviceRequests.businessEntityId, parseInt(filters.clientId)));
+    }
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const [requestsData, [{ count }]] = await Promise.all([
+      db.select()
+        .from(serviceRequests)
+        .where(whereClause)
+        .orderBy(desc(serviceRequests.createdAt))
+        .limit(filters?.limit || 50)
+        .offset(filters?.offset || 0),
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(serviceRequests)
+        .where(whereClause)
+    ]);
+    
+    return { requests: requestsData, total: count };
+  }
+  
+  async getServiceRequest(id: number): Promise<ServiceRequest | undefined> {
+    const [request] = await db.select().from(serviceRequests).where(eq(serviceRequests.id, id)).limit(1);
+    return request;
+  }
+  
+  async createServiceRequest(request: InsertServiceRequest): Promise<ServiceRequest> {
+    const [newRequest] = await db.insert(serviceRequests).values(request).returning();
+    return newRequest;
+  }
+  
+  async updateServiceRequest(id: number, updates: Partial<ServiceRequest>): Promise<ServiceRequest | undefined> {
+    const [updated] = await db.update(serviceRequests)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(serviceRequests.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteServiceRequest(id: number): Promise<boolean> {
+    await db.delete(serviceRequests).where(eq(serviceRequests.id, id));
+    return true;
+  }
+}
+
+// Business Entities (Clients) Storage
+export class DbBusinessEntitiesStorage {
+  async getAllBusinessEntities(filters?: {
+    search?: string;
+    isActive?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ entities: BusinessEntity[]; total: number }> {
+    const conditions = [];
+    
+    if (filters?.search) {
+      conditions.push(or(
+        ilike(businessEntities.name, `%${filters.search}%`),
+        ilike(businessEntities.pan, `%${filters.search}%`),
+        ilike(businessEntities.gstin, `%${filters.search}%`)
+      ));
+    }
+    
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(businessEntities.isActive, filters.isActive));
+    }
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const [entitiesData, [{ count }]] = await Promise.all([
+      db.select()
+        .from(businessEntities)
+        .where(whereClause)
+        .orderBy(desc(businessEntities.createdAt))
+        .limit(filters?.limit || 50)
+        .offset(filters?.offset || 0),
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(businessEntities)
+        .where(whereClause)
+    ]);
+    
+    return { entities: entitiesData, total: count };
+  }
+  
+  async getBusinessEntity(id: number): Promise<BusinessEntity | undefined> {
+    const [entity] = await db.select().from(businessEntities).where(eq(businessEntities.id, id)).limit(1);
+    return entity;
+  }
+  
+  async createBusinessEntity(entity: InsertBusinessEntity): Promise<BusinessEntity> {
+    const [newEntity] = await db.insert(businessEntities).values(entity).returning();
+    return newEntity;
+  }
+  
+  async updateBusinessEntity(id: number, updates: Partial<BusinessEntity>): Promise<BusinessEntity | undefined> {
+    const [updated] = await db.update(businessEntities)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(businessEntities.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteBusinessEntity(id: number): Promise<boolean> {
+    await db.delete(businessEntities).where(eq(businessEntities.id, id));
+    return true;
+  }
+}
+
+// Payments Storage
+export class DbPaymentsStorage {
+  async getAllPayments(filters?: {
+    search?: string;
+    status?: string;
+    serviceRequestId?: number;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ payments: Payment[]; total: number }> {
+    const conditions = [];
+    
+    if (filters?.status) {
+      conditions.push(eq(payments.status, filters.status));
+    }
+    
+    if (filters?.serviceRequestId) {
+      conditions.push(eq(payments.serviceRequestId, filters.serviceRequestId));
+    }
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const [paymentsData, [{ count }]] = await Promise.all([
+      db.select()
+        .from(payments)
+        .where(whereClause)
+        .orderBy(desc(payments.createdAt))
+        .limit(filters?.limit || 50)
+        .offset(filters?.offset || 0),
+      db.select({ count: sql<number>`count(*)::int` })
+        .from(payments)
+        .where(whereClause)
+    ]);
+    
+    return { payments: paymentsData, total: count };
+  }
+  
+  async getPayment(id: number): Promise<Payment | undefined> {
+    const [payment] = await db.select().from(payments).where(eq(payments.id, id)).limit(1);
+    return payment;
+  }
+  
+  async createPayment(payment: InsertPayment): Promise<Payment> {
+    const [newPayment] = await db.insert(payments).values(payment).returning();
+    return newPayment;
+  }
+  
+  async updatePayment(id: number, updates: Partial<Payment>): Promise<Payment | undefined> {
+    const [updated] = await db.update(payments)
+      .set(updates)
+      .where(eq(payments.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deletePayment(id: number): Promise<boolean> {
+    await db.delete(payments).where(eq(payments.id, id));
+    return true;
+  }
+}
+
 // Export instances
 export const dbLeadsStorage = new DbLeadsStorage();
 export const dbProposalsStorage = new DbProposalsStorage();
+export const dbServiceRequestsStorage = new DbServiceRequestsStorage();
+export const dbBusinessEntitiesStorage = new DbBusinessEntitiesStorage();
+export const dbPaymentsStorage = new DbPaymentsStorage();

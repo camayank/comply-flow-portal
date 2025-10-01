@@ -2494,7 +2494,13 @@ export class MemStorage implements IStorage {
 }
 
 // Hybrid storage: uses database for critical entities, MemStorage for others
-import { dbLeadsStorage, dbProposalsStorage } from './db-storage';
+import { 
+  dbLeadsStorage, 
+  dbProposalsStorage,
+  dbServiceRequestsStorage,
+  dbBusinessEntitiesStorage,
+  dbPaymentsStorage
+} from './db-storage';
 
 class HybridStorage extends MemStorage {
   // Override lead methods to use database
@@ -2589,6 +2595,86 @@ class HybridStorage extends MemStorage {
     pendingApprovals: number;
   }> {
     return dbProposalsStorage.getProposalStats();
+  }
+
+  // Override service request methods to use database
+  async getAllServiceRequests(filters?: {
+    search?: string;
+    status?: string;
+    clientId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ requests: ServiceRequest[]; total: number }> {
+    return dbServiceRequestsStorage.getAllServiceRequests(filters);
+  }
+
+  async getServiceRequest(id: number): Promise<ServiceRequest | undefined> {
+    return dbServiceRequestsStorage.getServiceRequest(id);
+  }
+
+  async createServiceRequest(request: InsertServiceRequest): Promise<ServiceRequest> {
+    return dbServiceRequestsStorage.createServiceRequest(request);
+  }
+
+  async updateServiceRequest(id: number, updates: Partial<ServiceRequest>): Promise<ServiceRequest | undefined> {
+    return dbServiceRequestsStorage.updateServiceRequest(id, updates);
+  }
+
+  async deleteServiceRequest(id: number): Promise<boolean> {
+    return dbServiceRequestsStorage.deleteServiceRequest(id);
+  }
+
+  // Override business entity methods to use database
+  async getAllBusinessEntities(filters?: {
+    search?: string;
+    isActive?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ entities: BusinessEntity[]; total: number }> {
+    return dbBusinessEntitiesStorage.getAllBusinessEntities(filters);
+  }
+
+  async getBusinessEntity(id: number): Promise<BusinessEntity | undefined> {
+    return dbBusinessEntitiesStorage.getBusinessEntity(id);
+  }
+
+  async createBusinessEntity(entity: InsertBusinessEntity): Promise<BusinessEntity> {
+    return dbBusinessEntitiesStorage.createBusinessEntity(entity);
+  }
+
+  async updateBusinessEntity(id: number, updates: Partial<BusinessEntity>): Promise<BusinessEntity | undefined> {
+    return dbBusinessEntitiesStorage.updateBusinessEntity(id, updates);
+  }
+
+  async deleteBusinessEntity(id: number): Promise<boolean> {
+    return dbBusinessEntitiesStorage.deleteBusinessEntity(id);
+  }
+
+  // Override payment methods to use database
+  async getAllPayments(filters?: {
+    search?: string;
+    status?: string;
+    serviceRequestId?: number;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ payments: Payment[]; total: number }> {
+    return dbPaymentsStorage.getAllPayments(filters);
+  }
+
+  async getPayment(id: number): Promise<Payment | undefined> {
+    return dbPaymentsStorage.getPayment(id);
+  }
+
+  async createPayment(payment: InsertPayment): Promise<Payment> {
+    return dbPaymentsStorage.createPayment(payment);
+  }
+
+  async updatePayment(id: number, updates: Partial<Payment>): Promise<Payment | undefined> {
+    return dbPaymentsStorage.updatePayment(id, updates);
+  }
+
+  async deletePayment(id: number): Promise<boolean> {
+    return dbPaymentsStorage.deletePayment(id);
   }
 }
 
