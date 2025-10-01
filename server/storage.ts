@@ -2493,4 +2493,103 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Hybrid storage: uses database for critical entities, MemStorage for others
+import { dbLeadsStorage, dbProposalsStorage } from './db-storage';
+
+class HybridStorage extends MemStorage {
+  // Override lead methods to use database
+  async getAllLeads(filters?: {
+    search?: string;
+    stage?: string;
+    source?: string;
+    executive?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ leads: LeadEnhanced[]; total: number }> {
+    return dbLeadsStorage.getAllLeads(filters);
+  }
+
+  async getLead(id: number): Promise<LeadEnhanced | undefined> {
+    return dbLeadsStorage.getLead(id);
+  }
+
+  async createLead(lead: InsertLeadEnhanced): Promise<LeadEnhanced> {
+    return dbLeadsStorage.createLead(lead);
+  }
+
+  async updateLead(id: number, updates: Partial<LeadEnhanced>): Promise<LeadEnhanced | undefined> {
+    return dbLeadsStorage.updateLead(id, updates);
+  }
+
+  async deleteLead(id: number): Promise<boolean> {
+    return dbLeadsStorage.deleteLead(id);
+  }
+
+  async addLeadInteraction(id: number, interaction: { type: string; notes: string; executive: string }): Promise<LeadEnhanced | undefined> {
+    return dbLeadsStorage.addLeadInteraction(id, interaction);
+  }
+
+  async getLeadStats(): Promise<{
+    stageDistribution: Record<string, number>;
+    sourceDistribution: Record<string, number>;
+    totalLeads: number;
+    recentLeads: number;
+    conversionRate: number;
+  }> {
+    return dbLeadsStorage.getLeadStats();
+  }
+
+  async getPreSalesExecutives(): Promise<string[]> {
+    return dbLeadsStorage.getPreSalesExecutives();
+  }
+
+  // Override proposal methods to use database
+  async getAllProposals(filters?: {
+    search?: string;
+    status?: string;
+    executive?: string;
+    viewMode?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ proposals: SalesProposal[]; total: number }> {
+    return dbProposalsStorage.getAllProposals(filters);
+  }
+
+  async getProposal(id: number): Promise<SalesProposal | undefined> {
+    return dbProposalsStorage.getProposal(id);
+  }
+
+  async getSalesProposalsByLead(leadId: string): Promise<SalesProposal[]> {
+    return dbProposalsStorage.getSalesProposalsByLead(leadId);
+  }
+
+  async createSalesProposal(proposal: InsertSalesProposal): Promise<SalesProposal> {
+    return dbProposalsStorage.createSalesProposal(proposal);
+  }
+
+  async updateProposal(id: number, updates: Partial<SalesProposal>): Promise<SalesProposal | undefined> {
+    return dbProposalsStorage.updateProposal(id, updates);
+  }
+
+  async deleteProposal(id: number): Promise<boolean> {
+    return dbProposalsStorage.deleteProposal(id);
+  }
+
+  async sendProposal(id: number): Promise<SalesProposal | undefined> {
+    return dbProposalsStorage.sendProposal(id);
+  }
+
+  async getProposalStats(): Promise<{
+    statusDistribution: Record<string, number>;
+    totalProposals: number;
+    recentProposals: number;
+    totalValue: number;
+    conversionRate: number;
+    avgProposalValue: number;
+    pendingApprovals: number;
+  }> {
+    return dbProposalsStorage.getProposalStats();
+  }
+}
+
+export const storage = new HybridStorage();
