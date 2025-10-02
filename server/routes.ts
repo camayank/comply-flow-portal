@@ -13,6 +13,7 @@ import {
 } from "@shared/schema";
 import { registerProposalRoutes } from "./proposals-routes";
 import { registerDashboardAnalyticsRoutes } from "./dashboard-analytics-routes";
+import { registerExportRoutes } from "./export-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -1142,6 +1143,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register Dashboard Analytics routes for Executive Dashboard, Business Intelligence, and Mobile Command Center
   registerDashboardAnalyticsRoutes(app);
   console.log('✅ Dashboard Analytics routes registered');
+
+  // Register Export routes for CSV/Excel data export functionality
+  registerExportRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;
