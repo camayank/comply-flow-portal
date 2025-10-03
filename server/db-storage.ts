@@ -1,12 +1,20 @@
 import { db } from './db';
-import { leads, salesProposals, serviceRequests, businessEntities, payments } from '../shared/schema';
-import { eq, desc, ilike, and, or, sql } from 'drizzle-orm';
+import { 
+  leads, salesProposals, serviceRequests, businessEntities, payments,
+  clientContracts, clientCommunications, clientPortfolios,
+  invoices
+} from '../shared/schema';
+import { eq, desc, ilike, and, or, sql, gte, lte } from 'drizzle-orm';
 import type { 
   LeadEnhanced, InsertLeadEnhanced, 
   SalesProposal, InsertSalesProposal,
   ServiceRequest, InsertServiceRequest,
   BusinessEntity, InsertBusinessEntity,
-  Payment, InsertPayment
+  Payment, InsertPayment,
+  ClientContract, InsertClientContract,
+  ClientCommunication, InsertClientCommunication,
+  ClientPortfolio, InsertClientPortfolio,
+  Invoice, InsertInvoice
 } from '../shared/schema';
 
 // Database-backed storage for critical entities (Leads & Proposals)
@@ -449,9 +457,210 @@ export class DbPaymentsStorage {
   }
 }
 
+// Database-backed Client Master storage
+export class DbClientMasterStorage {
+  // Client Contracts
+  async getAllClientContracts(filters?: {
+    clientId?: number;
+    status?: string;
+    contractType?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ contracts: ClientContract[]; total: number }> {
+    const conditions = [];
+    
+    if (filters?.clientId) conditions.push(eq(clientContracts.clientId, filters.clientId));
+    if (filters?.status) conditions.push(eq(clientContracts.status, filters.status));
+    if (filters?.contractType) conditions.push(eq(clientContracts.contractType, filters.contractType));
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const [contractsData, [{ count }]] = await Promise.all([
+      db.select().from(clientContracts).where(whereClause)
+        .orderBy(desc(clientContracts.startDate))
+        .limit(filters?.limit || 50).offset(filters?.offset || 0),
+      db.select({ count: sql<number>`count(*)::int` }).from(clientContracts).where(whereClause)
+    ]);
+    
+    return { contracts: contractsData, total: count };
+  }
+  
+  async getClientContract(id: number): Promise<ClientContract | undefined> {
+    const [contract] = await db.select().from(clientContracts).where(eq(clientContracts.id, id)).limit(1);
+    return contract;
+  }
+  
+  async createClientContract(contract: InsertClientContract): Promise<ClientContract> {
+    const [newContract] = await db.insert(clientContracts).values(contract).returning();
+    return newContract;
+  }
+  
+  async updateClientContract(id: number, updates: Partial<ClientContract>): Promise<ClientContract | undefined> {
+    const [updated] = await db.update(clientContracts).set(updates).where(eq(clientContracts.id, id)).returning();
+    return updated;
+  }
+  
+  async deleteClientContract(id: number): Promise<boolean> {
+    await db.delete(clientContracts).where(eq(clientContracts.id, id));
+    return true;
+  }
+  
+  // Client Communications
+  async getAllClientCommunications(filters?: {
+    clientId?: number;
+    communicationType?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ communications: ClientCommunication[]; total: number }> {
+    const conditions = [];
+    
+    if (filters?.clientId) conditions.push(eq(clientCommunications.clientId, filters.clientId));
+    if (filters?.communicationType) conditions.push(eq(clientCommunications.communicationType, filters.communicationType));
+    if (filters?.dateFrom) conditions.push(gte(clientCommunications.actualAt, filters.dateFrom));
+    if (filters?.dateTo) conditions.push(lte(clientCommunications.actualAt, filters.dateTo));
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const [commsData, [{ count }]] = await Promise.all([
+      db.select().from(clientCommunications).where(whereClause)
+        .orderBy(desc(clientCommunications.actualAt))
+        .limit(filters?.limit || 50).offset(filters?.offset || 0),
+      db.select({ count: sql<number>`count(*)::int` }).from(clientCommunications).where(whereClause)
+    ]);
+    
+    return { communications: commsData, total: count };
+  }
+  
+  async getClientCommunication(id: number): Promise<ClientCommunication | undefined> {
+    const [comm] = await db.select().from(clientCommunications).where(eq(clientCommunications.id, id)).limit(1);
+    return comm;
+  }
+  
+  async createClientCommunication(communication: InsertClientCommunication): Promise<ClientCommunication> {
+    const [newComm] = await db.insert(clientCommunications).values(communication).returning();
+    return newComm;
+  }
+  
+  async updateClientCommunication(id: number, updates: Partial<ClientCommunication>): Promise<ClientCommunication | undefined> {
+    const [updated] = await db.update(clientCommunications).set(updates).where(eq(clientCommunications.id, id)).returning();
+    return updated;
+  }
+  
+  async deleteClientCommunication(id: number): Promise<boolean> {
+    await db.delete(clientCommunications).where(eq(clientCommunications.id, id));
+    return true;
+  }
+  
+  // Client Portfolios
+  async getAllClientPortfolios(filters?: {
+    valueSegment?: string;
+    riskLevel?: string;
+    loyaltyTier?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ portfolios: ClientPortfolio[]; total: number }> {
+    const conditions = [];
+    
+    if (filters?.valueSegment) conditions.push(eq(clientPortfolios.valueSegment, filters.valueSegment));
+    if (filters?.riskLevel) conditions.push(eq(clientPortfolios.riskLevel, filters.riskLevel));
+    if (filters?.loyaltyTier) conditions.push(eq(clientPortfolios.loyaltyTier, filters.loyaltyTier));
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const [portfoliosData, [{ count }]] = await Promise.all([
+      db.select().from(clientPortfolios).where(whereClause)
+        .orderBy(desc(clientPortfolios.lifetimeValue))
+        .limit(filters?.limit || 50).offset(filters?.offset || 0),
+      db.select({ count: sql<number>`count(*)::int` }).from(clientPortfolios).where(whereClause)
+    ]);
+    
+    return { portfolios: portfoliosData, total: count };
+  }
+  
+  async getClientPortfolio(id: number): Promise<ClientPortfolio | undefined> {
+    const [portfolio] = await db.select().from(clientPortfolios).where(eq(clientPortfolios.id, id)).limit(1);
+    return portfolio;
+  }
+  
+  async getClientPortfolioByClient(clientId: number): Promise<ClientPortfolio | undefined> {
+    const [portfolio] = await db.select().from(clientPortfolios).where(eq(clientPortfolios.clientId, clientId)).limit(1);
+    return portfolio;
+  }
+  
+  async createClientPortfolio(portfolio: InsertClientPortfolio): Promise<ClientPortfolio> {
+    const [newPortfolio] = await db.insert(clientPortfolios).values(portfolio).returning();
+    return newPortfolio;
+  }
+  
+  async updateClientPortfolio(id: number, updates: Partial<ClientPortfolio>): Promise<ClientPortfolio | undefined> {
+    const [updated] = await db.update(clientPortfolios).set(updates).where(eq(clientPortfolios.id, id)).returning();
+    return updated;
+  }
+  
+  async deleteClientPortfolio(id: number): Promise<boolean> {
+    await db.delete(clientPortfolios).where(eq(clientPortfolios.id, id));
+    return true;
+  }
+}
+
+// Database-backed Financial storage
+export class DbFinancialsStorage {
+  // Invoices
+  async getAllInvoices(filters?: {
+    clientId?: number;
+    status?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ invoices: Invoice[]; total: number }> {
+    const conditions = [];
+    
+    if (filters?.clientId) conditions.push(eq(invoices.clientId, filters.clientId));
+    if (filters?.status) conditions.push(eq(invoices.status, filters.status));
+    if (filters?.dateFrom) conditions.push(gte(invoices.invoiceDate, filters.dateFrom));
+    if (filters?.dateTo) conditions.push(lte(invoices.invoiceDate, filters.dateTo));
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const [invoicesData, [{ count }]] = await Promise.all([
+      db.select().from(invoices).where(whereClause)
+        .orderBy(desc(invoices.invoiceDate))
+        .limit(filters?.limit || 50).offset(filters?.offset || 0),
+      db.select({ count: sql<number>`count(*)::int` }).from(invoices).where(whereClause)
+    ]);
+    
+    return { invoices: invoicesData, total: count };
+  }
+  
+  async getInvoice(id: number): Promise<Invoice | undefined> {
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
+    return invoice;
+  }
+  
+  async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
+    const [newInvoice] = await db.insert(invoices).values(invoice).returning();
+    return newInvoice;
+  }
+  
+  async updateInvoice(id: number, updates: Partial<Invoice>): Promise<Invoice | undefined> {
+    const [updated] = await db.update(invoices).set(updates).where(eq(invoices.id, id)).returning();
+    return updated;
+  }
+  
+  async deleteInvoice(id: number): Promise<boolean> {
+    await db.delete(invoices).where(eq(invoices.id, id));
+    return true;
+  }
+}
+
 // Export instances
 export const dbLeadsStorage = new DbLeadsStorage();
 export const dbProposalsStorage = new DbProposalsStorage();
 export const dbServiceRequestsStorage = new DbServiceRequestsStorage();
 export const dbBusinessEntitiesStorage = new DbBusinessEntitiesStorage();
 export const dbPaymentsStorage = new DbPaymentsStorage();
+export const dbClientMasterStorage = new DbClientMasterStorage();
+export const dbFinancialsStorage = new DbFinancialsStorage();

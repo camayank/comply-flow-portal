@@ -2499,7 +2499,9 @@ import {
   dbProposalsStorage,
   dbServiceRequestsStorage,
   dbBusinessEntitiesStorage,
-  dbPaymentsStorage
+  dbPaymentsStorage,
+  dbClientMasterStorage,
+  dbFinancialsStorage
 } from './db-storage';
 
 class HybridStorage extends MemStorage {
@@ -2675,6 +2677,118 @@ class HybridStorage extends MemStorage {
 
   async deletePayment(id: number): Promise<boolean> {
     return dbPaymentsStorage.deletePayment(id);
+  }
+
+  // Override Client Master methods to use database
+  async getAllClientContracts(filters?: {
+    clientId?: number;
+    status?: string;
+    contractType?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ contracts: ClientContract[]; total: number }> {
+    return dbClientMasterStorage.getAllClientContracts(filters);
+  }
+
+  async getClientContract(id: number): Promise<ClientContract | undefined> {
+    return dbClientMasterStorage.getClientContract(id);
+  }
+
+  async createClientContract(contract: InsertClientContract): Promise<ClientContract> {
+    return dbClientMasterStorage.createClientContract(contract);
+  }
+
+  async updateClientContract(id: number, updates: Partial<ClientContract>): Promise<ClientContract | undefined> {
+    return dbClientMasterStorage.updateClientContract(id, updates);
+  }
+
+  async deleteClientContract(id: number): Promise<boolean> {
+    return dbClientMasterStorage.deleteClientContract(id);
+  }
+
+  async getAllClientCommunications(filters?: {
+    clientId?: number;
+    communicationType?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ communications: ClientCommunication[]; total: number }> {
+    return dbClientMasterStorage.getAllClientCommunications(filters);
+  }
+
+  async getClientCommunication(id: number): Promise<ClientCommunication | undefined> {
+    return dbClientMasterStorage.getClientCommunication(id);
+  }
+
+  async createClientCommunication(communication: InsertClientCommunication): Promise<ClientCommunication> {
+    return dbClientMasterStorage.createClientCommunication(communication);
+  }
+
+  async updateClientCommunication(id: number, updates: Partial<ClientCommunication>): Promise<ClientCommunication | undefined> {
+    return dbClientMasterStorage.updateClientCommunication(id, updates);
+  }
+
+  async deleteClientCommunication(id: number): Promise<boolean> {
+    return dbClientMasterStorage.deleteClientCommunication(id);
+  }
+
+  async getAllClientPortfolios(filters?: {
+    valueSegment?: string;
+    riskLevel?: string;
+    loyaltyTier?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ portfolios: ClientPortfolio[]; total: number }> {
+    return dbClientMasterStorage.getAllClientPortfolios(filters);
+  }
+
+  async getClientPortfolio(id: number): Promise<ClientPortfolio | undefined> {
+    return dbClientMasterStorage.getClientPortfolio(id);
+  }
+
+  async getClientPortfolioByClient(clientId: number): Promise<ClientPortfolio | undefined> {
+    return dbClientMasterStorage.getClientPortfolioByClient(clientId);
+  }
+
+  async createClientPortfolio(portfolio: InsertClientPortfolio): Promise<ClientPortfolio> {
+    return dbClientMasterStorage.createClientPortfolio(portfolio);
+  }
+
+  async updateClientPortfolio(id: number, updates: Partial<ClientPortfolio>): Promise<ClientPortfolio | undefined> {
+    return dbClientMasterStorage.updateClientPortfolio(id, updates);
+  }
+
+  async deleteClientPortfolio(id: number): Promise<boolean> {
+    return dbClientMasterStorage.deleteClientPortfolio(id);
+  }
+
+  // Override Financials methods to use database
+  async getAllInvoices(filters?: {
+    clientId?: number;
+    status?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ invoices: Invoice[]; total: number }> {
+    return dbFinancialsStorage.getAllInvoices(filters);
+  }
+
+  async getInvoice(id: number): Promise<Invoice | undefined> {
+    return dbFinancialsStorage.getInvoice(id);
+  }
+
+  async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
+    return dbFinancialsStorage.createInvoice(invoice);
+  }
+
+  async updateInvoice(id: number, updates: Partial<Invoice>): Promise<Invoice | undefined> {
+    return dbFinancialsStorage.updateInvoice(id, updates);
+  }
+
+  async deleteInvoice(id: number): Promise<boolean> {
+    return dbFinancialsStorage.deleteInvoice(id);
   }
 }
 
