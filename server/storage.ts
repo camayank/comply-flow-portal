@@ -2491,6 +2491,75 @@ export class MemStorage implements IStorage {
       ]
     };
   }
+
+  // Client Master stub methods (not implemented in MemStorage)
+  async getAllClientContracts(filters?: any): Promise<{ contracts: ClientContract[]; total: number }> {
+    return { contracts: [], total: 0 };
+  }
+  async getClientContract(id: number): Promise<ClientContract | undefined> {
+    return undefined;
+  }
+  async createClientContract(contract: InsertClientContract): Promise<ClientContract> {
+    throw new Error('Client contracts not implemented in MemStorage');
+  }
+  async updateClientContract(id: number, updates: Partial<ClientContract>): Promise<ClientContract | undefined> {
+    return undefined;
+  }
+  async deleteClientContract(id: number): Promise<boolean> {
+    return false;
+  }
+
+  async getAllClientCommunications(filters?: any): Promise<{ communications: ClientCommunication[]; total: number }> {
+    return { communications: [], total: 0 };
+  }
+  async getClientCommunication(id: number): Promise<ClientCommunication | undefined> {
+    return undefined;
+  }
+  async createClientCommunication(communication: InsertClientCommunication): Promise<ClientCommunication> {
+    throw new Error('Client communications not implemented in MemStorage');
+  }
+  async updateClientCommunication(id: number, updates: Partial<ClientCommunication>): Promise<ClientCommunication | undefined> {
+    return undefined;
+  }
+  async deleteClientCommunication(id: number): Promise<boolean> {
+    return false;
+  }
+
+  async getAllClientPortfolios(filters?: any): Promise<{ portfolios: ClientPortfolio[]; total: number }> {
+    return { portfolios: [], total: 0 };
+  }
+  async getClientPortfolio(id: number): Promise<ClientPortfolio | undefined> {
+    return undefined;
+  }
+  async getClientPortfolioByClient(clientId: number): Promise<ClientPortfolio | undefined> {
+    return undefined;
+  }
+  async createClientPortfolio(portfolio: InsertClientPortfolio): Promise<ClientPortfolio> {
+    throw new Error('Client portfolios not implemented in MemStorage');
+  }
+  async updateClientPortfolio(id: number, updates: Partial<ClientPortfolio>): Promise<ClientPortfolio | undefined> {
+    return undefined;
+  }
+  async deleteClientPortfolio(id: number): Promise<boolean> {
+    return false;
+  }
+
+  // Financials stub methods (not implemented in MemStorage)
+  async getAllInvoices(filters?: any): Promise<{ invoices: Invoice[]; total: number }> {
+    return { invoices: [], total: 0 };
+  }
+  async getInvoice(id: number): Promise<Invoice | undefined> {
+    return undefined;
+  }
+  async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
+    throw new Error('Invoices not implemented in MemStorage');
+  }
+  async updateInvoice(id: number, updates: Partial<Invoice>): Promise<Invoice | undefined> {
+    return undefined;
+  }
+  async deleteInvoice(id: number): Promise<boolean> {
+    return false;
+  }
 }
 
 // Hybrid storage: uses database for critical entities, MemStorage for others

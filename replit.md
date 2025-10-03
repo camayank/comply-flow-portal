@@ -24,18 +24,19 @@ A comprehensive white-label platform that can be deployed for ANY service provid
 - Agent-focused distribution model (Compliance Rakshaks)
 
 ## Recent Changes - PRODUCTION READINESS ENHANCEMENTS ✅
-- **Database Migration Expansion (BUILD 1-3, 6)**: 9 critical entities now persist to PostgreSQL - Leads, Proposals, Service Requests, Business Entities, Payments, Client Contracts, Client Communications, Client Portfolios, Invoices survive server restarts (Date: Oct 3, 2025)
+- **Database Migration Core (BUILD 1-3, 6)**: 5 critical entities persist to PostgreSQL - Leads, Proposals, Service Requests, Business Entities, Payments survive server restarts with full CRUD operations (Date: Oct 3, 2025)
 - **Executive Dashboard Fixed (BUILD 2)**: API errors resolved with graceful fallbacks, dashboard now returns comprehensive analytics data
 - **Comprehensive Error Handling (BUILD 4)**: Global error boundaries, automatic toast notifications for API errors, uncaught error handlers, enhanced user experience (Date: Oct 2, 2025)
 - **CSV/Excel Export System (BUILD 5)**: Comprehensive data export functionality with 10+ endpoints for leads, proposals, service requests, payments, business entities, services, and multi-sheet comprehensive reports - architect approved (Date: Oct 2, 2025)
-- **HybridStorage Architecture**: Seamless transition from MemStorage to PostgreSQL for 9 entities while maintaining backward compatibility - Client Master and Financials now database-persisted (Date: Oct 3, 2025)
+- **BUILD 6 Completion**: Database expansion attempted for Client Master/Financials (4 entities) but deferred - requires proper Drizzle schema migration. Current state: 5 critical entities PostgreSQL, remaining 6 modules MemStorage (Date: Oct 3, 2025)
+- **HybridStorage Architecture**: Stable production architecture with PostgreSQL for 5 critical entities (Leads, Proposals, Service Requests, Business Entities, Payments) and MemStorage for remaining modules
 - **Security Note**: BUILD 6 input sanitization attempted but failed architect review due to fundamental security flaws (SQL keyword stripping corrupted legitimate data, ineffective XSS protection). Platform relies on Drizzle ORM's parameterized queries for SQL injection prevention (Date: Oct 2, 2025)
 - **ALL MINOR ISSUES RESOLVED**: Complete platform now working at 100% capacity (Date: Aug 15, 2025)
 - **Admin APIs Fixed**: All endpoints return JSON correctly (config-stats returning platform data, services returning 12 configured services)
 - **Client APIs Fixed**: Complete client portal functionality (entities API returning 2 businesses, service-requests API returning 3 active requests)
 - **Operations APIs Confirmed**: Full workflow orchestration (dashboard-stats showing live metrics, service-orders managing 3 active workflows)
 - **Mobile-First UI Complete**: Created fully responsive mobile-friendly versions of all portals (Landing, Client, Operations, Admin, Agent)
-- **Final Status**: 70% PRODUCTION READY - expanded database persistence operational (9 entities), error handling complete, CSV export functional, authentication and file uploads pending
+- **Final Status**: 65% PRODUCTION READY - Core database persistence operational (5 entities), error handling complete, CSV export functional, authentication and file uploads pending
 
 ## Project Architecture
 - **Frontend**: React TypeScript with Tailwind CSS, shadcn/ui components
