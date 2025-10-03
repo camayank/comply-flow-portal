@@ -1147,6 +1147,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register Export routes for CSV/Excel data export functionality
   registerExportRoutes(app);
 
+  // Register File Management routes for document upload/download functionality
+  const fileManagementRoutes = await import('./file-management-routes');
+  app.use('/api/files', fileManagementRoutes.default);
+  console.log('✅ File Management routes registered');
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -1343,16 +1343,23 @@ export type WorkflowExecution = typeof workflowExecutions.$inferSelect;
 // Client document uploads table
 export const documentsUploads = pgTable("documents", {
   id: serial("id").primaryKey(),
-  serviceOrderId: integer("service_order_id").notNull(),
+  serviceOrderId: integer("service_order_id"),
+  serviceRequestId: integer("service_request_id"),
   entityId: integer("entity_id").notNull(),
   doctype: text("doctype").notNull(),
   filename: text("filename").notNull(),
   path: text("path").notNull(),
   sizeBytes: integer("size_bytes"),
+  mimeType: text("mime_type"),
   uploader: text("uploader").notNull(), // 'client' | 'ops'
-  status: text("status").default("pending_review"), // 'pending_review' | 'approved' | 'rejected'
+  status: text("status").default("pending_review"), // 'pending_review' | 'approved' | 'rejected' | 'archived'
   rejectionReason: text("rejection_reason"),
+  notes: text("notes"),
+  reviewNotes: text("review_notes"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
   version: integer("version").default(1),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
