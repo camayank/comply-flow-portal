@@ -18,6 +18,7 @@ import { registerUserManagementRoutes } from "./user-management-routes";
 import { registerClientRegistrationRoutes } from "./client-registration-routes";
 import { registerPaymentRoutes } from "./payment-routes";
 import { registerAuthRoutes } from "./auth-routes";
+import { registerReferralRoutes } from "./referral-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -1167,6 +1168,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register Payment Processing routes with Stripe integration ready
   registerPaymentRoutes(app);
+  
+  // Register Referral & Wallet Credit System routes
+  registerReferralRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

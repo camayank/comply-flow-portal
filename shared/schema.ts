@@ -3608,6 +3608,84 @@ export type InsertBudgetPlan = z.infer<typeof insertBudgetPlanSchema>;
 export type ClientPortfolio = typeof clientPortfolios.$inferSelect;
 export type InsertClientPortfolio = z.infer<typeof insertClientPortfolioSchema>;
 
+// ============================================================================
+// REFERRAL & WALLET CREDIT SYSTEM
+// ============================================================================
+
+export const referralCodes = pgTable("referral_codes", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(), // Owner of this referral code
+  code: text("code").notNull().unique(), // Unique referral code (e.g., "LEGAL2024XYZ")
+  isActive: boolean("is_active").default(true),
+  totalReferrals: integer("total_referrals").default(0),
+  successfulReferrals: integer("successful_referrals").default(0),
+  totalCreditsEarned: decimal("total_credits_earned", { precision: 12, scale: 2 }).default("0.00"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const referrals = pgTable("referrals", {
+  id: serial("id").primaryKey(),
+  referrerId: integer("referrer_id").notNull(), // Client who referred
+  referralCode: text("referral_code").notNull(), // Code used for referral
+  refereeEmail: text("referee_email").notNull(), // Email of referred person
+  refereeClientId: integer("referee_client_id"), // Assigned after onboarding
+  status: text("status").notNull().default("pending"), // pending, registered, onboarded, credited, expired
+  creditAmount: decimal("credit_amount", { precision: 12, scale: 2 }).default("0.00"),
+  firstServiceAmount: decimal("first_service_amount", { precision: 12, scale: 2 }), // Amount of first service purchased by referee
+  creditPercentage: integer("credit_percentage").default(10), // % of first service as credit
+  isCredited: boolean("is_credited").default(false),
+  creditedAt: timestamp("credited_at"),
+  referredAt: timestamp("referred_at").defaultNow(),
+  registeredAt: timestamp("registered_at"),
+  onboardedAt: timestamp("onboarded_at"),
+  expiresAt: timestamp("expires_at"), // Referral link expiry
+});
+
+export const walletCredits = pgTable("wallet_credits", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull().unique(), // One wallet per client
+  balance: decimal("balance", { precision: 12, scale: 2 }).default("0.00"), // Current available balance
+  totalEarned: decimal("total_earned", { precision: 12, scale: 2 }).default("0.00"), // Lifetime earned
+  totalSpent: decimal("total_spent", { precision: 12, scale: 2 }).default("0.00"), // Lifetime spent
+  totalReferralEarnings: decimal("total_referral_earnings", { precision: 12, scale: 2 }).default("0.00"),
+  lifetimeReferrals: integer("lifetime_referrals").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const walletTransactions = pgTable("wallet_transactions", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  type: text("type").notNull(), // credit_referral, credit_bonus, debit_service, debit_invoice, credit_refund
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  balanceBefore: decimal("balance_before", { precision: 12, scale: 2 }),
+  balanceAfter: decimal("balance_after", { precision: 12, scale: 2 }),
+  description: text("description").notNull(),
+  relatedReferralId: integer("related_referral_id"), // If this is from a referral
+  relatedServiceRequestId: integer("related_service_request_id"), // If used for a service
+  relatedInvoiceId: integer("related_invoice_id"), // If used for an invoice payment
+  metadata: json("metadata"), // Additional context
+  createdBy: integer("created_by"), // Admin/system user who created this
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Zod schemas for validation
+export const insertReferralCodeSchema = createInsertSchema(referralCodes);
+export const insertReferralSchema = createInsertSchema(referrals);
+export const insertWalletCreditsSchema = createInsertSchema(walletCredits);
+export const insertWalletTransactionSchema = createInsertSchema(walletTransactions);
+
+// Type exports for referral system
+export type ReferralCode = typeof referralCodes.$inferSelect;
+export type InsertReferralCode = z.infer<typeof insertReferralCodeSchema>;
+export type Referral = typeof referrals.$inferSelect;
+export type InsertReferral = z.infer<typeof insertReferralSchema>;
+export type WalletCredit = typeof walletCredits.$inferSelect;
+export type InsertWalletCredit = z.infer<typeof insertWalletCreditsSchema>;
+export type WalletTransaction = typeof walletTransactions.$inferSelect;
+export type InsertWalletTransaction = z.infer<typeof insertWalletTransactionSchema>;
+
 // Type exports for HR system
 export type EmployeeSkill = typeof employeeSkills.$inferSelect;
 export type InsertEmployeeSkill = z.infer<typeof insertEmployeeSkillsSchema>;

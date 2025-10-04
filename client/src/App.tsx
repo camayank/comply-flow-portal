@@ -68,6 +68,7 @@ import LeadManagement from "./pages/LeadManagement";
 import ServiceRequestUI from "./pages/ServiceRequestUI";
 import Login from "./pages/Login";
 import ProposalManagement from "./pages/ProposalManagement";
+import ReferralDashboard from "./pages/ReferralDashboard";
 
 const App = () => (
   <ErrorBoundary>
@@ -93,6 +94,9 @@ const App = () => (
                 <Route path="/my-requests" component={ServiceRequestUI} />
                 <Route path="/proposals" component={ProposalManagement} />
                 <Route path="/proposal-management" component={ProposalManagement} />
+                <Route path="/referrals" component={ReferralDashboard} />
+                <Route path="/referral-dashboard" component={ReferralDashboard} />
+                <Route path="/wallet" component={ReferralDashboard} />
                 <Route path="/design-system" component={DesignSystemShowcase} />
                 <Route path="/landing" component={LandingPage} />
                 <Route path="/onboarding-flow" component={OnboardingFlow} />
