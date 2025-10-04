@@ -65,6 +65,7 @@ import MobileDashboard from "./pages/MobileDashboard";
 import DesignSystemShowcase from "./components/DesignSystemShowcase";
 import ClientRegistration from "./pages/ClientRegistration";
 import LeadManagement from "./pages/LeadManagement";
+import ServiceRequestUI from "./pages/ServiceRequestUI";
 
 const App = () => (
   <ErrorBoundary>
@@ -83,6 +84,9 @@ const App = () => (
                 <Route path="/signup" component={ClientRegistration} />
                 <Route path="/leads" component={LeadManagement} />
                 <Route path="/lead-management" component={LeadManagement} />
+                <Route path="/service-requests" component={ServiceRequestUI} />
+                <Route path="/requests" component={ServiceRequestUI} />
+                <Route path="/my-requests" component={ServiceRequestUI} />
                 <Route path="/design-system" component={DesignSystemShowcase} />
                 <Route path="/landing" component={LandingPage} />
                 <Route path="/onboarding-flow" component={OnboardingFlow} />
