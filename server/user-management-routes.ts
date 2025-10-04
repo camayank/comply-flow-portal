@@ -4,22 +4,15 @@ import { users } from '@shared/schema';
 import { eq, desc, or, like, and } from 'drizzle-orm';
 import { insertUserSchema, updateUserSchema, USER_ROLES } from '@shared/schema';
 import bcrypt from 'bcrypt';
+import { requireRole, requireMinimumRole, mockAuthMiddleware, USER_ROLES as RBAC_ROLES } from './rbac-middleware';
 
 export function registerUserManagementRoutes(app: Express) {
 
-  // Middleware to check if user is super_admin
-  const requireSuperAdmin = (req: any, res: any, next: any) => {
-    // TODO: Implement proper session/auth middleware
-    // For now, this is a placeholder - will be replaced with actual auth
-    const userRole = req.headers['x-user-role']; // Temporary hack
-    if (userRole !== USER_ROLES.SUPER_ADMIN) {
-      return res.status(403).json({ error: 'Forbidden: Super Admin access required' });
-    }
-    next();
-  };
+  // Apply mock authentication middleware globally for all user management routes
+  app.use('/api/admin/users', mockAuthMiddleware);
 
-  // Get all users (Super Admin only)
-  app.get('/api/admin/users', requireSuperAdmin, async (req, res) => {
+  // Get all users (Super Admin and Admin only)
+  app.get('/api/admin/users', requireMinimumRole(RBAC_ROLES.ADMIN), async (req, res) => {
     try {
       const { role, search, isActive } = req.query;
 
@@ -87,8 +80,8 @@ export function registerUserManagementRoutes(app: Express) {
     }
   });
 
-  // Get single user by ID (Super Admin only)
-  app.get('/api/admin/users/:id', requireSuperAdmin, async (req, res) => {
+  // Get single user by ID (Super Admin and Admin only)
+  app.get('/api/admin/users/:id', requireMinimumRole(RBAC_ROLES.ADMIN), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
 
@@ -122,7 +115,7 @@ export function registerUserManagementRoutes(app: Express) {
   });
 
   // Create new user (Super Admin only)
-  app.post('/api/admin/users', requireSuperAdmin, async (req, res) => {
+  app.post('/api/admin/users', requireRole(RBAC_ROLES.SUPER_ADMIN), async (req, res) => {
     try {
       const validatedData = insertUserSchema.parse(req.body);
 
@@ -168,7 +161,7 @@ export function registerUserManagementRoutes(app: Express) {
   });
 
   // Update user (Super Admin only)
-  app.patch('/api/admin/users/:id', requireSuperAdmin, async (req, res) => {
+  app.patch('/api/admin/users/:id', requireRole(RBAC_ROLES.SUPER_ADMIN), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
       const validatedData = updateUserSchema.parse(req.body);
@@ -213,7 +206,7 @@ export function registerUserManagementRoutes(app: Express) {
   });
 
   // Deactivate user (Super Admin only)
-  app.delete('/api/admin/users/:id', requireSuperAdmin, async (req, res) => {
+  app.delete('/api/admin/users/:id', requireRole(RBAC_ROLES.SUPER_ADMIN), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
 
@@ -243,7 +236,7 @@ export function registerUserManagementRoutes(app: Express) {
   });
 
   // Change user password (Super Admin only)
-  app.patch('/api/admin/users/:id/password', requireSuperAdmin, async (req, res) => {
+  app.patch('/api/admin/users/:id/password', requireRole(RBAC_ROLES.SUPER_ADMIN), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
       const { newPassword } = req.body;
@@ -278,8 +271,8 @@ export function registerUserManagementRoutes(app: Express) {
     }
   });
 
-  // Get user statistics (Super Admin only)
-  app.get('/api/admin/users/stats/summary', requireSuperAdmin, async (req, res) => {
+  // Get user statistics (Super Admin and Admin only)
+  app.get('/api/admin/users/stats/summary', requireMinimumRole(RBAC_ROLES.ADMIN), async (req, res) => {
     try {
       const allUsers = await db.select().from(users);
 
