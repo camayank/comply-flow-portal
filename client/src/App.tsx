@@ -63,6 +63,8 @@ import ExecutiveDashboard from "./pages/ExecutiveDashboard";
 import BusinessIntelligence from "./pages/BusinessIntelligence";
 import MobileDashboard from "./pages/MobileDashboard";
 import DesignSystemShowcase from "./components/DesignSystemShowcase";
+import ClientRegistration from "./pages/ClientRegistration";
+import LeadManagement from "./pages/LeadManagement";
 
 const App = () => (
   <ErrorBoundary>
@@ -76,6 +78,11 @@ const App = () => (
             <main className="flex-grow">
               <Switch>
                 <Route path="/" component={MobileResponsiveLanding} />
+                <Route path="/register" component={ClientRegistration} />
+                <Route path="/client-registration" component={ClientRegistration} />
+                <Route path="/signup" component={ClientRegistration} />
+                <Route path="/leads" component={LeadManagement} />
+                <Route path="/lead-management" component={LeadManagement} />
                 <Route path="/design-system" component={DesignSystemShowcase} />
                 <Route path="/landing" component={LandingPage} />
                 <Route path="/onboarding-flow" component={OnboardingFlow} />

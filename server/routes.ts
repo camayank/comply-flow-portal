@@ -15,6 +15,8 @@ import { registerProposalRoutes } from "./proposals-routes";
 import { registerDashboardAnalyticsRoutes } from "./dashboard-analytics-routes";
 import { registerExportRoutes } from "./export-routes";
 import { registerUserManagementRoutes } from "./user-management-routes";
+import { registerClientRegistrationRoutes } from "./client-registration-routes";
+import { registerPaymentRoutes } from "./payment-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -1155,6 +1157,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register User Management routes for Super Admin user creation and management
   registerUserManagementRoutes(app);
+  
+  // Register Client Registration routes for self-service onboarding
+  registerClientRegistrationRoutes(app);
+  
+  // Register Payment Processing routes with Stripe integration ready
+  registerPaymentRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;
