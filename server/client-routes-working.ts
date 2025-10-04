@@ -6,6 +6,7 @@ import {
   complianceTracking
 } from '@shared/schema';
 import { eq, desc, and, gte, lte, or } from 'drizzle-orm';
+import { COMPLIANCE_KNOWLEDGE_BASE, getComplianceByCode } from './compliance-knowledge-base';
 
 export function registerClientRoutes(app: Express) {
 
@@ -135,18 +136,36 @@ export function registerClientRoutes(app: Express) {
             .from(complianceTracking)
             .orderBy(complianceTracking.dueDate);
 
-      // Transform to match frontend interface
-      const transformedItems = complianceItems.map(item => ({
-        id: item.id,
-        serviceType: item.complianceType,
-        dueDate: item.dueDate?.toISOString() || new Date().toISOString(),
-        status: item.status,
-        priority: item.priority,
-        complianceType: item.complianceType,
-        healthScore: item.healthScore || 100,
-        penaltyRisk: item.penaltyRisk || false,
-        serviceId: item.serviceId
-      }));
+      // Enrich with compliance knowledge base data
+      const transformedItems = complianceItems.map(item => {
+        // Try to find matching rule in knowledge base by serviceId
+        const knowledgeRule = getComplianceByCode(item.serviceId);
+        
+        return {
+          id: item.id,
+          serviceType: item.serviceType || item.complianceType,
+          entityName: item.entityName,
+          dueDate: item.dueDate?.toISOString() || new Date().toISOString(),
+          status: item.status,
+          priority: item.priority,
+          complianceType: item.complianceType,
+          healthScore: item.healthScore || 100,
+          penaltyRisk: item.penaltyRisk || false,
+          estimatedPenalty: item.estimatedPenalty || 0,
+          serviceId: item.serviceId,
+          // Enhanced regulatory knowledge from knowledge base
+          regulatoryInfo: knowledgeRule ? {
+            formNumber: knowledgeRule.formNumber,
+            regulationCategory: knowledgeRule.regulationCategory,
+            description: knowledgeRule.description,
+            dueDateInfo: knowledgeRule.dueDateInfo,
+            penaltyInfo: knowledgeRule.penaltyInfo,
+            requiredDocuments: knowledgeRule.requiredDocuments,
+            priorityLevel: knowledgeRule.priorityLevel,
+            penaltyRiskLevel: knowledgeRule.penaltyRiskLevel
+          } : null
+        };
+      });
 
       res.json(transformedItems);
     } catch (error) {
