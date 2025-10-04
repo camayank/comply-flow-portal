@@ -42,6 +42,7 @@ import {
   Users
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ComplianceCalendar } from "@/components/ComplianceCalendar";
 
 interface Entity {
   id: number;
@@ -122,6 +123,14 @@ const UniversalClientPortal: React.FC = () => {
 
   const { data: notifications = [] } = useQuery({
     queryKey: ["/api/client/notifications"],
+  });
+
+  const { data: complianceItems = [] } = useQuery({
+    queryKey: ["/api/client/compliance-tracking"],
+  });
+
+  const { data: complianceSummary } = useQuery({
+    queryKey: ["/api/client/compliance-summary"],
   });
 
   // Mutations
@@ -261,10 +270,19 @@ const UniversalClientPortal: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-white dark:bg-gray-800 p-1">
+          <TabsList className="grid w-full grid-cols-6 bg-white dark:bg-gray-800 p-1">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
               Overview
+            </TabsTrigger>
+            <TabsTrigger value="compliance" className="flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              Compliance
+              {(complianceSummary as any)?.overdue > 0 && (
+                <Badge variant="destructive" className="ml-1 h-5 px-1 text-xs">
+                  {(complianceSummary as any)?.overdue}
+                </Badge>
+              )}
             </TabsTrigger>
             <TabsTrigger value="services" className="flex items-center gap-2">
               <Activity className="w-4 h-4" />
@@ -456,6 +474,19 @@ const UniversalClientPortal: React.FC = () => {
                 </Card>
               ))}
             </div>
+          </TabsContent>
+
+          {/* Compliance Tab */}
+          <TabsContent value="compliance" className="space-y-6">
+            <ComplianceCalendar 
+              complianceItems={complianceItems as any}
+              onItemClick={(item) => {
+                toast({ 
+                  title: "Compliance Item", 
+                  description: `${item.serviceType} - Due: ${new Date(item.dueDate).toLocaleDateString()}` 
+                });
+              }}
+            />
           </TabsContent>
 
           {/* Services Tab */}

@@ -2,9 +2,10 @@ import type { Express } from "express";
 import { db } from './db';
 import { 
   serviceRequests,
-  businessEntities
+  businessEntities,
+  complianceTracking
 } from '@shared/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, gte, lte, or } from 'drizzle-orm';
 
 export function registerClientRoutes(app: Express) {
 
@@ -95,6 +96,103 @@ export function registerClientRoutes(app: Express) {
     } catch (error) {
       console.error('Error updating service request:', error);
       res.status(500).json({ error: 'Failed to update service request' });
+    }
+  });
+
+  // Get compliance tracking items for client
+  app.get('/api/client/compliance-tracking', async (req, res) => {
+    try {
+      const { userId, startDate, endDate, status } = req.query;
+      
+      // Build the query with optional filters
+      let conditions = [];
+      
+      if (userId) {
+        conditions.push(eq(complianceTracking.userId, parseInt(userId as string)));
+      }
+      
+      if (startDate) {
+        conditions.push(gte(complianceTracking.dueDate, new Date(startDate as string)));
+      }
+      
+      if (endDate) {
+        conditions.push(lte(complianceTracking.dueDate, new Date(endDate as string)));
+      }
+      
+      if (status) {
+        conditions.push(eq(complianceTracking.status, status as string));
+      }
+
+      // Query compliance tracking data
+      const complianceItems = conditions.length > 0
+        ? await db
+            .select()
+            .from(complianceTracking)
+            .where(and(...conditions))
+            .orderBy(complianceTracking.dueDate)
+        : await db
+            .select()
+            .from(complianceTracking)
+            .orderBy(complianceTracking.dueDate);
+
+      // Transform to match frontend interface
+      const transformedItems = complianceItems.map(item => ({
+        id: item.id,
+        serviceType: item.complianceType,
+        dueDate: item.dueDate?.toISOString() || new Date().toISOString(),
+        status: item.status,
+        priority: item.priority,
+        complianceType: item.complianceType,
+        healthScore: item.healthScore || 100,
+        penaltyRisk: item.penaltyRisk || false,
+        serviceId: item.serviceId
+      }));
+
+      res.json(transformedItems);
+    } catch (error) {
+      console.error('Error fetching compliance tracking:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance tracking data' });
+    }
+  });
+
+  // Get compliance summary/stats for client dashboard
+  app.get('/api/client/compliance-summary', async (req, res) => {
+    try {
+      const { userId } = req.query;
+      
+      const conditions = userId 
+        ? [eq(complianceTracking.userId, parseInt(userId as string))]
+        : [];
+
+      const allItems = conditions.length > 0
+        ? await db
+            .select()
+            .from(complianceTracking)
+            .where(and(...conditions))
+        : await db
+            .select()
+            .from(complianceTracking);
+
+      const today = new Date();
+      const sevenDaysFromNow = new Date();
+      sevenDaysFromNow.setDate(today.getDate() + 7);
+
+      const summary = {
+        totalCompliance: allItems.length,
+        overdue: allItems.filter(item => item.dueDate && item.dueDate < today && item.status !== 'completed').length,
+        dueThisWeek: allItems.filter(item => item.dueDate && item.dueDate >= today && item.dueDate <= sevenDaysFromNow && item.status !== 'completed').length,
+        upcoming: allItems.filter(item => item.dueDate && item.dueDate > sevenDaysFromNow && item.status !== 'completed').length,
+        completed: allItems.filter(item => item.status === 'completed').length,
+        averageHealthScore: allItems.length > 0 
+          ? Math.round(allItems.reduce((sum, item) => sum + (item.healthScore || 100), 0) / allItems.length)
+          : 100,
+        highPriorityPending: allItems.filter(item => item.priority === 'high' || item.priority === 'critical').length
+      };
+
+      res.json(summary);
+    } catch (error) {
+      console.error('Error fetching compliance summary:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance summary' });
     }
   });
 

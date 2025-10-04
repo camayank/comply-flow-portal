@@ -46,10 +46,12 @@ app.use((req, res, next) => {
   console.log('🌱 Initializing service management systems...');
   const { serviceSpawner } = await import('./service-spawner');
   const { serviceSeeder } = await import('./service-seeder');
+  const { seedComplianceData } = await import('./compliance-seeder');
   
   // Auto-seed services on startup (development only)
   if (process.env.NODE_ENV === 'development') {
     await serviceSeeder.seedAllServices();
+    await seedComplianceData();
   }
   
   console.log('✅ Service management systems initialized');
