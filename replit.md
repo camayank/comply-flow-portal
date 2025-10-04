@@ -40,10 +40,11 @@ The platform is built on a robust architecture designed for enterprise deploymen
     - **No-Code Platform**: Features a drag-and-drop workflow builder for process changes without developer dependency.
 
 ### Feature Specifications
-- **Universal Admin Panel**: Supports no-code workflow building, global workflow updates, real-time system monitoring, and comprehensive analytics.
+- **Universal Admin Panel**: Supports no-code workflow building, global workflow updates, real-time system monitoring, and comprehensive analytics. Features dedicated DigiComply AI Products section with quick-access cards for AutoComply, TaxTracker, and DigiScore. Includes 7 comprehensive tabs (Dashboard, Services, Workflows, Analytics, Users, Config, Roles) with user management capabilities for creating, editing, and deactivating users with role-based permissions.
 - **Universal Client Portal**: Enables multi-entity management, service progress tracking, automated document workflows, and secure messaging.
 - **Universal Operations Panel**: Provides task orchestration, team management, SLA monitoring, and QA workflows.
 - **Universal Agent Network**: Includes lead management, commission tracking, and territory management functionalities.
+- **DigiComply AI Products**: Three fully functional AI-powered products with dedicated routes - AutoComply (/autocomply), TaxTracker (/taxtracker), DigiScore (/digiscore) - integrated into admin dashboard for seamless navigation.
 - **Security**: Implements multi-tier role-based access control, two-factor authentication, AES-256 encrypted document storage, and comprehensive audit trails. Relies on Drizzle ORM's parameterized queries for SQL injection prevention.
 
 ### System Design Choices
