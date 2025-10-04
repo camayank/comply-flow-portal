@@ -66,6 +66,7 @@ import DesignSystemShowcase from "./components/DesignSystemShowcase";
 import ClientRegistration from "./pages/ClientRegistration";
 import LeadManagement from "./pages/LeadManagement";
 import ServiceRequestUI from "./pages/ServiceRequestUI";
+import Login from "./pages/Login";
 
 const App = () => (
   <ErrorBoundary>
@@ -79,6 +80,8 @@ const App = () => (
             <main className="flex-grow">
               <Switch>
                 <Route path="/" component={MobileResponsiveLanding} />
+                <Route path="/login" component={Login} />
+                <Route path="/signin" component={Login} />
                 <Route path="/register" component={ClientRegistration} />
                 <Route path="/client-registration" component={ClientRegistration} />
                 <Route path="/signup" component={ClientRegistration} />

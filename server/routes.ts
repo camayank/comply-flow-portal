@@ -17,6 +17,7 @@ import { registerExportRoutes } from "./export-routes";
 import { registerUserManagementRoutes } from "./user-management-routes";
 import { registerClientRegistrationRoutes } from "./client-registration-routes";
 import { registerPaymentRoutes } from "./payment-routes";
+import { registerAuthRoutes } from "./auth-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -1155,6 +1156,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/files', fileManagementRoutes.default);
   console.log('✅ File Management routes registered');
 
+  // Register Authentication routes (Client OTP + Staff Password)
+  registerAuthRoutes(app);
+  
   // Register User Management routes for Super Admin user creation and management
   registerUserManagementRoutes(app);
   
