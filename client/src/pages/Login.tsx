@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Shield, Mail, Lock, Smartphone } from "lucide-react";
 
 export default function Login() {
-  const [, navigate] = useNavigate();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   return (
@@ -62,7 +62,7 @@ function ClientLogin() {
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const { toast } = useToast();
-  const [, navigate] = useNavigate();
+  const [, setLocation] = useLocation();
 
   const sendOtpMutation = useMutation({
     mutationFn: (email: string) => apiRequest('/api/auth/client/send-otp', 'POST', { email }),
@@ -92,7 +92,7 @@ function ClientLogin() {
       });
       // Store user data and navigate to client portal
       localStorage.setItem('user', JSON.stringify(data.user));
-      navigate('/client-portal');
+      setLocation('/client-portal');
     },
     onError: (error: any) => {
       toast({
@@ -218,7 +218,7 @@ function StaffLogin() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const { toast } = useToast();
-  const [, navigate] = useNavigate();
+  const [, setLocation] = useLocation();
 
   const loginMutation = useMutation({
     mutationFn: (data: { username: string; password: string }) =>
@@ -233,13 +233,13 @@ function StaffLogin() {
       
       const role = data.user.role;
       if (role === 'super_admin' || role === 'admin') {
-        navigate('/admin');
+        setLocation('/admin');
       } else if (role === 'ops_executive') {
-        navigate('/operations');
+        setLocation('/operations');
       } else if (role === 'agent') {
-        navigate('/agent');
+        setLocation('/agent');
       } else {
-        navigate('/portal');
+        setLocation('/portal');
       }
     },
     onError: (error: any) => {

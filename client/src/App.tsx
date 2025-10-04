@@ -67,6 +67,7 @@ import ClientRegistration from "./pages/ClientRegistration";
 import LeadManagement from "./pages/LeadManagement";
 import ServiceRequestUI from "./pages/ServiceRequestUI";
 import Login from "./pages/Login";
+import ProposalManagement from "./pages/ProposalManagement";
 
 const App = () => (
   <ErrorBoundary>
@@ -90,6 +91,8 @@ const App = () => (
                 <Route path="/service-requests" component={ServiceRequestUI} />
                 <Route path="/requests" component={ServiceRequestUI} />
                 <Route path="/my-requests" component={ServiceRequestUI} />
+                <Route path="/proposals" component={ProposalManagement} />
+                <Route path="/proposal-management" component={ProposalManagement} />
                 <Route path="/design-system" component={DesignSystemShowcase} />
                 <Route path="/landing" component={LandingPage} />
                 <Route path="/onboarding-flow" component={OnboardingFlow} />
