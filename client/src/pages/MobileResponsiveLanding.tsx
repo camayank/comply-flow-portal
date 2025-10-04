@@ -45,9 +45,9 @@ const MobileResponsiveLanding = () => {
             {/* Desktop Navigation */}
             <div className="hidden lg:flex items-center gap-6">
               <nav className="flex gap-6">
-                <Link href="#products" className="text-gray-600 hover:text-blue-600 transition-colors">Products</Link>
-                <Link href="#features" className="text-gray-600 hover:text-blue-600 transition-colors">Features</Link>
-                <Link href="#how-it-works" className="text-gray-600 hover:text-blue-600 transition-colors">How It Works</Link>
+                <a href="#products" className="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer">Products</a>
+                <a href="#pricing" className="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer">Pricing</a>
+                <a href="#how-it-works" className="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer">How It Works</a>
                 <Link href="/login" className="text-gray-600 hover:text-blue-600 transition-colors">Login</Link>
               </nav>
               <Link href="/register">
@@ -70,13 +70,37 @@ const MobileResponsiveLanding = () => {
           {mobileMenuOpen && (
             <div className="lg:hidden py-4 border-t bg-white">
               <nav className="flex flex-col gap-3">
-                <a href="#products" className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded" onClick={() => setMobileMenuOpen(false)}>
+                <a 
+                  href="#products" 
+                  className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setMobileMenuOpen(false);
+                    document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                >
                   Our Products
                 </a>
-                <a href="#features" className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded" onClick={() => setMobileMenuOpen(false)}>
-                  Features
+                <a 
+                  href="#pricing" 
+                  className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setMobileMenuOpen(false);
+                    document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                >
+                  Pricing
                 </a>
-                <a href="#how-it-works" className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded" onClick={() => setMobileMenuOpen(false)}>
+                <a 
+                  href="#how-it-works" 
+                  className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setMobileMenuOpen(false);
+                    document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                >
                   How It Works
                 </a>
                 <Link href="/login" className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded">
@@ -551,6 +575,240 @@ const MobileResponsiveLanding = () => {
         </div>
       </section>
 
+      {/* Pricing Section */}
+      <section id="pricing" className="py-12 sm:py-16 lg:py-20 bg-white">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-8 sm:mb-12">
+              <Badge className="mb-4 bg-green-100 text-green-700 border-green-300">💰 Simple, Transparent Pricing</Badge>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
+                Choose Your Plan
+              </h2>
+              <p className="text-base sm:text-lg lg:text-xl text-gray-600 px-4">
+                Start free for 14 days. No credit card required. Cancel anytime.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+              {/* Starter Plan */}
+              <Card className="border-2 hover:shadow-xl transition-all">
+                <CardHeader className="text-center pb-4">
+                  <CardTitle className="text-xl mb-2">Starter</CardTitle>
+                  <div className="text-3xl font-bold text-gray-900 mb-2">
+                    ₹2,999<span className="text-base font-normal text-gray-500">/month</span>
+                  </div>
+                  <CardDescription>Perfect for solo practitioners</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3 mb-6">
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>Up to 25 clients</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>AutoComply + TaxTracker access</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>Email support</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>5GB storage</span>
+                    </li>
+                  </ul>
+                  <Link href="/register">
+                    <Button className="w-full" variant="outline">Start Free Trial</Button>
+                  </Link>
+                </CardContent>
+              </Card>
+
+              {/* Professional Plan - POPULAR */}
+              <Card className="border-2 border-blue-500 hover:shadow-2xl transition-all relative">
+                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 text-white">MOST POPULAR</Badge>
+                <CardHeader className="text-center pb-4 pt-6">
+                  <CardTitle className="text-xl mb-2">Professional</CardTitle>
+                  <div className="text-3xl font-bold text-gray-900 mb-2">
+                    ₹6,999<span className="text-base font-normal text-gray-500">/month</span>
+                  </div>
+                  <CardDescription>For growing practices</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3 mb-6">
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>Up to 100 clients</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>All AI products (AutoComply, TaxTracker, DigiScore)</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>3 team members included</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>WhatsApp + Phone support</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>50GB storage</span>
+                    </li>
+                  </ul>
+                  <Link href="/register">
+                    <Button className="w-full bg-blue-600 hover:bg-blue-700">Start Free Trial</Button>
+                  </Link>
+                </CardContent>
+              </Card>
+
+              {/* Enterprise Plan */}
+              <Card className="border-2 hover:shadow-xl transition-all">
+                <CardHeader className="text-center pb-4">
+                  <CardTitle className="text-xl mb-2">Enterprise</CardTitle>
+                  <div className="text-3xl font-bold text-gray-900 mb-2">
+                    Custom
+                  </div>
+                  <CardDescription>For large firms & agencies</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3 mb-6">
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>Unlimited clients</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>All AI products + early access</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>Unlimited team members</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>Dedicated account manager</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>Custom integrations</span>
+                    </li>
+                  </ul>
+                  <Link href="/register">
+                    <Button className="w-full" variant="outline">Contact Sales</Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Pricing FAQ */}
+            <div className="mt-12 text-center">
+              <p className="text-gray-600 mb-2">
+                <strong>All plans include:</strong> Data export, API access, and can be cancelled anytime
+              </p>
+              <p className="text-sm text-gray-500">
+                Need help choosing? <a href="tel:+919876543210" className="text-blue-600 hover:underline">Call us: +91 98765 43210</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="py-12 sm:py-16 bg-gradient-to-br from-gray-50 to-blue-50">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-8 sm:mb-12">
+              <Badge className="mb-4 bg-yellow-100 text-yellow-800 border-yellow-300">⭐ Customer Stories</Badge>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
+                Hear From Real Users
+              </h2>
+              <p className="text-base sm:text-lg text-gray-600 px-4">
+                See how professionals like you are saving time and growing their practice
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Testimonial 1 */}
+              <Card className="bg-white">
+                <CardHeader>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-lg font-bold text-blue-600">RK</span>
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Rajesh Kumar</CardTitle>
+                      <p className="text-xs text-gray-500">CA, Mumbai</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 mb-2">
+                    {[1,2,3,4,5].map((star) => (
+                      <Star key={star} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    ))}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-600 italic">
+                    "Used to spend 8 hours every week just tracking GST deadlines for 45 clients. Now TaxTracker does it automatically. Saved me 30+ hours last month!"
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Testimonial 2 */}
+              <Card className="bg-white">
+                <CardHeader>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                      <span className="text-lg font-bold text-green-600">PS</span>
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Priya Sharma</CardTitle>
+                      <p className="text-xs text-gray-500">Company Secretary, Delhi</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 mb-2">
+                    {[1,2,3,4,5].map((star) => (
+                      <Star key={star} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    ))}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-600 italic">
+                    "Managing ROC filings for 20 companies was a nightmare. AutoComply creates workflows in seconds. My team loves it. Never missed a deadline since switching!"
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Testimonial 3 */}
+              <Card className="bg-white">
+                <CardHeader>
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                      <span className="text-lg font-bold text-purple-600">AG</span>
+                    </div>
+                    <div>
+                      <CardTitle className="text-base">Amit Gupta</CardTitle>
+                      <p className="text-xs text-gray-500">Legal Consultant, Bangalore</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 mb-2">
+                    {[1,2,3,4,5].map((star) => (
+                      <Star key={star} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    ))}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-600 italic">
+                    "DigiScore shows compliance health for all my startup clients at a glance. Can identify risks before they become penalties. Game changer for my practice."
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* How It Works - Mobile Responsive */}
       <section id="how-it-works" className="py-12 sm:py-16 bg-gray-50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -629,24 +887,29 @@ const MobileResponsiveLanding = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4">
-              Ready to Transform Your Service Business?
+              Ready to Stop Drowning in Paperwork?
             </h2>
             <p className="text-base sm:text-lg lg:text-xl mb-6 sm:mb-8 text-purple-100 px-4">
-              Join thousands of service providers scaling their operations with our platform
+              Start your 14-day free trial today. No credit card required.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
-              <Link href="/portal">
-                <Button size="lg" className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-6 py-3">
-                  Start Your Free Trial
+              <Link href="/register">
+                <Button size="lg" className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-4">
+                  Start Free Trial Now →
                 </Button>
               </Link>
-              <Link href="/admin">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto border-white text-white hover:bg-white hover:text-purple-900 px-6 py-3">
-                  Schedule Demo
+              <a href="tel:+919876543210">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto border-white text-white hover:bg-white hover:text-purple-900 px-8 py-4">
+                  <Phone className="h-5 w-5 mr-2" />
+                  Call Sales
                 </Button>
-              </Link>
+              </a>
             </div>
+            
+            <p className="text-sm text-purple-200 mt-6">
+              Questions? Call us: <a href="tel:+919876543210" className="text-yellow-400 hover:underline font-semibold">+91 98765 43210</a> or Email: <a href="mailto:hello@digicomply.in" className="text-yellow-400 hover:underline font-semibold">hello@digicomply.in</a>
+            </p>
           </div>
         </div>
       </section>
@@ -659,50 +922,50 @@ const MobileResponsiveLanding = () => {
               <div>
                 <div className="flex items-center gap-2 mb-3 sm:mb-4">
                   <Building2 className="h-6 w-6 text-blue-400" />
-                  <span className="text-lg sm:text-xl font-bold">ServicePro</span>
+                  <span className="text-lg sm:text-xl font-bold">DigiComply</span>
                 </div>
                 <p className="text-xs sm:text-sm text-gray-400 mb-3 sm:mb-4">
-                  Universal Service Provider Platform for scaling modern businesses
+                  AI-powered compliance and tax automation for service professionals.
                 </p>
-                <div className="flex gap-3">
-                  <Button size="sm" variant="outline" className="text-xs">
-                    <Phone className="h-3 w-3 mr-1" />
-                    Call
-                  </Button>
-                  <Button size="sm" variant="outline" className="text-xs">
-                    <Mail className="h-3 w-3 mr-1" />
-                    Email
-                  </Button>
+                <div className="space-y-2">
+                  <a href="tel:+919876543210" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white">
+                    <Phone className="h-4 w-4" />
+                    +91 98765 43210
+                  </a>
+                  <a href="mailto:hello@digicomply.in" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white">
+                    <Mail className="h-4 w-4" />
+                    hello@digicomply.in
+                  </a>
                 </div>
               </div>
               
               <div>
-                <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Platform</h3>
-                <ul className="space-y-2 text-xs sm:text-sm text-gray-400">
-                  <li><Link href="/admin" className="hover:text-white transition-colors">Admin Control</Link></li>
-                  <li><Link href="/portal" className="hover:text-white transition-colors">Client Portal</Link></li>
-                  <li><Link href="/operations" className="hover:text-white transition-colors">Operations</Link></li>
-                  <li><Link href="/agent" className="hover:text-white transition-colors">Partner Network</Link></li>
+                <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Products</h3>
+                <ul className="space-y-2 text-xs sm:text-sm">
+                  <li><Link href="/autocomply" className="text-gray-400 hover:text-white">AutoComply</Link></li>
+                  <li><Link href="/taxtracker" className="text-gray-400 hover:text-white">TaxTracker</Link></li>
+                  <li><Link href="/digiscore" className="text-gray-400 hover:text-white">DigiScore</Link></li>
+                  <li><a href="#pricing" className="text-gray-400 hover:text-white">Pricing</a></li>
                 </ul>
               </div>
               
               <div>
-                <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Industries</h3>
-                <ul className="space-y-2 text-xs sm:text-sm text-gray-400">
-                  <li>Legal Services</li>
-                  <li>Accounting Firms</li>
-                  <li>Consulting</li>
-                  <li>Healthcare</li>
+                <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Company</h3>
+                <ul className="space-y-2 text-xs sm:text-sm">
+                  <li><Link href="/about" className="text-gray-400 hover:text-white">About Us</Link></li>
+                  <li><a href="tel:+919876543210" className="text-gray-400 hover:text-white">Contact Sales</a></li>
+                  <li><Link href="/careers" className="text-gray-400 hover:text-white">Careers</Link></li>
+                  <li><Link href="/blog" className="text-gray-400 hover:text-white">Blog</Link></li>
                 </ul>
               </div>
               
               <div>
                 <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Support</h3>
-                <ul className="space-y-2 text-xs sm:text-sm text-gray-400">
-                  <li>Documentation</li>
-                  <li>API Reference</li>
-                  <li>24/7 Support</li>
-                  <li>Training</li>
+                <ul className="space-y-2 text-xs sm:text-sm">
+                  <li><Link href="/help" className="text-gray-400 hover:text-white">Help Center</Link></li>
+                  <li><Link href="/privacy" className="text-gray-400 hover:text-white">Privacy Policy</Link></li>
+                  <li><Link href="/terms" className="text-gray-400 hover:text-white">Terms of Service</Link></li>
+                  <li><Link href="/security" className="text-gray-400 hover:text-white">Security</Link></li>
                 </ul>
               </div>
             </div>
@@ -710,7 +973,7 @@ const MobileResponsiveLanding = () => {
             <div className="border-t border-gray-800 pt-6 sm:pt-8 mt-6 sm:mt-8">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
                 <p className="text-xs sm:text-sm text-gray-400">
-                  © 2025 ServicePro. All rights reserved.
+                  © 2025 DigiComply. All rights reserved.
                 </p>
                 <div className="flex gap-4 text-xs sm:text-sm text-gray-400">
                   <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
