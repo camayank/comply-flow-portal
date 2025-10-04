@@ -238,6 +238,132 @@ const LandingPage = () => {
         </div>
       </section>
 
+      {/* DigiComply Product Suite */}
+      <section id="products" className="py-12 sm:py-16 bg-gradient-to-br from-indigo-900 via-purple-900 to-blue-900 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]"></div>
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-8 sm:mb-12">
+              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full text-sm font-medium mb-4">
+                <Sparkles className="h-4 w-4" />
+                DigiComply AI Suite
+              </div>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4">
+                Comprehensive GRC Tech Platform
+              </h2>
+              <p className="text-base sm:text-lg lg:text-xl text-blue-100 px-4 max-w-3xl mx-auto">
+                AI-powered compliance automation products designed for Indian startups and professional firms
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {/* Available Products */}
+              <ProductCard
+                title="AutoComply"
+                description="AI-Powered Compliance Workflow Builder"
+                features={["No-code automation", "Smart triggers & actions", "Template library", "6 pre-built workflows"]}
+                status="available"
+                potential="₹8-10 Cr ARR"
+                href="/autocomply"
+                icon={<Zap className="h-6 w-6 text-purple-400" />}
+              />
+              <ProductCard
+                title="TaxTracker"
+                description="AI-Driven Multi-Entity Filing Tracker"
+                features={["GST/TDS/ITR tracking", "Auto-sync deadlines", "Tax calculators", "Filing history"]}
+                status="available"
+                potential="₹5-7 Cr ARR"
+                href="/taxtracker"
+                icon={<FileText className="h-6 w-6 text-green-400" />}
+              />
+              <ProductCard
+                title="DigiScore"
+                description="Automated Compliance Health Score Engine"
+                features={["100-point scoring", "Risk assessment", "Improvement tips", "Score trends"]}
+                status="available"
+                potential="₹3-5 Cr ARR"
+                href="/digiscore"
+                icon={<Shield className="h-6 w-6 text-blue-400" />}
+              />
+
+              {/* Coming Soon Products */}
+              <ProductCard
+                title="RegGPT"
+                description="Conversational Compliance Advisor"
+                features={["Q&A chatbot", "Indian statute knowledge", "Real-time filing logic", "White-label API"]}
+                status="coming_soon"
+                potential="₹2M ARR"
+                icon={<MessageSquare className="h-6 w-6 text-cyan-400" />}
+              />
+              <ProductCard
+                title="NoticeAI"
+                description="AI Notice Analyzer + Auto-Response"
+                features={["Upload & analyze notices", "Extract key issues", "Generate reply drafts", "Compliance checklist"]}
+                status="coming_soon"
+                potential="$1M ARR"
+                icon={<Eye className="h-6 w-6 text-orange-400" />}
+              />
+              <ProductCard
+                title="FileTrace"
+                description="Smart Document Intelligence Layer"
+                features={["Auto-tagging & indexing", "Semantic search", "OCR scanning", "Document classification"]}
+                status="coming_soon"
+                potential="$500K ARR"
+                icon={<FileText className="h-6 w-6 text-yellow-400" />}
+              />
+              <ProductCard
+                title="SOPGen"
+                description="AI SOP Generator for Regulatory Teams"
+                features={["Auto-generate SOPs", "Process documentation", "Audit forms", "Marketplace licensing"]}
+                status="coming_soon"
+                potential="$2-3M ARR"
+                icon={<FileText className="h-6 w-6 text-pink-400" />}
+              />
+              <ProductCard
+                title="AuditFlow"
+                description="AI-Powered Internal Audit Builder"
+                features={["Risk-based templates", "Findings tracker", "Closure management", "NLP parser"]}
+                status="coming_soon"
+                potential="$1-2M ARR"
+                icon={<CheckCircle className="h-6 w-6 text-teal-400" />}
+              />
+              <ProductCard
+                title="ESGComply"
+                description="AI-Driven ESG & CSR Tracker"
+                features={["ESG data automation", "GRI/SEBI BRSR reports", "Impact scoring", "Corporate reporting"]}
+                status="coming_soon"
+                potential="$2-3M ARR"
+                icon={<Globe className="h-6 w-6 text-green-400" />}
+              />
+              <ProductCard
+                title="CaseDock"
+                description="Legal & NCLT Case Tracker"
+                features={["Court notice parser", "Hearing tracker", "NCLT/IBBI sync", "IP/RP workflow"]}
+                status="coming_soon"
+                potential="$1M ARR"
+                icon={<Building2 className="h-6 w-6 text-red-400" />}
+              />
+            </div>
+
+            <div className="mt-8 sm:mt-12 text-center">
+              <p className="text-blue-200 mb-4">
+                Building the future of compliance automation in India
+              </p>
+              <Link href="/contact">
+                <Button 
+                  size="lg" 
+                  className="bg-white text-indigo-900 hover:bg-blue-50"
+                  data-testid="button-early-access"
+                >
+                  Get Early Access
+                  <ArrowRight className="h-5 w-5 ml-2" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Service Matrix - Mobile First */}
       <section id="services" className="py-12 sm:py-16 bg-gradient-to-br from-gray-50 to-blue-50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -715,6 +841,75 @@ const LandingPage = () => {
       </footer>
     </div>
   );
+};
+
+// Product Card Component
+interface ProductCardProps {
+  title: string;
+  description: string;
+  features: string[];
+  status: "available" | "coming_soon";
+  potential: string;
+  href?: string;
+  icon: React.ReactNode;
+}
+
+const ProductCard = ({ title, description, features, status, potential, href, icon }: ProductCardProps) => {
+  const card = (
+    <Card className={`border-2 ${status === 'available' ? 'border-green-400 bg-gradient-to-br from-white/10 to-white/5' : 'border-gray-400/30 bg-white/5'} hover:shadow-xl transition-all duration-300 transform hover:scale-105 backdrop-blur-sm`}>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between mb-3">
+          <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center">
+            {icon}
+          </div>
+          <Badge 
+            className={status === 'available' ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}
+          >
+            {status === 'available' ? 'Available' : 'Coming Soon'}
+          </Badge>
+        </div>
+        <CardTitle className="text-lg sm:text-xl text-white">{title}</CardTitle>
+        <CardDescription className="text-sm text-blue-200">
+          {description}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <ul className="space-y-2 mb-4">
+          {features.map((feature, index) => (
+            <li key={index} className="flex items-center gap-2 text-sm text-blue-100">
+              <CheckCircle className="h-4 w-4 text-green-400 flex-shrink-0" />
+              <span>{feature}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="border-t border-white/20 pt-4 mb-4">
+          <p className="text-sm text-gray-300">Potential ARR</p>
+          <p className="text-lg font-bold text-green-400">{potential}</p>
+        </div>
+        {status === 'available' && href ? (
+          <Link href={href}>
+            <Button 
+              className="w-full bg-green-500 hover:bg-green-600 text-white"
+              data-testid={`button-try-${title.toLowerCase().replace(/\s+/g, '-')}`}
+            >
+              Try Now
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </Link>
+        ) : (
+          <Button 
+            variant="outline" 
+            className="w-full border-white/30 text-white hover:bg-white/10"
+            data-testid={`button-notify-${title.toLowerCase().replace(/\s+/g, '-')}`}
+          >
+            Notify Me
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  return href && status === 'available' ? card : card;
 };
 
 export default LandingPage;
