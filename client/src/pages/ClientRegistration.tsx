@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ const STEPS = [
 
 export default function ClientRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
-  const [, navigate] = useNavigate();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -62,7 +62,7 @@ export default function ClientRegistration() {
         title: "Registration Successful!",
         description: "Your account has been created. Please check your email for verification.",
       });
-      navigate(`/client/onboarding-complete?id=${data.clientId}`);
+      setLocation(`/client/onboarding-complete?id=${data.clientId}`);
     },
     onError: (error: any) => {
       toast({
