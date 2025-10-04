@@ -17,12 +17,12 @@ export function registerAdminConfigRoutes(app: Express) {
   // ========== SERVICES CATALOG ==========
   app.get('/api/admin/services', async (req, res) => {
     try {
-      // Use the existing services table until servicesCatalog is created
+      // Query servicesCatalog table with all LegalSuvidha services
       const servicesList = await db
         .select()
-        .from(services)
-        .where(eq(services.isActive, true))
-        .orderBy(services.category, services.name);
+        .from(servicesCatalog)
+        .where(eq(servicesCatalog.isActive, true))
+        .orderBy(servicesCatalog.category, servicesCatalog.name);
       
       res.json(servicesList);
     } catch (error) {
@@ -36,14 +36,13 @@ export function registerAdminConfigRoutes(app: Express) {
       const { serviceKey, name, periodicity, description, category } = req.body;
       
       const [service] = await db
-        .insert(services)
+        .insert(servicesCatalog)
         .values({
-          serviceId: serviceKey,
+          serviceKey,
           name,
-          type: periodicity,
+          periodicity,
           description,
-          category,
-          price: 0 // Default price
+          category
         })
         .returning();
       
