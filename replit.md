@@ -26,6 +26,8 @@ The platform is built on a robust architecture designed for enterprise deploymen
     - **Compliance Calendar**: Interactive visual timeline with 4-tier risk-based color coding, multi-item day modals, and smart summary cards.
     - **Comprehensive Compliance Knowledge Base**: Integrates 18 compliance rules from Indian regulations (Companies Act 2013, GST, Income Tax, PF/ESI) with detailed penalty information and required document checklists.
     - **Service Catalog**: Integrated 99 services across 18 categories, covering business registrations, tax, IP, certifications, monthly/annual compliances, and legal documentation.
+    - **User Management System**: Complete role-based user management with 6 role types (Super Admin, Admin, Ops Executive, Customer Service, Agent, Client), CRUD operations, role-based access control (RBAC) middleware, password hashing with bcrypt, and comprehensive statistics dashboard.
+    - **Role-Based Access Control**: Hierarchical permission system with 40+ granular permissions across user management, client management, service operations, analytics, and system configuration. Includes role hierarchy enforcement and flexible authorization middleware.
     - **File Upload System**: Google Cloud Storage integration for secure document management with validation, type enforcement, and size limits.
     - **Data Validation**: Comprehensive client-side validation using Zod patterns for various data types (email, phone, PAN, GST, etc.).
     - **Performance Optimization**: 29 database indexes implemented across critical tables, with `pg_trgm` extension for fast text search.
