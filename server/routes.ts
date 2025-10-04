@@ -19,6 +19,9 @@ import { registerClientRegistrationRoutes } from "./client-registration-routes";
 import { registerPaymentRoutes } from "./payment-routes";
 import { registerAuthRoutes } from "./auth-routes";
 import { registerReferralRoutes } from "./referral-routes";
+import { registerWorkflowAutomationRoutes } from "./workflow-automation-routes";
+import { registerFinancialManagementRoutes } from "./financial-management-routes";
+import { registerTaxManagementRoutes } from "./tax-management-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -1139,10 +1142,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const clientMasterRoutes = await import('./client-master-routes');
   app.use('/api/client-master', clientMasterRoutes.default);
 
-  // Register Financial Management routes
-  const financialManagementRoutes = await import('./financial-management-routes');
-  app.use('/api/financial', financialManagementRoutes.default);
-
   console.log('✅ Client Master and Financial Management routes registered');
 
   // Register Dashboard Analytics routes for Executive Dashboard, Business Intelligence, and Mobile Command Center
@@ -1171,6 +1170,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register Referral & Wallet Credit System routes
   registerReferralRoutes(app);
+  
+  // Register Workflow Automation Engine routes
+  registerWorkflowAutomationRoutes(app);
+  
+  // Register Financial Management routes
+  registerFinancialManagementRoutes(app);
+  
+  // Register Tax Management routes for startups
+  registerTaxManagementRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

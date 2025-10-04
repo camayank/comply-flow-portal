@@ -21,7 +21,11 @@ The platform is built on a robust architecture designed for enterprise deploymen
 ### Technical Implementations
 - **Frontend**: React TypeScript with Tailwind CSS.
 - **Backend**: Express.js with enterprise-grade middleware and role-based API routes.
-- **Database**: PostgreSQL with Drizzle ORM, featuring 47 comprehensive tables supporting multi-tenant operations. A hybrid storage architecture uses PostgreSQL for 5 critical entities (Leads, Proposals, Service Requests, Business Entities, Payments) and in-memory storage for other modules.
+- **Database**: PostgreSQL with Drizzle ORM, featuring 51+ comprehensive tables supporting multi-tenant operations. A hybrid storage architecture uses PostgreSQL for critical entities (Leads, Proposals, Service Requests, Business Entities, Payments, Referrals, Wallet Credits) and in-memory storage for other modules.
+- **Referral & Wallet System**: Complete viral referral system with wallet credits (4 tables: referralCodes, referrals, walletCredits, walletTransactions). Clients earn 10% credit when referrals complete first service.
+- **Workflow Automation Engine**: No-code automation with triggers (client_registered, payment_due_soon, milestone_completed, referral_completed) and actions (send_email, send_whatsapp, create_task, credit_wallet).
+- **Financial Management**: Revenue tracking, expense management, profit/loss reporting, cash flow projection with real-time analytics.
+- **Tax Management**: GST, TDS, and ITR compliance tracking for startups with filing history, calculators, deadline calendar, and tax-saving insights.
 - **Core Functionality**:
     - **Compliance Calendar**: Interactive visual timeline with 4-tier risk-based color coding, multi-item day modals, and smart summary cards.
     - **Comprehensive Compliance Knowledge Base**: Integrates 18 compliance rules from Indian regulations (Companies Act 2013, GST, Income Tax, PF/ESI) with detailed penalty information and required document checklists.
@@ -50,7 +54,8 @@ The platform is built on a robust architecture designed for enterprise deploymen
 - **Google Cloud Storage**: For file upload and document management.
 - **LegalSuvidha.com**: Integrated for a comprehensive service catalog.
 - **PostgreSQL**: Primary database for persistent storage.
-- **WhatsApp**: Planned for automation integration.
+- **WhatsApp (Twilio)**: Twilio connector available for WhatsApp integration. User dismissed setup - requires Twilio credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER) if needed in future.
+- **Stripe**: Payment gateway integration complete. Requires STRIPE_SECRET_KEY and VITE_STRIPE_PUBLIC_KEY environment variables.
 - **Payment Processing**: Generic integration point for various payment gateways.
 - **CRM Synchronization**: Capability for integrating with Customer Relationship Management systems.
 - **Government API Endpoints**: Utilized for compliance and regulatory information.
