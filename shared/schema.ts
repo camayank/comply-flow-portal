@@ -8,11 +8,22 @@ import { relations } from "drizzle-orm";
 // ============================================================================
 
 export const USER_ROLES = {
-  CLIENT: 'client',
+  SUPER_ADMIN: 'super_admin',
   ADMIN: 'admin',
-  OPS: 'ops',
-  CA: 'ca',
+  OPS_EXECUTIVE: 'ops_executive', // Execution team
+  CUSTOMER_SERVICE: 'customer_service',
+  CLIENT: 'client',
   AGENT: 'agent'
+} as const;
+
+// Role hierarchy for permission checking
+export const ROLE_HIERARCHY = {
+  super_admin: 100,
+  admin: 80,
+  ops_executive: 60,
+  customer_service: 50,
+  agent: 30,
+  client: 10
 } as const;
 
 export const LEAD_STAGES = {
@@ -86,11 +97,14 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   email: text("email").notNull().unique(),
   phone: text("phone"),
-  role: text("role").notNull().default("client"), // client, admin, ops, ca
+  fullName: text("full_name"),
+  role: text("role").notNull().default("client"), // super_admin, admin, ops_executive, customer_service, client, agent
+  department: text("department"), // operations, sales, admin, etc.
   isActive: boolean("is_active").default(true),
   lastLogin: timestamp("last_login"),
   twoFactorSecret: text("two_factor_secret"),
   isTwoFactorEnabled: boolean("is_two_factor_enabled").default(false),
+  createdBy: integer("created_by"), // User ID of creator (for audit trail)
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -788,10 +802,26 @@ export const qualityChecklists = pgTable("quality_checklists", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+// User management schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLogin: true,
+  twoFactorSecret: true,
 });
+
+export const updateUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  password: true, // Password updates handled separately
+  twoFactorSecret: true,
+}).partial();
+
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpdateUser = z.infer<typeof updateUserSchema>;
+export type User = typeof users.$inferSelect;
 
 export const insertServiceSchema = createInsertSchema(services).omit({
   id: true,
