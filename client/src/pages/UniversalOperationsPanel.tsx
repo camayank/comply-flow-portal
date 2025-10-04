@@ -259,7 +259,7 @@ const UniversalOperationsPanel: React.FC = () => {
             </div>
             <div className="flex items-center gap-3">
               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                {operationalMetrics?.slaCompliance || 0}% SLA
+                {(operationalMetrics as any)?.slaCompliance || 0}% SLA
               </Badge>
               <Badge variant="outline">
                 {filteredTasks.filter(t => t.status === "in_progress").length} Active
@@ -590,7 +590,7 @@ const UniversalOperationsPanel: React.FC = () => {
                         Tasks Completed Today
                       </p>
                       <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {operationalMetrics?.completedToday || 0}
+                        {(operationalMetrics as any)?.completedToday || 0}
                       </p>
                     </div>
                     <CheckCircle2 className="w-8 h-8 text-green-500" />
@@ -606,7 +606,7 @@ const UniversalOperationsPanel: React.FC = () => {
                         Average Handle Time
                       </p>
                       <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {operationalMetrics?.avgHandleTime || 0}h
+                        {(operationalMetrics as any)?.avgHandleTime || 0}h
                       </p>
                     </div>
                     <Clock className="w-8 h-8 text-blue-500" />
@@ -622,7 +622,7 @@ const UniversalOperationsPanel: React.FC = () => {
                         Rework Rate
                       </p>
                       <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {operationalMetrics?.reworkRate || 0}%
+                        {(operationalMetrics as any)?.reworkRate || 0}%
                       </p>
                     </div>
                     <RotateCcw className="w-8 h-8 text-orange-500" />
@@ -638,7 +638,7 @@ const UniversalOperationsPanel: React.FC = () => {
                         Team Utilization
                       </p>
                       <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {operationalMetrics?.teamUtilization || 0}%
+                        {(operationalMetrics as any)?.teamUtilization || 0}%
                       </p>
                     </div>
                     <Activity className="w-8 h-8 text-purple-500" />
@@ -661,19 +661,19 @@ const UniversalOperationsPanel: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                   <div className="text-center">
                     <div className="text-3xl font-bold text-green-600 mb-2">
-                      {slaMetrics?.compliance || 0}%
+                      {(slaMetrics as any)?.compliance || 0}%
                     </div>
                     <p className="text-gray-600 dark:text-gray-300">SLA Compliance</p>
                   </div>
                   <div className="text-center">
                     <div className="text-3xl font-bold text-orange-600 mb-2">
-                      {slaMetrics?.atRisk || 0}
+                      {(slaMetrics as any)?.atRisk || 0}
                     </div>
                     <p className="text-gray-600 dark:text-gray-300">At Risk</p>
                   </div>
                   <div className="text-center">
                     <div className="text-3xl font-bold text-red-600 mb-2">
-                      {slaMetrics?.breached || 0}
+                      {(slaMetrics as any)?.breached || 0}
                     </div>
                     <p className="text-gray-600 dark:text-gray-300">Breached</p>
                   </div>

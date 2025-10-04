@@ -246,8 +246,8 @@ const UniversalClientPortal: React.FC = () => {
             <div className="flex items-center gap-3">
               <Button variant="outline" size="sm">
                 <Bell className="w-4 h-4" />
-                {notifications.length > 0 && (
-                  <Badge className="ml-1">{notifications.length}</Badge>
+                {((notifications as any[] ?? []).length > 0) && (
+                  <Badge className="ml-1">{(notifications as any[] ?? []).length}</Badge>
                 )}
               </Button>
               <Button variant="outline" size="sm">
@@ -318,7 +318,7 @@ const UniversalClientPortal: React.FC = () => {
                         Completion Rate
                       </p>
                       <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {clientMetrics?.completionRate || 0}%
+                        {(clientMetrics as any)?.completionRate || 0}%
                       </p>
                     </div>
                     <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
@@ -708,7 +708,7 @@ const UniversalClientPortal: React.FC = () => {
                             Total Outstanding
                           </h3>
                           <p className="text-2xl font-bold text-red-600">
-                            ₹{clientMetrics?.totalOutstanding?.toLocaleString() || 0}
+                            ₹{(clientMetrics as any)?.totalOutstanding?.toLocaleString() || 0}
                           </p>
                         </div>
                       </CardContent>
@@ -720,7 +720,7 @@ const UniversalClientPortal: React.FC = () => {
                             This Month
                           </h3>
                           <p className="text-2xl font-bold text-blue-600">
-                            ₹{clientMetrics?.monthlySpend?.toLocaleString() || 0}
+                            ₹{(clientMetrics as any)?.monthlySpend?.toLocaleString() || 0}
                           </p>
                         </div>
                       </CardContent>

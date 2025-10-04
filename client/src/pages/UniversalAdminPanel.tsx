@@ -278,7 +278,7 @@ const UniversalAdminPanel: React.FC = () => {
                         Active Service Orders
                       </p>
                       <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {dashboardMetrics?.activeOrders || 0}
+                        {(dashboardMetrics as any)?.activeOrders || 0}
                       </p>
                     </div>
                     <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
@@ -301,7 +301,7 @@ const UniversalAdminPanel: React.FC = () => {
                         SLA Compliance
                       </p>
                       <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {dashboardMetrics?.slaCompliance || 0}%
+                        {(dashboardMetrics as any)?.slaCompliance || 0}%
                       </p>
                     </div>
                     <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
@@ -323,7 +323,7 @@ const UniversalAdminPanel: React.FC = () => {
                         Monthly Revenue
                       </p>
                       <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                        ₹{dashboardMetrics?.monthlyRevenue?.toLocaleString() || 0}
+                        ₹{(dashboardMetrics as any)?.monthlyRevenue?.toLocaleString() || 0}
                       </p>
                     </div>
                     <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
