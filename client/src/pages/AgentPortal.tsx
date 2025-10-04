@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { getStatusStyle } from "@/lib/theme-utils";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -220,24 +221,11 @@ export default function AgentPortal() {
   };
 
   const getStatusColor = (status: string) => {
-    const colors = {
-      new: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
-      contacted: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-      converted: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-      in_progress: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
-      closed: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300",
-      lost: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
-    };
-    return colors[status as keyof typeof colors] || colors.new;
+    return getStatusStyle(status);
   };
 
   const getCommissionStatusColor = (status: string) => {
-    const colors = {
-      pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
-      cleared: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-      disputed: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
-    };
-    return colors[status as keyof typeof colors] || colors.pending;
+    return getStatusStyle(status);
   };
 
   return (
@@ -251,7 +239,7 @@ export default function AgentPortal() {
                 <Shield className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">DigiComply Agent Portal</h1>
               </div>
-              <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+              <Badge variant="secondary" className={getStatusStyle('active')}>
                 {mockAgentProfile.agentCode}
               </Badge>
             </div>
@@ -758,14 +746,14 @@ export default function AgentPortal() {
                       <h4 className="font-medium text-gray-900 dark:text-white">Commission payout inquiry</h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400">Submitted 2 days ago</p>
                     </div>
-                    <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">In Progress</Badge>
+                    <Badge className={getStatusStyle('inProgress')}>In Progress</Badge>
                   </div>
                   <div className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
                     <div>
                       <h4 className="font-medium text-gray-900 dark:text-white">Lead transfer approval request</h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400">Submitted 1 week ago</p>
                     </div>
-                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Resolved</Badge>
+                    <Badge className={getStatusStyle('completed')}>Resolved</Badge>
                   </div>
                 </div>
               </CardContent>
@@ -815,7 +803,7 @@ export default function AgentPortal() {
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Quarterly Excellence Award</h3>
                         <p className="text-gray-600 dark:text-gray-400">Maintain 80%+ conversion rate for 3 months</p>
                       </div>
-                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">In Progress</Badge>
+                      <Badge className={getStatusStyle('inProgress')}>In Progress</Badge>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
@@ -943,7 +931,7 @@ export default function AgentPortal() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-gray-700 dark:text-gray-300">Account Status</span>
-                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Active</Badge>
+                    <Badge className={getStatusStyle('active')}>Active</Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -959,7 +947,7 @@ export default function AgentPortal() {
                     <p className="font-medium text-gray-900 dark:text-white">Two-Factor Authentication</p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Secure your account with 2FA</p>
                   </div>
-                  <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">Enabled</Badge>
+                  <Badge className={getStatusStyle('active')}>Enabled</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
