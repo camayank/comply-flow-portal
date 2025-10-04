@@ -14,6 +14,7 @@ import {
 import { registerProposalRoutes } from "./proposals-routes";
 import { registerDashboardAnalyticsRoutes } from "./dashboard-analytics-routes";
 import { registerExportRoutes } from "./export-routes";
+import { registerUserManagementRoutes } from "./user-management-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -1151,6 +1152,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const fileManagementRoutes = await import('./file-management-routes');
   app.use('/api/files', fileManagementRoutes.default);
   console.log('✅ File Management routes registered');
+
+  // Register User Management routes for Super Admin user creation and management
+  registerUserManagementRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;
