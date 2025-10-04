@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -330,6 +331,78 @@ export default function AdminPanel() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* DigiComply Products - Quick Access */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xl font-semibold">DigiComply AI Products</h3>
+          <Badge variant="outline" className="text-green-600 border-green-600">3 Available</Badge>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Link href="/autocomply">
+            <Card className="cursor-pointer hover:shadow-lg transition-all duration-300 border-purple-200 bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/10 dark:to-background">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                    <Zap className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <Badge className="bg-green-500">Available</Badge>
+                </div>
+                <h4 className="text-lg font-semibold mb-2">AutoComply</h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  AI-Powered Workflow Automation Builder
+                </p>
+                <div className="flex items-center gap-2 text-sm text-purple-600 font-medium">
+                  <span>Launch Product</span>
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/taxtracker">
+            <Card className="cursor-pointer hover:shadow-lg transition-all duration-300 border-green-200 bg-gradient-to-br from-green-50 to-white dark:from-green-900/10 dark:to-background">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                    <FileText className="h-6 w-6 text-green-600" />
+                  </div>
+                  <Badge className="bg-green-500">Available</Badge>
+                </div>
+                <h4 className="text-lg font-semibold mb-2">TaxTracker</h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  AI-Driven Multi-Entity Filing Tracker
+                </p>
+                <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
+                  <span>Launch Product</span>
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/digiscore">
+            <Card className="cursor-pointer hover:shadow-lg transition-all duration-300 border-blue-200 bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/10 dark:to-background">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                    <Shield className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <Badge className="bg-green-500">Available</Badge>
+                </div>
+                <h4 className="text-lg font-semibold mb-2">DigiScore</h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Automated Compliance Health Score
+                </p>
+                <div className="flex items-center gap-2 text-sm text-blue-600 font-medium">
+                  <span>Launch Product</span>
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
       </div>
 
       {/* Real-time Service Status */}

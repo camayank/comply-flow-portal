@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import {
   Menu,
@@ -17,7 +18,9 @@ import {
   Eye,
   Home,
   Edit,
-  Trash2
+  Trash2,
+  Zap,
+  ArrowRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -262,6 +265,72 @@ const MobileAdminPanel = () => {
                       </Button>
                     </CardContent>
                   </Card>
+                </div>
+              </div>
+
+              {/* DigiComply Products - Quick Access */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">DigiComply AI Products</h3>
+                  <Badge variant="outline" className="text-green-600 border-green-600">3 Available</Badge>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Link href="/autocomply">
+                    <Card className="cursor-pointer hover:shadow-lg transition-all border-purple-200 bg-gradient-to-br from-purple-50 to-white">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <Zap className="h-5 w-5 text-purple-600" />
+                          </div>
+                          <Badge className="bg-green-500 text-white text-xs">Available</Badge>
+                        </div>
+                        <h4 className="font-semibold mb-1">AutoComply</h4>
+                        <p className="text-xs text-gray-600 mb-3">AI Workflow Automation</p>
+                        <div className="flex items-center gap-1 text-xs text-purple-600 font-medium">
+                          <span>Launch</span>
+                          <ArrowRight className="h-3 w-3" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+
+                  <Link href="/taxtracker">
+                    <Card className="cursor-pointer hover:shadow-lg transition-all border-green-200 bg-gradient-to-br from-green-50 to-white">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                            <FileText className="h-5 w-5 text-green-600" />
+                          </div>
+                          <Badge className="bg-green-500 text-white text-xs">Available</Badge>
+                        </div>
+                        <h4 className="font-semibold mb-1">TaxTracker</h4>
+                        <p className="text-xs text-gray-600 mb-3">Multi-Entity Tax Filing</p>
+                        <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                          <span>Launch</span>
+                          <ArrowRight className="h-3 w-3" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+
+                  <Link href="/digiscore">
+                    <Card className="cursor-pointer hover:shadow-lg transition-all border-blue-200 bg-gradient-to-br from-blue-50 to-white">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                            <Shield className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <Badge className="bg-green-500 text-white text-xs">Available</Badge>
+                        </div>
+                        <h4 className="font-semibold mb-1">DigiScore</h4>
+                        <p className="text-xs text-gray-600 mb-3">Compliance Health Score</p>
+                        <div className="flex items-center gap-1 text-xs text-blue-600 font-medium">
+                          <span>Launch</span>
+                          <ArrowRight className="h-3 w-3" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
                 </div>
               </div>
 
