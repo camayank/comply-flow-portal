@@ -195,7 +195,11 @@ export const payments = pgTable("payments", {
 export const complianceTracking = pgTable("compliance_tracking", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
+  businessEntityId: integer("business_entity_id"), // link to specific business entity
+  complianceRuleId: integer("compliance_rule_id"), // link to compliance_rules table
   serviceId: text("service_id").notNull(),
+  serviceType: text("service_type"), // descriptive name for display
+  entityName: text("entity_name"), // business entity name for display
   complianceType: text("compliance_type").notNull(), // monthly, quarterly, annual, event-based
   dueDate: timestamp("due_date").notNull(),
   status: text("status").notNull().default("pending"), // pending, overdue, completed, not_applicable
@@ -208,6 +212,84 @@ export const complianceTracking = pgTable("compliance_tracking", {
   estimatedPenalty: integer("estimated_penalty").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Comprehensive Compliance Rules Library
+// Covers Companies Act 2013, GST, Income Tax, PF/ESI, and other Indian regulations
+export const complianceRules = pgTable("compliance_rules", {
+  id: serial("id").primaryKey(),
+  ruleCode: text("rule_code").notNull().unique(), // e.g., "GST_GSTR3B_MONTHLY", "ROC_AOC4_ANNUAL"
+  regulationCategory: text("regulation_category").notNull(), // companies_act, gst, income_tax, pf_esi, labour_laws, professional_tax
+  complianceName: text("compliance_name").notNull(), // "GSTR-3B Monthly Return", "AOC-4 Financial Statements"
+  formNumber: text("form_number"), // "GSTR-3B", "AOC-4", "24Q", "DIR-3 KYC"
+  description: text("description"),
+  periodicity: text("periodicity").notNull(), // monthly, quarterly, half_yearly, annual, event_based, one_time
+  dueDateCalculationType: text("due_date_calculation_type").notNull(), // fixed_date, relative_to_month_end, relative_to_quarter_end, relative_to_fy_end, event_triggered
+  dueDateFormula: json("due_date_formula").notNull(), // {type: "fixed", day: 20, month_offset: 1} or {type: "fy_end", days_after: 180}
+  applicableEntityTypes: json("applicable_entity_types"), // ["pvt_ltd", "llp", "opc"] or null for all
+  turnoverThresholdMin: decimal("turnover_threshold_min", { precision: 15, scale: 2 }), // minimum turnover for applicability
+  turnoverThresholdMax: decimal("turnover_threshold_max", { precision: 15, scale: 2 }), // maximum turnover for applicability
+  employeeCountMin: integer("employee_count_min"), // minimum employee count for applicability (PF/ESI)
+  employeeCountMax: integer("employee_count_max"), // maximum employee count
+  stateSpecific: boolean("state_specific").default(false), // true for Professional Tax, Shops & Establishments
+  applicableStates: json("applicable_states"), // ["Maharashtra", "Karnataka"] or null for all India
+  priorityLevel: text("priority_level").notNull().default("medium"), // low, medium, high, critical
+  penaltyRiskLevel: text("penalty_risk_level").notNull().default("medium"), // low, medium, high, critical
+  isActive: boolean("is_active").default(true),
+  effectiveFrom: timestamp("effective_from").defaultNow(),
+  effectiveUntil: timestamp("effective_until"), // null means currently effective
+  version: integer("version").default(1), // for tracking regulatory changes
+  replacesRuleId: integer("replaces_rule_id"), // link to previous version if law changed
+  metadata: json("metadata"), // additional info like links to official govt circulars
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Required Documents Matrix
+// Maps each compliance to its required documentation
+export const complianceRequiredDocuments = pgTable("compliance_required_documents", {
+  id: serial("id").primaryKey(),
+  complianceRuleId: integer("compliance_rule_id").notNull(),
+  documentType: text("document_type").notNull(), // "audited_financials", "bank_statements", "sales_register"
+  documentName: text("document_name").notNull(), // "Audited Financial Statements"
+  isMandatory: boolean("is_mandatory").default(true),
+  description: text("description"),
+  format: json("format"), // ["PDF", "Excel"] accepted formats
+  validityPeriod: text("validity_period"), // "current_fy", "last_12_months", "as_of_filing_date"
+  order: integer("order").default(1), // display order
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Penalty Calculation Rules
+// Formulas for calculating late filing penalties and interest
+export const compliancePenaltyDefinitions = pgTable("compliance_penalty_definitions", {
+  id: serial("id").primaryKey(),
+  complianceRuleId: integer("compliance_rule_id").notNull(),
+  penaltyType: text("penalty_type").notNull(), // late_fee, interest, additional_penalty
+  calculationType: text("calculation_type").notNull(), // per_day, percentage_per_month, fixed_amount, slab_based
+  calculationFormula: json("calculation_formula").notNull(), // {base_amount: 50, per_day_rate: 50, max_amount: 5000} for GST
+  gracePeriodDays: integer("grace_period_days").default(0),
+  minPenalty: decimal("min_penalty", { precision: 12, scale: 2 }),
+  maxPenalty: decimal("max_penalty", { precision: 12, scale: 2 }),
+  compoundingAllowed: boolean("compounding_allowed").default(false),
+  notes: text("notes"), // additional context for penalty calculation
+  legalReference: text("legal_reference"), // section number of the act
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// State-Specific Rule Overrides
+// Handles variations like Professional Tax rates, Shops & Establishments rules by state
+export const complianceJurisdictionOverrides = pgTable("compliance_jurisdiction_overrides", {
+  id: serial("id").primaryKey(),
+  complianceRuleId: integer("compliance_rule_id").notNull(),
+  state: text("state").notNull(), // "Maharashtra", "Karnataka", etc.
+  overrideField: text("override_field").notNull(), // "due_date_formula", "penalty_definition", "turnover_threshold"
+  overrideValue: json("override_value").notNull(), // the state-specific value
+  description: text("description"),
+  effectiveFrom: timestamp("effective_from").defaultNow(),
+  effectiveUntil: timestamp("effective_until"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // SLA Timers for enhanced monitoring
@@ -734,6 +816,28 @@ export const insertComplianceTrackingSchema = createInsertSchema(complianceTrack
   updatedAt: true,
 });
 
+export const insertComplianceRuleSchema = createInsertSchema(complianceRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertComplianceRequiredDocumentSchema = createInsertSchema(complianceRequiredDocuments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCompliancePenaltyDefinitionSchema = createInsertSchema(compliancePenaltyDefinitions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertComplianceJurisdictionOverrideSchema = createInsertSchema(complianceJurisdictionOverrides).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertRetainershipPlanSchema = createInsertSchema(retainershipPlans).omit({
   id: true,
   createdAt: true,
@@ -766,6 +870,14 @@ export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type ComplianceTracking = typeof complianceTracking.$inferSelect;
 export type InsertComplianceTracking = z.infer<typeof insertComplianceTrackingSchema>;
+export type ComplianceRule = typeof complianceRules.$inferSelect;
+export type InsertComplianceRule = z.infer<typeof insertComplianceRuleSchema>;
+export type ComplianceRequiredDocument = typeof complianceRequiredDocuments.$inferSelect;
+export type InsertComplianceRequiredDocument = z.infer<typeof insertComplianceRequiredDocumentSchema>;
+export type CompliancePenaltyDefinition = typeof compliancePenaltyDefinitions.$inferSelect;
+export type InsertCompliancePenaltyDefinition = z.infer<typeof insertCompliancePenaltyDefinitionSchema>;
+export type ComplianceJurisdictionOverride = typeof complianceJurisdictionOverrides.$inferSelect;
+export type InsertComplianceJurisdictionOverride = z.infer<typeof insertComplianceJurisdictionOverrideSchema>;
 export type RetainershipPlan = typeof retainershipPlans.$inferSelect;
 export type InsertRetainershipPlan = z.infer<typeof insertRetainershipPlanSchema>;
 export type UserRetainershipSubscription = typeof userRetainershipSubscriptions.$inferSelect;
