@@ -282,7 +282,7 @@ const RetainershipPlans = () => {
                       Save ₹{yearlySavings.toLocaleString()} annually
                     </p>
                   )}
-                  {plan.discountPercentage > 0 && (
+                  {(plan.discountPercentage || 0) > 0 && (
                     <p className="text-sm text-blue-600 mt-1">
                       {plan.discountPercentage}% discount on all services
                     </p>
@@ -496,7 +496,7 @@ const RetainershipPlans = () => {
                     {plans.slice(0, 3).map((plan) => {
                       const monthlyCost = 10500;
                       const planCost = plan.monthlyFee;
-                      const discount = plan.discountPercentage;
+                      const discount = plan.discountPercentage || 0;
                       const discountedCost = monthlyCost * (1 - discount / 100);
                       const totalCost = planCost + discountedCost;
                       const savings = monthlyCost - totalCost;
