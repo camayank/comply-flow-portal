@@ -38,7 +38,7 @@ const MobileResponsiveLanding = () => {
               <Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
               <div className="flex flex-col">
                 <span className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">DigiComply</span>
-                <span className="text-xs text-gray-500 hidden sm:block">End-to-End Practice Management Platform</span>
+                <span className="text-xs text-gray-500 hidden sm:block">AI-Powered Compliance & Tax Automation</span>
               </div>
             </div>
 
