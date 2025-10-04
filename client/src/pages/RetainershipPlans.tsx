@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { getStatusStyle, getPlanGradient } from '@/lib/theme-utils';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -220,7 +221,7 @@ const RetainershipPlans = () => {
           Yearly
         </span>
         {billingCycle === 'yearly' && (
-          <Badge className="bg-green-100 text-green-800 ml-2">
+          <Badge className={`${getStatusStyle('active')} ml-2`}>
             <Gift className="h-3 w-3 mr-1" />
             Save up to 15%
           </Badge>
@@ -243,7 +244,7 @@ const RetainershipPlans = () => {
             >
               {plan.category === 'premium' && (
                 <div className="absolute top-4 right-4">
-                  <Badge className="bg-yellow-400 text-yellow-900">
+                  <Badge className={getStatusStyle('official')}>
                     <Star className="h-3 w-3 mr-1" />
                     Most Popular
                   </Badge>
@@ -252,7 +253,7 @@ const RetainershipPlans = () => {
               
               {isCurrentPlan && (
                 <div className="absolute top-4 left-4">
-                  <Badge className="bg-green-100 text-green-800">
+                  <Badge className={getStatusStyle('active')}>
                     Current Plan
                   </Badge>
                 </div>
@@ -589,7 +590,7 @@ const RetainershipPlans = () => {
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="font-medium">₹{bill.amount.toLocaleString()}</span>
-                          <Badge className="bg-green-100 text-green-800">{bill.status}</Badge>
+                          <Badge className={getStatusStyle(bill.status.toLowerCase())}>{bill.status}</Badge>
                           <Button variant="outline" size="sm">
                             Download
                           </Button>
