@@ -69,6 +69,9 @@ import ServiceRequestUI from "./pages/ServiceRequestUI";
 import Login from "./pages/Login";
 import ProposalManagement from "./pages/ProposalManagement";
 import ReferralDashboard from "./pages/ReferralDashboard";
+import AutoComply from "./pages/AutoComply";
+import TaxTracker from "./pages/TaxTracker";
+import DigiScore from "./pages/DigiScore";
 
 const App = () => (
   <ErrorBoundary>
@@ -97,6 +100,15 @@ const App = () => (
                 <Route path="/referrals" component={ReferralDashboard} />
                 <Route path="/referral-dashboard" component={ReferralDashboard} />
                 <Route path="/wallet" component={ReferralDashboard} />
+                <Route path="/autocomply" component={AutoComply} />
+                <Route path="/workflows" component={AutoComply} />
+                <Route path="/automation" component={AutoComply} />
+                <Route path="/taxtracker" component={TaxTracker} />
+                <Route path="/tax" component={TaxTracker} />
+                <Route path="/tax-management" component={TaxTracker} />
+                <Route path="/digiscore" component={DigiScore} />
+                <Route path="/compliance-score" component={DigiScore} />
+                <Route path="/score" component={DigiScore} />
                 <Route path="/design-system" component={DesignSystemShowcase} />
                 <Route path="/landing" component={LandingPage} />
                 <Route path="/onboarding-flow" component={OnboardingFlow} />
