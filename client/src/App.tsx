@@ -93,6 +93,7 @@ const AgentLeadManagement = lazy(() => import("./pages/AgentLeadManagement"));
 const AgentCommissionTracker = lazy(() => import("./pages/AgentCommissionTracker"));
 const AgentPerformance = lazy(() => import("./pages/AgentPerformance"));
 const AgentProfileSettings = lazy(() => import("./pages/AgentProfileSettings"));
+const CustomerServiceDashboard = lazy(() => import("./pages/CustomerServiceDashboard"));
 const RoleSelection = lazy(() => import("./pages/RoleSelection"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const DigiComplyWorkflowDashboard = lazy(() => import("./components/DigiComplyWorkflowDashboard"));

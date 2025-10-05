@@ -59,7 +59,7 @@ const userTypes: UserType[] = [
     route: '/ops-dashboard',
     icon: Settings,
     color: 'bg-orange-500',
-    status: 'coming-soon'
+    status: 'available'
   },
   {
     id: 'admin',
@@ -68,7 +68,7 @@ const userTypes: UserType[] = [
     route: '/admin',
     icon: Shield,
     color: 'bg-purple-500',
-    status: 'coming-soon'
+    status: 'available'
   },
   {
     id: 'customer-service',
@@ -77,7 +77,7 @@ const userTypes: UserType[] = [
     route: '/customer-service',
     icon: UserCog,
     color: 'bg-pink-500',
-    status: 'coming-soon'
+    status: 'available'
   },
   {
     id: 'super-admin',
@@ -86,7 +86,7 @@ const userTypes: UserType[] = [
     route: '/super-admin',
     icon: Users,
     color: 'bg-red-500',
-    status: 'coming-soon'
+    status: 'available'
   }
 ];
 
@@ -257,8 +257,8 @@ export default function UserTypeSelector() {
 
           {/* Development Status */}
           <div className="pt-2 text-center">
-            <p className="text-xs text-gray-500">
-              {availableTypes.length} of {userTypes.length} dashboards available
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              All {userTypes.length} dashboards are now available! 🎉
             </p>
           </div>
         </CardContent>

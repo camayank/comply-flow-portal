@@ -468,9 +468,9 @@ const MobileAdminPanel = () => {
 
               {servicesLoading ? (
                 <div className="text-center py-8">Loading services...</div>
-              ) : services.length > 0 ? (
+              ) : (services as any[]).length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {services.map((service: any, index: number) => (
+                  {(services as any[]).map((service: any, index: number) => (
                     <Card key={index} className="border-l-4 border-l-blue-500">
                       <CardContent className="p-4">
                         <div className="space-y-3">
