@@ -110,6 +110,21 @@ const LandingPage = () => {
               </Link>
             </div>
 
+            {/* Access Dashboard Button */}
+            <div className="flex justify-center px-4">
+              <Link to="/select-role">
+                <Button 
+                  variant="ghost"
+                  size="lg"
+                  className="text-white hover:bg-white/20 backdrop-blur-sm border border-white/30"
+                  data-testid="button-access-dashboard"
+                >
+                  <Users className="h-5 w-5 mr-2" />
+                  Access Dashboard / Login
+                </Button>
+              </Link>
+            </div>
+
             {/* Trust Badges - Mobile Responsive */}
             <div className="flex flex-wrap justify-center items-center gap-4 sm:gap-8 mb-6 sm:mb-8 text-sm">
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2">

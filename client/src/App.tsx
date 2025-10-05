@@ -91,6 +91,7 @@ const AgentLeadManagement = lazy(() => import("./pages/AgentLeadManagement"));
 const AgentCommissionTracker = lazy(() => import("./pages/AgentCommissionTracker"));
 const AgentPerformance = lazy(() => import("./pages/AgentPerformance"));
 const AgentProfileSettings = lazy(() => import("./pages/AgentProfileSettings"));
+const RoleSelection = lazy(() => import("./pages/RoleSelection"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const DigiComplyWorkflowDashboard = lazy(() => import("./components/DigiComplyWorkflowDashboard"));
 const OperationsManager = lazy(() => import("./components/OperationsManager"));
@@ -109,6 +110,8 @@ const App = () => (
               <Suspense fallback={<PageLoader />}>
                 <Switch>
                 <Route path="/" component={MobileResponsiveLanding} />
+                <Route path="/select-role" component={RoleSelection} />
+                <Route path="/role-selection" component={RoleSelection} />
                 <Route path="/login" component={Login} />
                 <Route path="/signin" component={Login} />
                 <Route path="/register" component={ClientRegistration} />
