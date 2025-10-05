@@ -68,31 +68,23 @@ const Footer = () => {
             </h3>
             <ul className="space-y-2.5 text-sm text-gray-300">
               <li>
-                <Link href="/autocomply">
-                  <a className="hover:text-blue-400 transition-colors flex items-center gap-2">
-                    <span className="text-purple-400">→</span> AutoComply
-                  </a>
+                <Link href="/autocomply" className="hover:text-blue-400 transition-colors flex items-center gap-2">
+                  <span className="text-purple-400">→</span> AutoComply
                 </Link>
               </li>
               <li>
-                <Link href="/taxtracker">
-                  <a className="hover:text-blue-400 transition-colors flex items-center gap-2">
-                    <span className="text-green-400">→</span> TaxTracker
-                  </a>
+                <Link href="/taxtracker" className="hover:text-blue-400 transition-colors flex items-center gap-2">
+                  <span className="text-green-400">→</span> TaxTracker
                 </Link>
               </li>
               <li>
-                <Link href="/digiscore">
-                  <a className="hover:text-blue-400 transition-colors flex items-center gap-2">
-                    <span className="text-blue-400">→</span> DigiScore
-                  </a>
+                <Link href="/digiscore" className="hover:text-blue-400 transition-colors flex items-center gap-2">
+                  <span className="text-blue-400">→</span> DigiScore
                 </Link>
               </li>
               <li>
-                <Link href="/documents">
-                  <a className="hover:text-blue-400 transition-colors flex items-center gap-2">
-                    <span className="text-orange-400">→</span> AI Document Generator
-                  </a>
+                <Link href="/documents" className="hover:text-blue-400 transition-colors flex items-center gap-2">
+                  <span className="text-orange-400">→</span> AI Document Generator
                 </Link>
               </li>
               <li className="pt-2">
@@ -109,38 +101,38 @@ const Footer = () => {
             </h3>
             <ul className="space-y-2.5 text-sm text-gray-300">
               <li>
-                <Link href="/admin">
-                  <a className="hover:text-blue-400 transition-colors">Admin Dashboard</a>
+                <Link href="/admin" className="hover:text-blue-400 transition-colors">
+                  Admin Dashboard
                 </Link>
               </li>
               <li>
-                <Link href="/client-portal">
-                  <a className="hover:text-blue-400 transition-colors">Client Portal</a>
+                <Link href="/client-portal" className="hover:text-blue-400 transition-colors">
+                  Client Portal
                 </Link>
               </li>
               <li>
-                <Link href="/operations">
-                  <a className="hover:text-blue-400 transition-colors">Operations Panel</a>
+                <Link href="/operations" className="hover:text-blue-400 transition-colors">
+                  Operations Panel
                 </Link>
               </li>
               <li>
-                <Link href="/agent">
-                  <a className="hover:text-blue-400 transition-colors">Agent Network</a>
+                <Link href="/agent" className="hover:text-blue-400 transition-colors">
+                  Agent Network
                 </Link>
               </li>
               <li>
-                <Link href="/tasks">
-                  <a className="hover:text-blue-400 transition-colors">Task Management</a>
+                <Link href="/tasks" className="hover:text-blue-400 transition-colors">
+                  Task Management
                 </Link>
               </li>
               <li>
-                <Link href="/compliance-dashboard">
-                  <a className="hover:text-blue-400 transition-colors">Compliance Calendar</a>
+                <Link href="/compliance-dashboard" className="hover:text-blue-400 transition-colors">
+                  Compliance Calendar
                 </Link>
               </li>
               <li>
-                <Link href="/financials">
-                  <a className="hover:text-blue-400 transition-colors">Financial Management</a>
+                <Link href="/financials" className="hover:text-blue-400 transition-colors">
+                  Financial Management
                 </Link>
               </li>
             </ul>
@@ -154,8 +146,8 @@ const Footer = () => {
             </h3>
             <ul className="space-y-2.5 text-sm text-gray-300">
               <li>
-                <Link href="/services">
-                  <a className="hover:text-blue-400 transition-colors">Service Catalog (131+)</a>
+                <Link href="/services" className="hover:text-blue-400 transition-colors">
+                  Service Catalog (131+)
                 </Link>
               </li>
               <li>
@@ -253,11 +245,11 @@ const Footer = () => {
               <a href="/privacy-policy" className="hover:text-blue-400 transition-colors">Privacy Policy</a>
               <a href="/terms-of-service" className="hover:text-blue-400 transition-colors">Terms of Service</a>
               <a href="/refund-policy" className="hover:text-blue-400 transition-colors">Refund Policy</a>
-              <Link href="/login">
-                <a className="hover:text-blue-400 transition-colors">Login</a>
+              <Link href="/login" className="hover:text-blue-400 transition-colors">
+                Login
               </Link>
-              <Link href="/register">
-                <a className="hover:text-blue-400 transition-colors font-medium">Start Free Trial →</a>
+              <Link href="/register" className="hover:text-blue-400 transition-colors font-medium">
+                Start Free Trial →
               </Link>
             </div>
           </div>

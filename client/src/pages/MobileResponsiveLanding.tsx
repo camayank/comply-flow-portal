@@ -21,7 +21,8 @@ import {
   X,
   Phone,
   Mail,
-  Award
+  Award,
+  Calendar
 } from 'lucide-react';
 
 const MobileResponsiveLanding = () => {
