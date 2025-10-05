@@ -4113,3 +4113,218 @@ export type InsertDocumentSignatory = z.infer<typeof insertDocumentSignatorySche
 export type DocumentActivityLogEntry = typeof documentActivityLog.$inferSelect;
 export type AiDocumentTemplate = typeof aiDocumentTemplates.$inferSelect;
 export type InsertAiDocumentTemplate = z.infer<typeof insertAiDocumentTemplateSchema>;
+
+// ============================================================================
+// GOVERNMENT INTEGRATION SYSTEM - Separate Input/Output Layer
+// ============================================================================
+
+// Integration Credentials - Secure storage for government API credentials
+export const integrationCredentials = pgTable("integration_credentials", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(), // which client this credential belongs to
+  
+  // Portal identification
+  portalType: text("portal_type").notNull(), // gsp, eri, mca21, sheets
+  portalName: text("portal_name").notNull(), // display name
+  
+  // Credentials (encrypted)
+  username: text("username"),
+  apiKey: text("api_key"),
+  clientSecret: text("client_secret"),
+  tokenData: json("token_data"), // access tokens, refresh tokens
+  
+  // Google Sheets specific
+  sheetId: text("sheet_id"),
+  serviceAccountEmail: text("service_account_email"),
+  
+  // Status and metadata
+  isActive: boolean("is_active").default(true),
+  lastUsed: timestamp("last_used"),
+  expiresAt: timestamp("expires_at"),
+  
+  // Auto-refresh configuration
+  autoRefresh: boolean("auto_refresh").default(true),
+  refreshSchedule: text("refresh_schedule"), // cron expression
+  
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Government Filings - Track all submissions to government portals
+export const governmentFilings = pgTable("government_filings", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  entityId: integer("entity_id"), // business entity
+  
+  // Filing identification
+  portalType: text("portal_type").notNull(), // gsp, eri, mca21
+  filingType: text("filing_type").notNull(), // gstr1, gstr3b, itr, dir3_kyc, aoc4, etc.
+  
+  // Filing details
+  period: text("period"), // tax period (MM-YYYY)
+  assessmentYear: text("assessment_year"), // for IT returns (2024-25)
+  financialYear: text("financial_year"), // for MCA filings
+  
+  // Status tracking
+  status: text("status").notNull().default('pending'), // pending, submitted, acknowledged, processed, rejected, failed
+  arnNumber: text("arn_number"), // Acknowledgment Reference Number (GST)
+  acknowledgmentNumber: text("acknowledgment_number"), // ITR acknowledgment
+  srnNumber: text("srn_number"), // Service Request Number (MCA)
+  
+  // Important dates
+  dueDate: timestamp("due_date"),
+  submittedAt: timestamp("submitted_at"),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  
+  // Filing data
+  filingData: json("filing_data"), // complete filing payload
+  responseData: json("response_data"), // portal response
+  
+  // Google Sheets sync
+  sheetRowId: text("sheet_row_id"), // reference to Google Sheets row
+  lastSyncedAt: timestamp("last_synced_at"),
+  syncStatus: text("sync_status").default('pending'), // pending, synced, conflict, error
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Sheet Sync Logs - Track Google Sheets bidirectional synchronization
+export const sheetSyncLogs = pgTable("sheet_sync_logs", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  sheetId: text("sheet_id").notNull(),
+  
+  // Sync operation details
+  syncDirection: text("sync_direction").notNull(), // to_sheet, from_sheet, bidirectional
+  syncType: text("sync_type").notNull(), // full, incremental, conflict_resolution
+  
+  // Sync status
+  status: text("status").notNull().default('in_progress'), // in_progress, completed, failed, partial
+  recordsProcessed: integer("records_processed").default(0),
+  recordsSucceeded: integer("records_succeeded").default(0),
+  recordsFailed: integer("records_failed").default(0),
+  
+  // Conflict resolution
+  conflictsDetected: integer("conflicts_detected").default(0),
+  conflictsResolved: integer("conflicts_resolved").default(0),
+  conflictResolutionStrategy: text("conflict_resolution_strategy"), // latest_wins, manual, portal_priority
+  
+  // Sync metadata
+  lastSyncCheckpoint: text("last_sync_checkpoint"), // watermark for incremental sync
+  dataChecksum: text("data_checksum"), // hash for change detection
+  errorDetails: json("error_details"),
+  
+  // Timing
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  duration: integer("duration"), // milliseconds
+});
+
+// API Audit Logs - Complete audit trail for all government API calls
+export const apiAuditLogs = pgTable("api_audit_logs", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id"),
+  
+  // API call details
+  portalType: text("portal_type").notNull(), // gsp, eri, mca21, sheets
+  apiEndpoint: text("api_endpoint").notNull(),
+  httpMethod: text("http_method").notNull(), // GET, POST, PUT
+  
+  // Request/Response
+  requestPayload: json("request_payload"),
+  responsePayload: json("response_payload"),
+  statusCode: integer("status_code"),
+  
+  // Outcome
+  success: boolean("success").notNull(),
+  errorMessage: text("error_message"),
+  errorCategory: text("error_category"), // auth_failure, rate_limit, validation, server_error, network
+  
+  // Retry tracking
+  retryAttempt: integer("retry_attempt").default(0),
+  maxRetries: integer("max_retries").default(3),
+  nextRetryAt: timestamp("next_retry_at"),
+  
+  // Performance
+  responseTime: integer("response_time"), // milliseconds
+  
+  // Context
+  initiatedBy: integer("initiated_by"), // user who triggered
+  relatedFilingId: integer("related_filing_id"),
+  
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+// Integration Job Queue - Background job processing for API calls
+export const integrationJobs = pgTable("integration_jobs", {
+  id: serial("id").primaryKey(),
+  
+  // Job identification
+  jobType: text("job_type").notNull(), // filing_submission, status_check, sheet_sync, token_refresh
+  portalType: text("portal_type").notNull(),
+  
+  // Job payload
+  payload: json("payload").notNull(),
+  priority: integer("priority").default(5), // 1-10, higher = more priority
+  
+  // Status
+  status: text("status").notNull().default('queued'), // queued, processing, completed, failed, retry
+  progress: integer("progress").default(0), // 0-100
+  
+  // Retry mechanism
+  attempts: integer("attempts").default(0),
+  maxAttempts: integer("max_attempts").default(3),
+  lastAttemptAt: timestamp("last_attempt_at"),
+  nextAttemptAt: timestamp("next_attempt_at"),
+  
+  // Result
+  result: json("result"),
+  errorMessage: text("error_message"),
+  
+  // Timing
+  createdAt: timestamp("created_at").defaultNow(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+});
+
+// Zod schemas for Integration System
+export const insertIntegrationCredentialSchema = createInsertSchema(integrationCredentials).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertGovernmentFilingSchema = createInsertSchema(governmentFilings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSheetSyncLogSchema = createInsertSchema(sheetSyncLogs).omit({
+  id: true,
+  startedAt: true,
+});
+
+export const insertApiAuditLogSchema = createInsertSchema(apiAuditLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
+export const insertIntegrationJobSchema = createInsertSchema(integrationJobs).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Export types for Integration System
+export type IntegrationCredential = typeof integrationCredentials.$inferSelect;
+export type InsertIntegrationCredential = z.infer<typeof insertIntegrationCredentialSchema>;
+export type GovernmentFiling = typeof governmentFilings.$inferSelect;
+export type InsertGovernmentFiling = z.infer<typeof insertGovernmentFilingSchema>;
+export type SheetSyncLog = typeof sheetSyncLogs.$inferSelect;
+export type InsertSheetSyncLog = z.infer<typeof insertSheetSyncLogSchema>;
+export type ApiAuditLog = typeof apiAuditLogs.$inferSelect;
+export type InsertApiAuditLog = z.infer<typeof insertApiAuditLogSchema>;
+export type IntegrationJob = typeof integrationJobs.$inferSelect;
+export type InsertIntegrationJob = z.infer<typeof insertIntegrationJobSchema>;
