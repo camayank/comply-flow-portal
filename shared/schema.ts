@@ -3905,3 +3905,211 @@ export type WorkloadMetric = typeof workloadMetrics.$inferSelect;
 export type InsertWorkloadMetric = z.infer<typeof insertWorkloadMetricsSchema>;
 export type TeamMetric = typeof teamMetrics.$inferSelect;
 export type InsertTeamMetric = z.infer<typeof insertTeamMetricsSchema>;
+
+// ============================================================================
+// AI DOCUMENT PREPARATION AND SIGNATURE MANAGEMENT
+// ============================================================================
+
+// AI-Generated Documents
+export const aiDocuments = pgTable("ai_documents", {
+  id: serial("id").primaryKey(),
+  documentNumber: text("document_number").notNull().unique(), // DOC-2024-0001
+  title: text("title").notNull(),
+  documentType: text("document_type").notNull(), // agreement, moa, aoa, board_resolution, notice, letter, etc.
+  category: text("category").notNull(), // incorporation, compliance, tax, legal, hr, other
+  
+  // AI Generation
+  generatedBy: text("generated_by").notNull().default('ai'), // ai, manual, template
+  aiPrompt: text("ai_prompt"), // original prompt used for generation
+  aiModel: text("ai_model").default('claude-sonnet-4'), // AI model used
+  
+  // Content
+  content: text("content").notNull(), // document content (HTML or markdown)
+  contentFormat: text("content_format").default('html'), // html, markdown, docx
+  variables: json("variables"), // template variables used {companyName, date, etc}
+  
+  // Metadata
+  templateId: integer("template_id"), // if generated from template
+  serviceRequestId: integer("service_request_id"),
+  clientId: integer("client_id"),
+  entityId: integer("entity_id"),
+  
+  // Status
+  status: text("status").notNull().default('draft'), // draft, pending_review, approved, signed, archived
+  version: integer("version").default(1),
+  
+  // File storage
+  pdfUrl: text("pdf_url"), // generated PDF file
+  docxUrl: text("docx_url"), // editable Word file
+  originalUrl: text("original_url"), // original uploaded file if any
+  
+  // Signature tracking
+  requiresSignature: boolean("requires_signature").default(false),
+  signatureStatus: text("signature_status").default('unsigned'), // unsigned, partially_signed, fully_signed
+  signatoryCount: integer("signatory_count").default(0),
+  signedCount: integer("signed_count").default(0),
+  
+  // Approval workflow
+  approvalRequired: boolean("approval_required").default(false),
+  approvedBy: integer("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  
+  // Audit
+  createdBy: integer("created_by").notNull(),
+  lastEditedBy: integer("last_edited_by"),
+  lastEditedAt: timestamp("last_edited_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Document Versions (for edit history)
+export const documentVersions = pgTable("document_versions", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").notNull(),
+  version: integer("version").notNull(),
+  content: text("content").notNull(),
+  contentFormat: text("content_format").default('html'),
+  changes: text("changes"), // description of changes made
+  editedBy: integer("edited_by").notNull(),
+  editedAt: timestamp("edited_at").defaultNow(),
+});
+
+// Document Signatures
+export const documentSignatures = pgTable("document_signatures", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").notNull(),
+  signatureNumber: text("signature_number").notNull().unique(), // SIG-2024-0001
+  
+  // Signatory details
+  signatoryId: integer("signatory_id"), // user ID if registered user
+  signatoryName: text("signatory_name").notNull(),
+  signatoryEmail: text("signatory_email"),
+  signatoryRole: text("signatory_role"), // director, partner, authorized_signatory, witness
+  
+  // Signature type
+  signatureType: text("signature_type").notNull(), // dsc, esign, drawn, uploaded
+  
+  // DSC (Digital Signature Certificate) details
+  dscCertificateId: text("dsc_certificate_id"),
+  dscSerialNumber: text("dsc_serial_number"),
+  dscIssuer: text("dsc_issuer"),
+  dscValidFrom: timestamp("dsc_valid_from"),
+  dscValidTo: timestamp("dsc_valid_to"),
+  
+  // E-Signature / Drawn signature
+  signatureImageUrl: text("signature_image_url"), // URL to signature image
+  signatureData: text("signature_data"), // base64 signature data for drawn signatures
+  
+  // Verification
+  ipAddress: text("ip_address"),
+  deviceInfo: text("device_info"),
+  location: text("location"), // geo-location if captured
+  
+  // Status
+  status: text("status").notNull().default('pending'), // pending, signed, verified, rejected
+  signedAt: timestamp("signed_at"),
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: integer("verified_by"),
+  
+  // Coordinates (position on document)
+  pageNumber: integer("page_number").default(1),
+  positionX: integer("position_x"),
+  positionY: integer("position_y"),
+  
+  // Audit
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Document Signatories (required signatures)
+export const documentSignatories = pgTable("document_signatories", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").notNull(),
+  userId: integer("user_id"), // if registered user
+  name: text("name").notNull(),
+  email: text("email").notNull(),
+  role: text("role").notNull(), // director, partner, witness, authorized_signatory
+  signatureRequired: text("signature_required").notNull(), // dsc, esign, any
+  order: integer("order").default(1), // signing order
+  status: text("status").notNull().default('pending'), // pending, invited, signed, declined
+  invitedAt: timestamp("invited_at"),
+  signedAt: timestamp("signed_at"),
+  signatureId: integer("signature_id"), // link to actual signature
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Document Activity Log
+export const documentActivityLog = pgTable("document_activity_log", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").notNull(),
+  userId: integer("user_id"),
+  action: text("action").notNull(), // created, edited, viewed, downloaded, signed, approved, rejected
+  details: text("details"),
+  metadata: json("metadata"),
+  ipAddress: text("ip_address"),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+// Document AI Generation Templates
+export const aiDocumentTemplates = pgTable("ai_document_templates", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  documentType: text("document_type").notNull(),
+  category: text("category").notNull(),
+  
+  // AI Prompt template
+  systemPrompt: text("system_prompt").notNull(),
+  userPromptTemplate: text("user_prompt_template").notNull(), // with {{variables}}
+  
+  // Required variables
+  requiredVariables: json("required_variables").notNull(), // [{name, type, description, required}]
+  
+  // Output configuration
+  outputFormat: text("output_format").default('html'), // html, markdown
+  includeFormatting: boolean("include_formatting").default(true),
+  
+  // Usage
+  usageCount: integer("usage_count").default(0),
+  isActive: boolean("is_active").default(true),
+  
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Zod schemas for AI Documents
+export const insertAiDocumentSchema = createInsertSchema(aiDocuments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDocumentSignatureSchema = createInsertSchema(documentSignatures).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertDocumentSignatorySchema = createInsertSchema(documentSignatories).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAiDocumentTemplateSchema = createInsertSchema(aiDocumentTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Export types
+export type AiDocument = typeof aiDocuments.$inferSelect;
+export type InsertAiDocument = z.infer<typeof insertAiDocumentSchema>;
+export type DocumentVersion = typeof documentVersions.$inferSelect;
+export type DocumentSignature = typeof documentSignatures.$inferSelect;
+export type InsertDocumentSignature = z.infer<typeof insertDocumentSignatureSchema>;
+export type DocumentSignatory = typeof documentSignatories.$inferSelect;
+export type InsertDocumentSignatory = z.infer<typeof insertDocumentSignatorySchema>;
+export type DocumentActivityLogEntry = typeof documentActivityLog.$inferSelect;
+export type AiDocumentTemplate = typeof aiDocumentTemplates.$inferSelect;
+export type InsertAiDocumentTemplate = z.infer<typeof insertAiDocumentTemplateSchema>;
