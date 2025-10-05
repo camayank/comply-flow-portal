@@ -3,6 +3,27 @@
 ## Overview
 The Universal Service Provider Platform is a comprehensive, white-label solution designed for any service provider business. It offers client management, operations, document handling, workflow automation, and agent management capabilities. The platform aims to be a universal solution adaptable to various service-based models, including legal firms, accounting practices, consulting agencies, and healthcare clinics, with a vision for immediate ₹100 Cr+ revenue deployment and multi-industry national expansion.
 
+## Unified Architecture (October 2025)
+**Major Consolidation:** Eliminated all duplicate landing pages and portals. Replaced with single unified system:
+
+### Landing Page
+- **Single Source:** `/` route serves `UnifiedLanding.tsx` - comprehensive master landing page
+- **Features:** Combines all best features from previous iterations (hero, products showcase, problem/solution, pricing, enterprise features, animated counters)
+- **Mobile-First:** Fully responsive design with dark mode support
+- **CTA Journey:** Clear path to role selection via "Access Dashboard / Login" button
+
+### Dynamic Dashboard System
+- **Single Dashboard:** `/dashboard` route serves `UnifiedDashboard.tsx`
+- **Role-Based Routing:** Dynamically loads correct dashboard based on `?type=` parameter
+- **Supported Types:** client, agent, operations, admin, super-admin (customer-service coming soon)
+- **State Management:** Uses localStorage to persist user type selection
+- **User Journey:** Landing → `/select-role` → `/dashboard?type=<selected-type>` → Role-specific interface
+
+### Backward Compatibility
+- Old landing pages preserved at different routes for reference: `/mobile-landing`, `/landing`, `/universal-landing`
+- Direct portal routes maintained for backward compatibility
+- All existing functionality preserved while providing unified entry point
+
 ## User Preferences
 - Focus on execution-ready deliverables
 - Prioritize revenue-generating features
