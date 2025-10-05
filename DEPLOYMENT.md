@@ -99,7 +99,7 @@ npm run db:push --force
 
 ✅ **Data Encryption**
 - Integration credentials encrypted at rest (libsodium)
-- AES-256-GCM encryption
+- XSalsa20-Poly1305 encryption (libsodium secretbox)
 - Environment-based key management
 
 ✅ **Input Validation**

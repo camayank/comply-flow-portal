@@ -13,22 +13,30 @@ All critical production deployment issues have been systematically fixed. The pl
 **Implementation:**
 - Created `otp_store` table with TTL support
 - Added automatic expiry and attempt tracking
+- Brute-force protection: 3 attempts max, then lockout
+- Hourly cleanup job for expired OTPs
 - Database indexes for performance: `idx_otp_email`, `idx_otp_expires_at`
 
 **Files Changed:**
 - `shared/schema.ts` - Added OTP table schema
-- `server/auth-routes.ts` - Updated to use PostgreSQL storage
+- `server/auth-routes.ts` - Updated to use PostgreSQL storage with attempt tracking and cleanup
 - Database migration applied
+
+**Security Features:**
+- Failed attempt tracking with 3-attempt limit
+- Automatic lockout after max attempts
+- Hourly cleanup of expired OTPs (cron job)
 
 ---
 
 ### 2. Credential Encryption ✅
 **Issue:** Integration credentials stored in plaintext  
-**Fix:** Implemented libsodium-based encryption (AES-256-GCM)  
+**Fix:** Implemented libsodium-based encryption (XSalsa20-Poly1305)  
 **Implementation:**
 - Created encryption module with key rotation support
 - All credentials encrypted before database storage
 - Environment-based key management (CREDENTIAL_ENCRYPTION_KEY)
+- Uses libsodium's crypto_secretbox for authenticated encryption
 
 **Files Changed:**
 - `server/encryption.ts` - New encryption module

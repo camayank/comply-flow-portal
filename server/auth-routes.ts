@@ -4,6 +4,7 @@ import { users, userSessions, otpStore } from '@shared/schema';
 import { eq, and, lt } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
+import * as cron from 'node-cron';
 
 // Production-ready PostgreSQL-based OTP storage
 async function storeOTP(email: string, otp: string, expiresAt: Date): Promise<void> {
@@ -36,10 +37,18 @@ async function getOTP(email: string): Promise<{ otp: string; expiresAt: Date; at
 }
 
 async function incrementOtpAttempts(email: string): Promise<void> {
-  await db
-    .update(otpStore)
-    .set({ attempts: lt(otpStore.attempts, 3) })
-    .where(eq(otpStore.email, email));
+  const [record] = await db
+    .select()
+    .from(otpStore)
+    .where(eq(otpStore.email, email))
+    .limit(1);
+  
+  if (record) {
+    await db
+      .update(otpStore)
+      .set({ attempts: Math.min(record.attempts + 1, 3) })
+      .where(eq(otpStore.email, email));
+  }
 }
 
 async function deleteOTP(email: string): Promise<void> {
@@ -125,8 +134,26 @@ export function registerAuthRoutes(app: Express) {
         return res.status(400).json({ error: 'OTP expired' });
       }
 
+      // Check if too many failed attempts
+      if (storedOtp.attempts >= 3) {
+        await deleteOTP(email);
+        return res.status(429).json({ error: 'Too many failed attempts. Please request a new OTP.' });
+      }
+
       if (storedOtp.otp !== otp) {
-        return res.status(400).json({ error: 'Invalid OTP' });
+        // Increment failed attempts
+        await incrementOtpAttempts(email);
+        const remainingAttempts = 3 - (storedOtp.attempts + 1);
+        
+        if (remainingAttempts <= 0) {
+          await deleteOTP(email);
+          return res.status(429).json({ error: 'Too many failed attempts. Please request a new OTP.' });
+        }
+        
+        return res.status(400).json({ 
+          error: 'Invalid OTP',
+          remainingAttempts
+        });
       }
 
       // OTP verified, delete from store
@@ -405,5 +432,16 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
+  // Schedule OTP cleanup job (runs every hour)
+  cron.schedule('0 * * * *', async () => {
+    try {
+      await cleanupExpiredOTPs();
+      console.log('🧹 Cleaned up expired OTPs');
+    } catch (error) {
+      console.error('OTP cleanup error:', error);
+    }
+  });
+
   console.log('✅ Authentication routes registered (Client OTP + Staff Password)');
+  console.log('⏰ Scheduled OTP cleanup job (runs hourly)');
 }
