@@ -204,7 +204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/payments/:paymentId", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { paymentId } = req.params;
+      const paymentId = parseInt(req.params.paymentId);
       const updates = req.body;
       
       const updatedPayment = await storage.updatePayment(paymentId, updates);
