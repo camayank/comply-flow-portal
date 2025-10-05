@@ -137,7 +137,7 @@ const MobileResponsiveLanding = () => {
                 </Button>
               </Link>
               <Link href="#products">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto bg-transparent border-white text-white hover:bg-white hover:text-blue-900 px-8 py-4 text-base sm:text-lg">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto bg-white/10 backdrop-blur-sm border-2 border-white text-white hover:bg-white hover:text-blue-900 px-8 py-4 text-base sm:text-lg font-semibold">
                   <Zap className="h-5 w-5 mr-2" />
                   See AI Products
                 </Button>
