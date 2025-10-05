@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  scroll-behavior: smooth;
+}
+
 /* =============================================================================
    UNIVERSAL DESIGN SYSTEM - DigiComply Platform
    Professional-grade design system with comprehensive variables and utilities
