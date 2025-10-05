@@ -1025,8 +1025,6 @@ export const insertDocumentVaultSchema = createInsertSchema(documentVault).omit(
   createdAt: true,
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
 export type Service = typeof services.$inferSelect;
 export type InsertService = z.infer<typeof insertServiceSchema>;
 export type ServiceRequest = typeof serviceRequests.$inferSelect;

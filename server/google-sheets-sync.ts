@@ -424,7 +424,7 @@ export class GoogleSheetsSync {
 
         if (existing) {
           // Conflict detection - compare last sync time
-          if (existing.lastSyncedAt && new Date(row[8]) > existing.lastSyncedAt) {
+          if (existing.lastSyncedAt && new Date(row[8]) > new Date(existing.lastSyncedAt)) {
             conflicts++;
             // Update with sheet data (sheet wins in conflict)
             await integrationHub.updateFiling(parseInt(id), {
@@ -458,7 +458,7 @@ export class GoogleSheetsSync {
         const existing = await integrationHub.getFilingById(parseInt(id));
 
         if (existing) {
-          if (existing.lastSyncedAt && new Date(row[8]) > existing.lastSyncedAt) {
+          if (existing.lastSyncedAt && new Date(row[8]) > new Date(existing.lastSyncedAt)) {
             conflicts++;
             await integrationHub.updateFiling(parseInt(id), {
               status,
@@ -491,7 +491,7 @@ export class GoogleSheetsSync {
         const existing = await integrationHub.getFilingById(parseInt(id));
 
         if (existing) {
-          if (existing.lastSyncedAt && new Date(row[8]) > existing.lastSyncedAt) {
+          if (existing.lastSyncedAt && new Date(row[8]) > new Date(existing.lastSyncedAt)) {
             conflicts++;
             await integrationHub.updateFiling(parseInt(id), {
               status,
