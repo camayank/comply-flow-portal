@@ -1,4 +1,4 @@
-
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -7,74 +7,83 @@ import { Router, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { GlobalErrorHandler } from "./components/GlobalErrorHandler";
 import { queryClient } from "@/lib/queryClient";
-import Onboarding from "./pages/Onboarding";
-import BusinessType from "./pages/BusinessType";
-import PackageSelection from "./pages/PackageSelection";
-import FounderDetails from "./pages/FounderDetails";
-import IndustryClassification from "./pages/IndustryClassification";
-import ServiceSelection from "./pages/ServiceSelection";
-import ServiceFlowDashboard from "./pages/ServiceFlowDashboard";
-import DocumentUpload from "./pages/DocumentUpload";
-import ESignAgreements from "./pages/ESignAgreements";
-import PaymentGateway from "./pages/PaymentGateway";
-import ComplianceTracker from "./pages/ComplianceTracker";
-import Confirmation from "./pages/Confirmation";
-import AdminPanel from "./pages/AdminPanel";
-import MobileOperationsPanel from "./pages/MobileOperationsPanel";
-import MobileAdminPanel from "./pages/MobileAdminPanel";
-import SyncDashboard from "./pages/SyncDashboard";
-import PlatformShowcase from "./pages/PlatformShowcase";
-import ComplianceTrackerDashboard from "./pages/ComplianceTrackerDashboard";
-import RetainershipPlans from "./pages/RetainershipPlans";
-import SmartSuggestionsEngine from "./pages/SmartSuggestionsEngine";
-import DocumentVault from "./pages/DocumentVault";
-import LandingPage from "./pages/LandingPage";
-import DigiComplyWorkflowDashboard from "./components/DigiComplyWorkflowDashboard";
-import Footer from "./components/Footer";
-import NotFound from "./pages/NotFound";
-import StreamlinedOnboarding from "./pages/StreamlinedOnboarding";
-import SmartStart from "./pages/SmartStart";
-import WhatsAppOnboarding from "./pages/WhatsAppOnboarding";
-import ComplianceScorecard from "./pages/ComplianceScorecard";
-import ClientPortal from "./pages/ClientPortal";
-import MobileClientPortal from "./pages/MobileClientPortal";
-import OperationsPanel from "./pages/OperationsPanel";
-import OperationsManager from "./components/OperationsManager";
-import AgentPortal from "./pages/AgentPortal";
-import MobileAgentPortal from "./pages/MobileAgentPortal";
-import MasterBlueprintDashboard from "./pages/MasterBlueprintDashboard";
-import UniversalAdminPanel from "./pages/UniversalAdminPanel";
-import UniversalClientPortal from "./pages/UniversalClientPortal";
-import UniversalOperationsPanel from "./pages/UniversalOperationsPanel";
-import UniversalLandingPage from "./pages/UniversalLandingPage";
-import WorkflowImport from "./pages/WorkflowImport";
-import MobileResponsiveLanding from "./pages/MobileResponsiveLanding";
-import OnboardingFlow from "./pages/OnboardingFlow";
-import PlatformDemo from "./pages/PlatformDemo";
-import AdminServiceConfig from "./pages/AdminServiceConfig";
-import PreSalesManager from "./pages/PreSalesManager";
-import SalesProposalManager from "./pages/SalesProposalManager";
-import QCDashboard from "./pages/QCDashboard";
-import QualityMetricsDashboard from "./pages/QualityMetricsDashboard";
-import DeliveryConfirmation from "./pages/DeliveryConfirmation";
-import HRDashboard from "./pages/HRDashboard";
-import ClientMasterDashboard from "./pages/ClientMasterDashboard";
-import FinancialManagementDashboard from "./pages/FinancialManagementDashboard";
-import ExecutiveDashboard from "./pages/ExecutiveDashboard";
-import BusinessIntelligence from "./pages/BusinessIntelligence";
-import MobileDashboard from "./pages/MobileDashboard";
-import DesignSystemShowcase from "./components/DesignSystemShowcase";
-import ClientRegistration from "./pages/ClientRegistration";
-import LeadManagement from "./pages/LeadManagement";
-import ServiceRequestUI from "./pages/ServiceRequestUI";
-import Login from "./pages/Login";
-import ProposalManagement from "./pages/ProposalManagement";
-import ReferralDashboard from "./pages/ReferralDashboard";
-import AutoComply from "./pages/AutoComply";
-import TaxTracker from "./pages/TaxTracker";
-import DigiScore from "./pages/DigiScore";
-import TaskManagement from "./pages/TaskManagement";
-import AiDocumentPreparation from "./pages/AiDocumentPreparation";
+
+// Loading component for lazy routes
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+  </div>
+);
+
+// Lazy load all pages for code splitting
+const MobileResponsiveLanding = lazy(() => import("./pages/MobileResponsiveLanding"));
+const Login = lazy(() => import("./pages/Login"));
+const ClientRegistration = lazy(() => import("./pages/ClientRegistration"));
+const LeadManagement = lazy(() => import("./pages/LeadManagement"));
+const ServiceRequestUI = lazy(() => import("./pages/ServiceRequestUI"));
+const ProposalManagement = lazy(() => import("./pages/ProposalManagement"));
+const ReferralDashboard = lazy(() => import("./pages/ReferralDashboard"));
+const AutoComply = lazy(() => import("./pages/AutoComply"));
+const TaxTracker = lazy(() => import("./pages/TaxTracker"));
+const DigiScore = lazy(() => import("./pages/DigiScore"));
+const TaskManagement = lazy(() => import("./pages/TaskManagement"));
+const AiDocumentPreparation = lazy(() => import("./pages/AiDocumentPreparation"));
+const DesignSystemShowcase = lazy(() => import("./components/DesignSystemShowcase"));
+const LandingPage = lazy(() => import("./pages/LandingPage"));
+const OnboardingFlow = lazy(() => import("./pages/OnboardingFlow"));
+const PlatformDemo = lazy(() => import("./pages/PlatformDemo"));
+const Onboarding = lazy(() => import("./pages/Onboarding"));
+const BusinessType = lazy(() => import("./pages/BusinessType"));
+const PackageSelection = lazy(() => import("./pages/PackageSelection"));
+const FounderDetails = lazy(() => import("./pages/FounderDetails"));
+const IndustryClassification = lazy(() => import("./pages/IndustryClassification"));
+const ServiceSelection = lazy(() => import("./pages/ServiceSelection"));
+const ServiceFlowDashboard = lazy(() => import("./pages/ServiceFlowDashboard"));
+const DocumentUpload = lazy(() => import("./pages/DocumentUpload"));
+const ESignAgreements = lazy(() => import("./pages/ESignAgreements"));
+const PaymentGateway = lazy(() => import("./pages/PaymentGateway"));
+const ComplianceTracker = lazy(() => import("./pages/ComplianceTracker"));
+const Confirmation = lazy(() => import("./pages/Confirmation"));
+const AdminPanel = lazy(() => import("./pages/AdminPanel"));
+const MobileOperationsPanel = lazy(() => import("./pages/MobileOperationsPanel"));
+const MobileAdminPanel = lazy(() => import("./pages/MobileAdminPanel"));
+const SyncDashboard = lazy(() => import("./pages/SyncDashboard"));
+const PlatformShowcase = lazy(() => import("./pages/PlatformShowcase"));
+const ComplianceTrackerDashboard = lazy(() => import("./pages/ComplianceTrackerDashboard"));
+const RetainershipPlans = lazy(() => import("./pages/RetainershipPlans"));
+const SmartSuggestionsEngine = lazy(() => import("./pages/SmartSuggestionsEngine"));
+const DocumentVault = lazy(() => import("./pages/DocumentVault"));
+const StreamlinedOnboarding = lazy(() => import("./pages/StreamlinedOnboarding"));
+const SmartStart = lazy(() => import("./pages/SmartStart"));
+const WhatsAppOnboarding = lazy(() => import("./pages/WhatsAppOnboarding"));
+const ComplianceScorecard = lazy(() => import("./pages/ComplianceScorecard"));
+const ClientPortal = lazy(() => import("./pages/ClientPortal"));
+const MobileClientPortal = lazy(() => import("./pages/MobileClientPortal"));
+const OperationsPanel = lazy(() => import("./pages/OperationsPanel"));
+const AgentPortal = lazy(() => import("./pages/AgentPortal"));
+const MobileAgentPortal = lazy(() => import("./pages/MobileAgentPortal"));
+const MasterBlueprintDashboard = lazy(() => import("./pages/MasterBlueprintDashboard"));
+const UniversalAdminPanel = lazy(() => import("./pages/UniversalAdminPanel"));
+const UniversalClientPortal = lazy(() => import("./pages/UniversalClientPortal"));
+const UniversalOperationsPanel = lazy(() => import("./pages/UniversalOperationsPanel"));
+const UniversalLandingPage = lazy(() => import("./pages/UniversalLandingPage"));
+const WorkflowImport = lazy(() => import("./pages/WorkflowImport"));
+const AdminServiceConfig = lazy(() => import("./pages/AdminServiceConfig"));
+const PreSalesManager = lazy(() => import("./pages/PreSalesManager"));
+const SalesProposalManager = lazy(() => import("./pages/SalesProposalManager"));
+const QCDashboard = lazy(() => import("./pages/QCDashboard"));
+const QualityMetricsDashboard = lazy(() => import("./pages/QualityMetricsDashboard"));
+const DeliveryConfirmation = lazy(() => import("./pages/DeliveryConfirmation"));
+const HRDashboard = lazy(() => import("./pages/HRDashboard"));
+const ClientMasterDashboard = lazy(() => import("./pages/ClientMasterDashboard"));
+const FinancialManagementDashboard = lazy(() => import("./pages/FinancialManagementDashboard"));
+const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
+const BusinessIntelligence = lazy(() => import("./pages/BusinessIntelligence"));
+const MobileDashboard = lazy(() => import("./pages/MobileDashboard"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const DigiComplyWorkflowDashboard = lazy(() => import("./components/DigiComplyWorkflowDashboard"));
+const OperationsManager = lazy(() => import("./components/OperationsManager"));
+const Footer = lazy(() => import("./components/Footer"));
 
 const App = () => (
   <ErrorBoundary>
@@ -86,7 +95,8 @@ const App = () => (
         <Router>
           <div className="min-h-screen flex flex-col">
             <main className="flex-grow">
-              <Switch>
+              <Suspense fallback={<PageLoader />}>
+                <Switch>
                 <Route path="/" component={MobileResponsiveLanding} />
                 <Route path="/login" component={Login} />
                 <Route path="/signin" component={Login} />
@@ -196,8 +206,11 @@ const App = () => (
                 <Route path="/vault" component={DocumentVault} />
                 <Route component={NotFound} />
               </Switch>
+              </Suspense>
             </main>
-            <Footer />
+            <Suspense fallback={null}>
+              <Footer />
+            </Suspense>
           </div>
         </Router>
       </TooltipProvider>
