@@ -30,11 +30,13 @@ import {
   Download,
   ArrowRight,
   Calculator,
-  FileCheck
+  FileCheck,
+  Upload
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { ProposalForm } from '../components/proposals/ProposalForm';
 import { ProposalsList } from '../components/proposals/ProposalsList';
+import { BulkUploadDialog } from '../components/BulkUploadDialog';
 import { type SalesProposal, type LeadEnhanced } from '@shared/schema';
 
 interface ProposalsResponse {
@@ -103,6 +105,7 @@ const SALES_EXECUTIVES = [
 export default function SalesProposalManager() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreateFromLeadDialogOpen, setIsCreateFromLeadDialogOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [executiveFilter, setExecutiveFilter] = useState('');
@@ -255,6 +258,26 @@ export default function SalesProposalManager() {
     }).format(num);
   };
 
+  const handleBulkUpload = async (data: any[]) => {
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: [] as string[]
+    };
+
+    for (let i = 0; i < data.length; i++) {
+      try {
+        await createProposalMutation.mutateAsync(data[i]);
+        results.success++;
+      } catch (error: any) {
+        results.failed++;
+        results.errors.push(`Row ${i + 2}: ${error.message || 'Upload failed'}`);
+      }
+    }
+
+    return results;
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6" data-testid="proposal-manager">
       {/* Header */}
@@ -268,6 +291,14 @@ export default function SalesProposalManager() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsBulkUploadOpen(true)}
+            data-testid="button-bulk-upload-proposals"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Bulk Upload
+          </Button>
           <Dialog open={isCreateFromLeadDialogOpen} onOpenChange={setIsCreateFromLeadDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" data-testid="button-create-from-lead">
@@ -571,6 +602,51 @@ export default function SalesProposalManager() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Upload Dialog */}
+      <BulkUploadDialog
+        open={isBulkUploadOpen}
+        onOpenChange={setIsBulkUploadOpen}
+        title="Bulk Upload Proposals"
+        description="Upload multiple sales proposals at once using an Excel or CSV file"
+        templateHeaders={[
+          'clientName',
+          'proposalTitle',
+          'servicesOffered',
+          'totalAmount',
+          'discountPercent',
+          'finalAmount',
+          'validityDays',
+          'paymentTerms',
+          'status',
+          'salesExecutive'
+        ]}
+        entityName="Proposals"
+        onUpload={handleBulkUpload}
+        sampleData={[
+          {
+            clientName: 'ABC Corp',
+            proposalTitle: 'Complete Compliance Package 2025',
+            servicesOffered: 'GST Filing, TDS Returns, Accounting',
+            totalAmount: '75000',
+            discountPercent: '10',
+            finalAmount: '67500',
+            validityDays: '30',
+            paymentTerms: '50% advance, 50% on delivery',
+            status: 'draft',
+            salesExecutive: 'Rahul Sharma'
+          }
+        ]}
+        validationRules={{
+          clientName: (value) => value ? true : 'Client name is required',
+          proposalTitle: (value) => value ? true : 'Proposal title is required',
+          totalAmount: (value) => {
+            if (!value) return 'Total amount is required';
+            if (isNaN(Number(value))) return 'Total amount must be a number';
+            return true;
+          }
+        }}
+      />
     </div>
   );
 }
