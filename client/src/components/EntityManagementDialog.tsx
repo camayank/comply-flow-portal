@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import {
   Dialog,
@@ -74,6 +74,38 @@ export function EntityManagementDialog({ open, onOpenChange, entity, mode }: Ent
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof EntityFormData, string>>>({});
+
+  // Sync form data when entity or mode changes
+  useEffect(() => {
+    if (mode === 'edit' && entity) {
+      setFormData({
+        name: entity.name || '',
+        entityType: entity.entityType || '',
+        gstin: entity.gstin || '',
+        pan: entity.pan || '',
+        cin: entity.cin || '',
+        address: entity.address || '',
+        city: entity.city || '',
+        state: entity.state || '',
+        industryType: entity.industryType || '',
+      });
+    } else if (mode === 'add') {
+      // Reset form for add mode
+      setFormData({
+        name: '',
+        entityType: '',
+        gstin: '',
+        pan: '',
+        cin: '',
+        address: '',
+        city: '',
+        state: '',
+        industryType: '',
+      });
+    }
+    // Clear errors when mode/entity changes
+    setErrors({});
+  }, [entity, mode]);
 
   // Validation functions
   const validatePAN = (pan: string): boolean => {
