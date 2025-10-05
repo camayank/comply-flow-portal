@@ -1192,6 +1192,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register Service-Document Integration routes
   const { registerServiceDocumentIntegration } = await import('./service-document-integration');
   registerServiceDocumentIntegration(app);
+  
+  // Register Google Sheets Import routes
+  const { registerGoogleSheetsImportRoutes } = await import('./google-sheets-import-routes');
+  registerGoogleSheetsImportRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;
