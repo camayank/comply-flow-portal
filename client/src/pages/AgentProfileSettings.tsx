@@ -206,13 +206,13 @@ export default function AgentProfileSettings() {
     );
   }
 
-  if (error || !profile) {
+  if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6 lg:p-8">
         <div className="mb-6">
           <div className="flex items-center gap-3">
             <Link href="/agent/dashboard">
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" data-testid="button-back">
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
@@ -224,12 +224,19 @@ export default function AgentProfileSettings() {
           </div>
         </div>
         <Card>
-          <CardContent className="p-6 text-center text-gray-500">
-            <p>Unable to load profile data. Please try again later.</p>
+          <CardContent className="p-6 text-center">
+            <p className="text-gray-500 mb-4">Unable to load profile data. Please try again later.</p>
+            <Button onClick={() => window.location.reload()} data-testid="button-retry">
+              Retry
+            </Button>
           </CardContent>
         </Card>
       </div>
     );
+  }
+
+  if (!profile) {
+    return null;
   }
 
   return (
