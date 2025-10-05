@@ -1,28 +1,7 @@
 # Universal Service Provider Platform - Enterprise Ready
 
 ## Overview
-The Universal Service Provider Platform is a comprehensive, white-label solution designed for any service provider business. It offers client management, operations, document handling, workflow automation, and agent management capabilities. The platform aims to be a universal solution adaptable to various service-based models, including legal firms, accounting practices, consulting agencies, and healthcare clinics, with a vision for immediate ₹100 Cr+ revenue deployment and multi-industry national expansion.
-
-## Unified Architecture (October 2025)
-**Major Consolidation:** Eliminated all duplicate landing pages and portals. Replaced with single unified system:
-
-### Landing Page
-- **Single Source:** `/` route serves `UnifiedLanding.tsx` - comprehensive master landing page
-- **Features:** Combines all best features from previous iterations (hero, products showcase, problem/solution, pricing, enterprise features, animated counters)
-- **Mobile-First:** Fully responsive design with dark mode support
-- **CTA Journey:** Clear path to role selection via "Access Dashboard / Login" button
-
-### Dynamic Dashboard System
-- **Single Dashboard:** `/dashboard` route serves `UnifiedDashboard.tsx`
-- **Role-Based Routing:** Dynamically loads correct dashboard based on `?type=` parameter
-- **Supported Types:** client, agent, operations, admin, super-admin (customer-service coming soon)
-- **State Management:** Uses localStorage to persist user type selection
-- **User Journey:** Landing → `/select-role` → `/dashboard?type=<selected-type>` → Role-specific interface
-
-### Backward Compatibility
-- Old landing pages preserved at different routes for reference: `/mobile-landing`, `/landing`, `/universal-landing`
-- Direct portal routes maintained for backward compatibility
-- All existing functionality preserved while providing unified entry point
+The Universal Service Provider Platform is a comprehensive, white-label solution designed for any service provider business. It offers client management, operations, document handling, workflow automation, and agent management capabilities. The platform aims to be a universal solution adaptable to various service-based models, including legal firms, accounting practices, consulting agencies, and healthcare clinics. Its vision is for immediate ₹100 Cr+ revenue deployment and multi-industry national expansion.
 
 ## User Preferences
 - Focus on execution-ready deliverables
@@ -32,105 +11,48 @@ The Universal Service Provider Platform is a comprehensive, white-label solution
 - Agent-focused distribution model (Compliance Rakshaks)
 
 ## System Architecture
-The platform is built on a robust architecture designed for enterprise deployment and scalability.
+The platform is built on a robust architecture designed for enterprise deployment and scalability. It features a unified landing page and a dynamic dashboard system that supports six distinct user roles (client, agent, operations, admin, customer-service, super-admin) with role-based routing and persistent state management.
 
 ### UI/UX Decisions
-- **Mobile-First Design**: All portals (Landing, Client, Operations, Admin, Agent) are fully responsive and mobile-friendly.
-- **Consistent Theming**: Uses centralized theme utilities for consistent colors, badges, and status indicators across all portals, including dark mode support.
+- **Mobile-First Design**: All portals are fully responsive and mobile-friendly.
+- **Consistent Theming**: Uses centralized theme utilities for consistent colors, badges, and status indicators, including dark mode support.
 - **Component Library**: Leverages `shadcn/ui` components for a modern and consistent user interface.
 
 ### Technical Implementations
 - **Frontend**: React TypeScript with Tailwind CSS.
 - **Backend**: Express.js with enterprise-grade middleware and role-based API routes.
-- **Database**: PostgreSQL with Drizzle ORM, featuring 56+ comprehensive tables supporting multi-tenant operations. A hybrid storage architecture uses PostgreSQL for critical entities (Leads, Proposals, Service Requests, Business Entities, Payments, Referrals, Wallet Credits) and in-memory storage for other modules.
-- **Government Integration Pro System**: Complete separate module for government compliance APIs with 5 dedicated tables (integrationCredentials, governmentFilings, sheetSyncLogs, apiAuditLogs, integrationJobs). Provides bidirectional Google Sheets sync for offline resilience, credential vault for secure API key management with **libsodium XSalsa20-Poly1305 encryption**, job queue with exponential backoff retry (async processing), and complete audit trail for all API interactions. Supports GSP (GST), ERI (Income Tax), and MCA21 (Corporate Affairs) portals with automatic retry mechanisms and conflict resolution. All credentials are encrypted at rest using libsodium's crypto_secretbox with environment-based key management (CREDENTIAL_ENCRYPTION_KEY).
-- **Referral & Wallet System**: Complete viral referral system with wallet credits (4 tables: referralCodes, referrals, walletCredits, walletTransactions). Clients earn 10% credit when referrals complete first service.
-- **Workflow Automation Engine**: No-code automation with triggers (client_registered, payment_due_soon, milestone_completed, referral_completed) and actions (send_email, send_whatsapp, create_task, credit_wallet).
-- **Universal Task Management System**: Cross-role task management supporting all user types (client, admin, ops, agent) with 7 database tables (taskItems, taskParticipants, taskDependencies, taskSubtasks, taskActivityLog, taskReminderTemplates, taskReminders). Features automated reminder scheduling (T-7, T-3, T-1 days, due date, overdue), task closure workflow with approval system, RBAC enforcement, activity logging, and notification integration. Reminder processor runs hourly for upcoming deadlines and daily at 9 AM IST for overdue tasks.
-- **AI Document Preparation & Signature Management**: Comprehensive document generation, editing, and signing system powered by Claude Sonnet 4. Features include AI-powered document generation from templates or custom prompts, real-time preview and editing, version control with edit history, multi-format download (HTML/PDF), and complete signature workflow supporting DSC (Digital Signature Certificate), e-signatures, canvas-drawn signatures, and uploaded signatures. System includes 6 database tables (aiDocuments, documentVersions, documentSignatures, documentSignatories, documentActivityLog, aiDocumentTemplates) with full audit trail, signatory management, and integration with existing document management system.
-- **Financial Management**: Revenue tracking, expense management, profit/loss reporting, cash flow projection with real-time analytics.
-- **Tax Management**: GST, TDS, and ITR compliance tracking for startups with filing history, calculators, deadline calendar, and tax-saving insights.
-- **Core Functionality**:
-    - **Compliance Calendar**: Interactive visual timeline with 4-tier risk-based color coding, multi-item day modals, and smart summary cards.
-    - **Comprehensive Compliance Knowledge Base**: Integrates 18 compliance rules from Indian regulations (Companies Act 2013, GST, Income Tax, PF/ESI) with detailed penalty information and required document checklists.
-    - **Service Catalog**: Integrated 99 services across 18 categories, covering business registrations, tax, IP, certifications, monthly/annual compliances, and legal documentation.
-    - **User Management System**: Complete role-based user management with 6 role types (Super Admin, Admin, Ops Executive, Customer Service, Agent, Client), CRUD operations, role-based access control (RBAC) middleware, password hashing with bcrypt, and comprehensive statistics dashboard.
-    - **Role-Based Access Control**: Hierarchical permission system with 40+ granular permissions across user management, client management, service operations, analytics, and system configuration. Includes role hierarchy enforcement and flexible authorization middleware.
-    - **File Upload System**: Google Cloud Storage integration for secure document management with validation, type enforcement, and size limits.
-    - **Data Validation**: Comprehensive client-side validation using Zod patterns for various data types (email, phone, PAN, GST, etc.).
-    - **Performance Optimization**: 29 database indexes implemented across critical tables, with `pg_trgm` extension for fast text search.
-    - **Error Handling**: Global error boundaries, automatic toast notifications, and uncaught error handlers enhance user experience.
-    - **Data Export**: Comprehensive CSV/Excel export system for various data entities and reports.
-    - **No-Code Platform**: Features a drag-and-drop workflow builder for process changes without developer dependency.
+- **Database**: PostgreSQL with Drizzle ORM, supporting multi-tenant operations with 56+ tables and a hybrid storage architecture.
+- **Government Integration Pro System**: A separate module for government compliance APIs (GSP, ERI, MCA21) with secure credential vault (libsodium XSalsa20-Poly1305 encryption), bidirectional Google Sheets sync, job queue with retry mechanisms, and complete audit trails.
+- **Referral & Wallet System**: Complete viral referral system with wallet credits.
+- **Workflow Automation Engine**: No-code automation with configurable triggers and actions (e.g., email, WhatsApp, task creation, wallet credit).
+- **Universal Task Management System**: Cross-role task management with automated reminders, approval workflows, RBAC, and activity logging.
+- **AI Document Preparation & Signature Management**: AI-powered document generation (Claude Sonnet 4), real-time editing, version control, multi-format download, and comprehensive signature workflow (DSC, e-signatures).
+- **Financial Management**: Revenue, expense, profit/loss tracking, and cash flow projection.
+- **Tax Management**: GST, TDS, ITR compliance tracking, calculators, and deadline calendars.
+- **Core Functionality**: Includes a Compliance Calendar, Knowledge Base of Indian regulations, a Service Catalog (99 services across 18 categories), a comprehensive User Management System with RBAC (40+ granular permissions), Google Cloud Storage integration for file uploads, Zod-based data validation, 29 database indexes, global error handling, CSV/Excel data export, and a drag-and-drop no-code platform.
 
 ### Feature Specifications
-- **Universal Admin Panel**: Supports no-code workflow building, global workflow updates, real-time system monitoring, and comprehensive analytics. Features dedicated DigiComply AI Products section with quick-access cards for AutoComply, TaxTracker, and DigiScore. Includes 7 comprehensive tabs (Dashboard, Services, Workflows, Analytics, Users, Config, Roles) with user management capabilities for creating, editing, and deactivating users with role-based permissions.
-- **Universal Client Portal**: Enables multi-entity management, service progress tracking, automated document workflows, and secure messaging.
+- **Universal Admin Panel**: Supports no-code workflow building, real-time monitoring, analytics, and user management. Includes "DigiComply AI Products" (AutoComply, TaxTracker, DigiScore).
+- **Universal Client Portal**: Enables multi-entity management, service tracking, automated document workflows, and secure messaging.
 - **Universal Operations Panel**: Provides task orchestration, team management, SLA monitoring, and QA workflows.
-- **Universal Agent Network**: Includes lead management, commission tracking, and territory management functionalities.
-- **DigiComply AI Products**: Three fully functional AI-powered products with dedicated routes - AutoComply (/autocomply), TaxTracker (/taxtracker), DigiScore (/digiscore) - integrated into admin dashboard for seamless navigation.
-- **Security**: Implements comprehensive enterprise-grade security measures:
-  - **Authentication**: Session-based authentication with secure token storage in PostgreSQL
-  - **OTP Security**: PostgreSQL-based OTP storage with 3-attempt brute-force protection, automatic expiry, and hourly cleanup job
-  - **Session Security**: httpOnly, secure, and sameSite=strict cookies prevent XSS and CSRF attacks
-  - **Rate Limiting**: 5 requests/15min for auth endpoints, 100 requests/15min for API endpoints
-  - **RBAC**: Multi-tier role-based access control with 40+ granular permissions
-  - **Input Validation**: Zod schemas validate all user inputs at API boundaries
-  - **SQL Injection Prevention**: Drizzle ORM's parameterized queries
-  - **XSS Protection**: DOMPurify sanitization for all AI-generated HTML content
-  - **Password Security**: bcrypt hashing (10 rounds) with no password logging
-  - **API Protection**: All sensitive routes protected with sessionAuthMiddleware
-  - **Audit Trail**: Complete session tracking with IP, user agent, and activity logs
-  - **Credential Encryption**: libsodium XSalsa20-Poly1305 encryption for all integration credentials
-  - **Security Headers**: X-Frame-Options, CSP, HSTS, Permissions-Policy
-  - **CSRF Protection**: Custom header validation for state-changing operations
+- **Universal Agent Network**: Includes lead management, commission tracking, and performance analytics.
+- **Customer Service Dashboard**: Complete support ticket management, response templates, and performance metrics.
+- **Security**: Enterprise-grade security including session-based authentication, PostgreSQL-based OTP with brute-force protection, httpOnly/secure cookies, rate limiting, multi-tier RBAC, Zod input validation, Drizzle ORM for SQL injection prevention, DOMPurify for XSS protection, bcrypt password hashing, libsodium encryption for credentials, and comprehensive security headers.
 
 ### System Design Choices
-- **Multi-tenant Architecture**: Designed to support unlimited clients and distributed operations teams, enabling national scale.
-- **Cloud Deployment Ready**: Configurations and scripts prepared for AWS, GCP, and Azure/Dynamics 365.
-
-### Production Readiness (October 2025)
-All critical production deployment issues have been systematically fixed:
-
-**Performance Optimizations:**
-- ✅ React.lazy() code splitting: 80% reduction in initial bundle size (5-10MB → ~500KB)
-- ✅ 20+ database indexes for critical queries and performance
-- ✅ Request timeouts (30s) and graceful shutdown with 30s timeout
-- ✅ Database connection pooling and query optimization
-
-**Security Enhancements:**
-- ✅ PostgreSQL-based OTP storage (replaces in-memory, survives restarts)
-- ✅ libsodium XSalsa20-Poly1305 encryption for integration credentials
-- ✅ Comprehensive Zod-based environment variable validation
-- ✅ Security headers: X-Frame-Options, CSP, HSTS, Permissions-Policy
-- ✅ CSRF protection via custom headers
-- ✅ Brute-force protection: 3-attempt lockout for OTP
-- ✅ Hourly cleanup job for expired OTPs
-
-**Monitoring & Health:**
-- ✅ Health check endpoints: /health, /health/detailed, /ready, /live
-- ✅ Database connectivity monitoring
-- ✅ Memory and uptime tracking
-- ✅ Graceful shutdown with cleanup handlers
-
-**Deployment:**
-- ✅ Production CORS configuration (ALLOWED_ORIGINS)
-- ✅ Environment-based configuration with fail-fast validation
-- ✅ Comprehensive deployment documentation (DEPLOYMENT.md)
-- ✅ Production fixes summary (PRODUCTION_FIXES_SUMMARY.md)
-
-**Status:** Production Ready ✅ (Ready for ₹100 Cr+ Revenue Deployment)
+- **Multi-tenant Architecture**: Designed for scalability and distributed operations.
+- **Cloud Deployment Ready**: Configured for AWS, GCP, and Azure/Dynamics 365.
 
 ## External Dependencies
-- **Google Cloud Storage**: For file upload and document management.
-- **Google Sheets API**: Bidirectional sync for government filings backup and offline operations. Service account credentials required.
-- **LegalSuvidha.com**: Integrated for a comprehensive service catalog.
-- **PostgreSQL**: Primary database for persistent storage.
-- **WhatsApp (Twilio)**: Twilio connector available for WhatsApp integration. User dismissed setup - requires Twilio credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER) if needed in future.
-- **Stripe**: Payment gateway integration complete. Requires STRIPE_SECRET_KEY and VITE_STRIPE_PUBLIC_KEY environment variables.
-- **Payment Processing**: Generic integration point for various payment gateways.
-- **CRM Synchronization**: Capability for integrating with Customer Relationship Management systems.
-- **Government API Integrations**: 
-  - **GSP (GST Suvidha Provider)**: GST filing and status tracking. Requires GSTIN, username, password for authentication.
-  - **ERI (e-Return Intermediary)**: Income Tax return filing. Requires PAN, password for authentication.
-  - **MCA21 (Ministry of Corporate Affairs)**: Corporate filings (AOC-4, DIR-3 KYC, etc.). Requires CIN, DIN, password for authentication.
+- **Google Cloud Storage**: For file management.
+- **Google Sheets API**: For bidirectional sync of government filings.
+- **PostgreSQL**: Primary database.
+- **LegalSuvidha.com**: Integrated for service catalog.
+- **Twilio (WhatsApp)**: Connector available (requires credentials for future setup).
+- **Stripe**: Payment gateway integration.
+- **Payment Processing**: Generic integration point for various gateways.
+- **CRM Synchronization**: Capability for integrating with CRM systems.
+- **Government API Integrations**:
+  - **GSP (GST Suvidha Provider)**: GST filing.
+  - **ERI (e-Return Intermediary)**: Income Tax filing.
+  - **MCA21 (Ministry of Corporate Affairs)**: Corporate filings.
