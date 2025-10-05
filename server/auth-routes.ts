@@ -5,8 +5,29 @@ import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 
-// OTP storage (in production, use Redis or similar)
+// OTP storage (in production, use Redis or database)
+// WARNING: In-memory Map is NOT production-ready and will lose OTPs on server restart
+// For production, implement Redis/database storage with proper expiration
 const otpStore = new Map<string, { otp: string; expiresAt: Date }>();
+
+// Production-ready OTP storage function (placeholder for future implementation)
+async function storeOTP(email: string, otp: string, expiresAt: Date): Promise<void> {
+  // TODO: Replace with Redis/database implementation
+  // Example with Redis: await redis.setex(`otp:${email}`, 600, JSON.stringify({ otp, expiresAt }))
+  otpStore.set(email, { otp, expiresAt });
+}
+
+async function getOTP(email: string): Promise<{ otp: string; expiresAt: Date } | null> {
+  // TODO: Replace with Redis/database implementation
+  // Example with Redis: const data = await redis.get(`otp:${email}`)
+  return otpStore.get(email) || null;
+}
+
+async function deleteOTP(email: string): Promise<void> {
+  // TODO: Replace with Redis/database implementation
+  // Example with Redis: await redis.del(`otp:${email}`)
+  otpStore.delete(email);
+}
 
 export function registerAuthRoutes(app: Express) {
 
@@ -40,8 +61,8 @@ export function registerAuthRoutes(app: Express) {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-      // Store OTP (in production, use Redis)
-      otpStore.set(email, { otp, expiresAt });
+      // Store OTP
+      await storeOTP(email, otp, expiresAt);
 
       // TODO: Send OTP via email
       console.log(`🔐 OTP for ${email}: ${otp}`);
@@ -71,14 +92,14 @@ export function registerAuthRoutes(app: Express) {
       }
 
       // Check OTP
-      const storedOtp = otpStore.get(email);
+      const storedOtp = await getOTP(email);
       
       if (!storedOtp) {
         return res.status(400).json({ error: 'OTP expired or invalid' });
       }
 
       if (storedOtp.expiresAt < new Date()) {
-        otpStore.delete(email);
+        await deleteOTP(email);
         return res.status(400).json({ error: 'OTP expired' });
       }
 
@@ -87,7 +108,7 @@ export function registerAuthRoutes(app: Express) {
       }
 
       // OTP verified, delete from store
-      otpStore.delete(email);
+      await deleteOTP(email);
 
       // Get user
       const [user] = await db
