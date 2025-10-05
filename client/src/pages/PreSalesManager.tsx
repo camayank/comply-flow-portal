@@ -22,11 +22,13 @@ import {
   Clock,
   Edit,
   Eye,
-  Trash2
+  Trash2,
+  Upload
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { LeadForm } from '../components/leads/LeadForm';
 import { LeadsList } from '../components/leads/LeadsList';
+import { BulkUploadDialog } from '../components/BulkUploadDialog';
 import { type LeadEnhanced } from '@shared/schema';
 
 interface LeadsResponse {
@@ -70,6 +72,7 @@ const LEAD_SOURCES = [
 
 export default function PreSalesManager() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [stageFilter, setStageFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
@@ -170,6 +173,26 @@ export default function PreSalesManager() {
     return LEAD_STAGES.find(s => s.value === stage) || LEAD_STAGES[0];
   };
 
+  const handleBulkUpload = async (data: any[]) => {
+    const results = {
+      success: 0,
+      failed: 0,
+      errors: [] as string[]
+    };
+
+    for (let i = 0; i < data.length; i++) {
+      try {
+        await createLeadMutation.mutateAsync(data[i]);
+        results.success++;
+      } catch (error: any) {
+        results.failed++;
+        results.errors.push(`Row ${i + 2}: ${error.message || 'Upload failed'}`);
+      }
+    }
+
+    return results;
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6" data-testid="presales-manager">
       {/* Header */}
@@ -182,28 +205,38 @@ export default function PreSalesManager() {
             Manage leads from acquisition to conversion
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-add-lead">
-              <Plus className="h-4 w-4 mr-2" />
-              Add New Lead
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Create New Lead</DialogTitle>
-              <DialogDescription>
-                Add a new lead to the pre-sales pipeline
-              </DialogDescription>
-            </DialogHeader>
-            <LeadForm 
-              onSubmit={(data) => createLeadMutation.mutate(data)}
-              isLoading={createLeadMutation.isPending}
-              sources={LEAD_SOURCES}
-              stages={LEAD_STAGES}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsBulkUploadOpen(true)}
+            data-testid="button-bulk-upload-leads"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Bulk Upload
+          </Button>
+          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-add-lead">
+                <Plus className="h-4 w-4 mr-2" />
+                Add New Lead
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Create New Lead</DialogTitle>
+                <DialogDescription>
+                  Add a new lead to the pre-sales pipeline
+                </DialogDescription>
+              </DialogHeader>
+              <LeadForm 
+                onSubmit={(data) => createLeadMutation.mutate(data)}
+                isLoading={createLeadMutation.isPending}
+                sources={LEAD_SOURCES}
+                stages={LEAD_STAGES}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Dashboard Stats */}
@@ -350,6 +383,71 @@ export default function PreSalesManager() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Upload Dialog */}
+      <BulkUploadDialog
+        open={isBulkUploadOpen}
+        onOpenChange={setIsBulkUploadOpen}
+        title="Bulk Upload Leads"
+        description="Upload multiple leads at once using an Excel or CSV file"
+        templateHeaders={[
+          'companyName',
+          'contactName',
+          'email',
+          'phone',
+          'serviceInterested',
+          'leadSource',
+          'leadStage',
+          'estimatedValue',
+          'city',
+          'state',
+          'notes'
+        ]}
+        entityName="Leads"
+        onUpload={handleBulkUpload}
+        sampleData={[
+          {
+            companyName: 'ABC Tech Solutions',
+            contactName: 'John Doe',
+            email: 'john@abctech.com',
+            phone: '+91 9876543210',
+            serviceInterested: 'GST Registration',
+            leadSource: 'Website',
+            leadStage: 'hot_lead',
+            estimatedValue: '25000',
+            city: 'Mumbai',
+            state: 'Maharashtra',
+            notes: 'Interested in GST and compliance services'
+          },
+          {
+            companyName: 'XYZ Enterprises',
+            contactName: 'Jane Smith',
+            email: 'jane@xyzent.com',
+            phone: '+91 9876543211',
+            serviceInterested: 'Company Incorporation',
+            leadSource: 'Referral',
+            leadStage: 'warm_lead',
+            estimatedValue: '50000',
+            city: 'Delhi',
+            state: 'Delhi',
+            notes: 'Looking for complete incorporation package'
+          }
+        ]}
+        validationRules={{
+          email: (value) => {
+            if (!value) return 'Email is required';
+            if (!/\S+@\S+\.\S+/.test(value)) return 'Invalid email format';
+            return true;
+          },
+          phone: (value) => {
+            if (!value) return 'Phone is required';
+            if (!/^[+]?[\d\s-()]+$/.test(value)) return 'Invalid phone format';
+            return true;
+          },
+          companyName: (value) => value ? true : 'Company name is required',
+          contactName: (value) => value ? true : 'Contact name is required'
+        }}
+      />
     </div>
   );
 }
