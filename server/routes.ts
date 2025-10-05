@@ -1187,6 +1187,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register AI Document Preparation routes
   const { registerAiDocumentRoutes } = await import('./ai-document-routes');
   registerAiDocumentRoutes(app);
+  
+  // Register Service-Document Integration routes
+  const { registerServiceDocumentIntegration } = await import('./service-document-integration');
+  registerServiceDocumentIntegration(app);
 
   const httpServer = createServer(app);
   return httpServer;
