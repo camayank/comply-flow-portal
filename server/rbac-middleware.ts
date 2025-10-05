@@ -215,17 +215,67 @@ export function requireAllPermissions(...requiredPermissions: string[]) {
   };
 }
 
-export function mockAuthMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-  if (!req.user) {
+// Session-based authentication middleware
+export async function sessionAuthMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  try {
+    // Get session token from Authorization header or cookie
+    const authHeader = req.headers.authorization;
+    const sessionToken = authHeader?.replace('Bearer ', '') || req.cookies?.sessionToken;
+
+    if (!sessionToken) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Import db and userSessions here to avoid circular dependencies
+    const { db } = await import('./db');
+    const { users, userSessions } = await import('@shared/schema');
+    const { eq } = await import('drizzle-orm');
+
+    // Verify session
+    const [session] = await db
+      .select()
+      .from(userSessions)
+      .where(eq(userSessions.sessionToken, sessionToken))
+      .limit(1);
+
+    if (!session || !session.isActive) {
+      return res.status(401).json({ error: 'Invalid or expired session' });
+    }
+
+    if (session.expiresAt < new Date()) {
+      await db
+        .update(userSessions)
+        .set({ isActive: false })
+        .where(eq(userSessions.id, session.id));
+      
+      return res.status(401).json({ error: 'Session expired' });
+    }
+
+    // Get user
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, session.userId))
+      .limit(1);
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({ error: 'User not found or inactive' });
+    }
+
+    // Attach user to request
     req.user = {
-      id: 1,
-      username: 'admin',
-      email: 'admin@digicomply.com',
-      role: USER_ROLES.SUPER_ADMIN,
-      isActive: true,
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      isActive: user.isActive,
     };
+
+    next();
+  } catch (error) {
+    console.error('Session authentication error:', error);
+    return res.status(500).json({ error: 'Authentication failed' });
   }
-  next();
 }
 
 export function hasPermission(role: string, permission: string): boolean {

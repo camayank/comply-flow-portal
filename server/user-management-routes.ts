@@ -4,12 +4,12 @@ import { users } from '@shared/schema';
 import { eq, desc, or, like, and } from 'drizzle-orm';
 import { insertUserSchema, updateUserSchema, USER_ROLES } from '@shared/schema';
 import bcrypt from 'bcrypt';
-import { requireRole, requireMinimumRole, mockAuthMiddleware, USER_ROLES as RBAC_ROLES } from './rbac-middleware';
+import { requireRole, requireMinimumRole, sessionAuthMiddleware, USER_ROLES as RBAC_ROLES } from './rbac-middleware';
 
 export function registerUserManagementRoutes(app: Express) {
 
-  // Apply mock authentication middleware globally for all user management routes
-  app.use('/api/admin/users', mockAuthMiddleware);
+  // Apply session authentication middleware globally for all user management routes
+  app.use('/api/admin/users', sessionAuthMiddleware);
 
   // Get all users (Super Admin and Admin only)
   app.get('/api/admin/users', requireMinimumRole(RBAC_ROLES.ADMIN), async (req, res) => {
