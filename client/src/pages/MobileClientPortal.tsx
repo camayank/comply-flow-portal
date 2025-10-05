@@ -26,6 +26,9 @@ import {
   Calendar,
   Gift,
   CreditCard,
+  Wallet,
+  ShoppingBag,
+  DollarSign,
 } from 'lucide-react';
 
 const MobileClientPortal = () => {
@@ -144,18 +147,45 @@ const MobileClientPortal = () => {
                 Documents
               </button>
               <div className="border-t pt-2 mt-2">
+                <p className="text-xs font-semibold text-gray-500 px-3 py-2">Client Features</p>
+                <Link href="/services" onClick={() => setMobileMenuOpen(false)}>
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50" data-testid="link-service-catalog">
+                    <ShoppingBag className="h-4 w-4" />
+                    Service Catalog
+                  </button>
+                </Link>
                 <Link href="/compliance-calendar" onClick={() => setMobileMenuOpen(false)}>
-                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50">
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50" data-testid="link-compliance-calendar">
                     <Calendar className="h-4 w-4" />
                     Compliance Calendar
                   </button>
                 </Link>
-                <Link href="/client-profile" onClick={() => setMobileMenuOpen(false)}>
-                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50">
-                    <Users className="h-4 w-4" />
-                    Profile & Settings
+                <Link href="/wallet" onClick={() => setMobileMenuOpen(false)}>
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50" data-testid="link-wallet">
+                    <Wallet className="h-4 w-4" />
+                    Wallet & Credits
                   </button>
                 </Link>
+                <Link href="/referral-dashboard" onClick={() => setMobileMenuOpen(false)}>
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50" data-testid="link-referrals">
+                    <Gift className="h-4 w-4" />
+                    Referral Program
+                  </button>
+                </Link>
+                <Link href="/payment-gateway" onClick={() => setMobileMenuOpen(false)}>
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50" data-testid="link-payments">
+                    <DollarSign className="h-4 w-4" />
+                    Payments & Billing
+                  </button>
+                </Link>
+                <div className="border-t pt-2 mt-2">
+                  <Link href="/client-profile" onClick={() => setMobileMenuOpen(false)}>
+                    <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50" data-testid="link-profile">
+                      <Users className="h-4 w-4" />
+                      Profile & Settings
+                    </button>
+                  </Link>
+                </div>
               </div>
             </nav>
           </div>
@@ -196,18 +226,45 @@ const MobileClientPortal = () => {
                 Documents
               </button>
               <div className="border-t pt-2 mt-2">
+                <p className="text-xs font-semibold text-gray-500 px-3 py-2">Client Features</p>
+                <Link href="/services">
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50" data-testid="link-service-catalog-desktop">
+                    <ShoppingBag className="h-4 w-4" />
+                    Service Catalog
+                  </button>
+                </Link>
                 <Link href="/compliance-calendar">
-                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50">
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50" data-testid="link-compliance-calendar-desktop">
                     <Calendar className="h-4 w-4" />
                     Compliance Calendar
                   </button>
                 </Link>
-                <Link href="/client-profile">
-                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50">
-                    <Users className="h-4 w-4" />
-                    Profile & Settings
+                <Link href="/wallet">
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50" data-testid="link-wallet-desktop">
+                    <Wallet className="h-4 w-4" />
+                    Wallet & Credits
                   </button>
                 </Link>
+                <Link href="/referral-dashboard">
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50" data-testid="link-referrals-desktop">
+                    <Gift className="h-4 w-4" />
+                    Referral Program
+                  </button>
+                </Link>
+                <Link href="/payment-gateway">
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50" data-testid="link-payments-desktop">
+                    <DollarSign className="h-4 w-4" />
+                    Payments & Billing
+                  </button>
+                </Link>
+                <div className="border-t pt-2 mt-2">
+                  <Link href="/client-profile">
+                    <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50" data-testid="link-profile-desktop">
+                      <Users className="h-4 w-4" />
+                      Profile & Settings
+                    </button>
+                  </Link>
+                </div>
               </div>
             </nav>
           </div>
