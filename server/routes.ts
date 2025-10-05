@@ -11,6 +11,7 @@ import {
   insertPaymentSchema,
   type Service 
 } from "@shared/schema";
+import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES, type AuthenticatedRequest } from "./rbac-middleware";
 import { registerProposalRoutes } from "./proposals-routes";
 import { registerDashboardAnalyticsRoutes } from "./dashboard-analytics-routes";
 import { registerExportRoutes } from "./export-routes";
@@ -26,7 +27,7 @@ import { registerTaskManagementRoutes } from "./task-management-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
-  // Services API
+  // Services API (Public - catalog viewing)
   app.get("/api/services", async (req: Request, res: Response) => {
     try {
       const services = await storage.getAllServices();
@@ -48,8 +49,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Service Requests API
-  app.post("/api/service-requests", async (req: Request, res: Response) => {
+  // Service Requests API (Protected)
+  app.post("/api/service-requests", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const validatedData = insertServiceRequestSchema.parse(req.body);
       
@@ -75,7 +76,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/service-requests/:id", async (req: Request, res: Response) => {
+  app.get("/api/service-requests/:id", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const serviceRequest = await storage.getServiceRequest(id);
@@ -90,7 +91,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/service-requests/:id", async (req: Request, res: Response) => {
+  app.patch("/api/service-requests/:id", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const updates = req.body;
@@ -158,7 +159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Payment Processing API
-  app.post("/api/payments", async (req: Request, res: Response) => {
+  app.post("/api/payments", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { serviceRequestId, paymentMethod, amount } = req.body;
       
@@ -201,7 +202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/payments/:paymentId", async (req: Request, res: Response) => {
+  app.patch("/api/payments/:paymentId", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { paymentId } = req.params;
       const updates = req.body;
@@ -513,8 +514,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced Admin Panel API Routes with Robust Configuration
-  app.post("/api/admin/service-configurations", async (req: Request, res: Response) => {
+  // Enhanced Admin Panel API Routes with Robust Configuration (Protected - Admin Only)
+  app.post("/api/admin/service-configurations", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ADMIN), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { adminEngine } = await import('./admin-engine');
       const serviceConfig = adminEngine.createServiceConfiguration(req.body);
@@ -536,7 +537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/service-configurations", async (req: Request, res: Response) => {
+  app.get("/api/admin/service-configurations", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ADMIN), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { adminEngine } = await import('./admin-engine');
       const configurations = adminEngine.getAllServiceConfigurations();
@@ -546,7 +547,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/admin/service-configurations/:id", async (req: Request, res: Response) => {
+  app.put("/api/admin/service-configurations/:id", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ADMIN), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { adminEngine } = await import('./admin-engine');
       const { id } = req.params;

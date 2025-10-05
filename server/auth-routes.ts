@@ -119,6 +119,14 @@ export function registerAuthRoutes(app: Express) {
         .set({ lastLogin: new Date() })
         .where(eq(users.id, user.id));
 
+      // Set secure session cookie
+      res.cookie('sessionToken', sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+
       res.json({
         success: true,
         user: {
@@ -193,6 +201,14 @@ export function registerAuthRoutes(app: Express) {
         .set({ lastLogin: new Date() })
         .where(eq(users.id, user.id));
 
+      // Set secure session cookie
+      res.cookie('sessionToken', sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+
       res.json({
         success: true,
         user: {
@@ -225,6 +241,9 @@ export function registerAuthRoutes(app: Express) {
         .update(userSessions)
         .set({ isActive: false })
         .where(eq(userSessions.sessionToken, sessionToken));
+
+      // Clear session cookie
+      res.clearCookie('sessionToken');
 
       res.json({ success: true, message: 'Logged out successfully' });
     } catch (error) {
