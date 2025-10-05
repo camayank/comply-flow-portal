@@ -635,6 +635,168 @@ const MobileResponsiveLanding = () => {
         </div>
       </section>
 
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-12 sm:py-16 lg:py-20 bg-white">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-8 sm:mb-12">
+              <Badge className="mb-4 bg-blue-100 text-blue-700 border-blue-300">🎯 Simple 4-Step Process</Badge>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
+                How DigiComply Works
+              </h2>
+              <p className="text-base sm:text-lg lg:text-xl text-gray-600 px-4 max-w-3xl mx-auto">
+                From signup to serving clients - get your practice running on DigiComply in minutes, not days
+              </p>
+            </div>
+
+            {/* Process Steps */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+              {/* Step 1 */}
+              <div className="relative">
+                <div className="text-center">
+                  <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                    1
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Sign Up Free</h3>
+                  <p className="text-sm text-gray-600">
+                    Create your account in 30 seconds. No credit card required. Start with 14-day free trial.
+                  </p>
+                </div>
+                {/* Connector Line */}
+                <div className="hidden lg:block absolute top-8 left-[60%] w-[80%] h-0.5 bg-gradient-to-r from-blue-300 to-green-300"></div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="relative">
+                <div className="text-center">
+                  <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                    2
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Add Your Clients</h3>
+                  <p className="text-sm text-gray-600">
+                    Import existing clients or add new ones. Upload their documents and compliance details in bulk.
+                  </p>
+                </div>
+                {/* Connector Line */}
+                <div className="hidden lg:block absolute top-8 left-[60%] w-[80%] h-0.5 bg-gradient-to-r from-green-300 to-purple-300"></div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="relative">
+                <div className="text-center">
+                  <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                    3
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Let AI Automate</h3>
+                  <p className="text-sm text-gray-600">
+                    AutoComply builds workflows, TaxTracker manages deadlines, DigiScore monitors compliance health.
+                  </p>
+                </div>
+                {/* Connector Line */}
+                <div className="hidden lg:block absolute top-8 left-[60%] w-[80%] h-0.5 bg-gradient-to-r from-purple-300 to-orange-300"></div>
+              </div>
+
+              {/* Step 4 */}
+              <div className="relative">
+                <div className="text-center">
+                  <div className="mx-auto mb-4 w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+                    4
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-900 mb-2">Serve & Scale</h3>
+                  <p className="text-sm text-gray-600">
+                    Focus on growing your practice. We handle the paperwork, reminders, and compliance tracking.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Benefits Grid */}
+            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 sm:p-8 lg:p-12">
+              <h3 className="text-xl sm:text-2xl font-bold text-gray-900 text-center mb-8">
+                What You Get From Day One
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+                    <Users className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Client Portal Access</h4>
+                  <p className="text-sm text-gray-600">
+                    Your clients get their own login to track progress, upload docs, and see deadlines
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
+                    <Calendar className="h-6 w-6 text-green-600" />
+                  </div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Automated Reminders</h4>
+                  <p className="text-sm text-gray-600">
+                    WhatsApp & email alerts before every deadline - never miss a filing again
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+                    <FileText className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Document Vault</h4>
+                  <p className="text-sm text-gray-600">
+                    Secure cloud storage for all client documents with Google Cloud Storage
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
+                    <TrendingUp className="h-6 w-6 text-orange-600" />
+                  </div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Revenue Analytics</h4>
+                  <p className="text-sm text-gray-600">
+                    Real-time dashboards showing revenue, pending payments, and profit margins
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center mb-4">
+                    <Building2 className="h-6 w-6 text-pink-600" />
+                  </div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Team Collaboration</h4>
+                  <p className="text-sm text-gray-600">
+                    Assign tasks to team members, track progress, and manage workload efficiently
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-4">
+                    <Globe className="h-6 w-6 text-indigo-600" />
+                  </div>
+                  <h4 className="font-semibold text-gray-900 mb-2">Government API Integration</h4>
+                  <p className="text-sm text-gray-600">
+                    Direct filing to GSP, ERI, MCA21 portals - no manual data entry needed
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="text-center mt-8 sm:mt-12">
+              <p className="text-gray-600 mb-4">
+                <strong>Join 5,200+ businesses</strong> already managing compliance on DigiComply
+              </p>
+              <Link to="/register">
+                <Button size="lg" className="bg-blue-600 hover:bg-blue-700 px-8 py-6 text-lg">
+                  Start Your Free 14-Day Trial →
+                </Button>
+              </Link>
+              <p className="text-sm text-gray-500 mt-3">
+                No credit card required • Cancel anytime • Setup in 5 minutes
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Who Is This For? */}
       <section className="py-12 sm:py-16 bg-gradient-to-br from-blue-50 to-purple-50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
