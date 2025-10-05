@@ -52,14 +52,14 @@ const bankDetailsSchema = z.object({
 export default function AgentProfileSettings() {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
-  const [notificationPrefs, setNotificationPrefs] = useState({
-    emailNotifications: true,
-    smsNotifications: true,
-    whatsappNotifications: false,
-    leadAssignments: true,
-    commissionUpdates: true,
-    performanceAlerts: true,
-  });
+  const [notificationPrefs, setNotificationPrefs] = useState<{
+    emailNotifications: boolean;
+    smsNotifications: boolean;
+    whatsappNotifications: boolean;
+    leadAssignments: boolean;
+    commissionUpdates: boolean;
+    performanceAlerts: boolean;
+  } | null>(null);
 
   const { data: profileData, isLoading, error } = useQuery({
     queryKey: ['/api/agent/profile'],
@@ -149,13 +149,20 @@ export default function AgentProfileSettings() {
   });
 
   const updateNotificationsMutation = useMutation({
-    mutationFn: async (data: typeof notificationPrefs) => {
+    mutationFn: async (data: NonNullable<typeof notificationPrefs>) => {
       return apiRequest('PUT', '/api/agent/notifications', data);
     },
     onSuccess: () => {
       toast({
         title: 'Success',
         description: 'Notification preferences updated',
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to update notification preferences',
+        variant: 'destructive',
       });
     },
   });
@@ -479,131 +486,139 @@ export default function AgentProfileSettings() {
               <CardDescription>Manage how you receive updates</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Communication Channels</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Mail className="h-5 w-5 text-gray-500" />
-                      <div>
-                        <p className="font-medium">Email Notifications</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Receive updates via email
-                        </p>
+              {notificationPrefs ? (
+                <>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Communication Channels</h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Mail className="h-5 w-5 text-gray-500" />
+                          <div>
+                            <p className="font-medium">Email Notifications</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Receive updates via email
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={notificationPrefs.emailNotifications}
+                          onCheckedChange={(checked) =>
+                            setNotificationPrefs({ ...notificationPrefs, emailNotifications: checked })
+                          }
+                          data-testid="switch-email"
+                        />
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Phone className="h-5 w-5 text-gray-500" />
+                          <div>
+                            <p className="font-medium">SMS Notifications</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Receive updates via SMS
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={notificationPrefs.smsNotifications}
+                          onCheckedChange={(checked) =>
+                            setNotificationPrefs({ ...notificationPrefs, smsNotifications: checked })
+                          }
+                          data-testid="switch-sms"
+                        />
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Phone className="h-5 w-5 text-gray-500" />
+                          <div>
+                            <p className="font-medium">WhatsApp Notifications</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Receive updates via WhatsApp
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={notificationPrefs.whatsappNotifications}
+                          onCheckedChange={(checked) =>
+                            setNotificationPrefs({ ...notificationPrefs, whatsappNotifications: checked })
+                          }
+                          data-testid="switch-whatsapp"
+                        />
                       </div>
                     </div>
-                    <Switch
-                      checked={notificationPrefs.emailNotifications}
-                      onCheckedChange={(checked) =>
-                        setNotificationPrefs({ ...notificationPrefs, emailNotifications: checked })
-                      }
-                      data-testid="switch-email"
-                    />
                   </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Phone className="h-5 w-5 text-gray-500" />
-                      <div>
-                        <p className="font-medium">SMS Notifications</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Receive updates via SMS
-                        </p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={notificationPrefs.smsNotifications}
-                      onCheckedChange={(checked) =>
-                        setNotificationPrefs({ ...notificationPrefs, smsNotifications: checked })
-                      }
-                      data-testid="switch-sms"
-                    />
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Phone className="h-5 w-5 text-gray-500" />
-                      <div>
-                        <p className="font-medium">WhatsApp Notifications</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Receive updates via WhatsApp
-                        </p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={notificationPrefs.whatsappNotifications}
-                      onCheckedChange={(checked) =>
-                        setNotificationPrefs({ ...notificationPrefs, whatsappNotifications: checked })
-                      }
-                      data-testid="switch-whatsapp"
-                    />
-                  </div>
-                </div>
-              </div>
 
-              <div>
-                <h3 className="text-lg font-semibold mb-4">Alert Types</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Lead Assignments</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Get notified when new leads are assigned
-                      </p>
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Alert Types</h3>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">Lead Assignments</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Get notified when new leads are assigned
+                          </p>
+                        </div>
+                        <Switch
+                          checked={notificationPrefs.leadAssignments}
+                          onCheckedChange={(checked) =>
+                            setNotificationPrefs({ ...notificationPrefs, leadAssignments: checked })
+                          }
+                          data-testid="switch-lead-assignments"
+                        />
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">Commission Updates</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Get notified about commission status changes
+                          </p>
+                        </div>
+                        <Switch
+                          checked={notificationPrefs.commissionUpdates}
+                          onCheckedChange={(checked) =>
+                            setNotificationPrefs({ ...notificationPrefs, commissionUpdates: checked })
+                          }
+                          data-testid="switch-commission-updates"
+                        />
+                      </div>
+                      <Separator />
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">Performance Alerts</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Get notified about performance milestones
+                          </p>
+                        </div>
+                        <Switch
+                          checked={notificationPrefs.performanceAlerts}
+                          onCheckedChange={(checked) =>
+                            setNotificationPrefs({ ...notificationPrefs, performanceAlerts: checked })
+                          }
+                          data-testid="switch-performance-alerts"
+                        />
+                      </div>
                     </div>
-                    <Switch
-                      checked={notificationPrefs.leadAssignments}
-                      onCheckedChange={(checked) =>
-                        setNotificationPrefs({ ...notificationPrefs, leadAssignments: checked })
-                      }
-                      data-testid="switch-lead-assignments"
-                    />
                   </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Commission Updates</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Get notified about commission status changes
-                      </p>
-                    </div>
-                    <Switch
-                      checked={notificationPrefs.commissionUpdates}
-                      onCheckedChange={(checked) =>
-                        setNotificationPrefs({ ...notificationPrefs, commissionUpdates: checked })
-                      }
-                      data-testid="switch-commission-updates"
-                    />
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Performance Alerts</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Get notified about performance milestones
-                      </p>
-                    </div>
-                    <Switch
-                      checked={notificationPrefs.performanceAlerts}
-                      onCheckedChange={(checked) =>
-                        setNotificationPrefs({ ...notificationPrefs, performanceAlerts: checked })
-                      }
-                      data-testid="switch-performance-alerts"
-                    />
-                  </div>
-                </div>
-              </div>
 
-              <div className="flex justify-end pt-4">
-                <Button
-                  onClick={() => updateNotificationsMutation.mutate(notificationPrefs)}
-                  disabled={updateNotificationsMutation.isPending}
-                  data-testid="button-save-notifications"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {updateNotificationsMutation.isPending ? 'Saving...' : 'Save Preferences'}
-                </Button>
-              </div>
+                  <div className="flex justify-end pt-4">
+                    <Button
+                      onClick={() => updateNotificationsMutation.mutate(notificationPrefs)}
+                      disabled={updateNotificationsMutation.isPending}
+                      data-testid="button-save-notifications"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {updateNotificationsMutation.isPending ? 'Saving...' : 'Save Preferences'}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No notification preferences available. Please contact support to set up notifications.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
