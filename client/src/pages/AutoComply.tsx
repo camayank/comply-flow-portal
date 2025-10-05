@@ -30,6 +30,7 @@ import {
 export default function AutoComply() {
   const [selectedWorkflow, setSelectedWorkflow] = useState<any>(null);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [templateData, setTemplateData] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -181,24 +182,68 @@ export default function AutoComply() {
                     description="Welcome email + task assignment + document checklist"
                     icon={<Mail className="h-5 w-5" />}
                     trigger="client_registered"
+                    onUse={() => {
+                      setTemplateData({
+                        name: "Client Onboarding",
+                        trigger: "client_registered",
+                        actions: [
+                          { type: "send_email", template: "WELCOME_EMAIL" },
+                          { type: "create_task", title: "Initial consultation call" },
+                        ]
+                      });
+                      setShowBuilder(true);
+                    }}
                   />
                   <TemplateCard
                     title="Payment Reminder"
                     description="Auto-remind clients 24hrs before payment due"
                     icon={<Clock className="h-5 w-5" />}
                     trigger="payment_due_soon"
+                    onUse={() => {
+                      setTemplateData({
+                        name: "Payment Reminder",
+                        trigger: "payment_due_soon",
+                        actions: [
+                          { type: "send_email", template: "PAYMENT_REMINDER" },
+                          { type: "send_whatsapp", message: "Payment due tomorrow" },
+                        ]
+                      });
+                      setShowBuilder(true);
+                    }}
                   />
                   <TemplateCard
                     title="Compliance Alert"
                     description="GST/TDS deadline reminders with WhatsApp notification"
                     icon={<AlertTriangle className="h-5 w-5" />}
                     trigger="compliance_due_soon"
+                    onUse={() => {
+                      setTemplateData({
+                        name: "Compliance Alert",
+                        trigger: "compliance_due_soon",
+                        actions: [
+                          { type: "send_email", template: "COMPLIANCE_ALERT" },
+                          { type: "send_whatsapp", message: "Compliance deadline approaching" },
+                        ]
+                      });
+                      setShowBuilder(true);
+                    }}
                   />
                   <TemplateCard
                     title="Referral Credit"
                     description="Auto-credit wallet when referral completes service"
                     icon={<Sparkles className="h-5 w-5" />}
                     trigger="referral_completed"
+                    onUse={() => {
+                      setTemplateData({
+                        name: "Referral Credit",
+                        trigger: "referral_completed",
+                        actions: [
+                          { type: "credit_wallet", amount: 10, unit: "percent" },
+                          { type: "send_email", template: "REFERRAL_CREDITED" },
+                        ]
+                      });
+                      setShowBuilder(true);
+                    }}
                   />
                 </div>
               </CardContent>
@@ -224,7 +269,13 @@ export default function AutoComply() {
 
         {/* Workflow Builder Modal */}
         {showBuilder && (
-          <WorkflowBuilder onClose={() => setShowBuilder(false)} />
+          <WorkflowBuilder 
+            onClose={() => {
+              setShowBuilder(false);
+              setTemplateData(null);
+            }}
+            initialData={templateData}
+          />
         )}
 
         {/* Edit Workflow Modal */}
@@ -302,7 +353,7 @@ function WorkflowCard({ workflow, onToggle, onTrigger, onEdit }: any) {
   );
 }
 
-function TemplateCard({ title, description, icon, trigger }: any) {
+function TemplateCard({ title, description, icon, trigger, onUse }: any) {
   return (
     <Card className="cursor-pointer hover:shadow-md transition-shadow">
       <CardHeader>
@@ -315,7 +366,12 @@ function TemplateCard({ title, description, icon, trigger }: any) {
         </div>
       </CardHeader>
       <CardContent>
-        <Button variant="outline" className="w-full" data-testid={`button-use-template-${trigger}`}>
+        <Button 
+          variant="outline" 
+          className="w-full" 
+          onClick={onUse}
+          data-testid={`button-use-template-${trigger}`}
+        >
           Use Template
         </Button>
       </CardContent>
@@ -355,19 +411,45 @@ function ExecutionCard({ execution }: any) {
   );
 }
 
-function WorkflowBuilder({ onClose }: any) {
+function WorkflowBuilder({ onClose, initialData }: any) {
   const [formData, setFormData] = useState({
-    name: '',
-    trigger: '',
-    actions: [],
+    name: initialData?.name || '',
+    trigger: initialData?.trigger || '',
+    actions: initialData?.actions || [],
   });
+
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => apiRequest('/api/workflows/automation', 'POST', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/workflows/automation'] });
+      toast({ title: "Success", description: "Workflow created successfully" });
+      onClose();
+    },
+  });
+
+  const handleCreate = () => {
+    if (!formData.name || !formData.trigger) {
+      toast({ 
+        title: "Error", 
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+    createMutation.mutate(formData);
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <Card className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <CardHeader>
-          <CardTitle>Create New Workflow</CardTitle>
-          <CardDescription>Build a custom automation workflow</CardDescription>
+          <CardTitle>{initialData ? 'Create from Template' : 'Create New Workflow'}</CardTitle>
+          <CardDescription>
+            {initialData ? `Using template: ${initialData.name}` : 'Build a custom automation workflow'}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -376,6 +458,7 @@ function WorkflowBuilder({ onClose }: any) {
               placeholder="e.g., Payment Reminder Automation"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              data-testid="input-workflow-name"
             />
           </div>
           <div>
@@ -393,11 +476,40 @@ function WorkflowBuilder({ onClose }: any) {
               </SelectContent>
             </Select>
           </div>
+          
+          {formData.actions.length > 0 && (
+            <div>
+              <Label>Actions (from template)</Label>
+              <div className="space-y-2 mt-2">
+                {formData.actions.map((action: any, index: number) => (
+                  <div key={index} className="border rounded-lg p-3 bg-muted/50">
+                    <div className="flex items-center gap-2">
+                      <ArrowRight className="h-4 w-4 text-primary" />
+                      <span className="font-medium">{action.type}</span>
+                    </div>
+                    {action.template && (
+                      <p className="text-sm text-muted-foreground ml-6">Template: {action.template}</p>
+                    )}
+                    {action.message && (
+                      <p className="text-sm text-muted-foreground ml-6">Message: {action.message}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <div className="flex gap-2 justify-end">
             <Button variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button>Create Workflow</Button>
+            <Button 
+              onClick={handleCreate}
+              disabled={createMutation.isPending}
+              data-testid="button-create-workflow"
+            >
+              {createMutation.isPending ? 'Creating...' : 'Create Workflow'}
+            </Button>
           </div>
         </CardContent>
       </Card>
