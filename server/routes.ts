@@ -25,6 +25,7 @@ import { registerFinancialManagementRoutes } from "./financial-management-routes
 import { registerTaxManagementRoutes } from "./tax-management-routes";
 import { registerTaskManagementRoutes } from "./task-management-routes";
 import { registerHealthRoutes } from "./health-routes";
+import customerServiceRoutes from "./customer-service-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -1192,6 +1193,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register Universal Task Management routes
   registerTaskManagementRoutes(app);
+  
+  // Register Customer Service & Support Ticket System routes
+  app.use('/api/customer-service', customerServiceRoutes);
   
   // Register AI Document Preparation routes
   const { registerAiDocumentRoutes } = await import('./ai-document-routes');

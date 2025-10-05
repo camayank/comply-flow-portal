@@ -4308,6 +4308,138 @@ export const integrationJobs = pgTable("integration_jobs", {
   completedAt: timestamp("completed_at"),
 });
 
+// ============================================================================
+// CUSTOMER SERVICE & SUPPORT TICKET SYSTEM
+// ============================================================================
+
+// Support Tickets - Customer service ticket management
+export const supportTickets = pgTable("support_tickets", {
+  id: serial("id").primaryKey(),
+  ticketNumber: text("ticket_number").notNull().unique(), // T00001, T00002, etc.
+  
+  // Client information
+  clientId: integer("client_id").notNull(),
+  clientName: text("client_name").notNull(),
+  clientEmail: text("client_email"),
+  clientPhone: text("client_phone"),
+  
+  // Ticket details
+  subject: text("subject").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(), // billing, technical, service_request, complaint, inquiry
+  priority: text("priority").notNull().default("medium"), // low, medium, high, urgent
+  status: text("status").notNull().default("open"), // open, in_progress, resolved, closed, reopened
+  
+  // Assignment
+  assignedTo: integer("assigned_to"), // customer service rep ID
+  assignedBy: integer("assigned_by"),
+  assignedAt: timestamp("assigned_at"),
+  
+  // SLA tracking
+  slaStatus: text("sla_status").default("on_track"), // on_track, at_risk, breached
+  firstResponseDue: timestamp("first_response_due"),
+  firstRespondedAt: timestamp("first_responded_at"),
+  resolutionDue: timestamp("resolution_due"),
+  resolutionSlaHours: integer("resolution_sla_hours").default(24), // default 24 hours
+  
+  // Escalation
+  escalationLevel: integer("escalation_level").default(0), // 0=none, 1=supervisor, 2=manager, 3=admin
+  escalatedAt: timestamp("escalated_at"),
+  escalatedTo: integer("escalated_to"),
+  escalationReason: text("escalation_reason"),
+  
+  // Satisfaction
+  satisfactionRating: integer("satisfaction_rating"), // 1-5 stars
+  satisfactionComment: text("satisfaction_comment"),
+  ratedAt: timestamp("rated_at"),
+  
+  // Related entities
+  serviceRequestId: integer("service_request_id"),
+  businessEntityId: integer("business_entity_id"),
+  
+  // Metadata
+  source: text("source").default("portal"), // portal, email, phone, whatsapp, chat
+  tags: json("tags"), // custom tags for categorization
+  attachments: json("attachments"),
+  internalNotes: text("internal_notes"),
+  
+  // Resolution
+  resolution: text("resolution"),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: integer("resolved_by"),
+  closedAt: timestamp("closed_at"),
+  closedBy: integer("closed_by"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Response Templates - Pre-written responses for common queries
+export const responseTemplates = pgTable("response_templates", {
+  id: serial("id").primaryKey(),
+  
+  // Template identification
+  templateCode: text("template_code").notNull().unique(), // STATUS_UPDATE, DOC_REQUEST, etc.
+  title: text("title").notNull(),
+  category: text("category").notNull(), // service_status, billing, technical, general
+  
+  // Content
+  subject: text("subject"),
+  body: text("body").notNull(),
+  
+  // Variables supported in template
+  variables: json("variables"), // ["clientName", "serviceName", "dueDate"]
+  
+  // Usage tracking
+  usageCount: integer("usage_count").default(0),
+  lastUsed: timestamp("last_used"),
+  
+  // Configuration
+  isActive: boolean("is_active").default(true),
+  department: text("department").default("customer_service"),
+  
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Ticket Messages - Communication thread for each ticket
+export const ticketMessages = pgTable("ticket_messages", {
+  id: serial("id").primaryKey(),
+  ticketId: integer("ticket_id").notNull(),
+  
+  // Message details
+  message: text("message").notNull(),
+  messageType: text("message_type").default("reply"), // reply, internal_note, status_change, assignment
+  
+  // Author
+  authorId: integer("author_id").notNull(),
+  authorName: text("author_name").notNull(),
+  authorRole: text("author_role").notNull(), // customer_service, client, admin
+  
+  // Metadata
+  isInternal: boolean("is_internal").default(false), // internal notes not visible to client
+  attachments: json("attachments"),
+  templateUsed: integer("template_used"), // ID of template if used
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Ticket Assignments History - Track assignment changes
+export const ticketAssignments = pgTable("ticket_assignments", {
+  id: serial("id").primaryKey(),
+  ticketId: integer("ticket_id").notNull(),
+  
+  assignedFrom: integer("assigned_from"), // previous assignee
+  assignedTo: integer("assigned_to").notNull(), // new assignee
+  assignedBy: integer("assigned_by").notNull(), // who made the assignment
+  
+  reason: text("reason"), // transfer reason
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Zod schemas for Integration System
 export const insertIntegrationCredentialSchema = createInsertSchema(integrationCredentials).omit({
   id: true,
@@ -4347,3 +4479,36 @@ export type ApiAuditLog = typeof apiAuditLogs.$inferSelect;
 export type InsertApiAuditLog = z.infer<typeof insertApiAuditLogSchema>;
 export type IntegrationJob = typeof integrationJobs.$inferSelect;
 export type InsertIntegrationJob = z.infer<typeof insertIntegrationJobSchema>;
+
+// Zod schemas for Customer Service & Support Ticket System
+export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertResponseTemplateSchema = createInsertSchema(responseTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTicketMessageSchema = createInsertSchema(ticketMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTicketAssignmentSchema = createInsertSchema(ticketAssignments).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Export types for Customer Service & Support Ticket System
+export type SupportTicket = typeof supportTickets.$inferSelect;
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+export type ResponseTemplate = typeof responseTemplates.$inferSelect;
+export type InsertResponseTemplate = z.infer<typeof insertResponseTemplateSchema>;
+export type TicketMessage = typeof ticketMessages.$inferSelect;
+export type InsertTicketMessage = z.infer<typeof insertTicketMessageSchema>;
+export type TicketAssignment = typeof ticketAssignments.$inferSelect;
+export type InsertTicketAssignment = z.infer<typeof insertTicketAssignmentSchema>;
