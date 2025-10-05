@@ -1,22 +1,32 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import {
   ArrowLeft,
   User,
-  Lock,
   Bell,
   Wallet,
   Building,
   Mail,
   Phone,
-  MapPin,
   Save,
   Copy,
   Check
@@ -25,44 +35,24 @@ import { Link } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 
+const profileFormSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Invalid email address'),
+  phone: z.string().regex(/^[+]?[\d\s-()]+$/, 'Invalid phone number'),
+  territory: z.string().min(2, 'Territory is required'),
+});
+
+const bankDetailsSchema = z.object({
+  bankName: z.string().min(2, 'Bank name is required'),
+  accountNumber: z.string().min(8, 'Account number must be at least 8 digits'),
+  ifscCode: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC code'),
+  panCard: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]$/, 'Invalid PAN card format'),
+});
+
 export default function AgentProfileSettings() {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
-
-  const { data: profileData, isLoading } = useQuery({
-    queryKey: ['/api/agent/profile'],
-  });
-
-  const profile = (profileData as any) || {
-    name: 'Rajesh Kumar',
-    email: 'rajesh@example.com',
-    phone: '+91 9876543210',
-    agentCode: 'AGT-2024-0047',
-    territory: 'Delhi NCR',
-    commissionRate: 15,
-    bankName: 'HDFC Bank',
-    accountNumber: '****6789',
-    ifscCode: 'HDFC0001234',
-    panCard: 'ABCDE1234F',
-    referralCode: 'RAJESH2024',
-    joinedDate: '2024-01-15',
-  };
-
-  const [profileForm, setProfileForm] = useState({
-    name: profile.name,
-    email: profile.email,
-    phone: profile.phone,
-    territory: profile.territory,
-  });
-
-  const [bankDetails, setBankDetails] = useState({
-    bankName: profile.bankName,
-    accountNumber: '',
-    ifscCode: profile.ifscCode,
-    panCard: profile.panCard,
-  });
-
-  const [notifications, setNotifications] = useState({
+  const [notificationPrefs, setNotificationPrefs] = useState({
     emailNotifications: true,
     smsNotifications: true,
     whatsappNotifications: false,
@@ -71,8 +61,56 @@ export default function AgentProfileSettings() {
     performanceAlerts: true,
   });
 
+  const { data: profileData, isLoading, error } = useQuery({
+    queryKey: ['/api/agent/profile'],
+  });
+
+  const profile = (profileData as any);
+
+  const profileForm = useForm<z.infer<typeof profileFormSchema>>({
+    resolver: zodResolver(profileFormSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      phone: '',
+      territory: '',
+    },
+  });
+
+  const bankForm = useForm<z.infer<typeof bankDetailsSchema>>({
+    resolver: zodResolver(bankDetailsSchema),
+    defaultValues: {
+      bankName: '',
+      accountNumber: '',
+      ifscCode: '',
+      panCard: '',
+    },
+  });
+
+  useEffect(() => {
+    if (profile) {
+      profileForm.reset({
+        name: profile.name || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+        territory: profile.territory || '',
+      });
+      
+      bankForm.reset({
+        bankName: profile.bankName || '',
+        accountNumber: '',
+        ifscCode: profile.ifscCode || '',
+        panCard: profile.panCard || '',
+      });
+
+      if (profile.notifications) {
+        setNotificationPrefs(profile.notifications);
+      }
+    }
+  }, [profile, profileForm, bankForm]);
+
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: typeof profileForm) => {
+    mutationFn: async (data: z.infer<typeof profileFormSchema>) => {
       return apiRequest('PUT', '/api/agent/profile', data);
     },
     onSuccess: () => {
@@ -92,7 +130,7 @@ export default function AgentProfileSettings() {
   });
 
   const updateBankDetailsMutation = useMutation({
-    mutationFn: async (data: typeof bankDetails) => {
+    mutationFn: async (data: z.infer<typeof bankDetailsSchema>) => {
       return apiRequest('PUT', '/api/agent/bank-details', data);
     },
     onSuccess: () => {
@@ -101,10 +139,17 @@ export default function AgentProfileSettings() {
         description: 'Bank details updated successfully',
       });
     },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to update bank details',
+        variant: 'destructive',
+      });
+    },
   });
 
   const updateNotificationsMutation = useMutation({
-    mutationFn: async (data: typeof notifications) => {
+    mutationFn: async (data: typeof notificationPrefs) => {
       return apiRequest('PUT', '/api/agent/notifications', data);
     },
     onSuccess: () => {
@@ -116,14 +161,76 @@ export default function AgentProfileSettings() {
   });
 
   const handleCopyReferralCode = () => {
-    navigator.clipboard.writeText(profile.referralCode);
-    setCopied(true);
-    toast({
-      title: 'Copied!',
-      description: 'Referral code copied to clipboard',
-    });
-    setTimeout(() => setCopied(false), 2000);
+    if (profile?.referralCode) {
+      navigator.clipboard.writeText(profile.referralCode);
+      setCopied(true);
+      toast({
+        title: 'Copied!',
+        description: 'Referral code copied to clipboard',
+      });
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
+
+  const onProfileSubmit = (data: z.infer<typeof profileFormSchema>) => {
+    updateProfileMutation.mutate(data);
+  };
+
+  const onBankSubmit = (data: z.infer<typeof bankDetailsSchema>) => {
+    updateBankDetailsMutation.mutate(data);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6 lg:p-8">
+        <div className="mb-6">
+          <div className="flex items-center gap-3">
+            <Link href="/agent/dashboard">
+              <Button variant="ghost" size="icon">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                Profile & Settings
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                Manage your profile and preferences
+              </p>
+            </div>
+          </div>
+        </div>
+        <Skeleton className="h-12 w-full mb-6" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
+  }
+
+  if (error || !profile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6 lg:p-8">
+        <div className="mb-6">
+          <div className="flex items-center gap-3">
+            <Link href="/agent/dashboard">
+              <Button variant="ghost" size="icon">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                Profile & Settings
+              </h1>
+            </div>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-6 text-center text-gray-500">
+            <p>Unable to load profile data. Please try again later.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6 lg:p-8">
@@ -173,81 +280,98 @@ export default function AgentProfileSettings() {
               <CardTitle>Personal Information</CardTitle>
               <CardDescription>Update your personal details</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="agentCode">Agent Code</Label>
-                  <Input
-                    id="agentCode"
-                    value={profile.agentCode}
-                    disabled
-                    data-testid="input-agent-code"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="territory">Territory</Label>
-                  <Input
-                    id="territory"
-                    value={profileForm.territory}
-                    onChange={(e) => setProfileForm({ ...profileForm, territory: e.target.value })}
-                    data-testid="input-territory"
-                  />
-                </div>
-              </div>
+            <CardContent>
+              <Form {...profileForm}>
+                <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormItem>
+                      <FormLabel>Agent Code</FormLabel>
+                      <Input
+                        value={profile.agentCode || 'N/A'}
+                        disabled
+                        data-testid="input-agent-code"
+                      />
+                    </FormItem>
+                    <FormField
+                      control={profileForm.control}
+                      name="territory"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Territory</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="input-territory" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input
-                    id="name"
-                    value={profileForm.name}
-                    onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                    data-testid="input-name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={profileForm.email}
-                    onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                    data-testid="input-email"
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={profileForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Full Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="input-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={profileForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" {...field} data-testid="input-email" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    value={profileForm.phone}
-                    onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                    data-testid="input-phone"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="commissionRate">Commission Rate</Label>
-                  <Input
-                    id="commissionRate"
-                    value={`${profile.commissionRate}%`}
-                    disabled
-                    data-testid="input-commission-rate"
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={profileForm.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="input-phone" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormItem>
+                      <FormLabel>Commission Rate</FormLabel>
+                      <Input
+                        value={`${profile.commissionRate || 0}%`}
+                        disabled
+                        data-testid="input-commission-rate"
+                      />
+                    </FormItem>
+                  </div>
 
-              <div className="flex justify-end pt-4">
-                <Button
-                  onClick={() => updateProfileMutation.mutate(profileForm)}
-                  disabled={updateProfileMutation.isPending}
-                  data-testid="button-save-profile"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {updateProfileMutation.isPending ? 'Saving...' : 'Save Changes'}
-                </Button>
-              </div>
+                  <div className="flex justify-end pt-4">
+                    <Button
+                      type="submit"
+                      disabled={updateProfileMutation.isPending}
+                      data-testid="button-save-profile"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {updateProfileMutation.isPending ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
             </CardContent>
           </Card>
         </TabsContent>
@@ -259,63 +383,83 @@ export default function AgentProfileSettings() {
               <CardTitle>Bank Account Details</CardTitle>
               <CardDescription>Update your bank details for commission payouts</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="bankName">Bank Name</Label>
-                  <Input
-                    id="bankName"
-                    value={bankDetails.bankName}
-                    onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value })}
-                    placeholder="HDFC Bank"
-                    data-testid="input-bank-name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="accountNumber">Account Number</Label>
-                  <Input
-                    id="accountNumber"
-                    value={bankDetails.accountNumber}
-                    onChange={(e) => setBankDetails({ ...bankDetails, accountNumber: e.target.value })}
-                    placeholder="Enter account number"
-                    data-testid="input-account-number"
-                  />
-                </div>
-              </div>
+            <CardContent>
+              <Form {...bankForm}>
+                <form onSubmit={bankForm.handleSubmit(onBankSubmit)} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={bankForm.control}
+                      name="bankName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Bank Name</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="HDFC Bank" data-testid="input-bank-name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={bankForm.control}
+                      name="accountNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Account Number</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="Enter account number"
+                              data-testid="input-account-number"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="ifscCode">IFSC Code</Label>
-                  <Input
-                    id="ifscCode"
-                    value={bankDetails.ifscCode}
-                    onChange={(e) => setBankDetails({ ...bankDetails, ifscCode: e.target.value })}
-                    placeholder="HDFC0001234"
-                    data-testid="input-ifsc-code"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="panCard">PAN Card</Label>
-                  <Input
-                    id="panCard"
-                    value={bankDetails.panCard}
-                    onChange={(e) => setBankDetails({ ...bankDetails, panCard: e.target.value })}
-                    placeholder="ABCDE1234F"
-                    data-testid="input-pan-card"
-                  />
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={bankForm.control}
+                      name="ifscCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>IFSC Code</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="HDFC0001234" data-testid="input-ifsc-code" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={bankForm.control}
+                      name="panCard"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>PAN Card</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="ABCDE1234F" data-testid="input-pan-card" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
-              <div className="flex justify-end pt-4">
-                <Button
-                  onClick={() => updateBankDetailsMutation.mutate(bankDetails)}
-                  disabled={updateBankDetailsMutation.isPending}
-                  data-testid="button-save-bank"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {updateBankDetailsMutation.isPending ? 'Saving...' : 'Save Bank Details'}
-                </Button>
-              </div>
+                  <div className="flex justify-end pt-4">
+                    <Button
+                      type="submit"
+                      disabled={updateBankDetailsMutation.isPending}
+                      data-testid="button-save-bank"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {updateBankDetailsMutation.isPending ? 'Saving...' : 'Save Bank Details'}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
             </CardContent>
           </Card>
         </TabsContent>
@@ -342,9 +486,9 @@ export default function AgentProfileSettings() {
                       </div>
                     </div>
                     <Switch
-                      checked={notifications.emailNotifications}
+                      checked={notificationPrefs.emailNotifications}
                       onCheckedChange={(checked) =>
-                        setNotifications({ ...notifications, emailNotifications: checked })
+                        setNotificationPrefs({ ...notificationPrefs, emailNotifications: checked })
                       }
                       data-testid="switch-email"
                     />
@@ -361,9 +505,9 @@ export default function AgentProfileSettings() {
                       </div>
                     </div>
                     <Switch
-                      checked={notifications.smsNotifications}
+                      checked={notificationPrefs.smsNotifications}
                       onCheckedChange={(checked) =>
-                        setNotifications({ ...notifications, smsNotifications: checked })
+                        setNotificationPrefs({ ...notificationPrefs, smsNotifications: checked })
                       }
                       data-testid="switch-sms"
                     />
@@ -380,9 +524,9 @@ export default function AgentProfileSettings() {
                       </div>
                     </div>
                     <Switch
-                      checked={notifications.whatsappNotifications}
+                      checked={notificationPrefs.whatsappNotifications}
                       onCheckedChange={(checked) =>
-                        setNotifications({ ...notifications, whatsappNotifications: checked })
+                        setNotificationPrefs({ ...notificationPrefs, whatsappNotifications: checked })
                       }
                       data-testid="switch-whatsapp"
                     />
@@ -401,9 +545,9 @@ export default function AgentProfileSettings() {
                       </p>
                     </div>
                     <Switch
-                      checked={notifications.leadAssignments}
+                      checked={notificationPrefs.leadAssignments}
                       onCheckedChange={(checked) =>
-                        setNotifications({ ...notifications, leadAssignments: checked })
+                        setNotificationPrefs({ ...notificationPrefs, leadAssignments: checked })
                       }
                       data-testid="switch-lead-assignments"
                     />
@@ -417,9 +561,9 @@ export default function AgentProfileSettings() {
                       </p>
                     </div>
                     <Switch
-                      checked={notifications.commissionUpdates}
+                      checked={notificationPrefs.commissionUpdates}
                       onCheckedChange={(checked) =>
-                        setNotifications({ ...notifications, commissionUpdates: checked })
+                        setNotificationPrefs({ ...notificationPrefs, commissionUpdates: checked })
                       }
                       data-testid="switch-commission-updates"
                     />
@@ -433,9 +577,9 @@ export default function AgentProfileSettings() {
                       </p>
                     </div>
                     <Switch
-                      checked={notifications.performanceAlerts}
+                      checked={notificationPrefs.performanceAlerts}
                       onCheckedChange={(checked) =>
-                        setNotifications({ ...notifications, performanceAlerts: checked })
+                        setNotificationPrefs({ ...notificationPrefs, performanceAlerts: checked })
                       }
                       data-testid="switch-performance-alerts"
                     />
@@ -445,7 +589,7 @@ export default function AgentProfileSettings() {
 
               <div className="flex justify-end pt-4">
                 <Button
-                  onClick={() => updateNotificationsMutation.mutate(notifications)}
+                  onClick={() => updateNotificationsMutation.mutate(notificationPrefs)}
                   disabled={updateNotificationsMutation.isPending}
                   data-testid="button-save-notifications"
                 >
@@ -465,46 +609,52 @@ export default function AgentProfileSettings() {
               <CardDescription>Earn by referring new agents</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
-                <h3 className="text-lg font-semibold mb-4">Your Referral Code</h3>
-                <div className="flex items-center gap-3">
-                  <Input
-                    value={profile.referralCode}
-                    readOnly
-                    className="text-lg font-mono"
-                    data-testid="input-referral-code"
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleCopyReferralCode}
-                    data-testid="button-copy-referral"
-                  >
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  </Button>
+              {profile.referralCode && (
+                <div className="p-6 bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg border border-primary/20">
+                  <h3 className="text-lg font-semibold mb-4">Your Referral Code</h3>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      value={profile.referralCode}
+                      readOnly
+                      className="text-lg font-mono"
+                      data-testid="input-referral-code"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleCopyReferralCode}
+                      data-testid="button-copy-referral"
+                    >
+                      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
+                    Share this code with others to earn referral bonuses
+                  </p>
                 </div>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-3">
-                  Share this code with others to earn referral bonuses
-                </p>
-              </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
                   <CardHeader className="pb-3">
                     <CardDescription>Total Referrals</CardDescription>
-                    <CardTitle className="text-2xl">8</CardTitle>
+                    <CardTitle className="text-2xl">{profile.totalReferrals || 0}</CardTitle>
                   </CardHeader>
                 </Card>
                 <Card>
                   <CardHeader className="pb-3">
                     <CardDescription>Active Referrals</CardDescription>
-                    <CardTitle className="text-2xl text-green-600">5</CardTitle>
+                    <CardTitle className="text-2xl text-green-600">
+                      {profile.activeReferrals || 0}
+                    </CardTitle>
                   </CardHeader>
                 </Card>
                 <Card>
                   <CardHeader className="pb-3">
                     <CardDescription>Referral Earnings</CardDescription>
-                    <CardTitle className="text-2xl text-primary">₹12,400</CardTitle>
+                    <CardTitle className="text-2xl text-primary">
+                      ₹{(profile.referralEarnings || 0).toLocaleString('en-IN')}
+                    </CardTitle>
                   </CardHeader>
                 </Card>
               </div>
