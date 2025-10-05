@@ -1183,6 +1183,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register Universal Task Management routes
   registerTaskManagementRoutes(app);
+  
+  // Register AI Document Preparation routes
+  const { registerAiDocumentRoutes } = await import('./ai-document-routes');
+  registerAiDocumentRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;
