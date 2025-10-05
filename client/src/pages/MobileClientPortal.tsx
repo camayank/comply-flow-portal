@@ -23,6 +23,9 @@ import {
   Bell,
   Users,
   Edit,
+  Calendar,
+  Gift,
+  CreditCard,
 } from 'lucide-react';
 
 const MobileClientPortal = () => {
@@ -140,6 +143,20 @@ const MobileClientPortal = () => {
                 <Upload className="h-4 w-4" />
                 Documents
               </button>
+              <div className="border-t pt-2 mt-2">
+                <Link href="/compliance-calendar" onClick={() => setMobileMenuOpen(false)}>
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50">
+                    <Calendar className="h-4 w-4" />
+                    Compliance Calendar
+                  </button>
+                </Link>
+                <Link href="/client-profile" onClick={() => setMobileMenuOpen(false)}>
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50">
+                    <Users className="h-4 w-4" />
+                    Profile & Settings
+                  </button>
+                </Link>
+              </div>
             </nav>
           </div>
         )}
@@ -178,6 +195,20 @@ const MobileClientPortal = () => {
                 <Upload className="h-4 w-4" />
                 Documents
               </button>
+              <div className="border-t pt-2 mt-2">
+                <Link href="/compliance-calendar">
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50">
+                    <Calendar className="h-4 w-4" />
+                    Compliance Calendar
+                  </button>
+                </Link>
+                <Link href="/client-profile">
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 hover:bg-gray-50">
+                    <Users className="h-4 w-4" />
+                    Profile & Settings
+                  </button>
+                </Link>
+              </div>
             </nav>
           </div>
         </aside>
@@ -241,6 +272,51 @@ const MobileClientPortal = () => {
                         </p>
                       </div>
                       <Clock className="h-6 w-6 lg:h-8 lg:w-8 text-orange-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Quick Actions Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setLocation('/services')}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-green-100 rounded-lg">
+                        <Plus className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">Browse Services</h3>
+                        <p className="text-xs text-gray-600">Request new services</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setLocation('/compliance-calendar')}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-blue-100 rounded-lg">
+                        <Calendar className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">Compliance Calendar</h3>
+                        <p className="text-xs text-gray-600">Track deadlines</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setLocation('/client-profile')}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-purple-100 rounded-lg">
+                        <Gift className="h-6 w-6 text-purple-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold">Referral Program</h3>
+                        <p className="text-xs text-gray-600">Earn rewards</p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
