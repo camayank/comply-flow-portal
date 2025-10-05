@@ -26,26 +26,32 @@ export default function TaxTracker() {
 
   const { data: dashboard, isLoading } = useQuery({
     queryKey: ['/api/tax/dashboard', selectedClient],
+    queryFn: () => fetch(`/api/tax/dashboard/${selectedClient}`).then(r => r.json()),
   });
 
   const { data: gstHistory } = useQuery({
     queryKey: ['/api/tax/gst/history', selectedClient],
+    queryFn: () => fetch(`/api/tax/gst/history/${selectedClient}`).then(r => r.json()),
   });
 
   const { data: tdsHistory } = useQuery({
     queryKey: ['/api/tax/tds/history', selectedClient],
+    queryFn: () => fetch(`/api/tax/tds/history/${selectedClient}`).then(r => r.json()),
   });
 
   const { data: itrStatus } = useQuery({
     queryKey: ['/api/tax/itr/status', selectedClient],
+    queryFn: () => fetch(`/api/tax/itr/status/${selectedClient}`).then(r => r.json()),
   });
 
   const { data: calendar } = useQuery({
     queryKey: ['/api/tax/calendar'],
+    queryFn: () => fetch('/api/tax/calendar').then(r => r.json()),
   });
 
   const { data: insights } = useQuery({
     queryKey: ['/api/tax/insights', selectedClient],
+    queryFn: () => fetch(`/api/tax/insights/${selectedClient}`).then(r => r.json()),
   });
 
   if (isLoading) {
