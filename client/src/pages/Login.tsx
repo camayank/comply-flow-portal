@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Shield, Mail, Lock, Smartphone } from "lucide-react";
+import { getRoleDashboardRoute } from "@/utils/roleBasedRouting";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -90,9 +91,10 @@ function ClientLogin() {
         title: "Success",
         description: "Login successful!",
       });
-      // Store user data and navigate to client portal
+      // Store user data and navigate to role-specific dashboard
       localStorage.setItem('user', JSON.stringify(data.user));
-      setLocation('/client-portal');
+      const dashboardRoute = getRoleDashboardRoute(data.user.role);
+      setLocation(dashboardRoute);
     },
     onError: (error: any) => {
       toast({
@@ -228,19 +230,10 @@ function StaffLogin() {
         title: "Success",
         description: "Login successful!",
       });
-      // Store user data and navigate based on role
+      // Store user data and navigate to role-specific dashboard
       localStorage.setItem('user', JSON.stringify(data.user));
-      
-      const role = data.user.role;
-      if (role === 'super_admin' || role === 'admin') {
-        setLocation('/admin');
-      } else if (role === 'ops_executive') {
-        setLocation('/operations');
-      } else if (role === 'agent') {
-        setLocation('/agent');
-      } else {
-        setLocation('/portal');
-      }
+      const dashboardRoute = getRoleDashboardRoute(data.user.role);
+      setLocation(dashboardRoute);
     },
     onError: (error: any) => {
       toast({
