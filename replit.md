@@ -11,7 +11,15 @@ The Universal Service Provider Platform is a comprehensive, white-label solution
 - Agent-focused distribution model (Compliance Rakshaks)
 
 ## System Architecture
-The platform is built on a robust architecture designed for enterprise deployment and scalability. It features a unified landing page and a dynamic dashboard system that supports six distinct user roles (client, agent, operations, admin, customer-service, super-admin) with role-based routing and persistent state management.
+The platform is built on a robust architecture designed for enterprise deployment and scalability. It features a unified landing page and a dynamic dashboard system that supports six distinct user roles with role-based routing and persistent state management:
+
+### User Roles & Access
+1. **Super Admin** (`/super-admin`) - System-wide control with user creation, role assignment, RBAC configuration, activity logging, and system settings
+2. **Admin** (`/admin`) - Platform configuration, workflow management, service catalog, analytics dashboards
+3. **Operations** (`/operations`) - Task orchestration, team assignment, SLA monitoring, quality control
+4. **Customer Service** (`/customer-service`) - Ticket management, client communication, support metrics
+5. **Agent** (`/agent`) - Lead pipeline, commission tracking, referral management, performance analytics
+6. **Client** (`/client-portal`) - Service requests, document tracking, compliance calendar, payment history
 
 ### UI/UX Decisions
 - **Mobile-First Design**: All portals are fully responsive and mobile-friendly.
