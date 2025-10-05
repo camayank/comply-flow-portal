@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,11 +17,19 @@ import {
   Calendar,
   TrendingDown,
   Bell,
-  FileText
+  FileText,
+  Menu,
+  X,
+  UserCircle,
+  Briefcase,
+  Gift,
+  Settings
 } from 'lucide-react';
 import { Link } from 'wouter';
 
 export default function AgentDashboard() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
   const { data: agentStats, isLoading: loadingStats } = useQuery({
     queryKey: ['/api/agent/stats'],
   });
@@ -55,16 +64,138 @@ export default function AgentDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6 lg:p-8">
-      {/* Header Section */}
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">
-          Agent Dashboard
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Track your leads, commissions, and performance
-        </p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+      {/* Mobile Header with Navigation */}
+      <header className="bg-white dark:bg-gray-800 border-b sticky top-0 z-50 lg:hidden">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              >
+                {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </Button>
+              <div>
+                <h1 className="font-bold text-lg dark:text-white">Agent Portal</h1>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Partner Dashboard</p>
+              </div>
+            </div>
+            <Bell className="h-5 w-5 text-gray-400" />
+          </div>
+
+          {/* Mobile Navigation Menu */}
+          {mobileMenuOpen && (
+            <div className="bg-white dark:bg-gray-800 border-t px-4 py-3 mt-3">
+              <nav className="space-y-2">
+                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 px-3 py-2">Agent Features</p>
+                <Link href="/pre-sales" onClick={() => setMobileMenuOpen(false)}>
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700" data-testid="link-leads">
+                    <Users className="h-4 w-4" />
+                    Lead Management
+                  </button>
+                </Link>
+                <Link href="/agent/commissions" onClick={() => setMobileMenuOpen(false)}>
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700" data-testid="link-commissions">
+                    <DollarSign className="h-4 w-4" />
+                    Commission Tracker
+                  </button>
+                </Link>
+                <Link href="/agent/performance" onClick={() => setMobileMenuOpen(false)}>
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700" data-testid="link-performance">
+                    <TrendingUp className="h-4 w-4" />
+                    Performance Analytics
+                  </button>
+                </Link>
+                <Link href="/proposals" onClick={() => setMobileMenuOpen(false)}>
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700" data-testid="link-proposals">
+                    <Briefcase className="h-4 w-4" />
+                    Sales Proposals
+                  </button>
+                </Link>
+                <Link href="/referral-dashboard" onClick={() => setMobileMenuOpen(false)}>
+                  <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700" data-testid="link-referrals-agent">
+                    <Gift className="h-4 w-4" />
+                    Referral Program
+                  </button>
+                </Link>
+                <div className="border-t pt-2 mt-2">
+                  <Link href="/agent/profile" onClick={() => setMobileMenuOpen(false)}>
+                    <button className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700" data-testid="link-profile-agent">
+                      <Settings className="h-4 w-4" />
+                      Profile & Settings
+                    </button>
+                  </Link>
+                </div>
+              </nav>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* Desktop Quick Links Bar */}
+      <div className="hidden lg:block bg-white dark:bg-gray-800 border-b sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <UserCircle className="h-6 w-6 text-primary" />
+              <span className="font-semibold dark:text-white">Agent Portal</span>
+            </div>
+            <nav className="flex items-center gap-1">
+              <Link href="/pre-sales">
+                <Button variant="ghost" size="sm" className="text-sm" data-testid="link-leads-desktop">
+                  <Users className="h-4 w-4 mr-1" />
+                  Leads
+                </Button>
+              </Link>
+              <Link href="/agent/commissions">
+                <Button variant="ghost" size="sm" className="text-sm" data-testid="link-commissions-desktop">
+                  <DollarSign className="h-4 w-4 mr-1" />
+                  Commissions
+                </Button>
+              </Link>
+              <Link href="/agent/performance">
+                <Button variant="ghost" size="sm" className="text-sm" data-testid="link-performance-desktop">
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                  Performance
+                </Button>
+              </Link>
+              <Link href="/proposals">
+                <Button variant="ghost" size="sm" className="text-sm" data-testid="link-proposals-desktop">
+                  <Briefcase className="h-4 w-4 mr-1" />
+                  Proposals
+                </Button>
+              </Link>
+              <Link href="/referral-dashboard">
+                <Button variant="ghost" size="sm" className="text-sm" data-testid="link-referrals-agent-desktop">
+                  <Gift className="h-4 w-4 mr-1" />
+                  Referrals
+                </Button>
+              </Link>
+              <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2"></div>
+              <Link href="/agent/profile">
+                <Button variant="ghost" size="sm" className="text-sm" data-testid="link-profile-agent-desktop">
+                  <Settings className="h-4 w-4 mr-1" />
+                  Settings
+                </Button>
+              </Link>
+            </nav>
+          </div>
+        </div>
       </div>
+
+      {/* Main Content */}
+      <div className="p-4 md:p-6 lg:p-8">
+        {/* Header Section */}
+        <div className="mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">
+            Agent Dashboard
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Track your leads, commissions, and performance
+          </p>
+        </div>
 
       {/* Agent Profile Card */}
       {loadingStats ? (
@@ -356,17 +487,18 @@ export default function AgentDashboard() {
         </Card>
       </div>
 
-      {/* Floating Action Button - Add New Lead */}
-      <Link href="/agent/leads/new">
-        <Button
-          size="lg"
-          className="fixed bottom-6 right-6 h-14 w-14 md:w-auto md:px-6 rounded-full shadow-xl hover:shadow-2xl transition-all"
-          data-testid="button-add-lead"
-        >
-          <Plus className="h-6 w-6 md:mr-2" />
-          <span className="hidden md:inline">Add Lead</span>
-        </Button>
-      </Link>
+        {/* Floating Action Button - Add New Lead */}
+        <Link href="/pre-sales">
+          <Button
+            size="lg"
+            className="fixed bottom-6 right-6 h-14 w-14 md:w-auto md:px-6 rounded-full shadow-xl hover:shadow-2xl transition-all"
+            data-testid="button-add-lead"
+          >
+            <Plus className="h-6 w-6 md:mr-2" />
+            <span className="hidden md:inline">Add Lead</span>
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 }
