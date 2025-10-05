@@ -89,6 +89,8 @@ const MobileDashboard = lazy(() => import("./pages/MobileDashboard"));
 const AgentDashboard = lazy(() => import("./pages/AgentDashboard"));
 const AgentLeadManagement = lazy(() => import("./pages/AgentLeadManagement"));
 const AgentCommissionTracker = lazy(() => import("./pages/AgentCommissionTracker"));
+const AgentPerformance = lazy(() => import("./pages/AgentPerformance"));
+const AgentProfileSettings = lazy(() => import("./pages/AgentProfileSettings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const DigiComplyWorkflowDashboard = lazy(() => import("./components/DigiComplyWorkflowDashboard"));
 const OperationsManager = lazy(() => import("./components/OperationsManager"));
@@ -199,6 +201,8 @@ const App = () => (
                 <Route path="/agent/dashboard" component={AgentDashboard} />
                 <Route path="/agent/leads" component={AgentLeadManagement} />
                 <Route path="/agent/commissions" component={AgentCommissionTracker} />
+                <Route path="/agent/performance" component={AgentPerformance} />
+                <Route path="/agent/profile" component={AgentProfileSettings} />
                 <Route path="/agents" component={AgentPortal} />
                 <Route path="/agent-portal" component={AgentPortal} />
                 <Route path="/partner" component={AgentPortal} />
