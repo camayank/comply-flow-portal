@@ -47,7 +47,18 @@ The platform is built on a robust architecture designed for enterprise deploymen
 - **Universal Operations Panel**: Provides task orchestration, team management, SLA monitoring, and QA workflows.
 - **Universal Agent Network**: Includes lead management, commission tracking, and territory management functionalities.
 - **DigiComply AI Products**: Three fully functional AI-powered products with dedicated routes - AutoComply (/autocomply), TaxTracker (/taxtracker), DigiScore (/digiscore) - integrated into admin dashboard for seamless navigation.
-- **Security**: Implements multi-tier role-based access control, two-factor authentication, AES-256 encrypted document storage, and comprehensive audit trails. Relies on Drizzle ORM's parameterized queries for SQL injection prevention.
+- **Security**: Implements comprehensive enterprise-grade security measures:
+  - **Authentication**: Session-based authentication with secure token storage in PostgreSQL
+  - **Session Security**: httpOnly, secure, and sameSite=strict cookies prevent XSS and CSRF attacks
+  - **Rate Limiting**: 5 requests/15min for auth endpoints, 100 requests/15min for API endpoints
+  - **RBAC**: Multi-tier role-based access control with 40+ granular permissions
+  - **Input Validation**: Zod schemas validate all user inputs at API boundaries
+  - **SQL Injection Prevention**: Drizzle ORM's parameterized queries
+  - **XSS Protection**: DOMPurify sanitization for all AI-generated HTML content
+  - **Password Security**: bcrypt hashing (10 rounds) with no password logging
+  - **API Protection**: All sensitive routes protected with sessionAuthMiddleware
+  - **Audit Trail**: Complete session tracking with IP, user agent, and activity logs
+  - **OTP Security**: Production-ready abstraction layer (currently in-memory, requires Redis/database for production)
 
 ### System Design Choices
 - **Multi-tenant Architecture**: Designed to support unlimited clients and distributed operations teams, enabling national scale.
