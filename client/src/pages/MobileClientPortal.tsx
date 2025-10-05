@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { useQuery } from '@tanstack/react-query';
+import { EntityManagementDialog } from '@/components/EntityManagementDialog';
 import { 
   Building2, 
   FileText, 
@@ -20,16 +21,33 @@ import {
   Home,
   Settings,
   Bell,
-  Users
+  Users,
+  Edit,
 } from 'lucide-react';
 
 const MobileClientPortal = () => {
+  const [, setLocation] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [entityDialogOpen, setEntityDialogOpen] = useState(false);
+  const [selectedEntity, setSelectedEntity] = useState<any>(null);
+  const [entityDialogMode, setEntityDialogMode] = useState<'add' | 'edit'>('add');
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
+
+  const handleAddEntity = () => {
+    setSelectedEntity(null);
+    setEntityDialogMode('add');
+    setEntityDialogOpen(true);
+  };
+
+  const handleEditEntity = (entity: any) => {
+    setSelectedEntity(entity);
+    setEntityDialogMode('edit');
+    setEntityDialogOpen(true);
+  };
 
   // Fetch client entities
   const { data: entities = [], isLoading: entitiesLoading } = useQuery({
@@ -260,7 +278,12 @@ const MobileClientPortal = () => {
                   <h2 className="text-xl lg:text-2xl font-bold mb-2">Business Entities</h2>
                   <p className="text-sm lg:text-base text-gray-600">Manage your business entities and compliance</p>
                 </div>
-                <Button size="sm" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2">
+                <Button 
+                  size="sm" 
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2"
+                  onClick={handleAddEntity}
+                  data-testid="button-add-entity"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Add New Business
                 </Button>
@@ -299,13 +322,19 @@ const MobileClientPortal = () => {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <Button size="sm" variant="outline" className="flex-1 text-xs px-3 py-2">
-                              <Eye className="h-3 w-3 mr-1" />
-                              <span>View Details</span>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex-1 text-xs px-3 py-2"
+                              onClick={() => handleEditEntity(entity)}
+                              data-testid={`button-edit-entity-${entity.id}`}
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              <span>Edit</span>
                             </Button>
                             <Button size="sm" className="flex-1 text-xs px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white">
-                              <Settings className="h-3 w-3 mr-1" />
-                              <span>Configure</span>
+                              <Eye className="h-3 w-3 mr-1" />
+                              <span>View Details</span>
                             </Button>
                           </div>
                         </div>
@@ -317,7 +346,11 @@ const MobileClientPortal = () => {
                     <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No entities found</h3>
                     <p className="text-sm text-gray-600 mb-4">Add your first business entity to get started</p>
-                    <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3">
+                    <Button 
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3"
+                      onClick={handleAddEntity}
+                      data-testid="button-add-first-entity"
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       <span>Add Your First Business</span>
                     </Button>
@@ -334,7 +367,12 @@ const MobileClientPortal = () => {
                   <h2 className="text-xl lg:text-2xl font-bold mb-2">Service Requests</h2>
                   <p className="text-sm lg:text-base text-gray-600">Track all your service requests and progress</p>
                 </div>
-                <Button size="sm" className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-4 py-2">
+                <Button 
+                  size="sm" 
+                  className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white px-4 py-2"
+                  onClick={() => setLocation('/services')}
+                  data-testid="button-request-service"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   <span>Request Service</span>
                 </Button>
@@ -399,7 +437,11 @@ const MobileClientPortal = () => {
                     <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No service requests</h3>
                     <p className="text-sm text-gray-600 mb-4">Start your first service request to get going</p>
-                    <Button className="bg-green-600 hover:bg-green-700 text-white px-6 py-3">
+                    <Button 
+                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-3"
+                      onClick={() => setLocation('/services')}
+                      data-testid="button-start-first-service"
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       <span>Start Your First Service Request</span>
                     </Button>
@@ -490,6 +532,14 @@ const MobileClientPortal = () => {
 
       {/* Spacer for bottom navigation on mobile */}
       <div className="lg:hidden h-16"></div>
+
+      {/* Entity Management Dialog */}
+      <EntityManagementDialog
+        open={entityDialogOpen}
+        onOpenChange={setEntityDialogOpen}
+        entity={selectedEntity}
+        mode={entityDialogMode}
+      />
     </div>
   );
 };
