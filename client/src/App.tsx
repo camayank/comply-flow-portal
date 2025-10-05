@@ -73,6 +73,7 @@ import AutoComply from "./pages/AutoComply";
 import TaxTracker from "./pages/TaxTracker";
 import DigiScore from "./pages/DigiScore";
 import TaskManagement from "./pages/TaskManagement";
+import AiDocumentPreparation from "./pages/AiDocumentPreparation";
 
 const App = () => (
   <ErrorBoundary>
@@ -113,6 +114,10 @@ const App = () => (
                 <Route path="/tasks" component={TaskManagement} />
                 <Route path="/task-management" component={TaskManagement} />
                 <Route path="/my-tasks" component={TaskManagement} />
+                <Route path="/documents" component={AiDocumentPreparation} />
+                <Route path="/ai-documents" component={AiDocumentPreparation} />
+                <Route path="/document-preparation" component={AiDocumentPreparation} />
+                <Route path="/doc-generator" component={AiDocumentPreparation} />
                 <Route path="/design-system" component={DesignSystemShowcase} />
                 <Route path="/landing" component={LandingPage} />
                 <Route path="/onboarding-flow" component={OnboardingFlow} />
