@@ -7,6 +7,7 @@ import { Router, Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { GlobalErrorHandler } from "./components/GlobalErrorHandler";
 import { queryClient } from "@/lib/queryClient";
+import { ChatWidget } from "./components/ChatWidget";
 
 // Loading component for lazy routes
 const PageLoader = () => (
@@ -211,6 +212,7 @@ const App = () => (
             <Suspense fallback={null}>
               <Footer />
             </Suspense>
+            <ChatWidget />
           </div>
         </Router>
       </TooltipProvider>
