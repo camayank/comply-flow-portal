@@ -21,7 +21,8 @@ The platform is built on a robust architecture designed for enterprise deploymen
 ### Technical Implementations
 - **Frontend**: React TypeScript with Tailwind CSS.
 - **Backend**: Express.js with enterprise-grade middleware and role-based API routes.
-- **Database**: PostgreSQL with Drizzle ORM, featuring 51+ comprehensive tables supporting multi-tenant operations. A hybrid storage architecture uses PostgreSQL for critical entities (Leads, Proposals, Service Requests, Business Entities, Payments, Referrals, Wallet Credits) and in-memory storage for other modules.
+- **Database**: PostgreSQL with Drizzle ORM, featuring 56+ comprehensive tables supporting multi-tenant operations. A hybrid storage architecture uses PostgreSQL for critical entities (Leads, Proposals, Service Requests, Business Entities, Payments, Referrals, Wallet Credits) and in-memory storage for other modules.
+- **Government Integration System**: Separate input/output layer for government compliance APIs with 5 dedicated tables (integrationCredentials, governmentFilings, sheetSyncLogs, apiAuditLogs, integrationJobs). Provides bidirectional Google Sheets sync for offline resilience, credential vault for secure API key management, job queue for async processing, and complete audit trail for all API interactions. Supports GSP (GST), ERI (Income Tax), and MCA21 (Corporate Affairs) portals with automatic retry mechanisms and conflict resolution.
 - **Referral & Wallet System**: Complete viral referral system with wallet credits (4 tables: referralCodes, referrals, walletCredits, walletTransactions). Clients earn 10% credit when referrals complete first service.
 - **Workflow Automation Engine**: No-code automation with triggers (client_registered, payment_due_soon, milestone_completed, referral_completed) and actions (send_email, send_whatsapp, create_task, credit_wallet).
 - **Universal Task Management System**: Cross-role task management supporting all user types (client, admin, ops, agent) with 7 database tables (taskItems, taskParticipants, taskDependencies, taskSubtasks, taskActivityLog, taskReminderTemplates, taskReminders). Features automated reminder scheduling (T-7, T-3, T-1 days, due date, overdue), task closure workflow with approval system, RBAC enforcement, activity logging, and notification integration. Reminder processor runs hourly for upcoming deadlines and daily at 9 AM IST for overdue tasks.
@@ -66,10 +67,14 @@ The platform is built on a robust architecture designed for enterprise deploymen
 
 ## External Dependencies
 - **Google Cloud Storage**: For file upload and document management.
+- **Google Sheets API**: Bidirectional sync for government filings backup and offline operations. Service account credentials required.
 - **LegalSuvidha.com**: Integrated for a comprehensive service catalog.
 - **PostgreSQL**: Primary database for persistent storage.
 - **WhatsApp (Twilio)**: Twilio connector available for WhatsApp integration. User dismissed setup - requires Twilio credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER) if needed in future.
 - **Stripe**: Payment gateway integration complete. Requires STRIPE_SECRET_KEY and VITE_STRIPE_PUBLIC_KEY environment variables.
 - **Payment Processing**: Generic integration point for various payment gateways.
 - **CRM Synchronization**: Capability for integrating with Customer Relationship Management systems.
-- **Government API Endpoints**: Utilized for compliance and regulatory information.
+- **Government API Integrations**: 
+  - **GSP (GST Suvidha Provider)**: GST filing and status tracking. Requires GSTIN, username, password for authentication.
+  - **ERI (e-Return Intermediary)**: Income Tax return filing. Requires PAN, password for authentication.
+  - **MCA21 (Ministry of Corporate Affairs)**: Corporate filings (AOC-4, DIR-3 KYC, etc.). Requires CIN, DIN, password for authentication.

@@ -123,17 +123,18 @@ export class IntegrationHub {
       conditions.push(eq(apiAuditLogs.portalType, portalType));
     }
     
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-    
-    let query = db
-      .select()
-      .from(apiAuditLogs);
-    
-    if (whereClause) {
-      query = query.where(whereClause);
+    if (conditions.length === 0) {
+      return await db
+        .select()
+        .from(apiAuditLogs)
+        .orderBy(desc(apiAuditLogs.timestamp))
+        .limit(limit);
     }
     
-    return await query
+    return await db
+      .select()
+      .from(apiAuditLogs)
+      .where(and(...conditions))
       .orderBy(desc(apiAuditLogs.timestamp))
       .limit(limit);
   }
