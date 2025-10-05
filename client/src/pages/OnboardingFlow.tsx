@@ -244,13 +244,13 @@ const OnboardingFlow = () => {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
-              <Link href="/admin" className="flex-1">
+              <Link to="/admin" className="flex-1">
                 <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                   <Settings className="h-4 w-4 mr-2" />
                   Configure Platform
                 </Button>
               </Link>
-              <Link href="/portal" className="flex-1">
+              <Link to="/portal" className="flex-1">
                 <Button variant="outline" className="w-full">
                   <Users className="h-4 w-4 mr-2" />
                   Preview Client View
@@ -329,7 +329,7 @@ const OnboardingFlow = () => {
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               ) : (
-                <Link href="/admin">
+                <Link to="/admin">
                   <Button className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white">
                     Launch Platform
                     <ArrowRight className="h-4 w-4" />

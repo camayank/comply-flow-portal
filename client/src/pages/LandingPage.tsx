@@ -87,7 +87,7 @@ const LandingPage = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-6 sm:mb-8 px-4">
-              <Link href="/onboarding">
+              <Link to="/onboarding">
                 <Button 
                   size="lg" 
                   className="w-full sm:w-auto bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-black font-semibold px-8 py-4 text-base sm:text-lg shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
@@ -97,7 +97,7 @@ const LandingPage = () => {
                   Start Free Compliance Check
                 </Button>
               </Link>
-              <Link href="/platform-showcase">
+              <Link to="/platform-showcase">
                 <Button 
                   size="lg" 
                   variant="outline" 
@@ -349,7 +349,7 @@ const LandingPage = () => {
               <p className="text-blue-200 mb-4">
                 Building the future of compliance automation in India
               </p>
-              <Link href="/contact">
+              <Link to="/contact">
                 <Button 
                   size="lg" 
                   className="bg-white text-indigo-900 hover:bg-blue-50"
@@ -796,29 +796,29 @@ const LandingPage = () => {
               <div>
                 <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Services</h3>
                 <ul className="space-y-2 text-xs sm:text-sm text-gray-400">
-                  <li><Link href="/service-selection" className="hover:text-white transition-colors">Company Incorporation</Link></li>
-                  <li><Link href="/service-selection" className="hover:text-white transition-colors">Annual Compliance</Link></li>
-                  <li><Link href="/service-selection" className="hover:text-white transition-colors">GST Registration</Link></li>
-                  <li><Link href="/service-selection" className="hover:text-white transition-colors">Startup India</Link></li>
+                  <li><Link to="/service-selection" className="hover:text-white transition-colors">Company Incorporation</Link></li>
+                  <li><Link to="/service-selection" className="hover:text-white transition-colors">Annual Compliance</Link></li>
+                  <li><Link to="/service-selection" className="hover:text-white transition-colors">GST Registration</Link></li>
+                  <li><Link to="/service-selection" className="hover:text-white transition-colors">Startup India</Link></li>
                 </ul>
               </div>
               
               <div>
                 <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Platform</h3>
                 <ul className="space-y-2 text-xs sm:text-sm text-gray-400">
-                  <li><Link href="/portal" className="hover:text-white transition-colors">Client Portal</Link></li>
-                  <li><Link href="/operations" className="hover:text-white transition-colors">Operations</Link></li>
-                  <li><Link href="/admin" className="hover:text-white transition-colors">Admin</Link></li>
-                  <li><Link href="/agent" className="hover:text-white transition-colors">Partners</Link></li>
+                  <li><Link to="/portal" className="hover:text-white transition-colors">Client Portal</Link></li>
+                  <li><Link to="/operations" className="hover:text-white transition-colors">Operations</Link></li>
+                  <li><Link to="/admin" className="hover:text-white transition-colors">Admin</Link></li>
+                  <li><Link to="/agent" className="hover:text-white transition-colors">Partners</Link></li>
                 </ul>
               </div>
               
               <div>
                 <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Resources</h3>
                 <ul className="space-y-2 text-xs sm:text-sm text-gray-400">
-                  <li><Link href="/10k" className="hover:text-white transition-colors">Free Scorecard</Link></li>
-                  <li><Link href="/platform-showcase" className="hover:text-white transition-colors">Platform Demo</Link></li>
-                  <li><Link href="/compliance-scorecard" className="hover:text-white transition-colors">Compliance Guide</Link></li>
+                  <li><Link to="/10k" className="hover:text-white transition-colors">Free Scorecard</Link></li>
+                  <li><Link to="/platform-showcase" className="hover:text-white transition-colors">Platform Demo</Link></li>
+                  <li><Link to="/compliance-scorecard" className="hover:text-white transition-colors">Compliance Guide</Link></li>
                   <li>24/7 Support</li>
                 </ul>
               </div>
@@ -830,9 +830,9 @@ const LandingPage = () => {
                   © 2025 DigiComply. Part of LegalSuvidha.com Group. All rights reserved.
                 </p>
                 <div className="flex gap-4 text-xs sm:text-sm text-gray-400">
-                  <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-                  <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
-                  <Link href="/security" className="hover:text-white transition-colors">Security</Link>
+                  <Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+                  <Link to="/terms" className="hover:text-white transition-colors">Terms</Link>
+                  <Link to="/security" className="hover:text-white transition-colors">Security</Link>
                 </div>
               </div>
             </div>
@@ -887,7 +887,7 @@ const ProductCard = ({ title, description, features, status, potential, href, ic
           <p className="text-lg font-bold text-green-400">{potential}</p>
         </div>
         {status === 'available' && href ? (
-          <Link href={href}>
+          <Link to={href}>
             <Button 
               className="w-full bg-green-500 hover:bg-green-600 text-white"
               data-testid={`button-try-${title.toLowerCase().replace(/\s+/g, '-')}`}

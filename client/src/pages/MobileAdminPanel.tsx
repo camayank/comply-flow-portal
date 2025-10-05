@@ -279,7 +279,7 @@ const MobileAdminPanel = () => {
                   <Badge variant="outline" className="text-green-600 border-green-600">3 Available</Badge>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <Link href="/autocomply">
+                  <Link to="/autocomply">
                     <Card className="cursor-pointer hover:shadow-lg transition-all border-purple-200 bg-gradient-to-br from-purple-50 to-white">
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between mb-3">
@@ -298,7 +298,7 @@ const MobileAdminPanel = () => {
                     </Card>
                   </Link>
 
-                  <Link href="/taxtracker">
+                  <Link to="/taxtracker">
                     <Card className="cursor-pointer hover:shadow-lg transition-all border-green-200 bg-gradient-to-br from-green-50 to-white">
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between mb-3">
@@ -317,7 +317,7 @@ const MobileAdminPanel = () => {
                     </Card>
                   </Link>
 
-                  <Link href="/digiscore">
+                  <Link to="/digiscore">
                     <Card className="cursor-pointer hover:shadow-lg transition-all border-blue-200 bg-gradient-to-br from-blue-50 to-white">
                       <CardContent className="p-4">
                         <div className="flex items-start justify-between mb-3">

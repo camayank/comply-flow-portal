@@ -340,7 +340,7 @@ export default function AdminPanel() {
           <Badge variant="outline" className="text-green-600 border-green-600">3 Available</Badge>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Link href="/autocomply">
+          <Link to="/autocomply">
             <Card className="cursor-pointer hover:shadow-lg transition-all duration-300 border-purple-200 bg-gradient-to-br from-purple-50 to-white dark:from-purple-900/10 dark:to-background">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-3">
@@ -361,7 +361,7 @@ export default function AdminPanel() {
             </Card>
           </Link>
 
-          <Link href="/taxtracker">
+          <Link to="/taxtracker">
             <Card className="cursor-pointer hover:shadow-lg transition-all duration-300 border-green-200 bg-gradient-to-br from-green-50 to-white dark:from-green-900/10 dark:to-background">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-3">
@@ -382,7 +382,7 @@ export default function AdminPanel() {
             </Card>
           </Link>
 
-          <Link href="/digiscore">
+          <Link to="/digiscore">
             <Card className="cursor-pointer hover:shadow-lg transition-all duration-300 border-blue-200 bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/10 dark:to-background">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-3">

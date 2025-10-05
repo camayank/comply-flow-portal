@@ -131,7 +131,7 @@ const UniversalLandingPage = () => {
               client management, operations orchestration, and compliance workflows across industries.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/universal-admin">
+              <Link to="/universal-admin">
                 <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8">
                   <Play className="w-5 h-5 mr-2" />
                   Launch Demo Platform
@@ -146,7 +146,7 @@ const UniversalLandingPage = () => {
             
             {/* Quick Access Links */}
             <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
-              <Link href="/universal-admin">
+              <Link to="/universal-admin">
                 <Card className="hover:shadow-md transition-shadow cursor-pointer">
                   <CardContent className="p-4 text-center">
                     <Settings className="w-6 h-6 text-blue-600 mx-auto mb-2" />
@@ -154,7 +154,7 @@ const UniversalLandingPage = () => {
                   </CardContent>
                 </Card>
               </Link>
-              <Link href="/universal-client">
+              <Link to="/universal-client">
                 <Card className="hover:shadow-md transition-shadow cursor-pointer">
                   <CardContent className="p-4 text-center">
                     <Users className="w-6 h-6 text-green-600 mx-auto mb-2" />
@@ -162,7 +162,7 @@ const UniversalLandingPage = () => {
                   </CardContent>
                 </Card>
               </Link>
-              <Link href="/universal-ops">
+              <Link to="/universal-ops">
                 <Card className="hover:shadow-md transition-shadow cursor-pointer">
                   <CardContent className="p-4 text-center">
                     <UserCheck className="w-6 h-6 text-purple-600 mx-auto mb-2" />
@@ -170,7 +170,7 @@ const UniversalLandingPage = () => {
                   </CardContent>
                 </Card>
               </Link>
-              <Link href="/agent-portal">
+              <Link to="/agent-portal">
                 <Card className="hover:shadow-md transition-shadow cursor-pointer">
                   <CardContent className="p-4 text-center">
                     <Target className="w-6 h-6 text-orange-600 mx-auto mb-2" />
@@ -364,7 +364,7 @@ const UniversalLandingPage = () => {
                     Comprehensive analytics
                   </li>
                 </ul>
-                <Link href="/universal-admin">
+                <Link to="/universal-admin">
                   <Button className="mt-4 w-full">
                     Explore Admin Panel
                     <ChevronRight className="w-4 h-4 ml-2" />
@@ -404,7 +404,7 @@ const UniversalLandingPage = () => {
                     Integrated messaging
                   </li>
                 </ul>
-                <Link href="/universal-client">
+                <Link to="/universal-client">
                   <Button className="mt-4 w-full">
                     Explore Client Portal
                     <ChevronRight className="w-4 h-4 ml-2" />
@@ -444,7 +444,7 @@ const UniversalLandingPage = () => {
                     Performance analytics
                   </li>
                 </ul>
-                <Link href="/universal-ops">
+                <Link to="/universal-ops">
                   <Button className="mt-4 w-full">
                     Explore Operations
                     <ChevronRight className="w-4 h-4 ml-2" />
@@ -484,7 +484,7 @@ const UniversalLandingPage = () => {
                     Sales enablement tools
                   </li>
                 </ul>
-                <Link href="/agent-portal">
+                <Link to="/agent-portal">
                   <Button className="mt-4 w-full">
                     Explore Agent Network
                     <ChevronRight className="w-4 h-4 ml-2" />
@@ -608,7 +608,7 @@ const UniversalLandingPage = () => {
             Join 50+ service providers who've scaled their operations with our platform
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/universal-admin">
+            <Link to="/universal-admin">
               <Button size="lg" variant="secondary" className="px-8">
                 <Play className="w-5 h-5 mr-2" />
                 Explore Live Demo
@@ -635,10 +635,10 @@ const UniversalLandingPage = () => {
             <div>
               <h4 className="font-semibold mb-4">Platform</h4>
               <ul className="space-y-2 text-gray-400">
-                <li><Link href="/universal-admin">Admin Panel</Link></li>
-                <li><Link href="/universal-client">Client Portal</Link></li>
-                <li><Link href="/universal-ops">Operations</Link></li>
-                <li><Link href="/agent-portal">Agent Network</Link></li>
+                <li><Link to="/universal-admin">Admin Panel</Link></li>
+                <li><Link to="/universal-client">Client Portal</Link></li>
+                <li><Link to="/universal-ops">Operations</Link></li>
+                <li><Link to="/agent-portal">Agent Network</Link></li>
               </ul>
             </div>
             <div>

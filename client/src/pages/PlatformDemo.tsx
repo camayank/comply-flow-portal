@@ -84,7 +84,7 @@ const PlatformDemo = () => {
               <Building2 className="h-6 w-6 text-blue-600" />
               <span className="text-xl font-bold text-gray-900">ServicePro Demo</span>
             </div>
-            <Link href="/">
+            <Link to="/">
               <Button variant="outline" size="sm">
                 Back to Home
               </Button>
@@ -255,7 +255,7 @@ const PlatformDemo = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/onboarding-flow">
+            <Link to="/onboarding-flow">
               <Button size="lg" className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-4">
                 Start Your Free Setup
                 <ArrowRight className="h-5 w-5 ml-2" />

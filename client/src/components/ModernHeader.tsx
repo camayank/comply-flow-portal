@@ -111,7 +111,7 @@ const ModernHeader = ({
             )}
             
             {/* Brand */}
-            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <BrandIcon className={`h-6 w-6 sm:h-8 sm:w-8 ${brandColor}`} />
               <div className="flex flex-col">
                 <span className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
@@ -178,7 +178,7 @@ const ModernHeader = ({
             {/* Primary Action */}
             {primaryAction && (
               primaryAction.href ? (
-                <Link href={primaryAction.href}>
+                <Link to={primaryAction.href}>
                   <Button 
                     size="sm" 
                     className="bg-blue-600 hover:bg-blue-700 text-white font-medium"
@@ -234,7 +234,7 @@ const ModernHeader = ({
               {primaryAction && (
                 <div className="px-3 pt-2">
                   {primaryAction.href ? (
-                    <Link href={primaryAction.href}>
+                    <Link to={primaryAction.href}>
                       <Button 
                         size="sm" 
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white"

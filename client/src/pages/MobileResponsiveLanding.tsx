@@ -48,9 +48,9 @@ const MobileResponsiveLanding = () => {
                 <a href="#products" className="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer">Products</a>
                 <a href="#pricing" className="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer">Pricing</a>
                 <a href="#how-it-works" className="text-gray-600 hover:text-blue-600 transition-colors cursor-pointer">How It Works</a>
-                <Link href="/login" className="text-gray-600 hover:text-blue-600 transition-colors">Login</Link>
+                <Link to="/login" className="text-gray-600 hover:text-blue-600 transition-colors">Login</Link>
               </nav>
-              <Link href="/register">
+              <Link to="/register">
                 <Button size="sm" className="bg-blue-600 hover:bg-blue-700">Start Free Trial</Button>
               </Link>
             </div>
@@ -103,11 +103,11 @@ const MobileResponsiveLanding = () => {
                 >
                   How It Works
                 </a>
-                <Link href="/login" className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded">
+                <Link to="/login" className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded">
                   Login
                 </Link>
                 <div className="px-3 pt-2">
-                  <Link href="/register">
+                  <Link to="/register">
                     <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700">Start Free Trial</Button>
                   </Link>
                 </div>
@@ -131,7 +131,7 @@ const MobileResponsiveLanding = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-6 sm:mb-8 px-4">
-              <Link href="/register">
+              <Link to="/register">
                 <Button size="lg" className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-4 text-base sm:text-lg">
                   Try Free for 14 Days →
                 </Button>
@@ -201,7 +201,7 @@ const MobileResponsiveLanding = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
               {/* AutoComply */}
-              <Link href="/autocomply">
+              <Link to="/autocomply">
                 <Card className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-2 border-purple-200 hover:border-purple-400 bg-gradient-to-br from-purple-50 to-white h-full">
                   <CardHeader className="pb-4">
                     <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
@@ -240,7 +240,7 @@ const MobileResponsiveLanding = () => {
               </Link>
 
               {/* TaxTracker */}
-              <Link href="/taxtracker">
+              <Link to="/taxtracker">
                 <Card className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-2 border-green-200 hover:border-green-400 bg-gradient-to-br from-green-50 to-white h-full">
                   <CardHeader className="pb-4">
                     <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center mb-4">
@@ -279,7 +279,7 @@ const MobileResponsiveLanding = () => {
               </Link>
 
               {/* DigiScore */}
-              <Link href="/digiscore">
+              <Link to="/digiscore">
                 <Card className="cursor-pointer hover:shadow-2xl transition-all duration-300 border-2 border-blue-200 hover:border-blue-400 bg-gradient-to-br from-blue-50 to-white h-full">
                   <CardHeader className="pb-4">
                     <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
@@ -323,7 +323,7 @@ const MobileResponsiveLanding = () => {
               <p className="text-gray-600 mb-4">
                 <strong>7 more AI products coming soon:</strong> RegGPT, NoticeAI, FileTrace, SOPGen, AuditFlow, ESGComply, CaseDock
               </p>
-              <Link href="/register">
+              <Link to="/register">
                 <Button variant="outline" className="border-purple-600 text-purple-600 hover:bg-purple-50">
                   Get Notified When They Launch
                 </Button>
@@ -370,7 +370,7 @@ const MobileResponsiveLanding = () => {
                       Team performance reports
                     </li>
                   </ul>
-                  <Link href="/admin">
+                  <Link to="/admin">
                     <Button className="w-full mt-4 text-sm">View Dashboard</Button>
                   </Link>
                 </CardContent>
@@ -399,7 +399,7 @@ const MobileResponsiveLanding = () => {
                       Instant status updates
                     </li>
                   </ul>
-                  <Link href="/portal">
+                  <Link to="/portal">
                     <Button className="w-full mt-4 text-sm">Try Client View</Button>
                   </Link>
                 </CardContent>
@@ -428,7 +428,7 @@ const MobileResponsiveLanding = () => {
                       See who's working on what
                     </li>
                   </ul>
-                  <Link href="/operations">
+                  <Link to="/operations">
                     <Button className="w-full mt-4 text-sm">Manage Team</Button>
                   </Link>
                 </CardContent>
@@ -457,7 +457,7 @@ const MobileResponsiveLanding = () => {
                       Manage partner network
                     </li>
                   </ul>
-                  <Link href="/referrals">
+                  <Link to="/referrals">
                     <Button className="w-full mt-4 text-sm">Grow Network</Button>
                   </Link>
                 </CardContent>
@@ -618,7 +618,7 @@ const MobileResponsiveLanding = () => {
                       <span>5GB storage</span>
                     </li>
                   </ul>
-                  <Link href="/register">
+                  <Link to="/register">
                     <Button className="w-full" variant="outline">Start Free Trial</Button>
                   </Link>
                 </CardContent>
@@ -657,7 +657,7 @@ const MobileResponsiveLanding = () => {
                       <span>50GB storage</span>
                     </li>
                   </ul>
-                  <Link href="/register">
+                  <Link to="/register">
                     <Button className="w-full bg-blue-600 hover:bg-blue-700">Start Free Trial</Button>
                   </Link>
                 </CardContent>
@@ -695,7 +695,7 @@ const MobileResponsiveLanding = () => {
                       <span>Custom integrations</span>
                     </li>
                   </ul>
-                  <Link href="/register">
+                  <Link to="/register">
                     <Button className="w-full" variant="outline">Contact Sales</Button>
                   </Link>
                 </CardContent>
@@ -894,7 +894,7 @@ const MobileResponsiveLanding = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4">
-              <Link href="/register">
+              <Link to="/register">
                 <Button size="lg" className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-4">
                   Start Free Trial Now →
                 </Button>
@@ -936,9 +936,9 @@ const MobileResponsiveLanding = () => {
               <div>
                 <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Products</h3>
                 <ul className="space-y-2 text-xs sm:text-sm">
-                  <li><Link href="/autocomply" className="text-gray-400 hover:text-white">AutoComply</Link></li>
-                  <li><Link href="/taxtracker" className="text-gray-400 hover:text-white">TaxTracker</Link></li>
-                  <li><Link href="/digiscore" className="text-gray-400 hover:text-white">DigiScore</Link></li>
+                  <li><Link to="/autocomply" className="text-gray-400 hover:text-white">AutoComply</Link></li>
+                  <li><Link to="/taxtracker" className="text-gray-400 hover:text-white">TaxTracker</Link></li>
+                  <li><Link to="/digiscore" className="text-gray-400 hover:text-white">DigiScore</Link></li>
                   <li><a href="#pricing" className="text-gray-400 hover:text-white">Pricing</a></li>
                 </ul>
               </div>
@@ -946,20 +946,20 @@ const MobileResponsiveLanding = () => {
               <div>
                 <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Company</h3>
                 <ul className="space-y-2 text-xs sm:text-sm">
-                  <li><Link href="/about" className="text-gray-400 hover:text-white">About Us</Link></li>
+                  <li><Link to="/about" className="text-gray-400 hover:text-white">About Us</Link></li>
                   <li><a href="tel:+919876543210" className="text-gray-400 hover:text-white">Contact Sales</a></li>
-                  <li><Link href="/careers" className="text-gray-400 hover:text-white">Careers</Link></li>
-                  <li><Link href="/blog" className="text-gray-400 hover:text-white">Blog</Link></li>
+                  <li><Link to="/careers" className="text-gray-400 hover:text-white">Careers</Link></li>
+                  <li><Link to="/blog" className="text-gray-400 hover:text-white">Blog</Link></li>
                 </ul>
               </div>
               
               <div>
                 <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Support</h3>
                 <ul className="space-y-2 text-xs sm:text-sm">
-                  <li><Link href="/help" className="text-gray-400 hover:text-white">Help Center</Link></li>
-                  <li><Link href="/privacy" className="text-gray-400 hover:text-white">Privacy Policy</Link></li>
-                  <li><Link href="/terms" className="text-gray-400 hover:text-white">Terms of Service</Link></li>
-                  <li><Link href="/security" className="text-gray-400 hover:text-white">Security</Link></li>
+                  <li><Link to="/help" className="text-gray-400 hover:text-white">Help Center</Link></li>
+                  <li><Link to="/privacy" className="text-gray-400 hover:text-white">Privacy Policy</Link></li>
+                  <li><Link to="/terms" className="text-gray-400 hover:text-white">Terms of Service</Link></li>
+                  <li><Link to="/security" className="text-gray-400 hover:text-white">Security</Link></li>
                 </ul>
               </div>
             </div>
@@ -970,9 +970,9 @@ const MobileResponsiveLanding = () => {
                   © 2025 DigiComply. All rights reserved.
                 </p>
                 <div className="flex gap-4 text-xs sm:text-sm text-gray-400">
-                  <Link href="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-                  <Link href="/terms" className="hover:text-white transition-colors">Terms</Link>
-                  <Link href="/security" className="hover:text-white transition-colors">Security</Link>
+                  <Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+                  <Link to="/terms" className="hover:text-white transition-colors">Terms</Link>
+                  <Link to="/security" className="hover:text-white transition-colors">Security</Link>
                 </div>
               </div>
             </div>
