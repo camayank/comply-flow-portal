@@ -6,6 +6,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { validateEnv } from "./env";
 import { initializeEncryption } from "./encryption";
+import { registerSecurityMiddleware } from "./security-middleware";
 
 // Validate environment variables on startup
 const env = validateEnv();
@@ -15,7 +16,10 @@ await initializeEncryption();
 
 const app = express();
 
-// Security middleware
+// Register security headers first
+registerSecurityMiddleware(app);
+
+// CORS middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? process.env.ALLOWED_ORIGINS?.split(',') || [] 

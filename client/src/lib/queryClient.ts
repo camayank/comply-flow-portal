@@ -3,7 +3,9 @@ import { toast } from '@/hooks/use-toast';
 
 const DEFAULT_QUERY_FN = async ({ queryKey }: { queryKey: readonly unknown[] }) => {
   const url = queryKey[0] as string;
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    credentials: 'include', // Include cookies for session
+  });
   
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
@@ -42,7 +44,9 @@ export const apiRequest = async (method: string, url: string, data?: any) => {
     method,
     headers: {
       'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest', // CSRF protection
     },
+    credentials: 'include', // Include cookies for session
     ...(data && { body: JSON.stringify(data) }),
   };
 

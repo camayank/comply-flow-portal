@@ -24,8 +24,12 @@ import { registerWorkflowAutomationRoutes } from "./workflow-automation-routes";
 import { registerFinancialManagementRoutes } from "./financial-management-routes";
 import { registerTaxManagementRoutes } from "./tax-management-routes";
 import { registerTaskManagementRoutes } from "./task-management-routes";
+import { registerHealthRoutes } from "./health-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  
+  // Register health check routes first (before any auth/protection)
+  registerHealthRoutes(app);
   
   // Services API (Public - catalog viewing)
   app.get("/api/services", async (req: Request, res: Response) => {
