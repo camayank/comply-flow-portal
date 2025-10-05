@@ -4,6 +4,14 @@ import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { validateEnv } from "./env";
+import { initializeEncryption } from "./encryption";
+
+// Validate environment variables on startup
+const env = validateEnv();
+
+// Initialize encryption
+await initializeEncryption();
 
 const app = express();
 
