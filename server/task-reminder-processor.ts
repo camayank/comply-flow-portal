@@ -1,7 +1,12 @@
 import { db } from './db';
 import { taskItems, taskReminders, users, notifications } from '@shared/schema';
 import { eq, and, lte, gte, sql, isNull } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import * as cron from 'node-cron';
+
+// Create aliases for joining users table multiple times
+const initiatorUser = alias(users, 'initiator');
+const assigneeUser = alias(users, 'assignee');
 
 // ============================================================================
 // TASK REMINDER PROCESSOR
@@ -63,12 +68,12 @@ export class TaskReminderProcessor {
       const tasksWithDueDates = await db
         .select({
           task: taskItems,
-          initiator: users,
-          assignee: users,
+          initiator: initiatorUser,
+          assignee: assigneeUser,
         })
         .from(taskItems)
-        .leftJoin(users, eq(taskItems.initiatorId, users.id))
-        .leftJoin(users, eq(taskItems.assigneeId, users.id))
+        .leftJoin(initiatorUser, eq(taskItems.initiatorId, initiatorUser.id))
+        .leftJoin(assigneeUser, eq(taskItems.assigneeId, assigneeUser.id))
         .where(
           and(
             isNull(taskItems.completedAt),
@@ -151,12 +156,12 @@ export class TaskReminderProcessor {
       const overdueTasks = await db
         .select({
           task: taskItems,
-          initiator: users,
-          assignee: users,
+          initiator: initiatorUser,
+          assignee: assigneeUser,
         })
         .from(taskItems)
-        .leftJoin(users, eq(taskItems.initiatorId, users.id))
-        .leftJoin(users, eq(taskItems.assigneeId, users.id))
+        .leftJoin(initiatorUser, eq(taskItems.initiatorId, initiatorUser.id))
+        .leftJoin(assigneeUser, eq(taskItems.assigneeId, assigneeUser.id))
         .where(
           and(
             isNull(taskItems.completedAt),
