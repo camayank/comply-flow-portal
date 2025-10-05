@@ -4113,6 +4113,27 @@ export type AiDocumentTemplate = typeof aiDocumentTemplates.$inferSelect;
 export type InsertAiDocumentTemplate = z.infer<typeof insertAiDocumentTemplateSchema>;
 
 // ============================================================================
+// OTP STORAGE - Production-Ready Database Storage
+// ============================================================================
+
+export const otpStore = pgTable("otp_store", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull(),
+  otp: text("otp").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  attempts: integer("attempts").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertOtpSchema = createInsertSchema(otpStore).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type OtpStore = typeof otpStore.$inferSelect;
+export type InsertOtp = z.infer<typeof insertOtpSchema>;
+
+// ============================================================================
 // GOVERNMENT INTEGRATION SYSTEM - Separate Input/Output Layer
 // ============================================================================
 

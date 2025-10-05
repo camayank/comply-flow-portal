@@ -1,32 +1,54 @@
 import type { Express } from "express";
 import { db } from './db';
-import { users, userSessions } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { users, userSessions, otpStore } from '@shared/schema';
+import { eq, and, lt } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 
-// OTP storage (in production, use Redis or database)
-// WARNING: In-memory Map is NOT production-ready and will lose OTPs on server restart
-// For production, implement Redis/database storage with proper expiration
-const otpStore = new Map<string, { otp: string; expiresAt: Date }>();
-
-// Production-ready OTP storage function (placeholder for future implementation)
+// Production-ready PostgreSQL-based OTP storage
 async function storeOTP(email: string, otp: string, expiresAt: Date): Promise<void> {
-  // TODO: Replace with Redis/database implementation
-  // Example with Redis: await redis.setex(`otp:${email}`, 600, JSON.stringify({ otp, expiresAt }))
-  otpStore.set(email, { otp, expiresAt });
+  // Delete any existing OTPs for this email
+  await db.delete(otpStore).where(eq(otpStore.email, email));
+  
+  // Insert new OTP
+  await db.insert(otpStore).values({
+    email,
+    otp,
+    expiresAt,
+    attempts: 0,
+  });
 }
 
-async function getOTP(email: string): Promise<{ otp: string; expiresAt: Date } | null> {
-  // TODO: Replace with Redis/database implementation
-  // Example with Redis: const data = await redis.get(`otp:${email}`)
-  return otpStore.get(email) || null;
+async function getOTP(email: string): Promise<{ otp: string; expiresAt: Date; attempts: number } | null> {
+  const [result] = await db
+    .select()
+    .from(otpStore)
+    .where(eq(otpStore.email, email))
+    .limit(1);
+  
+  if (!result) return null;
+  
+  return {
+    otp: result.otp,
+    expiresAt: result.expiresAt,
+    attempts: result.attempts,
+  };
+}
+
+async function incrementOtpAttempts(email: string): Promise<void> {
+  await db
+    .update(otpStore)
+    .set({ attempts: lt(otpStore.attempts, 3) })
+    .where(eq(otpStore.email, email));
 }
 
 async function deleteOTP(email: string): Promise<void> {
-  // TODO: Replace with Redis/database implementation
-  // Example with Redis: await redis.del(`otp:${email}`)
-  otpStore.delete(email);
+  await db.delete(otpStore).where(eq(otpStore.email, email));
+}
+
+// Cleanup expired OTPs (run periodically)
+async function cleanupExpiredOTPs(): Promise<void> {
+  await db.delete(otpStore).where(lt(otpStore.expiresAt, new Date()));
 }
 
 export function registerAuthRoutes(app: Express) {
