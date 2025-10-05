@@ -406,7 +406,7 @@ export default function AgentDashboard() {
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p>No leads yet</p>
-                <Link href="/agent/leads/new">
+                <Link href="/pre-sales">
                   <Button size="sm" className="mt-3" data-testid="button-add-first-lead">
                     <Plus className="h-4 w-4 mr-1" />
                     Add Your First Lead
