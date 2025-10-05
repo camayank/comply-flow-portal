@@ -333,6 +333,174 @@ const MobileResponsiveLanding = () => {
         </div>
       </section>
 
+      {/* Enterprise Features Section */}
+      <section className="py-12 sm:py-16 lg:py-20 bg-gradient-to-br from-slate-900 to-blue-900 text-white">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-8 sm:mb-12">
+              <Badge className="mb-4 bg-yellow-500 text-black hover:bg-yellow-600">🏢 Enterprise-Grade Platform</Badge>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4">
+                Built for ₹100 Cr+ Revenue Scale
+              </h2>
+              <p className="text-base sm:text-lg lg:text-xl text-blue-100 px-4 max-w-3xl mx-auto">
+                Not just software - a complete enterprise platform with government integrations, white-label capability, and national-scale architecture
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+              {/* Government API Integration */}
+              <Card className="bg-white/10 backdrop-blur-sm border-2 border-white/20 hover:border-white/40 transition-all hover:shadow-2xl">
+                <CardHeader className="pb-4">
+                  <div className="w-14 h-14 bg-blue-500 rounded-xl flex items-center justify-center mb-4">
+                    <Globe className="h-7 w-7 text-white" />
+                  </div>
+                  <CardTitle className="text-xl text-white mb-2">Government API Integration</CardTitle>
+                  <CardDescription className="text-blue-200">
+                    Direct integration with official portals
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2 mb-4">
+                    <li className="flex items-start gap-2 text-sm text-blue-100">
+                      <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                      <span><strong className="text-white">GSP Integration:</strong> Direct GST filing</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm text-blue-100">
+                      <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                      <span><strong className="text-white">ERI Integration:</strong> Income Tax returns</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm text-blue-100">
+                      <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                      <span><strong className="text-white">MCA21 Integration:</strong> Corporate filings</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm text-blue-100">
+                      <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                      <span>Encrypted credential storage with libsodium</span>
+                    </li>
+                  </ul>
+                  <Badge className="bg-green-500 text-white">Production Ready</Badge>
+                </CardContent>
+              </Card>
+
+              {/* Enterprise Scale */}
+              <Card className="bg-white/10 backdrop-blur-sm border-2 border-white/20 hover:border-white/40 transition-all hover:shadow-2xl">
+                <CardHeader className="pb-4">
+                  <div className="w-14 h-14 bg-purple-500 rounded-xl flex items-center justify-center mb-4">
+                    <TrendingUp className="h-7 w-7 text-white" />
+                  </div>
+                  <CardTitle className="text-xl text-white mb-2">National Scale Architecture</CardTitle>
+                  <CardDescription className="text-blue-200">
+                    Built for 100,000+ concurrent users
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2 mb-4">
+                    <li className="flex items-start gap-2 text-sm text-blue-100">
+                      <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                      <span><strong className="text-white">134 Database Tables</strong> for comprehensive operations</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm text-blue-100">
+                      <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                      <span><strong className="text-white">375+ API Endpoints</strong> with full RBAC</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm text-blue-100">
+                      <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                      <span><strong className="text-white">29 Performance Indexes</strong> for speed</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm text-blue-100">
+                      <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                      <span>Multi-tenant architecture ready</span>
+                    </li>
+                  </ul>
+                  <Badge className="bg-yellow-500 text-black">₹100 Cr+ Ready</Badge>
+                </CardContent>
+              </Card>
+
+              {/* White-Label & Distribution */}
+              <Card className="bg-white/10 backdrop-blur-sm border-2 border-white/20 hover:border-white/40 transition-all hover:shadow-2xl">
+                <CardHeader className="pb-4">
+                  <div className="w-14 h-14 bg-orange-500 rounded-xl flex items-center justify-center mb-4">
+                    <Building2 className="h-7 w-7 text-white" />
+                  </div>
+                  <CardTitle className="text-xl text-white mb-2">White-Label Ready</CardTitle>
+                  <CardDescription className="text-blue-200">
+                    Rebrand and resell as your own
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2 mb-4">
+                    <li className="flex items-start gap-2 text-sm text-blue-100">
+                      <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                      <span><strong className="text-white">Your Branding:</strong> Custom logo, colors, domain</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm text-blue-100">
+                      <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                      <span><strong className="text-white">Agent Network:</strong> Viral referral system</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm text-blue-100">
+                      <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                      <span><strong className="text-white">Commission Tracking:</strong> Automated payouts</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm text-blue-100">
+                      <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                      <span>Multi-region deployment support</span>
+                    </li>
+                  </ul>
+                  <Badge className="bg-blue-500 text-white">Scalable Model</Badge>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Technical Specs Banner */}
+            <div className="mt-8 sm:mt-12 bg-white/5 backdrop-blur-sm rounded-xl p-6 sm:p-8 border border-white/10">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-yellow-400 mb-1">
+                    131+
+                  </div>
+                  <div className="text-xs sm:text-sm text-blue-200">
+                    Services Catalog
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-yellow-400 mb-1">
+                    6 Roles
+                  </div>
+                  <div className="text-xs sm:text-sm text-blue-200">
+                    RBAC System
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-yellow-400 mb-1">
+                    40+
+                  </div>
+                  <div className="text-xs sm:text-sm text-blue-200">
+                    Permissions Matrix
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl sm:text-3xl font-bold text-yellow-400 mb-1">
+                    ISO
+                  </div>
+                  <div className="text-xs sm:text-sm text-blue-200">
+                    Enterprise Security
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="text-center mt-8">
+              <Link to="/register">
+                <Button size="lg" className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-4">
+                  Request Enterprise Demo →
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Grid - Mobile First */}
       <section id="features" className="py-12 sm:py-16">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -570,6 +738,286 @@ const MobileResponsiveLanding = () => {
                   <p className="text-sm font-medium text-indigo-600">Handles: Import/export compliance</p>
                 </CardContent>
               </Card>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Service Catalog Section */}
+      <section id="services" className="py-12 sm:py-16 lg:py-20 bg-white">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-8 sm:mb-12">
+              <Badge className="mb-4 bg-blue-100 text-blue-700 border-blue-300">📋 131+ Services Available</Badge>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
+                Complete Service Catalog
+              </h2>
+              <p className="text-base sm:text-lg lg:text-xl text-gray-600 px-4 max-w-3xl mx-auto">
+                From company registration to annual compliance - everything your clients need in one platform
+              </p>
+            </div>
+
+            {/* Popular Services Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
+              {/* Company Registration */}
+              <Card className="hover:shadow-lg transition-all border-2 border-blue-100 hover:border-blue-300">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Building2 className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <Badge className="bg-green-100 text-green-700 text-xs">Most Popular</Badge>
+                  </div>
+                  <CardTitle className="text-lg">Company Registration</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <ul className="space-y-2 text-sm text-gray-600 mb-3">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>Private Limited Company</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>LLP Registration</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>One Person Company (OPC)</span>
+                    </li>
+                  </ul>
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <span className="text-sm font-semibold text-gray-900">Starting ₹6,999</span>
+                    <Link to="/services">
+                      <Button size="sm" variant="outline">View Details</Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* GST Services */}
+              <Card className="hover:shadow-lg transition-all border-2 border-green-100 hover:border-green-300">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                      <FileText className="h-5 w-5 text-green-600" />
+                    </div>
+                    <Badge className="bg-blue-100 text-blue-700 text-xs">High Demand</Badge>
+                  </div>
+                  <CardTitle className="text-lg">GST Services</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <ul className="space-y-2 text-sm text-gray-600 mb-3">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>GST Registration</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>Monthly/Quarterly Returns</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>Annual Return (GSTR-9)</span>
+                    </li>
+                  </ul>
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <span className="text-sm font-semibold text-gray-900">Starting ₹999/mo</span>
+                    <Link to="/services">
+                      <Button size="sm" variant="outline">View Details</Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Income Tax */}
+              <Card className="hover:shadow-lg transition-all border-2 border-purple-100 hover:border-purple-300">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <TrendingUp className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <Badge className="bg-purple-100 text-purple-700 text-xs">Essential</Badge>
+                  </div>
+                  <CardTitle className="text-lg">Income Tax</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <ul className="space-y-2 text-sm text-gray-600 mb-3">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>ITR Filing (Individual/Business)</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>TDS Returns</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>Tax Planning & Advisory</span>
+                    </li>
+                  </ul>
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <span className="text-sm font-semibold text-gray-900">Starting ₹1,499</span>
+                    <Link to="/services">
+                      <Button size="sm" variant="outline">View Details</Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Annual Compliance */}
+              <Card className="hover:shadow-lg transition-all border-2 border-orange-100 hover:border-orange-300">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                      <Calendar className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <Badge className="bg-orange-100 text-orange-700 text-xs">Recommended</Badge>
+                  </div>
+                  <CardTitle className="text-lg">Annual Compliance</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <ul className="space-y-2 text-sm text-gray-600 mb-3">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>ROC Annual Filing</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>Board Meetings (4 per year)</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>AGM Compliance</span>
+                    </li>
+                  </ul>
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <span className="text-sm font-semibold text-gray-900">Starting ₹8,999/yr</span>
+                    <Link to="/services">
+                      <Button size="sm" variant="outline">View Details</Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Trademark & IP */}
+              <Card className="hover:shadow-lg transition-all border-2 border-pink-100 hover:border-pink-300">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-10 h-10 bg-pink-100 rounded-lg flex items-center justify-center">
+                      <Shield className="h-5 w-5 text-pink-600" />
+                    </div>
+                    <Badge className="bg-pink-100 text-pink-700 text-xs">Protect IP</Badge>
+                  </div>
+                  <CardTitle className="text-lg">Trademark & IP</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <ul className="space-y-2 text-sm text-gray-600 mb-3">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>Trademark Registration</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>Copyright Registration</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>Patent Filing</span>
+                    </li>
+                  </ul>
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <span className="text-sm font-semibold text-gray-900">Starting ₹4,999</span>
+                    <Link to="/services">
+                      <Button size="sm" variant="outline">View Details</Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Licenses & Registrations */}
+              <Card className="hover:shadow-lg transition-all border-2 border-indigo-100 hover:border-indigo-300">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                      <FileText className="h-5 w-5 text-indigo-600" />
+                    </div>
+                    <Badge className="bg-indigo-100 text-indigo-700 text-xs">Business</Badge>
+                  </div>
+                  <CardTitle className="text-lg">Licenses & Registrations</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <ul className="space-y-2 text-sm text-gray-600 mb-3">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>FSSAI License</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>Import Export Code (IEC)</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                      <span>Professional Tax Registration</span>
+                    </li>
+                  </ul>
+                  <div className="flex items-center justify-between pt-3 border-t">
+                    <span className="text-sm font-semibold text-gray-900">Starting ₹2,499</span>
+                    <Link to="/services">
+                      <Button size="sm" variant="outline">View Details</Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Service Categories */}
+            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl p-6 sm:p-8">
+              <div className="text-center mb-6">
+                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
+                  18 Service Categories | 131+ Services
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Everything from business setup to ongoing compliance - all in one place
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {[
+                  'Company Formation',
+                  'GST & Indirect Tax',
+                  'Income Tax',
+                  'Annual Compliances',
+                  'Accounting & Bookkeeping',
+                  'Trademark & IP',
+                  'Licenses & Permits',
+                  'Legal Documentation',
+                  'Startup Services',
+                  'Funding & Pitch Decks',
+                  'Import/Export',
+                  'Labour & HR Compliance',
+                  'Audit & Assurance',
+                  'Business Valuations',
+                  'Secretarial Services',
+                  'Tax Planning',
+                  'Property & Real Estate',
+                  'Others'
+                ].map((category) => (
+                  <div 
+                    key={category}
+                    className="bg-white rounded-lg px-3 py-2 text-sm text-center font-medium text-gray-700 hover:shadow-md transition-shadow cursor-pointer border border-gray-200"
+                  >
+                    {category}
+                  </div>
+                ))}
+              </div>
+
+              <div className="text-center mt-6">
+                <Link to="/services">
+                  <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
+                    Browse All 131+ Services →
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
         </div>
