@@ -45,14 +45,7 @@ export default function AgentCommissionTracker() {
   });
 
   const commissions = (commissionsData as any)?.commissions || [];
-  const summary = (summaryData as any) || {
-    totalEarned: 148500,
-    pendingAmount: 32400,
-    clearedAmount: 116100,
-    thisMonthEarnings: 18200,
-    nextPayoutDate: '2025-11-05',
-    nextPayoutAmount: 32400,
-  };
+  const summary = (summaryData as any);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -107,95 +100,113 @@ export default function AgentCommissionTracker() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
-          <CardHeader className="pb-3">
-            <CardDescription>Total Earned</CardDescription>
-            <CardTitle className="text-3xl text-green-700 dark:text-green-400">
-              ₹{summary.totalEarned?.toLocaleString('en-IN')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm text-green-600">
-              <TrendingUp className="h-4 w-4" />
-              <span className="font-medium">Lifetime earnings</span>
-            </div>
-          </CardContent>
-        </Card>
+        {loadingSummary ? (
+          <>
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-32 w-full" />
+            ))}
+          </>
+        ) : summary ? (
+          <>
+            <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
+              <CardHeader className="pb-3">
+                <CardDescription>Total Earned</CardDescription>
+                <CardTitle className="text-3xl text-green-700 dark:text-green-400">
+                  ₹{(summary.totalEarned || 0).toLocaleString('en-IN')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <TrendingUp className="h-4 w-4" />
+                  <span className="font-medium">Lifetime earnings</span>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950 dark:to-amber-950">
-          <CardHeader className="pb-3">
-            <CardDescription>Pending Payout</CardDescription>
-            <CardTitle className="text-3xl text-orange-700 dark:text-orange-400">
-              ₹{summary.pendingAmount?.toLocaleString('en-IN')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm text-orange-600">
-              <Clock className="h-4 w-4" />
-              <span className="font-medium">Processing</span>
-            </div>
-          </CardContent>
-        </Card>
+            <Card className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950 dark:to-amber-950">
+              <CardHeader className="pb-3">
+                <CardDescription>Pending Payout</CardDescription>
+                <CardTitle className="text-3xl text-orange-700 dark:text-orange-400">
+                  ₹{(summary.pendingAmount || 0).toLocaleString('en-IN')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-sm text-orange-600">
+                  <Clock className="h-4 w-4" />
+                  <span className="font-medium">Processing</span>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Cleared Amount</CardDescription>
-            <CardTitle className="text-3xl">
-              ₹{summary.clearedAmount?.toLocaleString('en-IN')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <CheckCircle className="h-4 w-4" />
-              <span className="font-medium">Already paid</span>
-            </div>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Cleared Amount</CardDescription>
+                <CardTitle className="text-3xl">
+                  ₹{(summary.clearedAmount || 0).toLocaleString('en-IN')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="font-medium">Already paid</span>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>This Month</CardDescription>
-            <CardTitle className="text-3xl">
-              ₹{summary.thisMonthEarnings?.toLocaleString('en-IN')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <Calendar className="h-4 w-4" />
-              <span className="font-medium">Current month</span>
-            </div>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>This Month</CardDescription>
+                <CardTitle className="text-3xl">
+                  ₹{(summary.thisMonthEarnings || 0).toLocaleString('en-IN')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <Calendar className="h-4 w-4" />
+                  <span className="font-medium">Current month</span>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <div className="col-span-4 text-center py-8 text-gray-500">
+            <p>Unable to load commission summary. Please try again.</p>
+          </div>
+        )}
       </div>
 
       {/* Next Payout Card */}
-      <Card className="mb-6 border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center">
-                <DollarSign className="h-8 w-8 text-primary" />
+      {loadingSummary ? (
+        <Skeleton className="h-24 w-full mb-6" />
+      ) : summary?.nextPayoutDate ? (
+        <Card className="mb-6 border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center">
+                  <DollarSign className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                    Next Payout
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Scheduled for {format(new Date(summary.nextPayoutDate), 'PPP')}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-                  Next Payout
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Scheduled for {summary.nextPayoutDate ? format(new Date(summary.nextPayoutDate), 'PPP') : 'Not scheduled'}
+              <div className="text-right">
+                <p className="text-3xl font-bold text-primary">
+                  ₹{(summary.nextPayoutAmount || 0).toLocaleString('en-IN')}
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  To be credited
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <p className="text-3xl font-bold text-primary">
-                ₹{summary.nextPayoutAmount?.toLocaleString('en-IN')}
-              </p>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                To be credited
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Filters */}
       <Card className="mb-6">

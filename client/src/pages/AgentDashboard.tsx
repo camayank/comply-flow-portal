@@ -39,20 +39,7 @@ export default function AgentDashboard() {
 
   const isLoading = loadingStats || loadingLeads || loadingCommissions;
 
-  // Mock data for demo - will be replaced by real API data
-  const stats = (agentStats as any) || {
-    totalLeads: 47,
-    convertedLeads: 12,
-    conversionRate: 25.5,
-    totalCommission: 45800,
-    pendingCommission: 18200,
-    clearedCommission: 27600,
-    thisMonthLeads: 8,
-    territory: 'Delhi NCR',
-    rank: 'Gold Agent',
-    performanceRating: 4.5
-  };
-
+  const stats = (agentStats as any);
   const recentLeadsData = (recentLeads as any)?.leads || [];
   const announcementsData = (announcements as any)?.announcements || [];
 
@@ -80,103 +67,123 @@ export default function AgentDashboard() {
       </div>
 
       {/* Agent Profile Card */}
-      <Card className="mb-6 border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center">
-                <Users className="h-8 w-8 text-primary" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                  Agent Profile
-                </h2>
-                <div className="flex items-center gap-2 mt-1">
-                  <MapPin className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">
-                    {stats.territory}
-                  </span>
+      {loadingStats ? (
+        <Skeleton className="h-24 w-full mb-6" />
+      ) : stats ? (
+        <Card className="mb-6 border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-16 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Users className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    Agent Profile
+                  </h2>
+                  <div className="flex items-center gap-2 mt-1">
+                    <MapPin className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {stats.territory || 'Not assigned'}
+                    </span>
+                  </div>
                 </div>
               </div>
+              <div className="flex items-center gap-3">
+                <Badge variant="outline" className="text-sm py-1 px-3">
+                  <Award className="h-4 w-4 mr-1" />
+                  {stats.rank || 'Agent'}
+                </Badge>
+                {stats.performanceRating && (
+                  <Badge variant="outline" className="text-sm py-1 px-3">
+                    ⭐ {stats.performanceRating} Rating
+                  </Badge>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Badge variant="outline" className="text-sm py-1 px-3">
-                <Award className="h-4 w-4 mr-1" />
-                {stats.rank}
-              </Badge>
-              <Badge variant="outline" className="text-sm py-1 px-3">
-                ⭐ {stats.performanceRating} Rating
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
-        {/* Total Leads */}
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-3">
-            <CardDescription>Total Leads</CardDescription>
-            <CardTitle className="text-3xl">{stats.totalLeads}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm">
-              <TrendingUp className="h-4 w-4 text-green-600" />
-              <span className="text-green-600 font-medium">
-                +{stats.thisMonthLeads} this month
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+        {loadingStats ? (
+          <>
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-32 w-full" />
+            ))}
+          </>
+        ) : stats ? (
+          <>
+            {/* Total Leads */}
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <CardDescription>Total Leads</CardDescription>
+                <CardTitle className="text-3xl">{stats.totalLeads || 0}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-sm">
+                  <TrendingUp className="h-4 w-4 text-green-600" />
+                  <span className="text-green-600 font-medium">
+                    +{stats.thisMonthLeads || 0} this month
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Converted Leads */}
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-3">
-            <CardDescription>Converted Leads</CardDescription>
-            <CardTitle className="text-3xl">{stats.convertedLeads}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm">
-              <Target className="h-4 w-4 text-blue-600" />
-              <span className="text-blue-600 font-medium">
-                {stats.conversionRate}% conversion rate
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+            {/* Converted Leads */}
+            <Card className="hover:shadow-lg transition-shadow">
+              <CardHeader className="pb-3">
+                <CardDescription>Converted Leads</CardDescription>
+                <CardTitle className="text-3xl">{stats.convertedLeads || 0}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-sm">
+                  <Target className="h-4 w-4 text-blue-600" />
+                  <span className="text-blue-600 font-medium">
+                    {stats.conversionRate || 0}% conversion rate
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Total Commission */}
-        <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
-          <CardHeader className="pb-3">
-            <CardDescription>Total Commission</CardDescription>
-            <CardTitle className="text-3xl text-green-700 dark:text-green-400">
-              ₹{stats.totalCommission.toLocaleString('en-IN')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm">
-              <DollarSign className="h-4 w-4 text-green-600" />
-              <span className="text-green-600 font-medium">Lifetime earnings</span>
-            </div>
-          </CardContent>
-        </Card>
+            {/* Total Commission */}
+            <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950 dark:to-emerald-950">
+              <CardHeader className="pb-3">
+                <CardDescription>Total Commission</CardDescription>
+                <CardTitle className="text-3xl text-green-700 dark:text-green-400">
+                  ₹{(stats.totalCommission || 0).toLocaleString('en-IN')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-sm">
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                  <span className="text-green-600 font-medium">Lifetime earnings</span>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Pending Commission */}
-        <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950 dark:to-amber-950">
-          <CardHeader className="pb-3">
-            <CardDescription>Pending Payout</CardDescription>
-            <CardTitle className="text-3xl text-orange-700 dark:text-orange-400">
-              ₹{stats.pendingCommission.toLocaleString('en-IN')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm">
-              <Calendar className="h-4 w-4 text-orange-600" />
-              <span className="text-orange-600 font-medium">Next payout: 5th</span>
-            </div>
-          </CardContent>
-        </Card>
+            {/* Pending Commission */}
+            <Card className="hover:shadow-lg transition-shadow bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950 dark:to-amber-950">
+              <CardHeader className="pb-3">
+                <CardDescription>Pending Payout</CardDescription>
+                <CardTitle className="text-3xl text-orange-700 dark:text-orange-400">
+                  ₹{(stats.pendingCommission || 0).toLocaleString('en-IN')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 text-orange-600" />
+                  <span className="text-orange-600 font-medium">Next payout: 5th</span>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <div className="col-span-4 text-center py-8 text-gray-500">
+            <p>Unable to load stats. Please try again.</p>
+          </div>
+        )}
       </div>
 
       {/* Quick Actions */}

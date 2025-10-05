@@ -37,21 +37,7 @@ export default function AgentPerformance() {
     queryKey: ['/api/agent/leaderboard', { period: periodFilter }],
   });
 
-  const performance = (performanceData as any) || {
-    currentRank: 5,
-    totalAgents: 48,
-    leadsGenerated: 18,
-    leadsConverted: 5,
-    conversionRate: 27.8,
-    commissionEarned: 18200,
-    performanceScore: 87,
-    monthlyTarget: 30000,
-    achievedTarget: 18200,
-    targetProgress: 60.7,
-    ranking: 'Silver Agent',
-    badges: ['Top Performer', 'Quick Converter', '10+ Leads'],
-  };
-
+  const performance = (performanceData as any);
   const leaderboard = (leaderboardData as any)?.agents || [];
 
   const getPerformanceColor = (score: number) => {
@@ -101,121 +87,149 @@ export default function AgentPerformance() {
       </div>
 
       {/* Performance Score Card */}
-      <Card className="mb-6 border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <div className="h-20 w-20 rounded-full bg-primary/20 flex items-center justify-center">
-                <Trophy className="h-10 w-10 text-primary" />
+      {isLoading ? (
+        <Skeleton className="h-32 w-full mb-6" />
+      ) : performance ? (
+        <Card className="mb-6 border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <div className="h-20 w-20 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Trophy className="h-10 w-10 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                    Performance Score
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Your overall performance rating
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                  Performance Score
-                </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Your overall performance rating
+              <div className="text-center md:text-right">
+                <div className={`text-5xl font-bold ${getPerformanceColor(performance.performanceScore || 0)}`}>
+                  {performance.performanceScore || 0}
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Out of 100
                 </p>
+                {performance.ranking && (
+                  <Badge variant="outline" className="mt-3">
+                    <Award className="h-4 w-4 mr-1" />
+                    {performance.ranking}
+                  </Badge>
+                )}
               </div>
             </div>
-            <div className="text-center md:text-right">
-              <div className={`text-5xl font-bold ${getPerformanceColor(performance.performanceScore)}`}>
-                {performance.performanceScore}
-              </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Out of 100
-              </p>
-              <Badge variant="outline" className="mt-3">
-                <Award className="h-4 w-4 mr-1" />
-                {performance.ranking}
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="mb-6">
+          <CardContent className="p-6 text-center text-gray-500">
+            Unable to load performance data. Please try again.
+          </CardContent>
+        </Card>
+      )}
 
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Current Rank</CardDescription>
-            <CardTitle className="text-3xl">#{performance.currentRank}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <TrendingUp className="h-4 w-4 text-green-600" />
-              <span>Out of {performance.totalAgents} agents</span>
-            </div>
-          </CardContent>
-        </Card>
+        {isLoading ? (
+          <>
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-32 w-full" />
+            ))}
+          </>
+        ) : performance ? (
+          <>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Current Rank</CardDescription>
+                <CardTitle className="text-3xl">#{performance.currentRank || 'N/A'}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <TrendingUp className="h-4 w-4 text-green-600" />
+                  <span>Out of {performance.totalAgents || 0} agents</span>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Conversion Rate</CardDescription>
-            <CardTitle className="text-3xl">{performance.conversionRate}%</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm">
-              <Target className="h-4 w-4 text-blue-600" />
-              <span className="text-blue-600 font-medium">
-                {performance.leadsConverted}/{performance.leadsGenerated} converted
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Conversion Rate</CardDescription>
+                <CardTitle className="text-3xl">{performance.conversionRate || 0}%</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-sm">
+                  <Target className="h-4 w-4 text-blue-600" />
+                  <span className="text-blue-600 font-medium">
+                    {performance.leadsConverted || 0}/{performance.leadsGenerated || 0} converted
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Commission Earned</CardDescription>
-            <CardTitle className="text-3xl text-green-600">
-              ₹{performance.commissionEarned?.toLocaleString('en-IN')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-              <DollarSign className="h-4 w-4" />
-              <span>This period</span>
-            </div>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Commission Earned</CardDescription>
+                <CardTitle className="text-3xl text-green-600">
+                  ₹{(performance.commissionEarned || 0).toLocaleString('en-IN')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <DollarSign className="h-4 w-4" />
+                  <span>This period</span>
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Target Progress</CardDescription>
-            <CardTitle className="text-3xl">{performance.targetProgress}%</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm">
-              <Zap className="h-4 w-4 text-orange-600" />
-              <span className="text-orange-600 font-medium">
-                ₹{performance.achievedTarget?.toLocaleString('en-IN')} / ₹{performance.monthlyTarget?.toLocaleString('en-IN')}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardDescription>Target Progress</CardDescription>
+                <CardTitle className="text-3xl">{performance.targetProgress || 0}%</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2 text-sm">
+                  <Zap className="h-4 w-4 text-orange-600" />
+                  <span className="text-orange-600 font-medium">
+                    ₹{(performance.achievedTarget || 0).toLocaleString('en-IN')} / ₹{(performance.monthlyTarget || 0).toLocaleString('en-IN')}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <div className="col-span-4 text-center py-8 text-gray-500">
+            Unable to load performance metrics. Please try again.
+          </div>
+        )}
       </div>
 
       {/* Badges */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Achievement Badges</CardTitle>
-          <CardDescription>Your earned achievements</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-3">
-            {performance.badges.map((badge: string, index: number) => (
-              <Badge
-                key={index}
-                variant="outline"
-                className="text-sm py-2 px-4 bg-gradient-to-r from-primary/10 to-primary/5"
-                data-testid={`badge-${index}`}
-              >
-                <Star className="h-4 w-4 mr-2 text-yellow-500" />
-                {badge}
-              </Badge>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {performance?.badges && performance.badges.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Achievement Badges</CardTitle>
+            <CardDescription>Your earned achievements</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3">
+              {performance.badges.map((badge: string, index: number) => (
+                <Badge
+                  key={index}
+                  variant="outline"
+                  className="text-sm py-2 px-4 bg-gradient-to-r from-primary/10 to-primary/5"
+                  data-testid={`badge-${index}`}
+                >
+                  <Star className="h-4 w-4 mr-2 text-yellow-500" />
+                  {badge}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Tabs for Detailed Analytics */}
       <Tabs defaultValue="leaderboard" className="space-y-4">
