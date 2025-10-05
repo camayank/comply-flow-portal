@@ -60,6 +60,8 @@ const WhatsAppOnboarding = lazy(() => import("./pages/WhatsAppOnboarding"));
 const ComplianceScorecard = lazy(() => import("./pages/ComplianceScorecard"));
 const ClientPortal = lazy(() => import("./pages/ClientPortal"));
 const MobileClientPortal = lazy(() => import("./pages/MobileClientPortal"));
+const ClientServiceCatalog = lazy(() => import("./pages/ClientServiceCatalog"));
+const ServiceRequestCreate = lazy(() => import("./pages/ServiceRequestCreate"));
 const OperationsPanel = lazy(() => import("./pages/OperationsPanel"));
 const AgentPortal = lazy(() => import("./pages/AgentPortal"));
 const MobileAgentPortal = lazy(() => import("./pages/MobileAgentPortal"));
@@ -135,7 +137,9 @@ const App = () => (
                 <Route path="/onboarding-flow" component={OnboardingFlow} />
                 <Route path="/platform-demo" component={PlatformDemo} />
                 <Route path="/compliance-dashboard" component={ComplianceTrackerDashboard} />
-                <Route path="/services" component={ServiceSelection} />
+                <Route path="/services" component={ClientServiceCatalog} />
+                <Route path="/service-catalog" component={ClientServiceCatalog} />
+                <Route path="/service-request/create" component={ServiceRequestCreate} />
                 <Route path="/workflows" component={DigiComplyWorkflowDashboard} />
                 <Route path="/smart-start" component={SmartStart} />
                 <Route path="/whatsapp-onboarding" component={WhatsAppOnboarding} />
