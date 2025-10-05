@@ -10,20 +10,38 @@ import {
   InsertIntegrationJob
 } from '@shared/schema';
 import { eq, and, desc } from 'drizzle-orm';
+import { encryptCredential, decryptCredential } from './encryption';
 
 // ============================================================================
 // INTEGRATION HUB - Core Service for Government API Integration
 // Separate from portal - handles input/output with GSP, ERI, MCA21
+// SECURITY: All sensitive credentials are encrypted at rest
 // ============================================================================
 
 export class IntegrationHub {
   
   // ========================================================================
-  // CREDENTIAL MANAGEMENT
+  // CREDENTIAL MANAGEMENT (Encrypted)
   // ========================================================================
   
   async storeCredentials(data: InsertIntegrationCredential) {
-    const [credential] = await db.insert(integrationCredentials).values(data).returning();
+    // Encrypt sensitive fields before storing
+    const encryptedData = { ...data };
+    
+    if (data.username) {
+      encryptedData.username = await encryptCredential(data.username);
+    }
+    if (data.apiKey) {
+      encryptedData.apiKey = await encryptCredential(data.apiKey);
+    }
+    if (data.clientSecret) {
+      encryptedData.clientSecret = await encryptCredential(data.clientSecret);
+    }
+    if (data.tokenData) {
+      encryptedData.tokenData = JSON.parse(await encryptCredential(JSON.stringify(data.tokenData)));
+    }
+    
+    const [credential] = await db.insert(integrationCredentials).values(encryptedData).returning();
     return credential;
   }
 
@@ -40,7 +58,26 @@ export class IntegrationHub {
       )
       .limit(1);
     
-    return credentials[0] || null;
+    if (!credentials[0]) return null;
+    
+    // Decrypt sensitive fields before returning
+    const decryptedCredential = { ...credentials[0] };
+    
+    if (credentials[0].username) {
+      decryptedCredential.username = await decryptCredential(credentials[0].username);
+    }
+    if (credentials[0].apiKey) {
+      decryptedCredential.apiKey = await decryptCredential(credentials[0].apiKey);
+    }
+    if (credentials[0].clientSecret) {
+      decryptedCredential.clientSecret = await decryptCredential(credentials[0].clientSecret);
+    }
+    if (credentials[0].tokenData) {
+      const decryptedToken = await decryptCredential(JSON.stringify(credentials[0].tokenData));
+      decryptedCredential.tokenData = JSON.parse(decryptedToken);
+    }
+    
+    return decryptedCredential;
   }
 
   async updateCredentials(id: number, updates: Partial<InsertIntegrationCredential>) {
