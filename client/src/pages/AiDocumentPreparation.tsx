@@ -3,6 +3,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import DOMPurify from 'isomorphic-dompurify';
 import { 
   FileText, Sparkles, Download, Upload, Edit, Eye, 
   Save, FileSignature, Stamp, PenTool, X, Plus,
@@ -541,7 +542,12 @@ export default function AiDocumentPreparation() {
             ) : (
               <div 
                 className="prose max-w-none dark:prose-invert min-h-[500px] p-4 border rounded-lg bg-white dark:bg-gray-900"
-                dangerouslySetInnerHTML={{ __html: selectedDoc.content }}
+                dangerouslySetInnerHTML={{ 
+                  __html: DOMPurify.sanitize(selectedDoc.content, {
+                    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'a', 'table', 'tr', 'td', 'th', 'thead', 'tbody', 'div', 'span', 'blockquote', 'pre', 'code'],
+                    ALLOWED_ATTR: ['href', 'target', 'class', 'style'],
+                  })
+                }}
                 data-testid="doc-preview"
               />
             )}

@@ -88,7 +88,7 @@ export function registerClientRegistrationRoutes(app: Express) {
         .returning();
 
       // TODO: Send welcome email with temporary password
-      console.log(`Welcome email should be sent to ${email} with password: ${tempPassword}`);
+      // Password is sent via email service (not logged for security)
 
       res.status(201).json({
         success: true,
