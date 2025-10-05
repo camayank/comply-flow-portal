@@ -56,6 +56,10 @@ app.use((req, res, next) => {
   
   console.log('✅ Service management systems initialized');
   
+  // Initialize task reminder processor
+  const { taskReminderProcessor } = await import('./task-reminder-processor');
+  console.log('📋 Task reminder processor initialized');
+  
   // Initialize platform-wide synchronization orchestrator
   // const { platformSyncOrchestrator } = await import('./platform-sync-orchestrator');
   console.log('Platform sync orchestrator initialized');
