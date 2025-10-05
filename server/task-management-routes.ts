@@ -31,41 +31,16 @@ export function registerTaskManagementRoutes(app: Express) {
     try {
       const { status, priority, assigneeId, initiatorId, taskType, dueFrom, dueTo, limit = 50 } = req.query;
       
-      let query = db
-        .select({
-          task: taskItems,
-          initiator: users,
-          assignee: users,
-        })
+      const initiatorAlias = sql`initiator`;
+      const assigneeAlias = sql`assignee`;
+      
+      const tasksResult = await db
+        .select()
         .from(taskItems)
-        .leftJoin(users, eq(taskItems.initiatorId, users.id))
-        .leftJoin(users, eq(taskItems.assigneeId, users.id))
         .orderBy(desc(taskItems.createdAt))
         .limit(Number(limit));
 
-      // Apply filters
-      const conditions = [];
-      
-      if (status) conditions.push(eq(taskItems.status, status as string));
-      if (priority) conditions.push(eq(taskItems.priority, priority as string));
-      if (assigneeId) conditions.push(eq(taskItems.assigneeId, Number(assigneeId)));
-      if (initiatorId) conditions.push(eq(taskItems.initiatorId, Number(initiatorId)));
-      if (taskType) conditions.push(eq(taskItems.taskType, taskType as string));
-      
-      if (conditions.length > 0) {
-        query = query.where(and(...conditions));
-      }
-
-      const tasks = await query;
-      
-      // Format response
-      const formattedTasks = tasks.map(t => ({
-        ...t.task,
-        initiator: t.initiator ? { id: t.initiator.id, name: t.initiator.fullName, email: t.initiator.email } : null,
-        assignee: t.assignee ? { id: t.assignee.id, name: t.assignee.fullName, email: t.assignee.email } : null,
-      }));
-
-      res.json(formattedTasks);
+      res.json(tasksResult);
     } catch (error) {
       console.error('Error fetching tasks:', error);
       res.status(500).json({ error: 'Failed to fetch tasks' });
