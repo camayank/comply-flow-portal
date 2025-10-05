@@ -72,6 +72,7 @@ import ReferralDashboard from "./pages/ReferralDashboard";
 import AutoComply from "./pages/AutoComply";
 import TaxTracker from "./pages/TaxTracker";
 import DigiScore from "./pages/DigiScore";
+import TaskManagement from "./pages/TaskManagement";
 
 const App = () => (
   <ErrorBoundary>
@@ -109,6 +110,9 @@ const App = () => (
                 <Route path="/digiscore" component={DigiScore} />
                 <Route path="/compliance-score" component={DigiScore} />
                 <Route path="/score" component={DigiScore} />
+                <Route path="/tasks" component={TaskManagement} />
+                <Route path="/task-management" component={TaskManagement} />
+                <Route path="/my-tasks" component={TaskManagement} />
                 <Route path="/design-system" component={DesignSystemShowcase} />
                 <Route path="/landing" component={LandingPage} />
                 <Route path="/onboarding-flow" component={OnboardingFlow} />
