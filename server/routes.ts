@@ -22,6 +22,7 @@ import { registerReferralRoutes } from "./referral-routes";
 import { registerWorkflowAutomationRoutes } from "./workflow-automation-routes";
 import { registerFinancialManagementRoutes } from "./financial-management-routes";
 import { registerTaxManagementRoutes } from "./tax-management-routes";
+import { registerTaskManagementRoutes } from "./task-management-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -1179,6 +1180,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register Tax Management routes for startups
   registerTaxManagementRoutes(app);
+  
+  // Register Universal Task Management routes
+  registerTaskManagementRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;
