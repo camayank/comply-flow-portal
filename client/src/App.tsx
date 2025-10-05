@@ -47,6 +47,7 @@ import UniversalAdminPanel from "./pages/UniversalAdminPanel";
 import UniversalClientPortal from "./pages/UniversalClientPortal";
 import UniversalOperationsPanel from "./pages/UniversalOperationsPanel";
 import UniversalLandingPage from "./pages/UniversalLandingPage";
+import WorkflowImport from "./pages/WorkflowImport";
 import MobileResponsiveLanding from "./pages/MobileResponsiveLanding";
 import OnboardingFlow from "./pages/OnboardingFlow";
 import PlatformDemo from "./pages/PlatformDemo";
@@ -143,6 +144,7 @@ const App = () => (
                 <Route path="/universal-client" component={UniversalClientPortal} />
                 <Route path="/universal-ops" component={UniversalOperationsPanel} />
                 <Route path="/admin-config" component={AdminServiceConfig} />
+                <Route path="/workflow-import" component={WorkflowImport} />
                 <Route path="/pre-sales" component={PreSalesManager} />
                 <Route path="/proposals" component={SalesProposalManager} />
                 <Route path="/sales-proposals" component={SalesProposalManager} />
