@@ -37,22 +37,16 @@ export class TaskReminderProcessor {
   private scheduleReminderCheck() {
     const job = cron.schedule('0 * * * *', async () => {
       await this.processUpcomingReminders();
-    }, {
-      scheduled: true,
-      timezone: 'Asia/Kolkata'
     });
 
     this.jobs.set('reminder_check', job);
     console.log('⏰ Scheduled hourly reminder check (every hour)');
   }
 
-  // Check for overdue tasks daily
+  // Check for overdue tasks daily (9 AM IST - adjust for your timezone)
   private scheduleOverdueCheck() {
     const job = cron.schedule('0 9 * * *', async () => {
       await this.processOverdueTasks();
-    }, {
-      scheduled: true,
-      timezone: 'Asia/Kolkata'
     });
 
     this.jobs.set('overdue_check', job);
