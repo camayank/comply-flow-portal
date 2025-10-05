@@ -419,11 +419,21 @@ const MobileClientPortal = () => {
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <Button size="sm" variant="outline" className="flex-1 text-xs px-2 py-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex-1 text-xs px-2 py-2"
+                              onClick={() => setLocation(`/service-request/${request.id}`)}
+                              data-testid={`button-track-progress-${request.id}`}
+                            >
                               <Eye className="h-3 w-3 mr-1" />
                               <span>Track Progress</span>
                             </Button>
-                            <Button size="sm" className="flex-1 text-xs px-2 py-2 bg-blue-600 hover:bg-blue-700 text-white">
+                            <Button 
+                              size="sm" 
+                              className="flex-1 text-xs px-2 py-2 bg-blue-600 hover:bg-blue-700 text-white"
+                              onClick={() => setLocation(`/service-request/${request.id}`)}
+                            >
                               <Upload className="h-3 w-3 mr-1" />
                               <span>Upload Files</span>
                             </Button>
