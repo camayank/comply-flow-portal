@@ -108,8 +108,8 @@ export function registerDeliveryRoutes(app: Application) {
         ],
         supportInfo: {
           contactName: 'Customer Success Team',
-          contactEmail: 'support@digicomply.in',
-          contactPhone: '+91-9876543210',
+          contactEmail: 'info@digicomply.in',
+          contactPhone: '+91-8130645164',
           supportHours: 'Monday to Friday, 9 AM to 6 PM IST'
         },
         ...deliveryDetails.deliveryConfirmation.handoffDocument

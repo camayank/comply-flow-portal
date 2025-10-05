@@ -899,16 +899,10 @@ const MobileResponsiveLanding = () => {
                   Start Free Trial Now →
                 </Button>
               </Link>
-              <a href="tel:+919876543210">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto border-white text-white hover:bg-white hover:text-purple-900 px-8 py-4">
-                  <Phone className="h-5 w-5 mr-2" />
-                  Call Sales
-                </Button>
-              </a>
             </div>
             
             <p className="text-sm text-purple-200 mt-6">
-              Questions? Call us: <a href="tel:+919876543210" className="text-yellow-400 hover:underline font-semibold">+91 98765 43210</a> or Email: <a href="mailto:hello@digicomply.in" className="text-yellow-400 hover:underline font-semibold">hello@digicomply.in</a>
+              Questions? Call us: <a href="tel:+918130645164" className="text-yellow-400 hover:underline font-semibold">+91 8130645164</a> or Email: <a href="mailto:info@digicomply.in" className="text-yellow-400 hover:underline font-semibold">info@digicomply.in</a>
             </p>
           </div>
         </div>
@@ -928,13 +922,13 @@ const MobileResponsiveLanding = () => {
                   AI-powered compliance and tax automation for service professionals.
                 </p>
                 <div className="space-y-2">
-                  <a href="tel:+919876543210" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white">
+                  <a href="tel:+918130645164" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white">
                     <Phone className="h-4 w-4" />
-                    +91 98765 43210
+                    +91 8130645164
                   </a>
-                  <a href="mailto:hello@digicomply.in" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white">
+                  <a href="mailto:info@digicomply.in" className="flex items-center gap-2 text-sm text-gray-400 hover:text-white">
                     <Mail className="h-4 w-4" />
-                    hello@digicomply.in
+                    info@digicomply.in
                   </a>
                 </div>
               </div>

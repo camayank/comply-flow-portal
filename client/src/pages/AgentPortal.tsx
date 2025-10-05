@@ -67,7 +67,7 @@ const mockAgentProfile = {
   name: "Rajesh Kumar",
   agentCode: "RK001",
   email: "rajesh@digicomply.com",
-  phone: "+91 9876543210",
+  phone: "+91 8130645164",
   assignedTerritory: "Mumbai, Maharashtra",
   joiningDate: "2024-01-15",
   role: "agent",
