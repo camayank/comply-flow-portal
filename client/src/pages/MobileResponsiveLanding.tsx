@@ -131,7 +131,7 @@ const MobileResponsiveLanding = () => {
               Automate compliance, taxes, and client work so you can focus on growing your business - not managing spreadsheets.
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-6 sm:mb-8 px-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-4 sm:mb-6 px-4">
               <Link to="/register">
                 <Button size="lg" className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-4 text-base sm:text-lg">
                   Try Free for 14 Days →
@@ -143,6 +143,21 @@ const MobileResponsiveLanding = () => {
                   See AI Products
                 </Button>
               </a>
+            </div>
+
+            {/* Access Dashboard Button */}
+            <div className="flex justify-center px-4 mb-6 sm:mb-8">
+              <Link to="/select-role">
+                <Button 
+                  variant="ghost"
+                  size="lg"
+                  className="text-white hover:bg-white/20 backdrop-blur-sm border border-white/30"
+                  data-testid="button-access-dashboard"
+                >
+                  <Users className="h-5 w-5 mr-2" />
+                  Access Dashboard / Login
+                </Button>
+              </Link>
             </div>
 
             {/* Trust Badges - Mobile Responsive */}
