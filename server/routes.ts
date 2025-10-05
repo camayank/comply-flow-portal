@@ -1168,6 +1168,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register User Management routes for Super Admin user creation and management
   registerUserManagementRoutes(app);
   
+  // Register Super Admin routes for system-wide management
+  const { registerSuperAdminRoutes } = await import('./super-admin-routes');
+  registerSuperAdminRoutes(app);
+  
   // Register Client Registration routes for self-service onboarding
   registerClientRegistrationRoutes(app);
   

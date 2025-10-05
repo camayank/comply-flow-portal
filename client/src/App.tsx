@@ -94,6 +94,7 @@ const AgentCommissionTracker = lazy(() => import("./pages/AgentCommissionTracker
 const AgentPerformance = lazy(() => import("./pages/AgentPerformance"));
 const AgentProfileSettings = lazy(() => import("./pages/AgentProfileSettings"));
 const CustomerServiceDashboard = lazy(() => import("./pages/CustomerServiceDashboard"));
+const SuperAdminPortal = lazy(() => import("./pages/SuperAdminPortal"));
 const RoleSelection = lazy(() => import("./pages/RoleSelection"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const DigiComplyWorkflowDashboard = lazy(() => import("./components/DigiComplyWorkflowDashboard"));
@@ -215,6 +216,8 @@ const App = () => (
                 <Route path="/agent-portal" component={AgentPortal} />
                 <Route path="/partner" component={AgentPortal} />
                 <Route path="/partners" component={AgentPortal} />
+                <Route path="/customer-service" component={CustomerServiceDashboard} />
+                <Route path="/super-admin" component={SuperAdminPortal} />
                 <Route path="/onboarding" component={Onboarding} />
                 <Route path="/streamlined-onboarding" component={StreamlinedOnboarding} />
                 <Route path="/business-type" component={BusinessType} />
