@@ -449,6 +449,141 @@ export const clientTasks = pgTable("client_tasks", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ============================================================================
+// UNIVERSAL TASK MANAGEMENT SYSTEM
+// ============================================================================
+
+// Universal tasks - works for all user types (client, admin, ops, agent)
+export const taskItems = pgTable("task_items", {
+  id: serial("id").primaryKey(),
+  taskNumber: text("task_number").notNull().unique(), // TASK-2024-001
+  title: text("title").notNull(),
+  description: text("description"),
+  taskType: text("task_type").notNull(), // user_created, service_related, compliance, reminder, approval
+  
+  // User assignments
+  initiatorId: integer("initiator_id").notNull(), // Who created the task
+  assigneeId: integer("assignee_id"), // Primary assignee
+  assigneeRole: text("assignee_role"), // Role-based assignment (admin, ops_executive, etc.)
+  
+  // Status and progress
+  status: text("status").notNull().default("pending"), // pending, in_progress, awaiting_verification, completed, reopened, cancelled
+  priority: text("priority").notNull().default("medium"), // low, medium, high, urgent
+  progress: integer("progress").default(0), // 0-100%
+  
+  // Timing
+  dueDate: timestamp("due_date"),
+  startDate: timestamp("start_date"),
+  completedAt: timestamp("completed_at"),
+  estimatedHours: integer("estimated_hours"),
+  actualHours: integer("actual_hours"),
+  
+  // Workflow and approval
+  requiresApproval: boolean("requires_approval").default(false),
+  approvedBy: integer("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  requiresChecklist: boolean("requires_checklist").default(false),
+  checklist: json("checklist"), // [{item: string, checked: boolean}]
+  
+  // Recurrence
+  isRecurring: boolean("is_recurring").default(false),
+  recurrencePattern: text("recurrence_pattern"), // daily, weekly, monthly, quarterly
+  nextOccurrence: timestamp("next_occurrence"),
+  
+  // Related entities
+  serviceRequestId: integer("service_request_id"),
+  businessEntityId: integer("business_entity_id"),
+  parentTaskId: integer("parent_task_id"),
+  templateId: integer("template_id"),
+  
+  // Additional data
+  tags: json("tags"), // ["urgent", "compliance", "client-facing"]
+  attachments: json("attachments"),
+  metadata: json("metadata"),
+  
+  // Tracking
+  reopenCount: integer("reopen_count").default(0),
+  lastReminderSent: timestamp("last_reminder_sent"),
+  reminderCount: integer("reminder_count").default(0),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Task participants - watchers and secondary assignees
+export const taskParticipants = pgTable("task_participants", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").notNull(),
+  userId: integer("user_id").notNull(),
+  role: text("role").notNull(), // watcher, contributor, approver
+  notifyOnUpdate: boolean("notify_on_update").default(true),
+  addedAt: timestamp("added_at").defaultNow(),
+});
+
+// Task dependencies
+export const taskDependencies = pgTable("task_dependencies", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").notNull(), // This task
+  dependsOnTaskId: integer("depends_on_task_id").notNull(), // Depends on this
+  dependencyType: text("dependency_type").default("blocks"), // blocks, related_to
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Task subtasks
+export const taskSubtasks = pgTable("task_subtasks", {
+  id: serial("id").primaryKey(),
+  parentTaskId: integer("parent_task_id").notNull(),
+  childTaskId: integer("child_task_id").notNull(),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Task activity log - full audit trail
+export const taskActivityLog = pgTable("task_activity_log", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").notNull(),
+  userId: integer("user_id").notNull(),
+  action: text("action").notNull(), // created, assigned, updated, completed, reopened, commented
+  fieldChanged: text("field_changed"), // status, assignee, due_date, etc.
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  comment: text("comment"),
+  metadata: json("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Task templates for quick creation
+export const userTaskTemplates = pgTable("user_task_templates", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  taskType: text("task_type").notNull(),
+  defaultAssigneeRole: text("default_assignee_role"),
+  defaultPriority: text("default_priority").default("medium"),
+  defaultDurationHours: integer("default_duration_hours"),
+  requiresApproval: boolean("requires_approval").default(false),
+  checklist: json("checklist"),
+  tags: json("tags"),
+  isActive: boolean("is_active").default(true),
+  createdBy: integer("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Task reminders - stores reminder schedules
+export const taskReminders = pgTable("task_reminders", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").notNull(),
+  reminderType: text("reminder_type").notNull(), // due_date, overdue, custom
+  daysOffset: integer("days_offset"), // -7, -3, -1, 0 (negative = before due)
+  reminderTime: timestamp("reminder_time"), // Specific time for reminder
+  sent: boolean("sent").default(false),
+  sentAt: timestamp("sent_at"),
+  channels: json("channels"), // ["email", "whatsapp", "in_app"]
+  metadata: json("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // In-app messaging system
 export const messages = pgTable("messages", {
   id: serial("id").primaryKey(),
@@ -930,6 +1065,44 @@ export const insertClientTaskSchema = createInsertSchema(clientTasks).omit({
   updatedAt: true,
 });
 
+// Universal Task System Schemas
+export const insertTaskItemSchema = createInsertSchema(taskItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaskParticipantSchema = createInsertSchema(taskParticipants).omit({
+  id: true,
+  addedAt: true,
+});
+
+export const insertTaskDependencySchema = createInsertSchema(taskDependencies).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTaskSubtaskSchema = createInsertSchema(taskSubtasks).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTaskActivityLogSchema = createInsertSchema(taskActivityLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserTaskTemplateSchema = createInsertSchema(userTaskTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTaskReminderSchema = createInsertSchema(taskReminders).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertMessageSchema = createInsertSchema(messages).omit({
   id: true,
   createdAt: true,
@@ -957,6 +1130,23 @@ export type BusinessEntity = typeof businessEntities.$inferSelect;
 export type InsertBusinessEntity = z.infer<typeof insertBusinessEntitySchema>;
 export type ClientTask = typeof clientTasks.$inferSelect;
 export type InsertClientTask = z.infer<typeof insertClientTaskSchema>;
+
+// Universal Task System Types
+export type TaskItem = typeof taskItems.$inferSelect;
+export type InsertTaskItem = z.infer<typeof insertTaskItemSchema>;
+export type TaskParticipant = typeof taskParticipants.$inferSelect;
+export type InsertTaskParticipant = z.infer<typeof insertTaskParticipantSchema>;
+export type TaskDependency = typeof taskDependencies.$inferSelect;
+export type InsertTaskDependency = z.infer<typeof insertTaskDependencySchema>;
+export type TaskSubtask = typeof taskSubtasks.$inferSelect;
+export type InsertTaskSubtask = z.infer<typeof insertTaskSubtaskSchema>;
+export type TaskActivityLog = typeof taskActivityLog.$inferSelect;
+export type InsertTaskActivityLog = z.infer<typeof insertTaskActivityLogSchema>;
+export type UserTaskTemplate = typeof userTaskTemplates.$inferSelect;
+export type InsertUserTaskTemplate = z.infer<typeof insertUserTaskTemplateSchema>;
+export type TaskReminder = typeof taskReminders.$inferSelect;
+export type InsertTaskReminder = z.infer<typeof insertTaskReminderSchema>;
+
 export type Message = typeof messages.$inferSelect;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Notification = typeof notifications.$inferSelect;
