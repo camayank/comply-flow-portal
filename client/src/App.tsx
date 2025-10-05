@@ -17,6 +17,8 @@ const PageLoader = () => (
 );
 
 // Lazy load all pages for code splitting
+const UnifiedLanding = lazy(() => import("./pages/UnifiedLanding"));
+const UnifiedDashboard = lazy(() => import("./pages/UnifiedDashboard"));
 const MobileResponsiveLanding = lazy(() => import("./pages/MobileResponsiveLanding"));
 const Login = lazy(() => import("./pages/Login"));
 const ClientRegistration = lazy(() => import("./pages/ClientRegistration"));
@@ -109,9 +111,11 @@ const App = () => (
             <main className="flex-grow">
               <Suspense fallback={<PageLoader />}>
                 <Switch>
-                <Route path="/" component={MobileResponsiveLanding} />
+                <Route path="/" component={UnifiedLanding} />
+                <Route path="/dashboard" component={UnifiedDashboard} />
                 <Route path="/select-role" component={RoleSelection} />
                 <Route path="/role-selection" component={RoleSelection} />
+                <Route path="/mobile-landing" component={MobileResponsiveLanding} />
                 <Route path="/login" component={Login} />
                 <Route path="/signin" component={Login} />
                 <Route path="/register" component={ClientRegistration} />

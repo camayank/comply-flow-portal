@@ -97,7 +97,10 @@ export default function UserTypeSelector() {
   const handleNavigate = () => {
     const userType = userTypes.find(type => type.id === selectedType);
     if (userType && userType.status === 'available') {
-      setLocation(userType.route);
+      // Store user type in localStorage for unified dashboard
+      localStorage.setItem('userType', userType.id);
+      // Navigate to unified dashboard with type parameter
+      setLocation(`/dashboard?type=${userType.id}`);
     }
   };
 
