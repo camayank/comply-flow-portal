@@ -1196,6 +1196,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register Google Sheets Import routes
   const { registerGoogleSheetsImportRoutes } = await import('./google-sheets-import-routes');
   registerGoogleSheetsImportRoutes(app);
+  
+  // Register Integration System routes (separate from portal)
+  const { registerIntegrationRoutes } = await import('./integration-routes');
+  registerIntegrationRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;
