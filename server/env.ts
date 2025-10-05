@@ -7,6 +7,7 @@ const envSchema = z.object({
   
   // Server configuration
   PORT: z.string().default('5000'),
+  ALLOWED_ORIGINS: z.string().optional(), // Comma-separated list for production CORS
   
   // Database (PostgreSQL)
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),

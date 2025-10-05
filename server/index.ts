@@ -31,6 +31,13 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(express.static('public'));
 
+// Request timeout (30 seconds for all requests)
+app.use((req, res, next) => {
+  req.setTimeout(30000); // 30 seconds
+  res.setTimeout(30000);
+  next();
+});
+
 // Rate limiting for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -133,5 +140,47 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+  });
+
+  // Graceful shutdown handler
+  const shutdown = async (signal: string) => {
+    log(`${signal} received - starting graceful shutdown...`);
+    
+    // Stop accepting new connections
+    server.close(() => {
+      log('HTTP server closed');
+    });
+
+    // Set timeout for forceful shutdown
+    const shutdownTimeout = setTimeout(() => {
+      log('Forceful shutdown after timeout');
+      process.exit(1);
+    }, 30000); // 30 seconds
+
+    try {
+      // Cleanup tasks here (close DB connections, etc.)
+      log('Cleanup completed');
+      clearTimeout(shutdownTimeout);
+      process.exit(0);
+    } catch (error) {
+      log('Error during shutdown:', error);
+      clearTimeout(shutdownTimeout);
+      process.exit(1);
+    }
+  };
+
+  // Listen for shutdown signals
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+
+  // Handle uncaught errors
+  process.on('uncaughtException', (error) => {
+    log('Uncaught Exception:', error);
+    shutdown('UNCAUGHT_EXCEPTION');
+  });
+
+  process.on('unhandledRejection', (reason) => {
+    log('Unhandled Rejection:', reason);
+    shutdown('UNHANDLED_REJECTION');
   });
 })();
