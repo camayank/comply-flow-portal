@@ -778,7 +778,7 @@ const WhatsAppOnboarding = () => {
                   <CardContent>
                     <div className="space-y-3">
                       <Button 
-                        onClick={() => window.open('https://wa.me/918826990111?text=Hi! I just completed my DigiComply payment. Please start my onboarding.', '_blank')}
+                        onClick={() => window.open('https://wa.me/918130645164?text=Hi! I just completed my DigiComply payment. Please start my onboarding.', '_blank')}
                         className="w-full bg-green-600 hover:bg-green-700"
                       >
                         <MessageCircle className="h-4 w-4 mr-2" />
@@ -813,11 +813,11 @@ const WhatsAppOnboarding = () => {
                   Our experts are available 24/7 for Premium customers, business hours for others
                 </p>
                 <div className="flex justify-center gap-4">
-                  <Button size="sm" variant="outline" onClick={() => window.open('tel:+918826990111')}>
+                  <Button size="sm" variant="outline" onClick={() => window.open('tel:+918130645164')}>
                     <Phone className="h-4 w-4 mr-1" />
                     Call Now
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => window.open('mailto:support@digicomply.in')}>
+                  <Button size="sm" variant="outline" onClick={() => window.open('mailto:info@digicomply.in')}>
                     <Mail className="h-4 w-4 mr-1" />
                     Email Support
                   </Button>

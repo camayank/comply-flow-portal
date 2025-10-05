@@ -48,11 +48,11 @@ const Footer = () => {
             <div className="space-y-2 text-sm text-gray-400">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4" />
-                <span>support@digicomply.com</span>
+                <span>info@digicomply.in</span>
               </div>
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
-                <span>+1 (555) 123-4567</span>
+                <span>+918130645164</span>
               </div>
               <div className="flex items-center gap-2">
                 <MapPin className="h-4 w-4" />

@@ -294,7 +294,7 @@ const ComplianceScorecard = () => {
 
   const handleWhatsAppContact = (message: string) => {
     const encodedMessage = encodeURIComponent(message);
-    window.open(`https://wa.me/918826990111?text=${encodedMessage}`, '_blank');
+    window.open(`https://wa.me/918130645164?text=${encodedMessage}`, '_blank');
   };
 
   const results = currentStep === 'results' ? calculateResults() : null;
@@ -759,7 +759,7 @@ const ComplianceScorecard = () => {
                   </Button>
                   
                   <Button 
-                    onClick={() => window.open('tel:+918826990111')}
+                    onClick={() => window.open('tel:+918130645164')}
                     size="lg"
                     variant="outline"
                     className="border-white text-white hover:bg-white hover:text-blue-600"

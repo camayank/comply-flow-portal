@@ -48,7 +48,7 @@ const LandingPage = () => {
     e.preventDefault();
     if (phoneNumber) {
       // Redirect to WhatsApp with pre-filled message
-      window.open(`https://wa.me/918826990111?text=Hi! I want a free compliance risk assessment for my startup. My number is ${phoneNumber}`, '_blank');
+      window.open(`https://wa.me/918130645164?text=Hi! I want a free compliance risk assessment for my startup. My number is ${phoneNumber}`, '_blank');
     }
   };
 
