@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -148,6 +148,10 @@ export default function AiDocumentPreparation() {
   const [signatureMethod, setSignatureMethod] = useState<'drawn' | 'dsc' | 'upload'>('drawn');
   const [drawnSignature, setDrawnSignature] = useState<string>('');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
 
   // Fetch documents
   const { data: documents = [], isLoading } = useQuery<any[]>({

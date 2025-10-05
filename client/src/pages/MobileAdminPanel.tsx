@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -33,6 +33,10 @@ const MobileAdminPanel = () => {
   const [serviceFormOpen, setServiceFormOpen] = useState(false);
   const [selectedService, setSelectedService] = useState(null);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
 
   // Fetch admin config stats
   const { data: configStats, isLoading: statsLoading } = useQuery({

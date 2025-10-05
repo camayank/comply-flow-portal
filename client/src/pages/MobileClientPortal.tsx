@@ -27,6 +27,10 @@ const MobileClientPortal = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
   // Fetch client entities
   const { data: entities = [], isLoading: entitiesLoading } = useQuery({
     queryKey: ['/api/client/entities'],
