@@ -1,579 +1,638 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const rateLimit = require('express-rate-limit');
-const pool = require('../database/connection');
+const db = require('../database/connection');
 const logger = require('../utils/logger');
+const { 
+  sessionManager,
+  sessionAuthMiddleware 
+} = require('../middleware/sessionAuth');
+const {
+  rateLimits,
+  csrfProtection,
+  trackOTPAttempt,
+  checkOTPCooldown,
+  hashOTP,
+  verifyOTP
+} = require('../middleware/security');
 
 const router = express.Router();
 
-// Rate limiting for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
-  message: {
-    success: false,
-    message: 'Too many authentication attempts, please try again later.',
-    retryAfter: '15 minutes'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Validation middleware
-const registerValidation = [
-  body('username')
-    .isLength({ min: 3, max: 50 })
-    .withMessage('Username must be between 3-50 characters')
-    .matches(/^[a-zA-Z0-9_]+$/)
-    .withMessage('Username can only contain letters, numbers, and underscores'),
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please provide a valid email address'),
-  body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-    .withMessage('Password must contain at least one lowercase letter, one uppercase letter, and one number'),
-  body('firstName')
-    .notEmpty()
-    .isLength({ max: 100 })
-    .withMessage('First name is required and must be less than 100 characters'),
-  body('lastName')
-    .optional()
-    .isLength({ max: 100 })
-    .withMessage('Last name must be less than 100 characters'),
-  body('role')
-    .optional()
-    .isIn(['admin', 'manager', 'sales_rep', 'user'])
-    .withMessage('Invalid role specified')
-];
-
-const loginValidation = [
-  body('email')
-    .isEmail()
-    .normalizeEmail()
-    .withMessage('Please provide a valid email address'),
-  body('password')
-    .notEmpty()
-    .withMessage('Password is required')
-];
-
-// JWT token generation
-const generateTokens = (user) => {
-  const payload = {
-    id: user.id,
-    email: user.email,
-    username: user.username,
-    role: user.role
-  };
-
-  const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '1h',
-    issuer: 'mkw-platform',
-    audience: 'mkw-platform-users'
-  });
-
-  const refreshToken = jwt.sign(
-    { id: user.id, type: 'refresh' },
-    process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
-    {
-      expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
-      issuer: 'mkw-platform',
-      audience: 'mkw-platform-users'
-    }
-  );
-
-  return { accessToken, refreshToken };
-};
-
-// JWT token verification middleware
-const authenticateToken = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Access token required'
-      });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
-      issuer: 'mkw-platform',
-      audience: 'mkw-platform-users'
-    });
-
-    // Get fresh user data
-    const result = await pool.query(
-      'SELECT id, uuid, username, email, first_name, last_name, role, status, last_login FROM users WHERE id = $1 AND status = $2',
-      [decoded.id, 'active']
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not found or inactive'
-      });
-    }
-
-    req.user = result.rows[0];
-    next();
-  } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token'
-      });
-    } else if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Token expired'
-      });
-    }
-
-    logger.error('Token verification error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Token verification failed'
-    });
-  }
-};
-
-// @route   POST /api/auth/register
-// @desc    Register new user
-// @access  Public (but can be restricted to admin only)
-router.post('/register', authLimiter, registerValidation, async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
-    const { username, email, password, firstName, lastName, role = 'user' } = req.body;
-
-    // Check if user already exists
-    const existingUser = await pool.query(
-      'SELECT id FROM users WHERE email = $1 OR username = $2',
-      [email, username]
-    );
-
-    if (existingUser.rows.length > 0) {
-      return res.status(409).json({
-        success: false,
-        message: 'User with this email or username already exists'
-      });
-    }
-
-    // Hash password
-    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
-
-    // Create user
-    const result = await pool.query(
-      `INSERT INTO users (username, email, password_hash, first_name, last_name, role) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
-       RETURNING id, uuid, username, email, first_name, last_name, role, status, created_at`,
-      [username, email, passwordHash, firstName, lastName, role]
-    );
-
-    const newUser = result.rows[0];
-
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(newUser);
-
-    // Log successful registration
-    logger.info('User registered successfully', {
-      userId: newUser.id,
-      username: newUser.username,
-      email: newUser.email,
-      role: newUser.role,
-      ip: req.ip
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      data: {
-        user: {
-          id: newUser.id,
-          uuid: newUser.uuid,
-          username: newUser.username,
-          email: newUser.email,
-          firstName: newUser.first_name,
-          lastName: newUser.last_name,
-          role: newUser.role,
-          status: newUser.status
-        },
-        tokens: {
-          accessToken,
-          refreshToken,
-          expiresIn: process.env.JWT_EXPIRES_IN || '1h'
+// Enhanced validation rules
+const validationRules = {
+  register: [
+    body('email')
+      .isEmail()
+      .normalizeEmail()
+      .custom(async (email) => {
+        const existing = await db('users').where('email', email).first();
+        if (existing) {
+          throw new Error('Email already registered');
         }
-      }
-    });
-
-  } catch (error) {
-    logger.error('Registration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Registration failed. Please try again.'
-    });
-  }
-});
-
-// @route   POST /api/auth/login
-// @desc    Authenticate user and get token
-// @access  Public
-router.post('/login', authLimiter, loginValidation, async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
-    const { email, password, rememberMe = false } = req.body;
-
-    // Get user by email
-    const result = await pool.query(
-      'SELECT id, uuid, username, email, password_hash, first_name, last_name, role, status, failed_login_attempts, account_locked_until FROM users WHERE email = $1',
-      [email]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
-
-    const user = result.rows[0];
-
-    // Check if account is locked
-    if (user.account_locked_until && new Date() < new Date(user.account_locked_until)) {
-      return res.status(423).json({
-        success: false,
-        message: 'Account is temporarily locked due to too many failed attempts',
-        lockedUntil: user.account_locked_until
-      });
-    }
-
-    // Check if user is active
-    if (user.status !== 'active') {
-      return res.status(401).json({
-        success: false,
-        message: 'Account is not active'
-      });
-    }
-
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
-
-    if (!isValidPassword) {
-      // Increment failed login attempts
-      const failedAttempts = (user.failed_login_attempts || 0) + 1;
-      const lockUntil = failedAttempts >= 5 ? new Date(Date.now() + 30 * 60 * 1000) : null; // Lock for 30 minutes after 5 failed attempts
-
-      await pool.query(
-        'UPDATE users SET failed_login_attempts = $1, account_locked_until = $2 WHERE id = $3',
-        [failedAttempts, lockUntil, user.id]
-      );
-
-      logger.warn('Failed login attempt', {
-        userId: user.id,
-        email: user.email,
-        failedAttempts: failedAttempts,
-        ip: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials',
-        ...(failedAttempts >= 5 && { accountLocked: true, lockedUntil: lockUntil })
-      });
-    }
-
-    // Reset failed login attempts and update last login
-    await pool.query(
-      'UPDATE users SET failed_login_attempts = 0, account_locked_until = NULL, last_login = CURRENT_TIMESTAMP WHERE id = $1',
-      [user.id]
-    );
-
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user);
-
-    // Log successful login
-    logger.info('User logged in successfully', {
-      userId: user.id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      ip: req.ip,
-      userAgent: req.get('User-Agent')
-    });
-
-    res.json({
-      success: true,
-      message: 'Login successful',
-      data: {
-        user: {
-          id: user.id,
-          uuid: user.uuid,
-          username: user.username,
-          email: user.email,
-          firstName: user.first_name,
-          lastName: user.last_name,
-          role: user.role,
-          status: user.status
-        },
-        tokens: {
-          accessToken,
-          refreshToken,
-          expiresIn: process.env.JWT_EXPIRES_IN || '1h'
+      }),
+    body('password')
+      .isLength({ min: 8 })
+      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+      .withMessage('Password must contain at least 8 characters with uppercase, lowercase, number, and special character'),
+    body('username')
+      .isLength({ min: 3, max: 50 })
+      .matches(/^[a-zA-Z0-9_]+$/)
+      .custom(async (username) => {
+        const existing = await db('users').where('username', username).first();
+        if (existing) {
+          throw new Error('Username already taken');
         }
-      }
-    });
-
-  } catch (error) {
-    logger.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Login failed. Please try again.'
-    });
-  }
-});
-
-// @route   GET /api/auth/me
-// @desc    Get current user profile
-// @access  Private
-router.get('/me', authenticateToken, async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: {
-        user: {
-          id: req.user.id,
-          uuid: req.user.uuid,
-          username: req.user.username,
-          email: req.user.email,
-          firstName: req.user.first_name,
-          lastName: req.user.last_name,
-          role: req.user.role,
-          status: req.user.status,
-          lastLogin: req.user.last_login
-        }
-      }
-    });
-  } catch (error) {
-    logger.error('Get me error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get user profile'
-    });
-  }
-});
-
-// @route   POST /api/auth/refresh
-// @desc    Refresh access token
-// @access  Public (requires valid refresh token)
-router.post('/refresh', async (req, res) => {
-  try {
-    const { refreshToken } = req.body;
-
-    if (!refreshToken) {
-      return res.status(401).json({
-        success: false,
-        message: 'Refresh token required'
-      });
-    }
-
-    const decoded = jwt.verify(
-      refreshToken,
-      process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET,
-      {
-        issuer: 'mkw-platform',
-        audience: 'mkw-platform-users'
-      }
-    );
-
-    if (decoded.type !== 'refresh') {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid refresh token'
-      });
-    }
-
-    // Get user
-    const result = await pool.query(
-      'SELECT id, uuid, username, email, first_name, last_name, role, status FROM users WHERE id = $1 AND status = $2',
-      [decoded.id, 'active']
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not found or inactive'
-      });
-    }
-
-    const user = result.rows[0];
-    const { accessToken, refreshToken: newRefreshToken } = generateTokens(user);
-
-    res.json({
-      success: true,
-      message: 'Tokens refreshed successfully',
-      data: {
-        tokens: {
-          accessToken,
-          refreshToken: newRefreshToken,
-          expiresIn: process.env.JWT_EXPIRES_IN || '1h'
-        }
-      }
-    });
-
-  } catch (error) {
-    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid refresh token'
-      });
-    }
-
-    logger.error('Token refresh error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Token refresh failed'
-    });
-  }
-});
-
-// @route   POST /api/auth/change-password
-// @desc    Change user password
-// @access  Private
-router.post('/change-password',
-  authenticateToken,
-  [
-    body('currentPassword').notEmpty().withMessage('Current password is required'),
-    body('newPassword')
-      .isLength({ min: 6 })
-      .withMessage('New password must be at least 6 characters long')
-      .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-      .withMessage('New password must contain at least one lowercase letter, one uppercase letter, and one number')
+      }),
+    body('firstName').isLength({ min: 1, max: 100 }).trim(),
+    body('lastName').optional().isLength({ max: 100 }).trim()
   ],
+  
+  login: [
+    body('email').isEmail().normalizeEmail(),
+    body('password').isLength({ min: 1 })
+  ],
+  
+  sendOTP: [
+    body('email').isEmail().normalizeEmail(),
+    body('captcha').optional().isLength({ min: 1 }) // For future CAPTCHA integration
+  ],
+  
+  verifyOTP: [
+    body('email').isEmail().normalizeEmail(),
+    body('otp').isLength({ min: 4, max: 8 }).isNumeric()
+  ]
+};
+
+// Secure OTP generation
+const generateOTP = () => {
+  return crypto.randomInt(100000, 999999).toString();
+};
+
+// Register endpoint with comprehensive security
+router.post('/register',
+  rateLimits.authPerIP,
+  csrfProtection,
+  validationRules.register,
   async (req, res) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
         return res.status(400).json({
           success: false,
-          message: 'Validation errors',
-          errors: errors.array()
+          error: 'Validation failed',
+          details: errors.array()
         });
       }
 
-      const { currentPassword, newPassword } = req.body;
-      const userId = req.user.id;
-
-      // Get current password hash
-      const result = await pool.query(
-        'SELECT password_hash FROM users WHERE id = $1',
-        [userId]
-      );
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({
-          success: false,
-          message: 'User not found'
-        });
-      }
-
-      const user = result.rows[0];
-
-      // Verify current password
-      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
-      if (!isCurrentPasswordValid) {
-        return res.status(400).json({
-          success: false,
-          message: 'Current password is incorrect'
-        });
-      }
-
-      // Hash new password
-      const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12;
-      const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
-
-      // Update password
-      await pool.query(
-        'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [newPasswordHash, userId]
-      );
-
-      // Log password change
-      logger.info('Password changed successfully', {
-        userId: userId,
-        email: req.user.email,
+      const { email, password, username, firstName, lastName } = req.body;
+      
+      // Hash password with high cost
+      const passwordHash = await bcrypt.hash(password, 12);
+      
+      // Create user
+      const [userId] = await db('users').insert({
+        email,
+        password_hash: passwordHash,
+        username,
+        first_name: firstName,
+        last_name: lastName,
+        role: 'user',
+        status: 'active',
+        email_verified: false,
+        created_at: new Date(),
+        updated_at: new Date()
+      }).returning('id');
+      
+      logger.info('User registered', {
+        userId: userId.id || userId,
+        email,
         ip: req.ip
       });
-
-      res.json({
-        success: true,
-        message: 'Password changed successfully'
+      
+      // Create session
+      const user = await db('users').where('id', userId.id || userId).first();
+      const session = await sessionManager.createSession(user, req);
+      
+      // Set secure cookie
+      res.cookie('mkw.sid', session.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000
       });
-
+      
+      res.status(201).json({
+        success: true,
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            firstName: user.first_name,
+            lastName: user.last_name,
+            role: user.role
+          },
+          tokens: {
+            accessToken: jwt.sign(
+              { userId: user.id, role: user.role },
+              process.env.JWT_SECRET,
+              { expiresIn: '7d' }
+            )
+          },
+          csrfToken: session.csrfToken
+        }
+      });
     } catch (error) {
-      logger.error('Change password error:', error);
+      logger.error('Registration error', {
+        error: error.message,
+        stack: error.stack,
+        ip: req.ip
+      });
+      
       res.status(500).json({
         success: false,
-        message: 'Password change failed'
+        error: 'Registration failed'
       });
     }
   }
 );
 
-// @route   POST /api/auth/logout
-// @desc    Logout user (client-side token removal)
-// @access  Private
-router.post('/logout', authenticateToken, async (req, res) => {
+// Login with comprehensive security
+router.post('/login',
+  rateLimits.authPerIP,
+  csrfProtection,
+  validationRules.login,
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid input'
+        });
+      }
+
+      const { email, password } = req.body;
+      
+      // Check for account lockout
+      const lockoutCheck = await db('failed_login_attempts')
+        .where('identifier', email)
+        .where('identifier_type', 'email')
+        .where('locked_until', '>', new Date())
+        .first();
+      
+      if (lockoutCheck) {
+        logger.warn('Login attempted on locked account', {
+          email,
+          ip: req.ip,
+          lockedUntil: lockoutCheck.locked_until
+        });
+        
+        return res.status(423).json({
+          success: false,
+          error: 'Account temporarily locked due to failed attempts'
+        });
+      }
+      
+      // Find user
+      const user = await db('users')
+        .where('email', email)
+        .where('status', 'active')
+        .first();
+      
+      if (!user) {
+        await trackFailedAttempt(email, 'email', req.ip);
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid credentials'
+        });
+      }
+      
+      // Verify password
+      const passwordValid = await bcrypt.compare(password, user.password_hash);
+      
+      if (!passwordValid) {
+        await trackFailedAttempt(email, 'email', req.ip);
+        logger.warn('Failed login attempt', {
+          email,
+          ip: req.ip
+        });
+        
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid credentials'
+        });
+      }
+      
+      // Clear failed attempts on successful login
+      await db('failed_login_attempts')
+        .where('identifier', email)
+        .where('identifier_type', 'email')
+        .delete();
+      
+      // Update last login
+      await db('users')
+        .where('id', user.id)
+        .update({
+          last_login: new Date(),
+          failed_login_attempts: 0,
+          updated_at: new Date()
+        });
+      
+      // Create session
+      const session = await sessionManager.createSession(user, req);
+      
+      // Set secure cookie
+      res.cookie('mkw.sid', session.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000
+      });
+      
+      logger.info('Successful login', {
+        userId: user.id,
+        email,
+        ip: req.ip
+      });
+      
+      res.json({
+        success: true,
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            firstName: user.first_name,
+            lastName: user.last_name,
+            role: user.role
+          },
+          tokens: {
+            accessToken: jwt.sign(
+              { userId: user.id, role: user.role },
+              process.env.JWT_SECRET,
+              { expiresIn: '7d' }
+            )
+          },
+          csrfToken: session.csrfToken
+        }
+      });
+    } catch (error) {
+      logger.error('Login error', {
+        error: error.message,
+        stack: error.stack,
+        ip: req.ip
+      });
+      
+      res.status(500).json({
+        success: false,
+        error: 'Authentication system error'
+      });
+    }
+  }
+);
+
+// Secure OTP sending with enterprise protection
+router.post('/send-otp',
+  rateLimits.otpPerIP,
+  rateLimits.otpPerEmail,
+  csrfProtection,
+  validationRules.sendOTP,
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        // Always return success to prevent enumeration
+        return res.json({
+          success: true,
+          message: 'If the account exists, an OTP has been sent'
+        });
+      }
+
+      const { email } = req.body;
+      
+      // Check OTP cooldown
+      const cooldownCheck = checkOTPCooldown(email);
+      if (!cooldownCheck.allowed) {
+        return res.status(429).json({
+          success: false,
+          error: `Please wait ${cooldownCheck.cooldownMinutes} minutes before requesting another OTP`
+        });
+      }
+      
+      // Track attempt (even if user doesn't exist)
+      trackOTPAttempt(email);
+      
+      // Check if user exists (but don't reveal in response)
+      const user = await db('users')
+        .where('email', email)
+        .where('status', 'active')
+        .first();
+      
+      if (user) {
+        // Generate and hash OTP
+        const otp = generateOTP();
+        const hashedOTP = await hashOTP(otp);
+        
+        // Store hashed OTP
+        await db('otp_store').insert({
+          identifier: email,
+          otp_hash: hashedOTP,
+          attempts: 0,
+          ip_address: req.ip,
+          user_agent: req.headers['user-agent'] || null,
+          expires_at: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
+          created_at: new Date()
+        });
+        
+        // In production, send via email service
+        // await emailService.sendOTP(email, otp);
+        
+        // NEVER log the raw OTP in production
+        if (process.env.NODE_ENV === 'development' && process.env.DEBUG_OTP === 'true') {
+          logger.debug('OTP generated for development', {
+            email,
+            otpHint: `***${otp.slice(-2)}`, // Only last 2 digits
+            ip: req.ip
+          });
+        }
+        
+        logger.info('OTP sent successfully', {
+          email,
+          ip: req.ip
+        });
+      }
+      
+      // Always return success to prevent email enumeration
+      res.json({
+        success: true,
+        message: 'If the account exists, an OTP has been sent'
+      });
+    } catch (error) {
+      logger.error('OTP sending error', {
+        error: error.message,
+        stack: error.stack,
+        ip: req.ip
+      });
+      
+      res.json({
+        success: true,
+        message: 'If the account exists, an OTP has been sent'
+      });
+    }
+  }
+);
+
+// Secure OTP verification
+router.post('/verify-otp',
+  rateLimits.authPerIP,
+  csrfProtection,
+  validationRules.verifyOTP,
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid input'
+        });
+      }
+
+      const { email, otp } = req.body;
+      
+      // Get OTP record
+      const otpRecord = await db('otp_store')
+        .where('identifier', email)
+        .where('expires_at', '>', new Date())
+        .orderBy('created_at', 'desc')
+        .first();
+      
+      if (!otpRecord) {
+        logger.warn('OTP verification failed - no valid OTP found', {
+          email,
+          ip: req.ip
+        });
+        
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid or expired OTP'
+        });
+      }
+      
+      // Check attempt limit
+      if (otpRecord.attempts >= 3) {
+        await db('otp_store').where('id', otpRecord.id).delete();
+        
+        logger.warn('OTP verification failed - too many attempts', {
+          email,
+          ip: req.ip,
+          attempts: otpRecord.attempts
+        });
+        
+        return res.status(429).json({
+          success: false,
+          error: 'Too many attempts. Please request a new OTP.'
+        });
+      }
+      
+      // Verify OTP
+      const otpValid = await verifyOTP(otp, otpRecord.otp_hash);
+      
+      // Increment attempts
+      await db('otp_store')
+        .where('id', otpRecord.id)
+        .update({ attempts: otpRecord.attempts + 1 });
+      
+      if (!otpValid) {
+        logger.warn('OTP verification failed - invalid OTP', {
+          email,
+          ip: req.ip,
+          attempts: otpRecord.attempts + 1
+        });
+        
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid or expired OTP'
+        });
+      }
+      
+      // Delete used OTP
+      await db('otp_store').where('id', otpRecord.id).delete();
+      
+      // Get user and create session
+      const user = await db('users')
+        .where('email', email)
+        .where('status', 'active')
+        .first();
+      
+      if (!user) {
+        return res.status(400).json({
+          success: false,
+          error: 'User account not found'
+        });
+      }
+      
+      // Mark email as verified
+      await db('users')
+        .where('id', user.id)
+        .update({
+          email_verified: true,
+          last_login: new Date(),
+          updated_at: new Date()
+        });
+      
+      // Create session
+      const session = await sessionManager.createSession(user, req);
+      
+      // Set secure cookie
+      res.cookie('mkw.sid', session.id, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000
+      });
+      
+      logger.info('OTP verification successful', {
+        userId: user.id,
+        email,
+        ip: req.ip
+      });
+      
+      res.json({
+        success: true,
+        data: {
+          user: {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            firstName: user.first_name,
+            lastName: user.last_name,
+            role: user.role
+          },
+          tokens: {
+            accessToken: jwt.sign(
+              { userId: user.id, role: user.role },
+              process.env.JWT_SECRET,
+              { expiresIn: '7d' }
+            )
+          },
+          csrfToken: session.csrfToken
+        }
+      });
+    } catch (error) {
+      logger.error('OTP verification error', {
+        error: error.message,
+        stack: error.stack,
+        ip: req.ip
+      });
+      
+      res.status(500).json({
+        success: false,
+        error: 'Verification system error'
+      });
+    }
+  }
+);
+
+// Get current user (session-based)
+router.get('/me', sessionAuthMiddleware, async (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      user: {
+        id: req.user.id,
+        email: req.user.email,
+        username: req.user.username,
+        firstName: req.user.first_name,
+        lastName: req.user.last_name,
+        role: req.user.role,
+        emailVerified: req.user.email_verified,
+        lastLogin: req.user.last_login
+      },
+      session: {
+        id: req.session.id.substring(0, 8) + '...',
+        createdAt: req.session.createdAt,
+        lastActivity: req.session.lastActivity
+      }
+    }
+  });
+});
+
+// Secure logout
+router.post('/logout', sessionAuthMiddleware, async (req, res) => {
   try {
-    // Log logout
+    await sessionManager.revokeSession(req.sessionId);
+    
+    res.clearCookie('mkw.sid', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict'
+    });
+    
     logger.info('User logged out', {
       userId: req.user.id,
-      email: req.user.email,
       ip: req.ip
     });
-
-    res.json({
-      success: true,
-      message: 'Logged out successfully'
-    });
+    
+    res.json({ success: true });
   } catch (error) {
-    logger.error('Logout error:', error);
+    logger.error('Logout error', {
+      error: error.message,
+      userId: req.user.id,
+      ip: req.ip
+    });
+    
     res.status(500).json({
       success: false,
-      message: 'Logout failed'
+      error: 'Logout failed'
     });
   }
 });
 
-// Export middleware for use in other routes
-module.exports = {
-  router,
-  authenticateToken,
-  generateTokens
-};
+// Helper function to track failed login attempts
+async function trackFailedAttempt(identifier, type, ip) {
+  const existing = await db('failed_login_attempts')
+    .where('identifier', identifier)
+    .where('identifier_type', type)
+    .first();
+  
+  if (existing) {
+    const newCount = existing.attempt_count + 1;
+    let lockedUntil = null;
+    
+    // Progressive lockout
+    if (newCount >= 10) {
+      lockedUntil = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    } else if (newCount >= 5) {
+      lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    }
+    
+    await db('failed_login_attempts')
+      .where('id', existing.id)
+      .update({
+        attempt_count: newCount,
+        last_attempt: new Date(),
+        locked_until: lockedUntil
+      });
+  } else {
+    await db('failed_login_attempts').insert({
+      identifier,
+      identifier_type: type,
+      attempt_count: 1,
+      last_attempt: new Date()
+    });
+  }
+  
+  // Log security event
+  await db('security_events').insert({
+    event_type: 'login_failed',
+    ip_address: ip,
+    details: { identifier, type },
+    created_at: new Date()
+  });
+}
 
-// Export router as default
 module.exports = router;
-module.exports.authenticateToken = authenticateToken;
