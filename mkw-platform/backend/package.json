@@ -1,0 +1,149 @@
+{
+  "name": "mkw-platform-backend",
+  "version": "1.0.0",
+  "description": "MKW Advisors Enterprise Platform Backend API",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src --ext .js",
+    "lint:fix": "eslint src --ext .js --fix",
+    "format": "prettier --write \"src/**/*.js\"",
+    "migrate": "node src/database/migrate.js",
+    "seed": "node src/database/seed.js",
+    "build": "npm install --production",
+    "docker:build": "docker build -t mkw-platform-backend .",
+    "docker:run": "docker run -p 5000:5000 mkw-platform-backend"
+  },
+  "keywords": [
+    "crm",
+    "enterprise",
+    "salesforce",
+    "nodejs",
+    "express",
+    "postgresql",
+    "jwt",
+    "api",
+    "mkw-advisors"
+  ],
+  "author": "MKW Advisors <info@mkwadvisors.com>",
+  "license": "PROPRIETARY",
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-rate-limit": "^6.8.1",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.0.0",
+    "cors": "^2.8.5",
+    "compression": "^1.7.4",
+    "morgan": "^1.10.0",
+    "winston": "^3.10.0",
+    "winston-daily-rotate-file": "^4.7.1",
+    "pg": "^8.11.2",
+    "redis": "^4.6.7",
+    "jsonwebtoken": "^9.0.1",
+    "bcryptjs": "^2.4.3",
+    "uuid": "^9.0.0",
+    "socket.io": "^4.7.2",
+    "multer": "^1.4.5-lts.1",
+    "sharp": "^0.32.4",
+    "aws-sdk": "^2.1419.0",
+    "nodemailer": "^6.9.4",
+    "razorpay": "^2.9.2",
+    "joi": "^17.9.2",
+    "lodash": "^4.17.21",
+    "moment": "^2.29.4",
+    "csv-parser": "^3.0.0",
+    "json2csv": "^6.1.0",
+    "pdf-lib": "^1.17.1",
+    "qrcode": "^1.5.3",
+    "axios": "^1.4.0",
+    "dotenv": "^16.3.1",
+    "express-async-errors": "^3.1.1",
+    "express-fileupload": "^1.4.0",
+    "express-session": "^1.17.3",
+    "connect-redis": "^7.1.0",
+    "ioredis": "^5.3.2",
+    "bullmq": "^4.8.0",
+    "cron": "^2.4.1",
+    "node-cron": "^3.0.2",
+    "crypto": "^1.0.1",
+    "speakeasy": "^2.0.0",
+    "libphonenumber-js": "^1.10.42",
+    "validator": "^13.11.0",
+    "sanitize-html": "^2.11.0",
+    "helmet-csp": "^3.4.0",
+    "express-mongo-sanitize": "^2.2.0",
+    "hpp": "^0.2.3",
+    "cookie-parser": "^1.4.6",
+    "passport": "^0.6.0",
+    "passport-jwt": "^4.0.1",
+    "passport-local": "^1.0.0",
+    "passport-google-oauth20": "^2.0.0",
+    "express-openapi-validator": "^5.0.4",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0",
+    "yamljs": "^0.3.0",
+    "chalk": "^4.1.2",
+    "figlet": "^1.6.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.6.2",
+    "supertest": "^6.3.3",
+    "eslint": "^8.45.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.27.5",
+    "prettier": "^3.0.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^13.2.3",
+    "@types/node": "^20.4.8",
+    "cross-env": "^7.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/camayank/comply-flow-portal"
+  },
+  "bugs": {
+    "url": "https://github.com/camayank/comply-flow-portal/issues"
+  },
+  "homepage": "https://github.com/camayank/comply-flow-portal#readme",
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/server.js",
+      "!src/database/migrate.js",
+      "!src/database/seed.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.js",
+      "**/?(*.)+(spec|test).js"
+    ]
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "prettier --write",
+      "git add"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "pre-push": "npm test"
+    }
+  }
+}
