@@ -1,284 +1,364 @@
-# MKW Enterprise Platform 🏢
+# 🚀 MKW Platform - Enterprise CRM Solution
 
-A complete Salesforce-level CRM platform built for MKW Advisors with modern web technologies.
+**Complete Salesforce-level CRM platform built for MKW Advisors**
+
+[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-18+-blue.svg)](https://reactjs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
+
+## 📋 Table of Contents
+
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Architecture](#architecture)
+- [API Documentation](#api-documentation)
+- [Deployment](#deployment)
+- [Development](#development)
+- [Contributing](#contributing)
+
+## ✨ Features
+
+### 🏢 Account Management
+- **Complete customer profiles** with billing/shipping addresses
+- **Industry categorization** and account type classification
+- **Health scoring** and relationship tracking
+- **Hierarchical account structures** (parent-child relationships)
+- **360-degree account view** with related opportunities and contacts
+
+### 🎯 Opportunity Management
+- **Visual sales pipeline** with drag-and-drop Kanban boards
+- **Probability-based forecasting** with weighted pipeline values
+- **Stage progression tracking** with automatic date logging
+- **Competitor analysis** and deal risk assessment
+- **Real-time collaboration** with Socket.IO updates
+
+### 👥 Contact & Lead Management
+- **Comprehensive contact profiles** with relationship mapping
+- **Lead scoring and qualification** workflows
+- **Communication history** tracking across all touchpoints
+- **Conversion tracking** from lead to opportunity
+
+### 📊 Business Intelligence
+- **Executive dashboard** with KPIs and trends
+- **Revenue forecasting** with pipeline analytics
+- **Performance metrics** and win/loss analysis
+- **Industry insights** and account distribution
+- **Real-time reporting** with interactive charts
+
+### 🔐 Enterprise Security
+- **JWT authentication** with refresh token support
+- **Role-based access control** (Admin, Manager, Sales Rep, User)
+- **Rate limiting** and DDoS protection
+- **Audit logging** for compliance requirements
+- **Data encryption** and secure password hashing
+
+### 📱 Modern Tech Stack
+- **React 18** with hooks and modern patterns
+- **Node.js/Express** backend with TypeScript support
+- **PostgreSQL** with optimized schemas and indexing
+- **Socket.IO** for real-time collaboration
+- **Docker** containerization for easy deployment
+- **Tailwind CSS** for responsive, beautiful UI
 
 ## 🚀 Quick Start
 
+### Prerequisites
+- Node.js 18+
+- PostgreSQL 15+
+- Git
+- Docker (optional, recommended)
+
+### Method 1: Docker Deployment (Recommended)
+
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/camayank/comply-flow-portal.git
 cd comply-flow-portal/mkw-platform
 
-# Start with Docker (Recommended)
+# Start all services with Docker
 docker-compose up -d
 
-# Or start manually
-# 1. Start database
-sudo service postgresql start
-
-# 2. Start backend
-cd backend
-npm install
-npm run dev
-
-# 3. Start frontend
-cd frontend
-npm install
-npm start
+# Check health
+curl http://localhost:5000/health
 ```
+
+### Method 2: Manual Setup
+
+```bash
+# Clone and navigate
+git clone https://github.com/camayank/comply-flow-portal.git
+cd comply-flow-portal/mkw-platform
+
+# Run automated setup
+npm run setup
+
+# Create database
+createdb mkw_platform
+psql -U postgres -d mkw_platform -f backend/src/database/schema.sql
+
+# Start development servers
+npm run dev:all
+```
+
+### Access Application
+
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:5000
+- **API Health**: http://localhost:5000/health
+
+**Default Login:**
+- Email: `admin@mkwadvisors.com`
+- Password: `admin123`
 
 ## 🏗️ Architecture
 
-### Tech Stack
-- **Frontend**: React 18, Tailwind CSS, Recharts, Socket.IO
-- **Backend**: Node.js, Express.js, PostgreSQL, JWT
-- **Deployment**: Docker, Docker Compose
-- **Database**: PostgreSQL with comprehensive CRM schema
+### System Overview
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   React Frontend│    │  Express Backend│    │  PostgreSQL DB  │
+│   (Port 3000)   │◄──►│   (Port 5000)   │◄──►│   (Port 5432)   │
+│                 │    │                 │    │                 │
+│ • Dashboard     │    │ • JWT Auth      │    │ • 12 Core Tables│
+│ • Account Mgmt  │    │ • REST APIs     │    │ • Relationships │
+│ • Pipeline View │    │ • Socket.IO     │    │ • Indexes       │
+│ • Real-time UI  │    │ • Security      │    │ • Audit Trail   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+### Database Schema
+```sql
+-- Core CRM Tables
+├── users (system users)
+├── accounts (companies/organizations)  
+├── contacts (people)
+├── opportunities (sales deals)
+├── leads (potential customers)
+├── cases (support tickets)
+├── activities (tasks/meetings/calls)
+├── campaigns (marketing campaigns)
+├── services (service catalog)
+├── service_instances (active deliveries)
+├── documents (file attachments)
+└── audit_logs (system audit trail)
+```
+
+### API Endpoints
+```
+/api/v1/auth/*          Authentication & user management
+/api/v1/accounts/*      Account CRUD and relationships
+/api/v1/opportunities/* Pipeline management and forecasting
+/api/v1/contacts/*      Contact relationship management
+/api/v1/leads/*         Lead capture and qualification
+/api/v1/cases/*         Support ticket management
+/api/v1/activities/*    Task and meeting management
+/api/v1/campaigns/*     Marketing campaign tracking
+```
+
+## 📚 API Documentation
+
+### Authentication
+
+**POST /api/v1/auth/login**
+```json
+{
+  "email": "admin@mkwadvisors.com",
+  "password": "admin123"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "user": { "id": 1, "email": "admin@mkwadvisors.com", "role": "admin" },
+    "tokens": {
+      "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+      "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
+      "expiresIn": "7d"
+    }
+  }
+}
+```
+
+### Accounts
+
+**GET /api/v1/accounts**
+- Query params: `page`, `limit`, `search`, `type`, `industry`, `status`
+- Returns paginated account list with relationships
+
+**POST /api/v1/accounts**
+```json
+{
+  "name": "Acme Corporation",
+  "type": "enterprise",
+  "industry": "technology",
+  "website": "https://acme.com",
+  "phone": "+91-99999-99999",
+  "email": "contact@acme.com",
+  "billingCity": "Mumbai",
+  "billingState": "Maharashtra",
+  "annualRevenue": 50000000,
+  "numberOfEmployees": 250
+}
+```
+
+### Opportunities
+
+**GET /api/v1/opportunities/pipeline**
+- Returns Kanban pipeline data grouped by stage
+- Includes summary statistics and weighted values
+
+**POST /api/v1/opportunities**
+```json
+{
+  "name": "Q4 Software License Deal",
+  "accountId": 1,
+  "amount": 2500000,
+  "probability": 75,
+  "closeDate": "2024-12-31",
+  "stage": "proposal",
+  "description": "Enterprise software licensing opportunity"
+}
+```
+
+## 🌐 Deployment Options
+
+### AWS Deployment
+```bash
+# Deploy to AWS with RDS
+aws rds create-db-instance \
+  --db-instance-identifier mkw-platform \
+  --engine postgres \
+  --db-instance-class db.t3.micro
+
+# Deploy to EC2
+scp -r mkw-platform/ ec2-user@your-server:/home/ec2-user/
+ssh ec2-user@your-server
+cd mkw-platform
+docker-compose --profile production up -d
+```
+
+### Digital Ocean
+1. Fork this repository
+2. Connect to DigitalOcean App Platform
+3. Import from GitHub
+4. Set environment variables
+5. Deploy!
+
+### Railway/Render
+```bash
+# One-command deployment
+railway up
+# or
+render deploy
+```
+
+## 🛠️ Development
 
 ### Project Structure
 ```
 mkw-platform/
-├── backend/                    # Node.js API server
+├── backend/
 │   ├── src/
-│   │   ├── server.js          # Main server file
-│   │   ├── database/
-│   │   │   └── schema.sql     # Complete database schema
-│   │   └── routes/
-│   │       ├── auth.js        # Authentication routes
-│   │       ├── accounts.js    # Account management
-│   │       └── opportunities.js # Opportunity management
-│   ├── package.json
-│   ├── Dockerfile
-│   └── .env.example
-├── frontend/                   # React application
+│   │   ├── routes/          # API route handlers
+│   │   ├── database/        # Database schema & connection
+│   │   ├── middleware/      # Express middleware
+│   │   └── utils/          # Utility functions
+│   ├── Dockerfile          # Backend container
+│   └── package.json        # Backend dependencies
+├── frontend/
 │   ├── src/
-│   │   ├── components/
-│   │   │   ├── Dashboard.jsx
-│   │   │   ├── AccountManagement.jsx
-│   │   │   └── OpportunityManagement.jsx
-│   │   └── App.jsx
-│   ├── package.json
-│   └── Dockerfile
-├── docker-compose.yml          # Container orchestration
-└── README.md
+│   │   ├── components/     # React components
+│   │   └── App.jsx        # Main application
+│   ├── Dockerfile          # Frontend container
+│   └── package.json        # Frontend dependencies
+├── docker-compose.yml      # Container orchestration
+├── scripts/               # Automation scripts
+└── README.md              # This file
 ```
 
-## 📊 Features
+### Development Workflow
 
-### ✅ Core CRM Functionality
-- **Dashboard**: Real-time analytics and key metrics
-- **Account Management**: Complete customer lifecycle management
-- **Opportunity Pipeline**: Visual sales pipeline with drag-drop
-- **Contact Management**: Relationship tracking and communication
-- **Lead Management**: Lead scoring and conversion tracking
-- **Activity Tracking**: Tasks, meetings, calls, and notes
+```bash
+# Start development environment
+npm run dev:all
 
-### ✅ Enterprise Features
-- **Authentication & Authorization**: JWT-based with role management
-- **Real-time Updates**: Socket.IO for live collaboration
-- **Advanced Filtering**: Multi-parameter search and filtering
-- **Data Visualization**: Interactive charts and reports
-- **File Management**: Document upload and storage
-- **Audit Trail**: Complete activity logging
-- **Mobile Responsive**: Works on all devices
+# Run tests
+npm run test:all
 
-### ✅ Business Process Automation
-- **Service Management**: Track service delivery lifecycle
-- **Payment Integration**: Razorpay payment gateway
-- **Email Notifications**: Automated email workflows
-- **SLA Management**: Service level agreement tracking
-- **Compliance Tracking**: GST, legal, and regulatory compliance
+# Lint and format code
+npm run lint:all
 
-## 🗄️ Database Schema
+# Build for production
+npm run build:all
+```
 
-### Core Entities
-- **Users**: System users with role-based permissions
-- **Accounts**: Companies and organizations
-- **Contacts**: People associated with accounts
-- **Opportunities**: Sales deals and pipeline
-- **Leads**: Potential customers
-- **Cases**: Customer support tickets
-- **Activities**: Tasks, meetings, calls, emails
-- **Campaigns**: Marketing campaign tracking
-- **Services**: Service catalog and offerings
-- **Service Instances**: Active service deliveries
+### Adding New Features
 
-## 🔐 Environment Configuration
+1. **Backend**: Add routes in `backend/src/routes/`
+2. **Frontend**: Add components in `frontend/src/components/`
+3. **Database**: Update `backend/src/database/schema.sql`
+4. **API**: Follow existing patterns for consistency
 
-### Backend (.env)
+## 📈 Performance
+
+- **Database**: Optimized indexes for all major queries
+- **API**: Response caching and pagination
+- **Frontend**: Code splitting and lazy loading
+- **Real-time**: Efficient Socket.IO event handling
+- **Security**: Rate limiting and request validation
+
+## 🔧 Configuration
+
+### Environment Variables
+
+**Backend (.env):**
 ```env
-# Database
 DB_HOST=localhost
-DB_PORT=5432
 DB_NAME=mkw_platform
 DB_USER=mkw_user
-DB_PASSWORD=your_secure_password
-
-# JWT
-JWT_SECRET=your-super-secure-jwt-secret-key
-JWT_EXPIRES_IN=7d
-
-# Server
+DB_PASSWORD=mkw_secure_2024!
+JWT_SECRET=your-super-secure-jwt-secret
 NODE_ENV=development
 PORT=5000
-FRONTEND_URL=http://localhost:3000
-
-# External Services
-RAZORPAY_KEY_ID=your_razorpay_key
-SMTP_USER=your_email
-AWS_S3_BUCKET=your_s3_bucket
 ```
 
-### Frontend (.env)
+**Frontend (.env):**
 ```env
 REACT_APP_API_URL=http://localhost:5000
 REACT_APP_SOCKET_URL=http://localhost:5000
 REACT_APP_ENV=development
 ```
 
-## 🐳 Docker Deployment
+## 📊 Monitoring
 
-### Development
-```bash
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
-```
-
-### Production
-```bash
-docker-compose --profile production up -d
-```
-
-## 📚 API Documentation
-
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - User login
-- `GET /api/auth/me` - Get current user
-- `POST /api/auth/refresh` - Refresh JWT token
-
-### Accounts
-- `GET /api/accounts` - List accounts with filtering
-- `POST /api/accounts` - Create new account
-- `GET /api/accounts/:id` - Get account details
-- `PUT /api/accounts/:id` - Update account
-- `DELETE /api/accounts/:id` - Delete account
-
-### Opportunities
-- `GET /api/opportunities` - List opportunities
-- `GET /api/opportunities/pipeline` - Pipeline view
-- `POST /api/opportunities` - Create opportunity
-- `PUT /api/opportunities/:id` - Update opportunity
-
-## 🚀 Deployment Options
-
-### Cloud Platforms
-- **AWS**: EC2, RDS, S3, CloudFront
-- **Azure**: App Service, PostgreSQL, Blob Storage
-- **Google Cloud**: Compute Engine, Cloud SQL, Cloud Storage
-- **DigitalOcean**: Droplets, Managed Databases, Spaces
-
-### Recommended Production Setup
-1. **Database**: Managed PostgreSQL (AWS RDS, Azure Database)
-2. **Backend**: Container service (AWS ECS, Azure Container Instances)
-3. **Frontend**: Static hosting (Netlify, Vercel, CloudFront)
-4. **Files**: Object storage (AWS S3, Azure Blob Storage)
-5. **Monitoring**: Application monitoring (New Relic, DataDog)
-
-## 🧪 Testing
-
-```bash
-# Backend tests
-cd backend
-npm test
-
-# Frontend tests  
-cd frontend
-npm test
-
-# Integration tests
-npm run test:integration
-```
-
-## 🔧 Development
-
-### Prerequisites
-- Node.js 18+
-- PostgreSQL 14+
-- Docker & Docker Compose (optional)
-
-### Setup Development Environment
-```bash
-# 1. Install dependencies
-npm run install:all
-
-# 2. Setup database
-createdb mkw_platform
-psql mkw_platform < backend/src/database/schema.sql
-
-# 3. Configure environment
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-
-# 4. Start development servers
-npm run dev
-```
-
-### Database Migrations
-```bash
-cd backend
-npm run migrate
-npm run seed
-```
-
-## 📈 Performance
-
-### Optimizations
-- Database indexing for fast queries
-- Redis caching for frequent operations
-- CDN for static assets
-- Gzip compression
-- Image optimization
-- Lazy loading for large datasets
-
-### Scalability
-- Horizontal scaling with load balancers
-- Database read replicas
-- Microservices architecture ready
-- Container orchestration (Kubernetes)
-
-## 🔒 Security
-
-### Implemented Security Features
-- JWT authentication with refresh tokens
-- Password hashing with bcrypt
-- Rate limiting and request throttling
-- CORS protection
-- Input validation and sanitization
-- SQL injection prevention
-- XSS protection
-- HTTPS enforcement in production
-
-## 📞 Support
-
-### Business Contacts
-- **Company**: MKW Advisors
-- **Email**: info@mkwadvisors.com
-- **Phone**: +91-9999999999
-- **Support**: support@mkwadvisors.com
-
-### Technical Support
-- **Documentation**: [Link to documentation]
-- **Issues**: GitHub Issues
-- **Discussions**: GitHub Discussions
-
-## 📄 License
-
-This project is proprietary software developed for MKW Advisors.
+- **Health Checks**: `/health` endpoint with database connectivity
+- **Logging**: Winston logger with file rotation
+- **Error Tracking**: Comprehensive error logging and monitoring
+- **Performance**: Request timing and memory usage tracking
 
 ## 🤝 Contributing
 
-This is a private enterprise application. For internal development guidelines, please refer to the development documentation.
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
+5. Open Pull Request
+
+## 📝 License
+
+Proprietary - MKW Advisors. All rights reserved.
+
+## 📞 Support
+
+- **Technical Issues**: Create GitHub issues
+- **Business Questions**: Contact MKW Advisors team
+- **Documentation**: Check `/docs` folder
 
 ---
 
 **Built with ❤️ by MKW Advisors Development Team**
+
+*Transform your business relationships with enterprise-grade CRM technology.*

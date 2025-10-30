@@ -1,0 +1,57 @@
+{
+  "name": "mkw-platform",
+  "version": "1.0.0",
+  "description": "Complete Salesforce-level CRM platform for MKW Advisors",
+  "private": true,
+  "scripts": {
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm start",
+    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "build:all": "npm run build:backend && npm run build:frontend",
+    "start:backend": "cd backend && npm start",
+    "start:frontend": "cd frontend && npm run serve",
+    "start:all": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "test:all": "npm run test:backend && npm run test:frontend",
+    "lint:backend": "cd backend && npm run lint",
+    "lint:frontend": "cd frontend && npm run lint",
+    "lint:all": "npm run lint:backend && npm run lint:frontend",
+    "docker:dev": "docker-compose up",
+    "docker:prod": "docker-compose --profile production up -d",
+    "docker:build": "docker-compose build",
+    "docker:down": "docker-compose down",
+    "setup": "chmod +x scripts/setup.sh && ./scripts/setup.sh",
+    "db:schema": "psql -U mkw_user -d mkw_platform -f backend/src/database/schema.sql",
+    "db:reset": "dropdb mkw_platform && createdb mkw_platform && npm run db:schema",
+    "clean": "rm -rf backend/node_modules frontend/node_modules backend/logs",
+    "health": "curl -f http://localhost:5000/health || echo 'Backend not running'"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "keywords": [
+    "crm",
+    "enterprise", 
+    "salesforce",
+    "react",
+    "nodejs",
+    "postgresql",
+    "mkw-advisors"
+  ],
+  "author": "MKW Advisors <info@mkwadvisors.com>",
+  "license": "PROPRIETARY",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/camayank/comply-flow-portal"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
