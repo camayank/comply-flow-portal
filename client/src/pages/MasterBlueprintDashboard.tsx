@@ -3,9 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Clock, 
-  CheckCircle2, 
+import {
+  Clock,
+  CheckCircle2,
   AlertTriangle, 
   PlayCircle, 
   Calendar,
@@ -17,6 +17,16 @@ import {
   Zap,
   GitBranch
 } from "lucide-react";
+
+interface ServiceTypeMetrics {
+  onTime?: number;
+  total?: number;
+  complianceRate?: number;
+}
+
+interface SlaMetrics {
+  serviceTypeBreakdown: Record<string, ServiceTypeMetrics>;
+}
 
 interface BlueprintStatus {
   currentPhase: string;
@@ -73,7 +83,7 @@ export default function MasterBlueprintDashboard() {
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
-  const { data: slaMetrics } = useQuery({
+  const { data: slaMetrics } = useQuery<SlaMetrics>({
     queryKey: ["/api/sla/metrics"],
     refetchInterval: 60000, // Refresh every minute
   });
@@ -313,17 +323,23 @@ export default function MasterBlueprintDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {Object.entries(slaMetrics.serviceTypeBreakdown).map(([serviceType, metrics]: [string, any]) => (
-                    <div key={serviceType} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium capitalize">{serviceType.replace('_', ' ')}</span>
-                        <div className="text-sm text-muted-foreground">
-                          {metrics.onTime || 0}/{metrics.total || 0} ({(metrics.complianceRate || 0).toFixed(1)}%)
+                  {Object.entries(slaMetrics.serviceTypeBreakdown).map(([serviceType, metrics]) => {
+                    const onTime = metrics.onTime ?? 0;
+                    const total = metrics.total ?? 0;
+                    const complianceRate = metrics.complianceRate ?? 0;
+
+                    return (
+                      <div key={serviceType} className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium capitalize">{serviceType.replace('_', ' ')}</span>
+                          <div className="text-sm text-muted-foreground">
+                            {onTime}/{total} ({complianceRate.toFixed(1)}%)
+                          </div>
                         </div>
+                        <Progress value={complianceRate} className="h-2" />
                       </div>
-                      <Progress value={metrics.complianceRate || 0} className="h-2" />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>

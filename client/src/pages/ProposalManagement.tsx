@@ -1,66 +1,110 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import {
-  FileText,
-  Plus,
-  Search,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  Eye,
-  Send,
-  Download,
-  Edit,
-  DollarSign,
-  Calculator,
-} from "lucide-react";
+import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Calculator, CheckCircle2, Clock, Download, Edit, Eye, Plus, Search, Send, XCircle } from 'lucide-react';
 
 const PROPOSAL_STATUS = {
-  draft: { label: "Draft", color: "bg-gray-100 text-gray-800", icon: Edit },
-  sent: { label: "Sent", color: "bg-blue-100 text-blue-800", icon: Send },
-  viewed: { label: "Viewed", color: "bg-purple-100 text-purple-800", icon: Eye },
-  accepted: { label: "Accepted", color: "bg-green-100 text-green-800", icon: CheckCircle2 },
-  rejected: { label: "Rejected", color: "bg-red-100 text-red-800", icon: XCircle },
-  expired: { label: "Expired", color: "bg-orange-100 text-orange-800", icon: Clock },
-};
+  draft: { label: 'Draft', color: 'bg-gray-100 text-gray-800', icon: Edit },
+  sent: { label: 'Sent', color: 'bg-blue-100 text-blue-800', icon: Send },
+  viewed: { label: 'Viewed', color: 'bg-purple-100 text-purple-800', icon: Eye },
+  accepted: { label: 'Accepted', color: 'bg-green-100 text-green-800', icon: CheckCircle2 },
+  rejected: { label: 'Rejected', color: 'bg-red-100 text-red-800', icon: XCircle },
+  expired: { label: 'Expired', color: 'bg-orange-100 text-orange-800', icon: Clock },
+} as const;
 
+type ProposalStatusKey = keyof typeof PROPOSAL_STATUS;
+
+interface Proposal {
+  id: number;
+  proposalId: string;
+  companyName: string;
+  contactPerson: string;
+  email: string;
+  totalAmount: string;
+  validUntil: string;
+  status: ProposalStatusKey;
+}
+
+interface LeadOption {
+  id: number;
+  companyName: string;
+  contactPerson: string;
+  email: string;
+}
+
+interface ServiceOption {
+  serviceId: string | number;
+  name: string;
+  price: number;
+}
+
+interface UpdateProposalInput {
+  id: number;
+  status: ProposalStatusKey;
+}
+
+interface CreateProposalInput {
+  leadId: string;
+  companyName: string;
+  contactPerson: string;
+  email: string;
+  selectedServices: string[];
+  discount: number;
+  validityDays: number;
+  notes: string;
+  termsAndConditions: string;
+  totalAmount: string;
+  status: ProposalStatusKey;
+}
+
+interface CreateProposalFormProps {
+  leads: LeadOption[];
+  services: ServiceOption[];
+  onSubmit: (data: CreateProposalInput) => void;
+}
+
+type CreateProposalFormState = Omit<CreateProposalInput, 'totalAmount' | 'status'>;
+
+interface ProposalCardProps {
+  proposal: Proposal;
+  onClick?: () => void;
+  onUpdate: (input: UpdateProposalInput) => void;
+}
 export default function ProposalManagement() {
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedProposal, setSelectedProposal] = useState<any>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: proposals = [], isLoading } = useQuery({
+  const { data: proposals = [], isLoading } = useQuery<Proposal[]>({
     queryKey: ['/api/proposals'],
   });
 
-  const { data: leads = [] } = useQuery({
+  const { data: leads = [] } = useQuery<LeadOption[]>({
     queryKey: ['/api/leads'],
   });
 
-  const { data: services = [] } = useQuery({
+  const { data: services = [] } = useQuery<ServiceOption[]>({
     queryKey: ['/api/services'],
   });
 
   const createProposalMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/proposals', 'POST', data),
+    mutationFn: (data: CreateProposalInput) => apiRequest<Proposal>('POST', '/api/proposals', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/proposals'] });
       toast({ title: "Success", description: "Proposal created successfully" });
       setShowCreateModal(false);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message || "Failed to create proposal",
@@ -70,19 +114,23 @@ export default function ProposalManagement() {
   });
 
   const updateProposalMutation = useMutation({
-    mutationFn: ({ id, ...data }: any) => apiRequest(`/api/proposals/${id}`, 'PATCH', data),
+    mutationFn: ({ id, ...data }: UpdateProposalInput) => apiRequest<Proposal>('PATCH', `/api/proposals/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/proposals'] });
       toast({ title: "Success", description: "Proposal updated successfully" });
     },
   });
 
-  const filteredProposals = proposals.filter((proposal: any) => {
+  const filteredProposals = proposals.filter((proposal) => {
     return (
       proposal.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       proposal.proposalId?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
+
+  const acceptedProposals = proposals.filter((proposal) => proposal.status === 'accepted').length;
+  const pendingProposals = proposals.filter((proposal) => (['sent', 'viewed'] as ProposalStatusKey[]).includes(proposal.status)).length;
+  const totalProposalValue = proposals.reduce((sum, proposal) => sum + (Number.parseFloat(proposal.totalAmount) || 0), 0);
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -128,9 +176,7 @@ export default function ProposalManagement() {
               <CardTitle className="text-sm font-medium">Accepted</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {proposals.filter((p: any) => p.status === 'accepted').length}
-              </div>
+              <div className="text-2xl font-bold text-green-600">{acceptedProposals}</div>
             </CardContent>
           </Card>
           <Card>
@@ -138,9 +184,7 @@ export default function ProposalManagement() {
               <CardTitle className="text-sm font-medium">Pending</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {proposals.filter((p: any) => ['sent', 'viewed'].includes(p.status)).length}
-              </div>
+              <div className="text-2xl font-bold text-blue-600">{pendingProposals}</div>
             </CardContent>
           </Card>
           <Card>
@@ -149,7 +193,7 @@ export default function ProposalManagement() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                ₹{proposals.reduce((sum: number, p: any) => sum + (parseFloat(p.totalAmount) || 0), 0).toLocaleString()}
+                ₹{totalProposalValue.toLocaleString()}
               </div>
             </CardContent>
           </Card>
@@ -176,11 +220,10 @@ export default function ProposalManagement() {
               <div className="text-center py-8">Loading proposals...</div>
             ) : (
               <div className="space-y-4">
-                {filteredProposals.map((proposal: any) => (
+                {filteredProposals.map((proposal) => (
                   <ProposalCard
                     key={proposal.id}
                     proposal={proposal}
-                    onClick={() => setSelectedProposal(proposal)}
                     onUpdate={updateProposalMutation.mutate}
                   />
                 ))}
@@ -198,8 +241,8 @@ export default function ProposalManagement() {
   );
 }
 
-function ProposalCard({ proposal, onClick, onUpdate }: any) {
-  const statusConfig = PROPOSAL_STATUS[proposal.status as keyof typeof PROPOSAL_STATUS] || PROPOSAL_STATUS.draft;
+function ProposalCard({ proposal, onClick, onUpdate }: ProposalCardProps) {
+  const statusConfig = PROPOSAL_STATUS[proposal.status] || PROPOSAL_STATUS.draft;
   const StatusIcon = statusConfig.icon;
 
   return (
@@ -250,29 +293,33 @@ function ProposalCard({ proposal, onClick, onUpdate }: any) {
   );
 }
 
-function CreateProposalForm({ onSubmit, leads, services }: any) {
-  const [formData, setFormData] = useState({
-    leadId: "",
-    companyName: "",
-    contactPerson: "",
-    email: "",
-    selectedServices: [] as string[],
+function CreateProposalForm({ onSubmit, leads, services }: CreateProposalFormProps) {
+  const [formData, setFormData] = useState<CreateProposalFormState>({
+    leadId: '',
+    companyName: '',
+    contactPerson: '',
+    email: '',
+    selectedServices: [],
     discount: 0,
     validityDays: 30,
-    notes: "",
-    termsAndConditions: "Standard terms and conditions apply.",
+    notes: '',
+    termsAndConditions: 'Standard terms and conditions apply.',
   });
 
-  const selectedServicesList = services.filter((s: any) => 
-    formData.selectedServices.includes(s.serviceId)
+  const selectedServicesList = useMemo(
+    () =>
+      services.filter((service) =>
+        formData.selectedServices.includes(String(service.serviceId))
+      ),
+    [formData.selectedServices, services]
   );
 
-  const subtotal = selectedServicesList.reduce((sum: number, s: any) => sum + s.price, 0);
+  const subtotal = selectedServicesList.reduce((sum, service) => sum + service.price, 0);
   const discountAmount = (subtotal * formData.discount) / 100;
   const total = subtotal - discountAmount;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     onSubmit({
       ...formData,
       totalAmount: total.toFixed(2),
@@ -281,7 +328,7 @@ function CreateProposalForm({ onSubmit, leads, services }: any) {
   };
 
   const handleLeadSelect = (leadId: string) => {
-    const lead = leads.find((l: any) => l.id.toString() === leadId);
+    const lead = leads.find((leadOption) => leadOption.id.toString() === leadId);
     if (lead) {
       setFormData({
         ...formData,
@@ -291,6 +338,26 @@ function CreateProposalForm({ onSubmit, leads, services }: any) {
         email: lead.email,
       });
     }
+  };
+
+  const handleTextInputChange = (field: 'companyName' | 'contactPerson' | 'email') => (
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
+    setFormData({ ...formData, [field]: event.target.value });
+  };
+
+  const handleNotesChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    setFormData({ ...formData, notes: event.target.value });
+  };
+
+  const handleDiscountChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const value = parseFloat(event.target.value);
+    setFormData({ ...formData, discount: Number.isNaN(value) ? 0 : value });
+  };
+
+  const handleValidityChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(event.target.value, 10);
+    setFormData({ ...formData, validityDays: Number.isNaN(value) ? 30 : value });
   };
 
   return (
@@ -306,7 +373,7 @@ function CreateProposalForm({ onSubmit, leads, services }: any) {
               <SelectValue placeholder="Select from leads" />
             </SelectTrigger>
             <SelectContent>
-              {leads.map((lead: any) => (
+              {leads.map((lead) => (
                 <SelectItem key={lead.id} value={lead.id.toString()}>
                   {lead.companyName}
                 </SelectItem>
@@ -321,7 +388,7 @@ function CreateProposalForm({ onSubmit, leads, services }: any) {
             id="companyName"
             required
             value={formData.companyName}
-            onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+            onChange={handleTextInputChange('companyName')}
           />
         </div>
       </div>
@@ -333,7 +400,7 @@ function CreateProposalForm({ onSubmit, leads, services }: any) {
             id="contactPerson"
             required
             value={formData.contactPerson}
-            onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+            onChange={handleTextInputChange('contactPerson')}
           />
         </div>
 
@@ -344,7 +411,7 @@ function CreateProposalForm({ onSubmit, leads, services }: any) {
             type="email"
             required
             value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            onChange={handleTextInputChange('email')}
           />
         </div>
       </div>
@@ -352,32 +419,37 @@ function CreateProposalForm({ onSubmit, leads, services }: any) {
       <div className="space-y-2">
         <Label>Select Services *</Label>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded-lg p-2">
-          {services.slice(0, 20).map((service: any) => (
-            <div key={service.serviceId} className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id={service.serviceId}
-                checked={formData.selectedServices.includes(service.serviceId)}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setFormData({
-                      ...formData,
-                      selectedServices: [...formData.selectedServices, service.serviceId],
-                    });
-                  } else {
-                    setFormData({
-                      ...formData,
-                      selectedServices: formData.selectedServices.filter(s => s !== service.serviceId),
-                    });
-                  }
-                }}
-                className="rounded border-gray-300"
-              />
-              <label htmlFor={service.serviceId} className="text-sm cursor-pointer">
-                {service.name} - ₹{service.price}
-              </label>
-            </div>
-          ))}
+          {services.slice(0, 20).map((service) => {
+            const serviceId = String(service.serviceId);
+            const isSelected = formData.selectedServices.includes(serviceId);
+
+            return (
+              <div key={serviceId} className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id={serviceId}
+                  checked={isSelected}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                    if (event.target.checked) {
+                      setFormData({
+                        ...formData,
+                        selectedServices: [...formData.selectedServices, serviceId],
+                      });
+                    } else {
+                      setFormData({
+                        ...formData,
+                        selectedServices: formData.selectedServices.filter((selected) => selected !== serviceId),
+                      });
+                    }
+                  }}
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor={serviceId} className="text-sm cursor-pointer">
+                  {service.name} - ₹{service.price}
+                </label>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -395,7 +467,7 @@ function CreateProposalForm({ onSubmit, leads, services }: any) {
               max="100"
               className="w-20"
               value={formData.discount}
-              onChange={(e) => setFormData({ ...formData, discount: parseFloat(e.target.value) || 0 })}
+              onChange={handleDiscountChange}
             />
             <span>%</span>
             <span className="font-semibold">-₹{discountAmount.toLocaleString()}</span>
@@ -415,7 +487,7 @@ function CreateProposalForm({ onSubmit, leads, services }: any) {
             type="number"
             min="1"
             value={formData.validityDays}
-            onChange={(e) => setFormData({ ...formData, validityDays: parseInt(e.target.value) || 30 })}
+            onChange={handleValidityChange}
           />
         </div>
       </div>
@@ -425,7 +497,7 @@ function CreateProposalForm({ onSubmit, leads, services }: any) {
         <Textarea
           id="notes"
           value={formData.notes}
-          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+          onChange={handleNotesChange}
           rows={3}
         />
       </div>
