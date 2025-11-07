@@ -62,6 +62,7 @@
     "@uppy/file-input": "^4.2.2",
     "@uppy/progress-bar": "^4.3.2",
     "@uppy/react": "^4.5.2",
+    "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
     "caniuse-lite": "^1.0.30001735",
     "class-variance-authority": "^0.7.1",
@@ -113,7 +114,8 @@
     "ws": "^8.18.2",
     "xlsx": "^0.18.5",
     "zod": "^3.24.2",
-    "zod-validation-error": "^3.4.0"
+    "zod-validation-error": "^3.4.0",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@replit/vite-plugin-cartographer": "^0.2.5",
