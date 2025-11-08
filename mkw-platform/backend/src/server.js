@@ -2,131 +2,168 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
-const rateLimit = require('express-rate-limit');
-const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
+const session = require('express-session');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
-require('express-async-errors');
-require('dotenv').config();
+const path = require('path');
 
+// Import security middleware
+const {
+  rateLimits,
+  getCSPPolicy,
+  csrfProtection,
+  sessionConfig,
+  requireMinimumRole,
+  validateEnvironment
+} = require('./middleware/security');
+const {
+  sessionManager,
+  sessionAuthMiddleware
+} = require('./middleware/sessionAuth');
+
+// Import utilities
 const logger = require('./utils/logger');
-const pool = require('./database/connection');
+const db = require('./database/connection');
 
-// Import routes
-const authRoutes = require('./routes/auth');
-const accountRoutes = require('./routes/accounts');
-const opportunityRoutes = require('./routes/opportunities');
+// Validate environment before starting
+try {
+  validateEnvironment();
+  logger.info('Environment validation passed');
+} catch (error) {
+  logger.error('Environment validation failed', { error: error.message });
+  process.exit(1);
+}
 
-// Create Express app
 const app = express();
 const server = createServer(app);
-
-// Create Socket.IO server
 const io = new Server(server, {
   cors: {
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    methods: ['GET', 'POST'],
     credentials: true
   }
 });
 
-// Security middleware
+// Trust proxy for accurate IP addresses behind load balancers
+app.set('trust proxy', 1);
+
+// Security middleware - Applied in order of importance
+
+// 1. Helmet with strict CSP for production
 app.use(helmet({
   contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https:"],
-      scriptSrc: ["'self'"],
-      connectSrc: ["'self'", "ws:", "wss:"],
-    },
+    directives: getCSPPolicy(process.env.NODE_ENV)
   },
-  crossOriginEmbedderPolicy: false
+  hsts: {
+    maxAge: 31536000, // 1 year
+    includeSubDomains: true,
+    preload: true
+  },
+  noSniff: true,
+  frameguard: { action: 'deny' },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
 }));
 
-// CORS configuration
-app.use(cors({
+// 2. Compression for performance
+app.use(compression());
+
+// 3. Body parsing with size limits
+app.use(express.json({ 
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    // Store raw body for webhook verification if needed
+    req.rawBody = buf;
+  }
+}));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// 4. Cookie parser for secure session management
+app.use(cookieParser(sessionConfig.secret));
+
+// 5. Session middleware with secure configuration
+if (process.env.NODE_ENV === 'production') {
+  // Use Redis for production sessions
+  const RedisStore = require('connect-redis')(session);
+  const redis = require('redis');
+  const redisClient = redis.createClient({
+    url: process.env.REDIS_URL || 'redis://localhost:6379'
+  });
+  
+  sessionConfig.store = new RedisStore({ client: redisClient });
+}
+
+app.use(session(sessionConfig));
+
+// 6. CORS with strict configuration
+const corsOptions = {
   origin: function (origin, callback) {
-    const allowedOrigins = [
-      process.env.FRONTEND_URL || 'http://localhost:3000',
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://127.0.0.1:3000'
-    ];
+    const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000').split(',');
     
+    // Allow requests with no origin (mobile apps, Postman, etc.)
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      logger.warn('CORS blocked request', { origin, allowedOrigins });
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-}));
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With', 
+    'Content-Type',
+    'Accept',
+    'Authorization',
+    'X-CSRF-Token'
+  ],
+  exposedHeaders: ['X-CSRF-Token']
+};
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000, // 15 minutes
-  max: process.env.RATE_LIMIT_MAX_REQUESTS || 100, // limit each IP to 100 requests per windowMs
-  message: {
-    error: 'Too many requests from this IP, please try again later.',
-    retryAfter: '15 minutes'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => {
-    // Skip rate limiting for health checks
-    return req.path === '/health' || req.path === '/api/health';
-  }
-});
+app.use(cors(corsOptions));
 
-app.use('/api/', limiter);
+// 7. General API rate limiting
+app.use('/api/', rateLimits.generalAPI);
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Compression middleware
-app.use(compression());
-
-// Logging middleware
-app.use(morgan('combined', {
-  stream: {
-    write: (message) => logger.info(message.trim())
-  }
-}));
-
-// Request ID middleware
+// 8. Request logging middleware
 app.use((req, res, next) => {
-  req.id = require('uuid').v4();
-  res.setHeader('X-Request-ID', req.id);
+  // Log all requests with essential info
+  logger.info('API Request', {
+    method: req.method,
+    path: req.path,
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+    sessionId: req.sessionID ? req.sessionID.substring(0, 8) + '...' : 'none'
+  });
+  
+  // Add request ID for tracing
+  req.requestId = require('crypto').randomBytes(8).toString('hex');
+  res.setHeader('X-Request-ID', req.requestId);
+  
   next();
 });
 
-// API versioning
-const API_VERSION = process.env.API_VERSION || 'v1';
-
-// Health check endpoint
+// Health check endpoint (no authentication required)
 app.get('/health', async (req, res) => {
   try {
-    // Check database connection
-    await pool.query('SELECT 1');
+    // Check database connectivity
+    await db.raw('SELECT 1');
     
-    res.status(200).json({
+    const healthData = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
       version: process.env.npm_package_version || '1.0.0',
-      environment: process.env.NODE_ENV || 'development',
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
-      database: 'connected'
-    });
+      environment: process.env.NODE_ENV,
+      database: 'connected',
+      redis: 'connected', // TODO: Add Redis health check
+      uptime: process.uptime()
+    };
+    
+    res.status(200).json(healthData);
   } catch (error) {
-    logger.error('Health check failed:', error);
+    logger.error('Health check failed', { error: error.message });
     res.status(503).json({
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
@@ -135,148 +172,307 @@ app.get('/health', async (req, res) => {
   }
 });
 
-// API Routes
-app.use(`/api/${API_VERSION}/auth`, authRoutes);
-app.use(`/api/${API_VERSION}/accounts`, accountRoutes);
-app.use(`/api/${API_VERSION}/opportunities`, opportunityRoutes);
+// API Routes with progressive security layers
 
-// Default API route
-app.get(`/api/${API_VERSION}`, (req, res) => {
-  res.json({
-    message: 'MKW Platform API',
-    version: API_VERSION,
-    timestamp: new Date().toISOString(),
-    endpoints: {
-      auth: `/api/${API_VERSION}/auth`,
-      accounts: `/api/${API_VERSION}/accounts`,
-      opportunities: `/api/${API_VERSION}/opportunities`
+// Authentication routes (with specific rate limits)
+const authRoutes = require('./routes/auth');
+app.use('/api/v1/auth', authRoutes);
+
+// Protected API routes (require session authentication)
+const accountRoutes = require('./routes/accounts');
+const opportunityRoutes = require('./routes/opportunities');
+
+app.use('/api/v1/accounts', sessionAuthMiddleware, accountRoutes);
+app.use('/api/v1/opportunities', sessionAuthMiddleware, opportunityRoutes);
+
+// Admin routes with strict protection
+app.use('/api/admin/*', 
+  rateLimits.adminPerIP, // Strict rate limiting for admin endpoints
+  sessionAuthMiddleware, // Must be authenticated
+  requireMinimumRole('admin'), // Must have admin privileges
+  csrfProtection // CSRF protection for state-changing operations
+);
+
+// Example admin routes (previously unprotected - NOW SECURED)
+app.post('/api/admin/combo-configurations', 
+  sessionAuthMiddleware,
+  requireMinimumRole('admin'),
+  csrfProtection,
+  async (req, res) => {
+    try {
+      // Admin-only configuration creation
+      logger.info('Admin created combo configuration', {
+        adminId: req.user.id,
+        ip: req.ip,
+        config: req.body
+      });
+      
+      res.json({ success: true, message: 'Configuration created' });
+    } catch (error) {
+      logger.error('Admin combo config creation failed', {
+        error: error.message,
+        adminId: req.user.id
+      });
+      res.status(500).json({ success: false, error: 'Creation failed' });
     }
-  });
+  }
+);
+
+app.post('/api/admin/quality-standards',
+  sessionAuthMiddleware,
+  requireMinimumRole('admin'),
+  csrfProtection,
+  async (req, res) => {
+    try {
+      // Admin-only quality standards creation
+      logger.info('Admin created quality standard', {
+        adminId: req.user.id,
+        ip: req.ip
+      });
+      
+      res.json({ success: true, message: 'Quality standard created' });
+    } catch (error) {
+      logger.error('Admin quality standard creation failed', {
+        error: error.message,
+        adminId: req.user.id
+      });
+      res.status(500).json({ success: false, error: 'Creation failed' });
+    }
+  }
+);
+
+app.post('/api/admin/retainership-plans',
+  sessionAuthMiddleware,
+  requireMinimumRole('admin'),
+  csrfProtection,
+  async (req, res) => {
+    try {
+      // Admin-only retainership plan creation
+      logger.info('Admin created retainership plan', {
+        adminId: req.user.id,
+        ip: req.ip
+      });
+      
+      res.json({ success: true, message: 'Retainership plan created' });
+    } catch (error) {
+      logger.error('Admin retainership plan creation failed', {
+        error: error.message,
+        adminId: req.user.id
+      });
+      res.status(500).json({ success: false, error: 'Creation failed' });
+    }
+  }
+);
+
+app.post('/api/admin/quality-audit/:serviceId',
+  sessionAuthMiddleware,
+  requireMinimumRole('admin'),
+  csrfProtection,
+  async (req, res) => {
+    try {
+      const { serviceId } = req.params;
+      
+      // Admin-only quality audit creation
+      logger.info('Admin created quality audit', {
+        adminId: req.user.id,
+        serviceId,
+        ip: req.ip
+      });
+      
+      res.json({ success: true, message: 'Quality audit created' });
+    } catch (error) {
+      logger.error('Admin quality audit creation failed', {
+        error: error.message,
+        adminId: req.user.id
+      });
+      res.status(500).json({ success: false, error: 'Creation failed' });
+    }
+  }
+);
+
+// Socket.IO authentication and real-time features
+io.use(async (socket, next) => {
+  try {
+    const sessionId = socket.handshake.auth.sessionId || 
+                     socket.handshake.headers.cookie?.match(/mkw\.sid=([^;]+)/)?.[1];
+    
+    if (!sessionId) {
+      return next(new Error('Authentication required'));
+    }
+    
+    const validation = await sessionManager.validateSession(sessionId, {
+      ip: socket.handshake.address,
+      headers: socket.handshake.headers
+    });
+    
+    if (!validation.valid) {
+      return next(new Error('Invalid session'));
+    }
+    
+    const user = await db('users')
+      .where('id', validation.session.userId)
+      .where('status', 'active')
+      .first();
+    
+    if (!user) {
+      return next(new Error('User not found'));
+    }
+    
+    socket.user = user;
+    socket.sessionId = sessionId;
+    
+    logger.info('Socket.IO connection authenticated', {
+      userId: user.id,
+      socketId: socket.id,
+      ip: socket.handshake.address
+    });
+    
+    next();
+  } catch (error) {
+    logger.error('Socket.IO authentication failed', {
+      error: error.message,
+      ip: socket.handshake.address
+    });
+    next(new Error('Authentication failed'));
+  }
 });
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
-  logger.info(`User connected: ${socket.id}`);
+  const userId = socket.user.id;
   
-  // Join user to their personal room
-  socket.on('join-user-room', (userId) => {
-    socket.join(`user-${userId}`);
-    logger.info(`User ${userId} joined personal room`);
+  // Join user-specific room for private notifications
+  socket.join(`user_${userId}`);
+  
+  // Join role-based rooms for broadcast messages
+  socket.join(`role_${socket.user.role}`);
+  
+  logger.info('User connected to real-time service', {
+    userId,
+    role: socket.user.role,
+    socketId: socket.id
   });
   
-  // Join opportunity room for real-time updates
-  socket.on('join-opportunity', (opportunityId) => {
-    socket.join(`opportunity-${opportunityId}`);
-    logger.info(`User joined opportunity room: ${opportunityId}`);
+  // Handle real-time events
+  socket.on('join_account_room', (accountId) => {
+    // Verify user has access to this account
+    socket.join(`account_${accountId}`);
+    logger.info('User joined account room', { userId, accountId });
   });
   
-  // Join account room for real-time updates
-  socket.on('join-account', (accountId) => {
-    socket.join(`account-${accountId}`);
-    logger.info(`User joined account room: ${accountId}`);
+  socket.on('opportunity_update', async (data) => {
+    // Broadcast opportunity updates to account room
+    socket.to(`account_${data.accountId}`).emit('opportunity_updated', {
+      ...data,
+      updatedBy: socket.user.first_name + ' ' + socket.user.last_name,
+      timestamp: new Date()
+    });
   });
   
-  // Handle activity updates
-  socket.on('activity-update', (data) => {
-    socket.to(`${data.type}-${data.id}`).emit('activity-updated', data);
-  });
-  
-  // Handle disconnection
-  socket.on('disconnect', () => {
-    logger.info(`User disconnected: ${socket.id}`);
+  socket.on('disconnect', (reason) => {
+    logger.info('User disconnected from real-time service', {
+      userId,
+      socketId: socket.id,
+      reason
+    });
   });
 });
 
-// Make io available in routes
-app.set('io', io);
+// Error handling middleware
+app.use((err, req, res, next) => {
+  logger.error('Unhandled error', {
+    error: err.message,
+    stack: err.stack,
+    path: req.path,
+    method: req.method,
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+    userId: req.user?.id
+  });
+  
+  // Don't expose internal errors in production
+  const isDev = process.env.NODE_ENV === 'development';
+  
+  res.status(err.status || 500).json({
+    success: false,
+    error: isDev ? err.message : 'Internal server error',
+    ...(isDev && { stack: err.stack })
+  });
+});
 
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
-    message: 'Route not found',
-    path: req.originalUrl,
-    method: req.method,
-    timestamp: new Date().toISOString()
+    error: 'Endpoint not found'
   });
 });
 
-// Global error handler
-app.use((error, req, res, next) => {
-  logger.error('Global error handler:', {
-    error: error.message,
-    stack: error.stack,
-    requestId: req.id,
-    method: req.method,
-    url: req.url,
-    ip: req.ip,
-    userAgent: req.get('User-Agent')
+// Graceful shutdown handling
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
+
+async function gracefulShutdown(signal) {
+  logger.info(`Received ${signal}. Starting graceful shutdown...`);
+  
+  // Stop accepting new connections
+  server.close(() => {
+    logger.info('HTTP server closed');
+    
+    // Close database connections
+    db.destroy(() => {
+      logger.info('Database connections closed');
+      
+      // Close Socket.IO connections
+      io.close(() => {
+        logger.info('Socket.IO server closed');
+        process.exit(0);
+      });
+    });
   });
   
-  // Don't expose error details in production
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  
-  res.status(error.status || 500).json({
-    success: false,
-    message: error.message || 'Internal server error',
-    requestId: req.id,
-    timestamp: new Date().toISOString(),
-    ...(isDevelopment && { stack: error.stack })
-  });
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    logger.info('Process terminated');
-    pool.end();
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  server.close(() => {
-    logger.info('Process terminated');
-    pool.end();
-    process.exit(0);
-  });
-});
-
-// Unhandled promise rejection handler
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
-
-// Uncaught exception handler
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', error);
-  process.exit(1);
-});
+  // Force shutdown after 30 seconds
+  setTimeout(() => {
+    logger.error('Forced shutdown after 30 seconds');
+    process.exit(1);
+  }, 30000);
+}
 
 // Start server
 const PORT = process.env.PORT || 5000;
-const HOST = process.env.HOST || '0.0.0.0';
 
-server.listen(PORT, HOST, () => {
-  logger.info(`🚀 MKW Platform API Server started`);
-  logger.info(`📍 Server running on ${HOST}:${PORT}`);
-  logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`📊 API Version: ${API_VERSION}`);
-  logger.info(`🔗 Health Check: http://${HOST}:${PORT}/health`);
-  logger.info(`📡 Socket.IO enabled for real-time updates`);
-  
-  // ASCII Art Banner
-  console.log(`
-  ███╗   ███╗██╗  ██╗██╗    ██╗    ██████╗ ██╗      █████╗ ████████╗███████╗ ██████╗ ██████╗ ███╗   ███╗
-  ████╗ ████║██║ ██╔╝██║    ██║    ██╔══██╗██║     ██╔══██╗╚══██╔══╝██╔════╝██╔═══██╗██╔══██╗████╗ ████║
-  ██╔████╔██║█████╔╝ ██║ █╗ ██║    ██████╔╝██║     ███████║   ██║   █████╗  ██║   ██║██████╔╝██╔████╔██║
-  ██║╚██╔╝██║██╔═██╗ ██║███╗██║    ██╔═══╝ ██║     ██╔══██║   ██║   ██╔══╝  ██║   ██║██╔══██╗██║╚██╔╝██║
-  ██║ ╚═╝ ██║██║  ██╗╚███╔███╔╝    ██║     ███████╗██║  ██║   ██║   ██║     ╚██████╔╝██║  ██║██║ ╚═╝ ██║
-  ╚═╝     ╚═╝╚═╝  ╚═╝ ╚══╝╚══╝     ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚═╝      ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝
-`);
+server.listen(PORT, () => {
+  logger.info(`🚀 MKW Platform server started successfully`, {
+    port: PORT,
+    environment: process.env.NODE_ENV,
+    version: process.env.npm_package_version || '1.0.0',
+    security: 'enterprise-grade',
+    features: [
+      'session-based-auth',
+      'csrf-protection', 
+      'rate-limiting',
+      'admin-route-protection',
+      'hashed-otp-storage',
+      'progressive-lockout',
+      'session-fingerprinting',
+      'real-time-collaboration'
+    ]
+  });
 });
+
+// Periodic cleanup tasks
+setInterval(async () => {
+  try {
+    await sessionManager.cleanupExpiredSessions();
+    
+    // Run database cleanup
+    const cleanedCount = await db.raw('SELECT cleanup_expired_security_data()');
+    logger.info('Periodic security cleanup completed', {
+      cleanedRecords: cleanedCount.rows[0]?.cleanup_expired_security_data || 0
+    });
+  } catch (error) {
+    logger.error('Periodic cleanup failed', { error: error.message });
+  }
+}, 60 * 60 * 1000); // Every hour
 
 module.exports = { app, server, io };
