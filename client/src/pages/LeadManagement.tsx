@@ -1,68 +1,103 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import {
-  Plus,
-  Search,
-  Filter,
-  Phone,
-  Mail,
-  Building,
-  MapPin,
-  Calendar,
-  TrendingUp,
-  UserPlus,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Star,
-} from "lucide-react";
+import { ChangeEvent, FormEvent, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CheckCircle2, Mail, Phone, Plus, Search, Star, UserPlus } from 'lucide-react';
 
 const LEAD_STAGES = {
-  new: { label: "New", color: "bg-blue-100 text-blue-800" },
-  hot_lead: { label: "Hot", color: "bg-red-100 text-red-800" },
-  warm_lead: { label: "Warm", color: "bg-orange-100 text-orange-800" },
-  cold_lead: { label: "Cold", color: "bg-gray-100 text-gray-800" },
-  not_answered: { label: "Not Answered", color: "bg-yellow-100 text-yellow-800" },
-  not_interested: { label: "Not Interested", color: "bg-purple-100 text-purple-800" },
-  converted: { label: "Converted", color: "bg-green-100 text-green-800" },
-  lost: { label: "Lost", color: "bg-red-100 text-red-800" },
-};
+  new: { label: 'New', color: 'bg-blue-100 text-blue-800' },
+  hot_lead: { label: 'Hot', color: 'bg-red-100 text-red-800' },
+  warm_lead: { label: 'Warm', color: 'bg-orange-100 text-orange-800' },
+  cold_lead: { label: 'Cold', color: 'bg-gray-100 text-gray-800' },
+  not_answered: { label: 'Not Answered', color: 'bg-yellow-100 text-yellow-800' },
+  not_interested: { label: 'Not Interested', color: 'bg-purple-100 text-purple-800' },
+  converted: { label: 'Converted', color: 'bg-green-100 text-green-800' },
+  lost: { label: 'Lost', color: 'bg-red-100 text-red-800' },
+} as const;
+
+type LeadStageKey = keyof typeof LEAD_STAGES;
+type LeadFilterStage = 'all' | LeadStageKey;
+
+interface Lead {
+  id: number;
+  companyName: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  stage: LeadStageKey;
+  requirementSummary?: string;
+  leadSource?: string;
+  estimatedValue?: number | string;
+  isHot?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface LeadStats {
+  total: number;
+  hotLeads: number;
+  converted: number;
+  conversionRate: number;
+}
+
+interface UpdateLeadInput {
+  id: number;
+  stage: LeadStageKey;
+}
+
+interface CreateLeadInput {
+  companyName: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  leadSource: string;
+  requirementSummary: string;
+  estimatedValue: string;
+  stage: LeadStageKey;
+}
+
+interface LeadCardProps {
+  lead: Lead;
+  onUpdate: (input: UpdateLeadInput) => void;
+  onConvert: () => void;
+}
+
+interface CreateLeadFormProps {
+  onSubmit: (data: CreateLeadInput) => void;
+}
 
 export default function LeadManagement() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterStage, setFilterStage] = useState("all");
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStage, setFilterStage] = useState<LeadFilterStage>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: leads = [], isLoading } = useQuery({
+  const { data: leads = [], isLoading } = useQuery<Lead[]>({
     queryKey: ['/api/leads', filterStage],
   });
 
-  const { data: leadStats } = useQuery({
+  const { data: leadStats } = useQuery<LeadStats>({
     queryKey: ['/api/leads/stats'],
   });
 
   const createLeadMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/leads', 'POST', data),
+    mutationFn: (data: CreateLeadInput) => apiRequest<Lead>('POST', '/api/leads', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
       queryClient.invalidateQueries({ queryKey: ['/api/leads/stats'] });
       toast({ title: "Success", description: "Lead created successfully" });
       setShowCreateModal(false);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message || "Failed to create lead",
@@ -72,13 +107,13 @@ export default function LeadManagement() {
   });
 
   const updateLeadMutation = useMutation({
-    mutationFn: ({ id, ...data }: any) => apiRequest(`/api/leads/${id}`, 'PATCH', data),
+    mutationFn: ({ id, ...data }: UpdateLeadInput) => apiRequest<Lead>('PATCH', `/api/leads/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
       queryClient.invalidateQueries({ queryKey: ['/api/leads/stats'] });
       toast({ title: "Success", description: "Lead updated successfully" });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message || "Failed to update lead",
@@ -88,7 +123,7 @@ export default function LeadManagement() {
   });
 
   const convertLeadMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/leads/${id}/convert`, 'POST', {}),
+    mutationFn: (id: number) => apiRequest('POST', `/api/leads/${id}/convert`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
       queryClient.invalidateQueries({ queryKey: ['/api/leads/stats'] });
@@ -97,7 +132,7 @@ export default function LeadManagement() {
         description: "Lead converted to client successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
         description: error.message || "Failed to convert lead",
@@ -106,7 +141,7 @@ export default function LeadManagement() {
     },
   });
 
-  const filteredLeads = leads.filter((lead: any) => {
+  const filteredLeads = leads.filter((lead) => {
     const matchesSearch =
       lead.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       lead.contactPerson?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -196,7 +231,7 @@ export default function LeadManagement() {
                     data-testid="input-search-leads"
                   />
                 </div>
-                <Select value={filterStage} onValueChange={setFilterStage}>
+                <Select value={filterStage} onValueChange={(value) => setFilterStage(value as LeadFilterStage)}>
                   <SelectTrigger className="w-full md:w-48" data-testid="select-filter-stage">
                     <SelectValue />
                   </SelectTrigger>
@@ -239,10 +274,8 @@ export default function LeadManagement() {
   );
 }
 
-function LeadCard({ lead, onUpdate, onConvert }: any) {
-  const [showDetails, setShowDetails] = useState(false);
-  
-  const stageInfo = LEAD_STAGES[lead.stage as keyof typeof LEAD_STAGES] || LEAD_STAGES.new;
+function LeadCard({ lead, onUpdate, onConvert }: LeadCardProps) {
+  const stageInfo = LEAD_STAGES[lead.stage] || LEAD_STAGES.new;
 
   return (
     <div className="border rounded-lg p-4 hover:shadow-md transition-shadow" data-testid={`lead-card-${lead.id}`}>
@@ -281,10 +314,7 @@ function LeadCard({ lead, onUpdate, onConvert }: any) {
         </div>
 
         <div className="flex flex-col md:flex-row gap-2">
-          <Select
-            value={lead.stage}
-            onValueChange={(value) => onUpdate({ id: lead.id, stage: value })}
-          >
+          <Select value={lead.stage} onValueChange={(value) => onUpdate({ id: lead.id, stage: value as LeadStageKey })}>
             <SelectTrigger className="w-full md:w-40">
               <SelectValue />
             </SelectTrigger>
@@ -313,21 +343,29 @@ function LeadCard({ lead, onUpdate, onConvert }: any) {
   );
 }
 
-function CreateLeadForm({ onSubmit }: any) {
-  const [formData, setFormData] = useState({
-    companyName: "",
-    contactPerson: "",
-    email: "",
-    phone: "",
-    leadSource: "",
-    requirementSummary: "",
-    estimatedValue: "",
-    stage: "new",
+function CreateLeadForm({ onSubmit }: CreateLeadFormProps) {
+  const [formData, setFormData] = useState<CreateLeadInput>({
+    companyName: '',
+    contactPerson: '',
+    email: '',
+    phone: '',
+    leadSource: '',
+    requirementSummary: '',
+    estimatedValue: '',
+    stage: 'new',
   });
 
-  const handleSubmit = (e: any) => {
-    e.preventDefault();
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     onSubmit(formData);
+  };
+
+  const handleInputChange = (field: keyof CreateLeadInput) => (event: ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [field]: event.target.value });
+  };
+
+  const handleRequirementChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    setFormData({ ...formData, requirementSummary: event.target.value });
   };
 
   return (
@@ -339,7 +377,7 @@ function CreateLeadForm({ onSubmit }: any) {
             id="companyName"
             required
             value={formData.companyName}
-            onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+            onChange={handleInputChange('companyName')}
             data-testid="input-company-name"
           />
         </div>
@@ -350,7 +388,7 @@ function CreateLeadForm({ onSubmit }: any) {
             id="contactPerson"
             required
             value={formData.contactPerson}
-            onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+            onChange={handleInputChange('contactPerson')}
             data-testid="input-contact-person"
           />
         </div>
@@ -364,7 +402,7 @@ function CreateLeadForm({ onSubmit }: any) {
             type="email"
             required
             value={formData.email}
-            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            onChange={handleInputChange('email')}
             data-testid="input-email"
           />
         </div>
@@ -376,7 +414,7 @@ function CreateLeadForm({ onSubmit }: any) {
             type="tel"
             required
             value={formData.phone}
-            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+            onChange={handleInputChange('phone')}
             data-testid="input-phone"
           />
         </div>
@@ -407,18 +445,18 @@ function CreateLeadForm({ onSubmit }: any) {
         <Textarea
           id="requirementSummary"
           value={formData.requirementSummary}
-          onChange={(e) => setFormData({ ...formData, requirementSummary: e.target.value })}
+          onChange={handleRequirementChange}
           rows={3}
         />
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="estimatedValue">Estimated Value (₹)</Label>
-        <Input
-          id="estimatedValue"
-          type="number"
-          value={formData.estimatedValue}
-          onChange={(e) => setFormData({ ...formData, estimatedValue: e.target.value })}
+          <Input
+            id="estimatedValue"
+            type="number"
+            value={formData.estimatedValue}
+            onChange={handleInputChange('estimatedValue')}
         />
       </div>
 

@@ -101,6 +101,19 @@ const STATUS_COLORS = {
   escalated: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
 };
 
+const formatTimeAgo = (date: string) => {
+  const now = new Date();
+  const past = new Date(date);
+  if (Number.isNaN(past.getTime())) {
+    return 'Unknown';
+  }
+  const diffInHours = Math.floor((now.getTime() - past.getTime()) / (1000 * 60 * 60));
+
+  if (diffInHours < 1) return 'Just now';
+  if (diffInHours < 24) return `${diffInHours}h ago`;
+  return `${Math.floor(diffInHours / 24)}d ago`;
+};
+
 export default function QCDashboard() {
   const [selectedTab, setSelectedTab] = useState('pending');
   const [searchTerm, setSearchTerm] = useState('');
@@ -145,9 +158,7 @@ export default function QCDashboard() {
   const startReviewMutation = useMutation({
     mutationFn: async ({ reviewId, serviceType }: { reviewId: number; serviceType: string }) => {
       await fetchChecklist(serviceType);
-      return apiRequest(`/api/qc/reviews/${reviewId}/start`, {
-        method: 'POST'
-      });
+      return apiRequest('POST', `/api/qc/reviews/${reviewId}/start`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['qc-dashboard'] });
@@ -166,10 +177,7 @@ export default function QCDashboard() {
       clientFacingNotes?: string;
       reworkInstructions?: string;
     }) => {
-      return apiRequest(`/api/qc/reviews/${data.reviewId}/submit`, {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
+      return apiRequest('POST', `/api/qc/reviews/${data.reviewId}/submit`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['qc-dashboard'] });
@@ -241,16 +249,6 @@ export default function QCDashboard() {
       case 'escalated': return <AlertTriangle className="h-4 w-4 text-purple-600" />;
       default: return <Clock className="h-4 w-4 text-gray-400" />;
     }
-  };
-
-  const formatTimeAgo = (date: string) => {
-    const now = new Date();
-    const past = new Date(date);
-    const diffInHours = Math.floor((now.getTime() - past.getTime()) / (1000 * 60 * 60));
-    
-    if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    return `${Math.floor(diffInHours / 24)}d ago`;
   };
 
   if (isLoading) {

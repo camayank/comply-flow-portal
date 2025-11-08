@@ -39,7 +39,7 @@ export const queryClient = new QueryClient({
   },
 });
 
-export const apiRequest = async (method: string, url: string, data?: any) => {
+export const apiRequest = async <T>(method: string, url: string, data?: unknown): Promise<T> => {
   const config: RequestInit = {
     method,
     headers: {
@@ -51,13 +51,13 @@ export const apiRequest = async (method: string, url: string, data?: any) => {
   };
 
   const response = await fetch(url, config);
-  
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
     throw new Error(errorData.error || `HTTP ${response.status}`);
   }
-  
-  return response.json();
+
+  return (await response.json()) as T;
 };
 
 // Utility functions for common API patterns

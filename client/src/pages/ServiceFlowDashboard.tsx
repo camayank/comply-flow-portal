@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, type ComponentType } from 'react';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -15,8 +15,33 @@ import { FileText, Upload, CheckCircle, Clock, AlertTriangle, PenTool, Building2
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
+type IconComponent = ComponentType<{ className?: string }>;
+
+interface ServiceDefinition {
+  id: string;
+  name: string;
+  type: string;
+  price: number;
+  category: string;
+  deadline?: string;
+  formType?: string;
+  icon?: IconComponent;
+  requiredDocs?: string[];
+}
+
+type SelectableService = ServiceDefinition & { serviceId?: string };
+
+interface AddOnDefinition {
+  id: string;
+  name: string;
+  price: number;
+  icon: IconComponent;
+  urgency: string;
+  description: string;
+}
+
 // KOSHIKA Services SOPs - configured from Excel worksheets
-const koshikaServices = [
+const koshikaServices: ServiceDefinition[] = [
   // Incorporation Services
   { id: 'company-incorporation', name: 'Company Incorporation', type: 'Incorporation', price: 15000, category: 'business-setup', deadline: '20 days', formType: 'SPICE Part B', icon: Building2, requiredDocs: ['unique_company_names', 'director_pan_aadhaar', 'address_proof', 'moa_aoa'] },
   { id: 'llp-incorporation', name: 'LLP Incorporation', type: 'Incorporation', price: 12000, category: 'business-setup', deadline: '3 months', formType: 'FiLLiP form', icon: Users, requiredDocs: ['unique_name', 'designated_partners', 'llp_agreement'] },
@@ -52,7 +77,7 @@ const koshikaServices = [
 ];
 
 // Business-specific add-on recommendations
-const businessAddOns = {
+const businessAddOns: Record<string, AddOnDefinition[]> = {
   'ecommerce': [
     { id: 'gst-registration', name: 'GST Registration', price: 3000, icon: Receipt, urgency: 'high', description: 'Required for online sales' },
     { id: 'fssai-license', name: 'FSSAI License', price: 2500, icon: Shield, urgency: 'medium', description: 'For food products' },
@@ -116,13 +141,13 @@ const ServiceFlowDashboard = () => {
   }, [currentStep]);
 
   // Fetch services from backend
-  const { data: backendServices, isLoading: servicesLoading } = useQuery({
+  const { data: backendServices = [], isLoading: servicesLoading } = useQuery<ServiceDefinition[]>({
     queryKey: ['/api/services'],
     enabled: true
   });
 
   // Use backend services if available, fallback to KOSHIKA config
-  const availableServices = backendServices || koshikaServices;
+  const availableServices: ServiceDefinition[] = backendServices.length > 0 ? backendServices : koshikaServices;
 
   // Service request creation mutation
   const createServiceRequestMutation = useMutation({
@@ -140,7 +165,7 @@ const ServiceFlowDashboard = () => {
     }
   });
 
-  const handleServiceSelect = (svc: any) => {
+  const handleServiceSelect = (svc: SelectableService) => {
     if (!selectedServices.includes(svc.serviceId || svc.id)) {
       const newSelectedServices = [...selectedServices, svc.serviceId || svc.id];
       setSelectedServices(newSelectedServices);
@@ -285,7 +310,9 @@ const ServiceFlowDashboard = () => {
                             >
                               <CardHeader className="pb-3">
                                 <div className="flex items-center justify-between">
-                                  <Icon className={`h-6 w-6 ${isSelected ? 'text-blue-600' : 'text-gray-600'}`} />
+                                  {Icon ? (
+                                    <Icon className={`h-6 w-6 ${isSelected ? 'text-blue-600' : 'text-gray-600'}`} />
+                                  ) : null}
                                   <Badge className={getCategoryColor(svc.category)}>
                                     {svc.category}
                                   </Badge>
@@ -321,7 +348,7 @@ const ServiceFlowDashboard = () => {
                       {selectedServiceData.map((service) => (
                         <div key={service.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div className="flex items-center gap-3">
-                            <service.icon className="h-5 w-5 text-blue-600" />
+                            {service.icon && <service.icon className="h-5 w-5 text-blue-600" />}
                             <div>
                               <p className="font-medium">{service.name}</p>
                               <p className="text-sm text-gray-600">{service.type}</p>
@@ -367,10 +394,10 @@ const ServiceFlowDashboard = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {selectedServiceData.map((service: any) => (
+                  {selectedServiceData.map(service => (
                     <div key={service.id} className="border p-6 rounded-lg bg-gradient-to-r from-white to-gray-50">
                       <div className="flex items-center gap-3 mb-6">
-                        <service.icon className="h-6 w-6 text-blue-600" />
+                        {service.icon && <service.icon className="h-6 w-6 text-blue-600" />}
                         <h3 className="font-semibold text-lg">{service.name}</h3>
                         <Badge className={getCategoryColor(service.category)}>{service.category}</Badge>
                       </div>
@@ -441,11 +468,11 @@ const ServiceFlowDashboard = () => {
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium">Upload Progress</span>
                         <span className="text-sm text-gray-600">
-                          {Object.keys(uploadedDocs).length} / {selectedServiceData.reduce((total: number, service: any) => total + (service.requiredDocs?.length || 0), 0)} documents
+                          {Object.keys(uploadedDocs).length} / {selectedServiceData.reduce((total, service) => total + (service.requiredDocs?.length ?? 0), 0)} documents
                         </span>
                       </div>
-                      <Progress 
-                        value={(Object.keys(uploadedDocs).length / selectedServiceData.reduce((total: number, service: any) => total + (service.requiredDocs?.length || 0), 0)) * 100} 
+                      <Progress
+                        value={(Object.keys(uploadedDocs).length / selectedServiceData.reduce((total, service) => total + (service.requiredDocs?.length ?? 0), 0)) * 100}
                         className="mb-3"
                       />
                       <p className="text-sm text-gray-600">
@@ -485,7 +512,7 @@ const ServiceFlowDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid md:grid-cols-2 gap-4">
-                    {businessAddOns[businessType as keyof typeof businessAddOns]?.map((addon: any) => (
+                  {businessAddOns[businessType as keyof typeof businessAddOns]?.map(addon => (
                       <div key={addon.id} className="border border-amber-200 rounded-lg p-4 bg-white">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-3">
@@ -528,10 +555,10 @@ const ServiceFlowDashboard = () => {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {selectedServiceData.map((service: any, index: number) => (
+                  {selectedServiceData.map((service, index) => (
                     <div key={service.id} className="border rounded-lg p-4 bg-gradient-to-r from-blue-50 to-indigo-50">
                       <div className="flex items-center gap-3 mb-4">
-                        <service.icon className="h-5 w-5 text-blue-600" />
+                      {service.icon && <service.icon className="h-5 w-5 text-blue-600" />}
                         <h3 className="font-semibold">{service.name}</h3>
                         <Badge variant="secondary">In Progress</Badge>
                       </div>
