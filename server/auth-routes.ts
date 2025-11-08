@@ -479,16 +479,28 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  // Schedule OTP cleanup job (runs every hour)
-  cron.schedule('0 * * * *', async () => {
+  // Schedule OTP cleanup job (runs every hour) using JobLifecycleManager
+  const { jobManager } = require('./job-lifecycle-manager');
+
+  const otpCleanupJob = cron.schedule('0 * * * *', async () => {
     try {
       await cleanupExpiredOTPs();
       console.log('🧹 Cleaned up expired OTPs');
     } catch (error) {
       console.error('OTP cleanup error:', error);
     }
+  }, {
+    scheduled: false // Don't start automatically
   });
 
+  jobManager.registerCron(
+    'otp-cleanup',
+    otpCleanupJob,
+    'Hourly OTP cleanup - removes expired OTP entries'
+  );
+
+  otpCleanupJob.start();
+
   console.log('✅ Authentication routes registered (Client OTP + Staff Password)');
-  console.log('⏰ Scheduled OTP cleanup job (runs hourly)');
+  console.log('⏰ Scheduled OTP cleanup job (runs hourly) - managed by JobLifecycleManager');
 }

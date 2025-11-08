@@ -73,18 +73,26 @@ export class NotificationEngine {
 
   private registerScheduledRule(rule: any) {
     try {
+      const { jobManager } = require('./job-lifecycle-manager');
       const scheduleConfig = JSON.parse(rule.scheduleJson);
       const { cron: cronExpr, timezone = 'Asia/Kolkata' } = scheduleConfig;
 
       const job = cron.schedule(cronExpr, async () => {
         await this.executeScheduledRule(rule);
       }, {
-        scheduled: true,
+        scheduled: false, // Don't start automatically
         timezone
       });
 
+      jobManager.registerCron(
+        `notification-rule-${rule.ruleKey}`,
+        job,
+        `Notification rule: ${rule.name || rule.ruleKey} - ${cronExpr}`
+      );
+
+      job.start();
       this.scheduledJobs.set(rule.ruleKey, job);
-      console.log(`⏰ Scheduled rule: ${rule.ruleKey} with cron: ${cronExpr}`);
+      console.log(`⏰ Scheduled rule: ${rule.ruleKey} with cron: ${cronExpr} - managed by JobLifecycleManager`);
     } catch (error) {
       console.error(`❌ Error registering scheduled rule ${rule.ruleKey}:`, error);
     }
@@ -294,12 +302,19 @@ export class NotificationEngine {
   }
 
   private startOutboxProcessor() {
-    // Process outbox every 30 seconds
-    setInterval(async () => {
-      await this.processOutbox();
-    }, 30000);
+    const { jobManager } = require('./job-lifecycle-manager');
 
-    console.log('📦 Outbox processor started (30-second intervals)');
+    // Process outbox every 30 seconds
+    jobManager.registerInterval(
+      'notification-outbox-processor',
+      async () => {
+        await this.processOutbox();
+      },
+      30000, // 30 seconds
+      'Notification outbox processor - sends queued notifications via email/SMS/WhatsApp'
+    );
+
+    console.log('📦 Outbox processor started (30-second intervals) - managed by JobLifecycleManager');
   }
 
   private async processOutbox() {
@@ -426,9 +441,11 @@ export class NotificationEngine {
 
   // Admin methods for rule management
   public async reloadRules() {
-    // Stop existing scheduled jobs
+    const { jobManager } = require('./job-lifecycle-manager');
+
+    // Stop existing scheduled jobs using JobLifecycleManager
     for (const [ruleKey, job] of this.scheduledJobs) {
-      job.stop();
+      jobManager.stopJob(`notification-rule-${ruleKey}`);
     }
     this.scheduledJobs.clear();
 
