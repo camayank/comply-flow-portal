@@ -16,15 +16,9 @@ export const USER_ROLES = {
   AGENT: 'agent'
 } as const;
 
-// Role hierarchy for permission checking
-export const ROLE_HIERARCHY = {
-  super_admin: 100,
-  admin: 80,
-  ops_executive: 60,
-  customer_service: 50,
-  agent: 30,
-  client: 10
-} as const;
+// ⚠️ ROLE HIERARCHY MOVED TO server/rbac-middleware.ts
+// DO NOT re-add here - this caused a security vulnerability (conflicting values)
+// Authorization uses server/rbac-middleware.ts as the single source of truth
 
 export const LEAD_STAGES = {
   NEW: 'new',

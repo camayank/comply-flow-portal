@@ -9,13 +9,26 @@ export const USER_ROLES = {
   CLIENT: 'client',
 } as const;
 
+/**
+ * Role Hierarchy for Authorization
+ *
+ * ⚠️ SINGLE SOURCE OF TRUTH - DO NOT DUPLICATE
+ *
+ * This is the authoritative role hierarchy used for permission checking.
+ * Higher numbers = more permissions.
+ *
+ * Previously duplicated in shared/schema.ts with different values (10-100),
+ * which created a security vulnerability. That duplicate has been removed.
+ *
+ * Used by: requireMinimumRole() middleware for authorization checks
+ */
 export const ROLE_HIERARCHY = {
-  [USER_ROLES.SUPER_ADMIN]: 6,
-  [USER_ROLES.ADMIN]: 5,
-  [USER_ROLES.OPS_EXECUTIVE]: 4,
-  [USER_ROLES.CUSTOMER_SERVICE]: 3,
-  [USER_ROLES.AGENT]: 2,
-  [USER_ROLES.CLIENT]: 1,
+  [USER_ROLES.SUPER_ADMIN]: 6,        // Full system access
+  [USER_ROLES.ADMIN]: 5,              // Administrative access
+  [USER_ROLES.OPS_EXECUTIVE]: 4,      // Operations team
+  [USER_ROLES.CUSTOMER_SERVICE]: 3,   // Customer support
+  [USER_ROLES.AGENT]: 2,              // External partners
+  [USER_ROLES.CLIENT]: 1,             // End users
 } as const;
 
 export const PERMISSIONS = {
