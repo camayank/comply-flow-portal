@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
+import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { validateEnv } from "./env";
@@ -30,6 +31,12 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(express.static('public'));
+
+// Serve uploaded files (local storage in development)
+// In production with GCS, files are served directly from Google Cloud Storage
+const uploadsPath = process.env.LOCAL_STORAGE_PATH || './uploads';
+app.use('/uploads', express.static(uploadsPath));
+log(`📁 File uploads directory: ${uploadsPath}`);
 
 // Request timeout (30 seconds for all requests)
 app.use((req, res, next) => {
