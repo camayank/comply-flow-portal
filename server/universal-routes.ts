@@ -632,11 +632,12 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/agent/leads", async (req, res) => {
+  app.post("/api/agent/leads", requireAuth, async (req, res) => {
     try {
+      const agentId = req.user!.id; // Assuming user ID can be used as agent ID
       const [lead] = await db.insert(leads).values({
         ...req.body,
-        agent_id: req.user?.agentId || 1, // TODO: Get from auth
+        agent_id: agentId,
         created_at: new Date()
       }).returning();
 

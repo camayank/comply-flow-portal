@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from './db';
+import { requireAuth } from './auth-middleware';
 import { 
   supportTickets, 
   responseTemplates, 
@@ -201,7 +202,7 @@ router.patch('/tickets/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/tickets/:id/assign', async (req: Request, res: Response) => {
+router.post('/tickets/:id/assign', requireAuth, async (req: Request, res: Response) => {
   try {
     const ticketId = parseInt(req.params.id);
     const { assignedTo, reason } = req.body;
@@ -221,14 +222,14 @@ router.post('/tickets/:id/assign', async (req: Request, res: Response) => {
       ticketId,
       assignedFrom: previousAssignee,
       assignedTo,
-      assignedBy: req.user?.id || 1,
+      assignedBy: req.user!.id,
       reason
     });
 
     const [updatedTicket] = await db.update(supportTickets)
       .set({
         assignedTo,
-        assignedBy: req.user?.id || 1,
+        assignedBy: req.user!.id,
         assignedAt: new Date(),
         updatedAt: new Date()
       })
@@ -242,17 +243,17 @@ router.post('/tickets/:id/assign', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/tickets/:id/messages', async (req: Request, res: Response) => {
+router.post('/tickets/:id/messages', requireAuth, async (req: Request, res: Response) => {
   try {
     const ticketId = parseInt(req.params.id);
-    
+
     const validatedData = insertTicketMessageSchema.parse({
       ticketId,
       message: req.body.message,
       messageType: req.body.messageType || 'reply',
-      authorId: req.user?.id || 1,
-      authorName: req.user?.fullName || 'Customer Service',
-      authorRole: req.user?.role || 'customer_service',
+      authorId: req.user!.id,
+      authorName: req.user!.fullName || req.user!.username,
+      authorRole: req.user!.role,
       isInternal: req.body.isInternal || false,
       templateUsed: req.body.templateUsed
     });
@@ -298,11 +299,11 @@ router.get('/templates', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/templates', async (req: Request, res: Response) => {
+router.post('/templates', requireAuth, async (req: Request, res: Response) => {
   try {
     const validatedData = insertResponseTemplateSchema.parse({
       ...req.body,
-      createdBy: req.user?.id || 1
+      createdBy: req.user!.id
     });
 
     const [newTemplate] = await db.insert(responseTemplates)

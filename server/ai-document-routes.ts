@@ -1,5 +1,6 @@
 import { Express, Request, Response } from 'express';
 import { db } from './db';
+import { requireAuth } from './auth-middleware';
 import Anthropic from '@anthropic-ai/sdk';
 import {
   aiDocuments,
@@ -31,10 +32,10 @@ export function registerAiDocumentRoutes(app: Express) {
   // ============================================================================
   
   // Generate document using AI
-  app.post('/api/ai-documents/generate', async (req: Request, res: Response) => {
+  app.post('/api/ai-documents/generate', requireAuth, async (req: Request, res: Response) => {
     try {
       const { prompt, documentType, category, variables, templateId } = req.body;
-      const userId = (req as any).user?.id || 1; // Get from session
+      const userId = req.user!.id;
       
       // Build AI prompt
       let systemPrompt = `You are an expert legal and business document writer. Generate professional, legally sound documents based on user requirements. Format the output in clean HTML with proper headings, paragraphs, and formatting.`;
@@ -181,9 +182,9 @@ export function registerAiDocumentRoutes(app: Express) {
   });
   
   // Update document content
-  app.patch('/api/ai-documents/:id', async (req: Request, res: Response) => {
+  app.patch('/api/ai-documents/:id', requireAuth, async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user?.id || 1;
+      const userId = req.user!.id;
       const documentId = parseInt(req.params.id);
       
       const [existingDoc] = await db
@@ -255,9 +256,9 @@ export function registerAiDocumentRoutes(app: Express) {
   });
   
   // Delete document
-  app.delete('/api/ai-documents/:id', async (req: Request, res: Response) => {
+  app.delete('/api/ai-documents/:id', requireAuth, async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user?.id || 1;
+      const userId = req.user!.id;
       const documentId = parseInt(req.params.id);
       
       await db.delete(aiDocuments).where(eq(aiDocuments.id, documentId));
