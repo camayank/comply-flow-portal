@@ -110,5 +110,27 @@ export function registerHealthRoutes(app: Express) {
     res.status(200).json({ alive: true });
   });
 
+  // Background jobs status (for operational monitoring)
+  app.get('/health/jobs', (req, res) => {
+    const { jobManager } = require('./job-lifecycle-manager');
+
+    const jobs = jobManager.getStatus();
+    const activeCount = jobManager.getActiveJobCount();
+
+    res.json({
+      status: 'ok',
+      activeJobs: activeCount,
+      jobs: jobs.map((job: any) => ({
+        id: job.id,
+        type: job.type,
+        description: job.description,
+        startedAt: job.startedAt,
+        lastRun: job.lastRun,
+        runCount: job.runCount,
+        uptime: Date.now() - new Date(job.startedAt).getTime()
+      }))
+    });
+  });
+
   console.log('✅ Health check routes registered');
 }

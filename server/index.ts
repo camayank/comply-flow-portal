@@ -11,6 +11,7 @@ import { registerSecurityMiddleware } from "./security-middleware";
 import { logger, requestLogger, attachLogger, logStartup, logShutdown } from "./logger";
 import { errorHandler, notFoundHandler, handleUncaughtException, handleUnhandledRejection } from "./error-middleware";
 import { createBackwardCompatibilityMiddleware, apiVersionMiddleware } from "./api-versioning";
+import { jobManager } from "./job-lifecycle-manager";
 
 // Validate environment variables on startup
 const env = validateEnv();
@@ -223,12 +224,20 @@ app.use((req, res, next) => {
     }, 30000); // 30 seconds
 
     try {
-      // Cleanup tasks here (close DB connections, etc.)
+      // Stop all background jobs first
+      logger.info('Stopping background jobs...');
+      await jobManager.stopAll();
+      logger.info('Background jobs stopped');
+
+      // TODO: Close database connection pool
+      // await db.end();
+
       log('Cleanup completed');
       clearTimeout(shutdownTimeout);
       process.exit(0);
     } catch (error) {
       log('Error during shutdown:', error);
+      logger.error('Shutdown failed', { error });
       clearTimeout(shutdownTimeout);
       process.exit(1);
     }
