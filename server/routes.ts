@@ -1111,7 +1111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerWorkflowRoutes(app);
   
   // Register admin config routes BEFORE client routes to prevent conflicts
-  const { registerAdminConfigRoutes } = await import('./admin-config-routes-fixed');
+  const { registerAdminConfigRoutes } = await import('./admin-config-routes');
   registerAdminConfigRoutes(app);
   
   // Register service orders routes for ops board
@@ -1123,7 +1123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerOperationsRoutes(app);
   
   // Register client portal routes
-  const { registerClientRoutes } = await import('./client-routes-working');
+  const { registerClientRoutes } = await import('./client-routes');
   registerClientRoutes(app);
   
   // Register leads management routes for Practice Management System

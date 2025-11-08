@@ -8,6 +8,8 @@ import { setupVite, serveStatic, log } from "./vite";
 import { validateEnv } from "./env";
 import { initializeEncryption } from "./encryption";
 import { registerSecurityMiddleware } from "./security-middleware";
+import { logger, requestLogger, attachLogger, logStartup, logShutdown } from "./logger";
+import { errorHandler, notFoundHandler, handleUncaughtException, handleUnhandledRejection } from "./error-middleware";
 
 // Validate environment variables on startup
 const env = validateEnv();
@@ -31,6 +33,10 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(express.static('public'));
+
+// Request logging and correlation
+app.use(requestLogger);
+app.use(attachLogger);
 
 // Serve uploaded files (local storage in development)
 // In production with GCS, files are served directly from Google Cloud Storage
@@ -166,15 +172,11 @@ app.use((req, res, next) => {
   // const { platformSyncOrchestrator } = await import('./platform-sync-orchestrator');
   console.log('Platform sync orchestrator initialized');
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+  // 404 handler (must be before error handler)
+  app.use(notFoundHandler);
 
-    // Log the error for monitoring but don't crash the server
-    console.error(`[ERROR] ${status} - ${message}`, err.stack || err);
-
-    res.status(status).json({ message });
-  });
+  // Global error handler (must be last)
+  app.use(errorHandler);
 
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
@@ -195,15 +197,18 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    logStartup(port);
   });
 
   // Graceful shutdown handler
   const shutdown = async (signal: string) => {
     log(`${signal} received - starting graceful shutdown...`);
-    
+    logShutdown(signal);
+
     // Stop accepting new connections
     server.close(() => {
       log('HTTP server closed');
+      logger.info('HTTP server closed');
     });
 
     // Set timeout for forceful shutdown
@@ -229,13 +234,6 @@ app.use((req, res, next) => {
   process.on('SIGINT', () => shutdown('SIGINT'));
 
   // Handle uncaught errors
-  process.on('uncaughtException', (error) => {
-    log('Uncaught Exception:', error);
-    shutdown('UNCAUGHT_EXCEPTION');
-  });
-
-  process.on('unhandledRejection', (reason) => {
-    log('Unhandled Rejection:', reason);
-    shutdown('UNHANDLED_REJECTION');
-  });
+  process.on('uncaughtException', handleUncaughtException);
+  process.on('unhandledRejection', handleUnhandledRejection);
 })();

@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { db } from './db';
 import { sql } from 'drizzle-orm';
+import { storage } from './storage';
 
 export function registerHealthRoutes(app: Express) {
   
@@ -51,6 +52,41 @@ export function registerHealthRoutes(app: Express) {
       nodeEnv: process.env.NODE_ENV || 'development',
       nodeVersion: process.version
     };
+
+    // Check storage backend (critical for production)
+    try {
+      const storageInfo = (storage as any).getStorageBackendInfo?.();
+      if (storageInfo) {
+        const isProduction = process.env.NODE_ENV === 'production';
+        const isProductionSafe = storageInfo.isProductionSafe;
+
+        healthStatus.checks.storage = {
+          status: (isProduction && !isProductionSafe) ? 'warning' : 'ok',
+          type: storageInfo.type,
+          usesDatabase: storageInfo.usesDatabase,
+          databaseEntities: storageInfo.databaseEntities,
+          memoryEntities: storageInfo.memoryEntities,
+          isProductionSafe: storageInfo.isProductionSafe,
+          warning: (isProduction && !isProductionSafe)
+            ? 'DANGER: Using in-memory storage in production - data loss will occur on restart'
+            : undefined
+        };
+
+        if (isProduction && !isProductionSafe) {
+          healthStatus.status = 'degraded';
+        }
+      } else {
+        healthStatus.checks.storage = {
+          status: 'unknown',
+          message: 'Storage backend info not available'
+        };
+      }
+    } catch (error) {
+      healthStatus.checks.storage = {
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Storage check failed'
+      };
+    }
 
     const statusCode = healthStatus.status === 'ok' ? 200 : 503;
     res.status(statusCode).json(healthStatus);

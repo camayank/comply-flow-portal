@@ -2749,6 +2749,50 @@ class HybridStorage extends MemStorage {
   }
 
   // Client Master and Financials using MemStorage temporarily until full schema sync
+
+  // Health check method to verify storage backend
+  getStorageBackendInfo() {
+    return {
+      type: 'hybrid',
+      usesDatabase: true,
+      databaseEntities: ['leads', 'proposals', 'serviceRequests', 'entities', 'payments'],
+      memoryEntities: ['services', 'clientMaster', 'financials'],
+      isProductionSafe: false, // Hybrid is not production-safe until all entities use DB
+    };
+  }
 }
 
-export const storage = new HybridStorage();
+// Storage selection with production safety check
+function createStorage(): IStorage {
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // CRITICAL: Never allow in-memory storage in production
+  if (isProduction) {
+    const hybridStorage = new HybridStorage();
+    const info = hybridStorage.getStorageBackendInfo();
+
+    if (!info.isProductionSafe) {
+      console.error('❌ CRITICAL ERROR: HybridStorage is not production-safe!');
+      console.error('   Some entities still use in-memory storage:', info.memoryEntities);
+      console.error('   This will cause data loss on server restart.');
+      console.error('\n   Action required: Migrate all entities to database storage');
+
+      // In strict production mode, fail fast
+      if (process.env.STRICT_STORAGE_CHECK !== 'false') {
+        throw new Error('Production deployment blocked: In-memory storage detected');
+      }
+
+      console.warn('⚠️  STRICT_STORAGE_CHECK=false detected - allowing hybrid storage');
+      console.warn('⚠️  THIS IS DANGEROUS - DATA LOSS WILL OCCUR ON RESTART');
+    }
+
+    console.log('✅ Storage backend validated for production');
+    return hybridStorage;
+  }
+
+  // Development: Hybrid storage is acceptable
+  console.log('📦 Using HybridStorage (development mode)');
+  return new HybridStorage();
+}
+
+export const storage = createStorage();
