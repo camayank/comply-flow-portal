@@ -2571,10 +2571,24 @@ import {
   dbPaymentsStorage,
   dbClientMasterStorage,
   dbFinancialsStorage,
+  dbUsersStorage,
   dbServicesStorage
 } from './db-storage';
 
 class HybridStorage extends MemStorage {
+  // Override user methods to use database
+  async getUser(id: number): Promise<User | undefined> {
+    return dbUsersStorage.getUser(id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return dbUsersStorage.getUserByUsername(username);
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    return dbUsersStorage.createUser(user);
+  }
+
   // Override service methods to use database
   async getAllServices(): Promise<Service[]> {
     return dbServicesStorage.getAllServices();
@@ -2769,7 +2783,7 @@ class HybridStorage extends MemStorage {
     return {
       type: 'hybrid',
       usesDatabase: true,
-      databaseEntities: ['leads', 'proposals', 'serviceRequests', 'entities', 'payments', 'services'],
+      databaseEntities: ['leads', 'proposals', 'serviceRequests', 'entities', 'payments', 'services', 'users'],
       memoryEntities: ['clientMaster', 'financials'],
       isProductionSafe: false, // Hybrid is not production-safe until all entities use DB
     };
