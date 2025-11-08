@@ -2563,17 +2563,31 @@ export class MemStorage implements IStorage {
 }
 
 // Hybrid storage: uses database for critical entities, MemStorage for others
-import { 
-  dbLeadsStorage, 
+import {
+  dbLeadsStorage,
   dbProposalsStorage,
   dbServiceRequestsStorage,
   dbBusinessEntitiesStorage,
   dbPaymentsStorage,
   dbClientMasterStorage,
-  dbFinancialsStorage
+  dbFinancialsStorage,
+  dbServicesStorage
 } from './db-storage';
 
 class HybridStorage extends MemStorage {
+  // Override service methods to use database
+  async getAllServices(): Promise<Service[]> {
+    return dbServicesStorage.getAllServices();
+  }
+
+  async getService(serviceId: string): Promise<Service | undefined> {
+    return dbServicesStorage.getService(serviceId);
+  }
+
+  async createService(service: InsertService): Promise<Service> {
+    return dbServicesStorage.createService(service);
+  }
+
   // Override lead methods to use database
   async getAllLeads(filters?: {
     search?: string;
@@ -2755,8 +2769,8 @@ class HybridStorage extends MemStorage {
     return {
       type: 'hybrid',
       usesDatabase: true,
-      databaseEntities: ['leads', 'proposals', 'serviceRequests', 'entities', 'payments'],
-      memoryEntities: ['services', 'clientMaster', 'financials'],
+      databaseEntities: ['leads', 'proposals', 'serviceRequests', 'entities', 'payments', 'services'],
+      memoryEntities: ['clientMaster', 'financials'],
       isProductionSafe: false, // Hybrid is not production-safe until all entities use DB
     };
   }
