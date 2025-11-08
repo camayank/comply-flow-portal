@@ -6,6 +6,7 @@ import bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 import * as cron from 'node-cron';
 import crypto from 'crypto';
+import { emailService } from './email-service';
 
 // Session fingerprinting for hijack detection (Salesforce-level security)
 function generateSessionFingerprint(req: Request): string {
@@ -113,19 +114,31 @@ export function registerAuthRoutes(app: Express) {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-      // Store OTP
+      // Store hashed OTP
       await storeOTP(email, otp, expiresAt);
 
-      // TODO: Send OTP via email
-      console.log(`🔐 OTP for ${email}: ${otp}`);
-      
-      // In development, return OTP in response
+      // Send OTP via email
+      const emailSent = await emailService.sendOTP({
+        email,
+        otp,
+        expiryMinutes: 10,
+        userName: user.fullName || undefined,
+      });
+
+      if (!emailSent && process.env.NODE_ENV === 'production') {
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to send OTP. Please try again.',
+        });
+      }
+
+      // In development, return OTP in response for easy testing
       const otpInResponse = process.env.NODE_ENV === 'development' ? otp : undefined;
 
       res.json({
         success: true,
         message: 'OTP sent to your email',
-        // Only in development
+        // Only in development mode
         ...(otpInResponse && { otp: otpInResponse }),
       });
     } catch (error) {

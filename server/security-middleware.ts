@@ -56,32 +56,36 @@ export function registerSecurityMiddleware(app: Express) {
     next();
   });
 
-  // Simple CSRF protection for state-changing operations
-  // This checks for a custom header on all POST/PUT/PATCH/DELETE requests
+  // CSRF protection for state-changing operations
+  // Checks for custom header on all POST/PUT/PATCH/DELETE requests
   app.use((req: Request, res: Response, next: NextFunction) => {
     // Skip CSRF check for:
-    // - GET/HEAD/OPTIONS requests
+    // - GET/HEAD/OPTIONS requests (safe methods)
     // - Health check endpoints
     // - Webhook endpoints (they have their own signature verification)
+    // - Login/registration endpoints (no session yet)
     if (
       ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ||
       req.path.startsWith('/health') ||
       req.path.startsWith('/ready') ||
       req.path.startsWith('/live') ||
-      req.path.includes('/webhook')
+      req.path.includes('/webhook') ||
+      req.path === '/api/auth/client/send-otp' ||
+      req.path === '/api/auth/client/verify-otp' ||
+      req.path === '/api/auth/staff/login'
     ) {
       return next();
     }
 
-    // For API requests, check for custom header or valid session
+    // For all other API requests, require CSRF header
     if (req.path.startsWith('/api/')) {
-      const hasCustomHeader = req.headers['x-requested-with'] === 'XMLHttpRequest' ||
-                             req.headers['x-csrf-token'];
-      const hasValidSession = req.session && req.session.userId;
-      
-      if (!hasCustomHeader && !hasValidSession) {
-        return res.status(403).json({ 
-          error: 'CSRF protection: Missing required security headers' 
+      const hasCSRFHeader = req.headers['x-requested-with'] === 'XMLHttpRequest' ||
+                           !!req.headers['x-csrf-token'];
+
+      if (!hasCSRFHeader) {
+        return res.status(403).json({
+          success: false,
+          error: 'CSRF protection: Missing required security headers (X-Requested-With or X-CSRF-Token)'
         });
       }
     }
