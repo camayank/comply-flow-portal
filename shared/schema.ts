@@ -142,16 +142,19 @@ export const businessEntities = pgTable("business_entities", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// User sessions for login tracking
+// User sessions for login tracking (enhanced with security features)
 export const userSessions = pgTable("user_sessions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   sessionToken: text("session_token").notNull().unique(),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
+  fingerprint: text("fingerprint"), // Session fingerprinting for hijack detection
+  csrfToken: text("csrf_token"), // CSRF protection token
   isActive: boolean("is_active").default(true),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+  lastActivity: timestamp("last_activity").defaultNow(), // Track session activity
 });
 
 export const services = pgTable("services", {

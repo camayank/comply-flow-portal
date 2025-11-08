@@ -1,20 +1,41 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { db } from './db';
 import { users, userSessions, otpStore } from '@shared/schema';
 import { eq, and, lt } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 import * as cron from 'node-cron';
+import crypto from 'crypto';
 
-// Production-ready PostgreSQL-based OTP storage
+// Session fingerprinting for hijack detection (Salesforce-level security)
+function generateSessionFingerprint(req: Request): string {
+  const userAgent = req.headers['user-agent'] || '';
+  const ipSubnet = (req.ip || '').split('.').slice(0, 3).join('.'); // Allow IP changes within subnet
+
+  return crypto
+    .createHash('sha256')
+    .update(userAgent)
+    .update(ipSubnet)
+    .digest('hex');
+}
+
+// Generate CSRF token for session
+function generateCSRFToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+// Production-ready PostgreSQL-based OTP storage with hashing (Salesforce-level security)
 async function storeOTP(email: string, otp: string, expiresAt: Date): Promise<void> {
   // Delete any existing OTPs for this email
   await db.delete(otpStore).where(eq(otpStore.email, email));
-  
-  // Insert new OTP
+
+  // Hash OTP before storing (cost factor 12 like Salesforce)
+  const hashedOTP = await bcrypt.hash(otp, 12);
+
+  // Insert hashed OTP
   await db.insert(otpStore).values({
     email,
-    otp,
+    otp: hashedOTP, // Store hashed version
     expiresAt,
     attempts: 0,
   });
@@ -140,17 +161,20 @@ export function registerAuthRoutes(app: Express) {
         return res.status(429).json({ error: 'Too many failed attempts. Please request a new OTP.' });
       }
 
-      if (storedOtp.otp !== otp) {
+      // Verify OTP using constant-time comparison (bcrypt.compare)
+      const isOtpValid = await bcrypt.compare(otp, storedOtp.otp);
+
+      if (!isOtpValid) {
         // Increment failed attempts
         await incrementOtpAttempts(email);
         const remainingAttempts = 3 - (storedOtp.attempts + 1);
-        
+
         if (remainingAttempts <= 0) {
           await deleteOTP(email);
           return res.status(429).json({ error: 'Too many failed attempts. Please request a new OTP.' });
         }
-        
-        return res.status(400).json({ 
+
+        return res.status(400).json({
           error: 'Invalid OTP',
           remainingAttempts
         });
@@ -170,17 +194,22 @@ export function registerAuthRoutes(app: Express) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      // Create session
+      // Create session with fingerprinting and CSRF protection
       const sessionToken = nanoid(32);
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      const fingerprint = generateSessionFingerprint(req);
+      const csrfToken = generateCSRFToken();
 
       await db.insert(userSessions).values({
         userId: user.id,
         sessionToken,
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'] || 'unknown',
+        fingerprint, // Session fingerprinting for hijack detection
+        csrfToken, // CSRF protection token
         expiresAt,
         isActive: true,
+        lastActivity: new Date(),
       });
 
       // Update last login
@@ -252,17 +281,22 @@ export function registerAuthRoutes(app: Express) {
         return res.status(403).json({ error: 'Account is deactivated. Contact administrator.' });
       }
 
-      // Create session
+      // Create session with fingerprinting and CSRF protection
       const sessionToken = nanoid(32);
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      const fingerprint = generateSessionFingerprint(req);
+      const csrfToken = generateCSRFToken();
 
       await db.insert(userSessions).values({
         userId: user.id,
         sessionToken,
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'] || 'unknown',
+        fingerprint, // Session fingerprinting for hijack detection
+        csrfToken, // CSRF protection token
         expiresAt,
         isActive: true,
+        lastActivity: new Date(),
       });
 
       // Update last login

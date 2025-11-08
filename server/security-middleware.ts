@@ -1,48 +1,58 @@
 import type { Express, Request, Response, NextFunction } from "express";
 
 export function registerSecurityMiddleware(app: Express) {
-  
+
   // Security headers middleware
   app.use((req: Request, res: Response, next: NextFunction) => {
     // Prevent clickjacking
     res.setHeader('X-Frame-Options', 'DENY');
-    
+
     // Prevent MIME type sniffing
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    
+
     // Enable browser XSS protection
     res.setHeader('X-XSS-Protection', '1; mode=block');
-    
+
     // Referrer policy
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    
-    // Content Security Policy (basic)
+
+    // Production-grade Content Security Policy (environment-specific)
+    const isDev = process.env.NODE_ENV === 'development';
+
     const cspDirectives = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com",
+      // CRITICAL: Different policies for dev vs production
+      isDev
+        ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com http://localhost:*"
+        : "script-src 'self' https://js.stripe.com", // NO unsafe-inline/eval in production!
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https: blob:",
-      "connect-src 'self' https://api.stripe.com https://api.anthropic.com",
+      isDev
+        ? "connect-src 'self' https://api.stripe.com https://api.anthropic.com ws://localhost:* http://localhost:*"
+        : "connect-src 'self' https://api.stripe.com https://api.anthropic.com",
       "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
-      "frame-ancestors 'none'"
-    ].join('; ');
-    
+      "frame-ancestors 'none'",
+      "media-src 'self'",
+      "worker-src 'self'",
+      "child-src 'none'"
+    ].join('; ') + (isDev ? '' : '; upgrade-insecure-requests');
+
     res.setHeader('Content-Security-Policy', cspDirectives);
-    
+
     // Permissions Policy (formerly Feature Policy)
-    res.setHeader('Permissions-Policy', 
+    res.setHeader('Permissions-Policy',
       'geolocation=(), microphone=(), camera=(), payment=(self)'
     );
-    
+
     // HSTS (Strict Transport Security) - only in production with HTTPS
     if (process.env.NODE_ENV === 'production') {
       res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
     }
-    
+
     next();
   });
 
