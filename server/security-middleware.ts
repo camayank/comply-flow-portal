@@ -63,16 +63,23 @@ export function registerSecurityMiddleware(app: Express) {
     // - GET/HEAD/OPTIONS requests (safe methods)
     // - Health check endpoints
     // - Webhook endpoints (they have their own signature verification)
-    // - Login/registration endpoints (no session yet)
+    // - Public authentication endpoints (no session yet)
+    // - Client registration flows (pre-authentication)
     if (
       ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ||
       req.path.startsWith('/health') ||
       req.path.startsWith('/ready') ||
       req.path.startsWith('/live') ||
       req.path.includes('/webhook') ||
+      // Auth endpoints that don't require session
       req.path === '/api/auth/client/send-otp' ||
       req.path === '/api/auth/client/verify-otp' ||
-      req.path === '/api/auth/staff/login'
+      req.path === '/api/auth/staff/login' ||
+      req.path === '/api/auth/verify-session' || // Session verification is idempotent
+      // Client registration flows
+      req.path === '/api/client/register' ||
+      req.path === '/api/client/verify-email' ||
+      req.path === '/api/client/resend-otp'
     ) {
       return next();
     }

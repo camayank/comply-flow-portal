@@ -45,17 +45,21 @@ export function useAuth() {
 
   const isAuthenticated = !!user;
 
-  const login = async (email: string, password: string) => {
-    const response = await fetch('/api/auth/login', {
+  const login = async (username: string, password: string) => {
+    // Use staff login endpoint (username/password authentication)
+    const response = await fetch('/api/auth/staff/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        // No CSRF header needed - this endpoint is excluded from CSRF check
+      },
       credentials: 'include',
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ username, password })
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || 'Login failed');
+      throw new Error(error.error || 'Login failed');
     }
 
     const data = await response.json();
@@ -66,6 +70,9 @@ export function useAuth() {
   const logout = async () => {
     await fetch('/api/auth/logout', {
       method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest', // CSRF protection for authenticated requests
+      },
       credentials: 'include'
     });
 

@@ -344,10 +344,70 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
+  // Get current authenticated user (for frontend useAuth hook)
+  app.get('/api/auth/me', async (req, res) => {
+    try {
+      const sessionToken = req.cookies?.sessionToken;
+
+      if (!sessionToken) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const [session] = await db
+        .select()
+        .from(userSessions)
+        .where(eq(userSessions.sessionToken, sessionToken))
+        .limit(1);
+
+      if (!session || !session.isActive) {
+        return res.status(401).json({ error: 'Invalid or expired session' });
+      }
+
+      if (session.expiresAt < new Date()) {
+        await db
+          .update(userSessions)
+          .set({ isActive: false })
+          .where(eq(userSessions.id, session.id));
+
+        return res.status(401).json({ error: 'Session expired' });
+      }
+
+      // Get user
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, session.userId))
+        .limit(1);
+
+      if (!user || !user.isActive) {
+        return res.status(401).json({ error: 'User not found or inactive' });
+      }
+
+      // Update last activity
+      await db
+        .update(userSessions)
+        .set({ lastActivity: new Date() })
+        .where(eq(userSessions.id, session.id));
+
+      res.json({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        department: user.department,
+        isActive: user.isActive,
+      });
+    } catch (error) {
+      console.error('Get current user error:', error);
+      res.status(500).json({ error: 'Failed to fetch user' });
+    }
+  });
+
   // Logout (both client and staff)
   app.post('/api/auth/logout', async (req, res) => {
     try {
-      const { sessionToken } = req.body;
+      const sessionToken = req.cookies?.sessionToken || req.body?.sessionToken;
 
       if (!sessionToken) {
         return res.status(400).json({ error: 'Session token required' });
