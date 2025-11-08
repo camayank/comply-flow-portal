@@ -10,6 +10,7 @@ import { initializeEncryption } from "./encryption";
 import { registerSecurityMiddleware } from "./security-middleware";
 import { logger, requestLogger, attachLogger, logStartup, logShutdown } from "./logger";
 import { errorHandler, notFoundHandler, handleUncaughtException, handleUnhandledRejection } from "./error-middleware";
+import { createBackwardCompatibilityMiddleware, apiVersionMiddleware } from "./api-versioning";
 
 // Validate environment variables on startup
 const env = validateEnv();
@@ -37,6 +38,10 @@ app.use(express.static('public'));
 // Request logging and correlation
 app.use(requestLogger);
 app.use(attachLogger);
+
+// API versioning (must be before routes)
+app.use(apiVersionMiddleware());
+app.use(createBackwardCompatibilityMiddleware('v1'));
 
 // Serve uploaded files (local storage in development)
 // In production with GCS, files are served directly from Google Cloud Storage
