@@ -22,7 +22,7 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/components/ProtectedRoute';
 
 const ClientProfile = () => {
   const { user } = useAuth();
