@@ -42,6 +42,10 @@ interface ModernHeaderProps {
   brandName: string;
   brandSubtitle?: string;
   brandIcon?: any;
+  /**
+   * Brand color using semantic tokens (e.g., 'text-primary', 'text-success')
+   * @default 'text-primary'
+   */
   brandColor?: string;
   
   // Navigation
@@ -66,7 +70,7 @@ const ModernHeader = ({
   brandName,
   brandSubtitle,
   brandIcon: BrandIcon = Building2,
-  brandColor = 'text-blue-600',
+  brandColor = 'text-primary',
   navigationItems = [],
   mobileNavigationItems = [],
   primaryAction,
@@ -114,11 +118,11 @@ const ModernHeader = ({
             <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <BrandIcon className={`h-6 w-6 sm:h-8 sm:w-8 ${brandColor}`} />
               <div className="flex flex-col">
-                <span className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+                <span className="text-lg sm:text-xl lg:text-2xl font-bold text-foreground">
                   {brandName}
                 </span>
                 {brandSubtitle && (
-                  <span className="text-xs text-gray-500 hidden sm:block">
+                  <span className="text-xs text-muted-foreground hidden sm:block">
                     {brandSubtitle}
                   </span>
                 )}
@@ -131,10 +135,10 @@ const ModernHeader = ({
             <div className="hidden lg:flex items-center gap-6">
               <nav className="flex gap-6">
                 {navigationItems.map((item, index) => (
-                  <Link 
+                  <Link
                     key={index}
-                    href={item.href} 
-                    className="text-gray-600 hover:text-blue-600 transition-colors font-medium"
+                    href={item.href}
+                    className="text-muted-foreground hover:text-primary transition-colors font-medium"
                     data-testid={`nav-link-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                   >
                     {item.label}
@@ -161,7 +165,7 @@ const ModernHeader = ({
                   {ActionIcon && <ActionIcon className="h-4 w-4 mr-1" />}
                   <span className="hidden sm:inline">{action.label}</span>
                   {action.badge && (
-                    <Badge className="ml-1 bg-red-500 text-white text-xs px-1 py-0 min-w-[16px] h-4">
+                    <Badge className="ml-1 bg-error text-error-foreground text-xs px-1 py-0 min-w-[16px] h-4">
                       {action.badge}
                     </Badge>
                   )}
@@ -179,9 +183,9 @@ const ModernHeader = ({
             {primaryAction && (
               primaryAction.href ? (
                 <Link to={primaryAction.href}>
-                  <Button 
-                    size="sm" 
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                  <Button
+                    size="sm"
+                    className="font-medium"
                     data-testid="button-primary-action"
                   >
                     {primaryAction.icon && <primaryAction.icon className="h-4 w-4 mr-2" />}
@@ -189,9 +193,9 @@ const ModernHeader = ({
                   </Button>
                 </Link>
               ) : (
-                <Button 
-                  size="sm" 
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium"
+                <Button
+                  size="sm"
+                  className="font-medium"
                   onClick={primaryAction.onClick}
                   data-testid="button-primary-action"
                 >
@@ -210,10 +214,10 @@ const ModernHeader = ({
               {(mobileNavigationItems.length > 0 ? mobileNavigationItems : navigationItems).map((item, index) => {
                 const ItemIcon = item.icon;
                 return (
-                  <Link 
+                  <Link
                     key={index}
                     href={item.href}
-                    className="block px-3 py-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-lg transition-colors"
+                    className="block px-3 py-2 text-muted-foreground hover:text-primary hover:bg-accent rounded-lg transition-colors"
                     onClick={() => setMobileMenuOpen(false)}
                     data-testid={`mobile-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                   >
@@ -222,7 +226,7 @@ const ModernHeader = ({
                       <div>
                         <div className="font-medium">{item.label}</div>
                         {item.description && (
-                          <div className="text-sm text-gray-500">{item.description}</div>
+                          <div className="text-sm text-muted-foreground">{item.description}</div>
                         )}
                       </div>
                     </div>
@@ -235,9 +239,9 @@ const ModernHeader = ({
                 <div className="px-3 pt-2">
                   {primaryAction.href ? (
                     <Link to={primaryAction.href}>
-                      <Button 
-                        size="sm" 
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                      <Button
+                        size="sm"
+                        className="w-full"
                         onClick={() => setMobileMenuOpen(false)}
                         data-testid="mobile-primary-action"
                       >
@@ -246,9 +250,9 @@ const ModernHeader = ({
                       </Button>
                     </Link>
                   ) : (
-                    <Button 
-                      size="sm" 
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    <Button
+                      size="sm"
+                      className="w-full"
                       onClick={() => {
                         primaryAction.onClick?.();
                         setMobileMenuOpen(false);
@@ -305,74 +309,74 @@ export const HeaderPresets = {
   portal: {
     variant: 'portal' as const,
     brandIcon: Users,
-    brandColor: 'text-blue-600',
+    brandColor: 'text-primary',
     secondaryActions: [
-      { 
-        label: 'Alerts', 
-        icon: Bell, 
-        variant: 'outline' as const, 
-        badge: 3 
+      {
+        label: 'Alerts',
+        icon: Bell,
+        variant: 'outline' as const,
+        badge: 3
       }
     ]
   },
-  
+
   admin: {
     variant: 'dashboard' as const,
     brandIcon: Shield,
-    brandColor: 'text-blue-600',
+    brandColor: 'text-primary',
     brandName: 'Admin Control',
     brandSubtitle: 'Platform configuration',
     secondaryActions: [
-      { 
-        label: 'Search', 
-        icon: Search, 
+      {
+        label: 'Search',
+        icon: Search,
         variant: 'outline' as const,
         hideOnMobile: true
       },
-      { 
-        label: 'Settings', 
-        icon: Settings, 
-        variant: 'outline' as const 
+      {
+        label: 'Settings',
+        icon: Settings,
+        variant: 'outline' as const
       }
     ]
   },
-  
+
   operations: {
     variant: 'dashboard' as const,
     brandIcon: BarChart3,
-    brandColor: 'text-purple-600',
+    brandColor: 'text-primary',
     brandName: 'Operations',
     brandSubtitle: 'Team workflow orchestration',
     secondaryActions: [
-      { 
-        label: 'Call', 
-        icon: Phone, 
-        variant: 'outline' as const 
+      {
+        label: 'Call',
+        icon: Phone,
+        variant: 'outline' as const
       },
-      { 
-        label: 'Email', 
-        icon: Mail, 
-        variant: 'outline' as const 
+      {
+        label: 'Email',
+        icon: Mail,
+        variant: 'outline' as const
       }
     ]
   },
-  
+
   agent: {
     variant: 'dashboard' as const,
     brandIcon: Star,
-    brandColor: 'text-orange-600',
+    brandColor: 'text-warning',
     brandName: 'Partner Portal',
     brandSubtitle: 'Agent network management',
     secondaryActions: [
-      { 
-        label: 'Call', 
-        icon: Phone, 
-        variant: 'outline' as const 
+      {
+        label: 'Call',
+        icon: Phone,
+        variant: 'outline' as const
       },
-      { 
-        label: 'Email', 
-        icon: Mail, 
-        variant: 'outline' as const 
+      {
+        label: 'Email',
+        icon: Mail,
+        variant: 'outline' as const
       }
     ]
   }

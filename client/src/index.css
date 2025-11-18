@@ -155,6 +155,16 @@ html {
     --gradient-warning-to: 45 93% 47%;
     --gradient-error-from: 0 84% 60%;
     --gradient-error-to: 340 82% 52%;
+
+    /* === CHART COLORS === */
+    --chart-1: 220 91% 50%;  /* Primary Blue */
+    --chart-2: 142 76% 36%;  /* Success Green */
+    --chart-3: 38 92% 50%;   /* Warning Orange */
+    --chart-4: 0 84% 60%;    /* Error Red */
+    --chart-5: 250 84% 54%;  /* Purple */
+    --chart-6: 158 64% 52%;  /* Teal */
+    --chart-7: 45 93% 47%;   /* Amber */
+    --chart-8: 340 82% 52%;  /* Pink */
   }
 
   .dark {
@@ -239,6 +249,16 @@ html {
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
     --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.4), 0 8px 10px -6px rgb(0 0 0 / 0.4);
     --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+
+    /* === CHART COLORS === */
+    --chart-1: 220 91% 60%;  /* Primary Blue (lighter for dark mode) */
+    --chart-2: 142 76% 46%;  /* Success Green (lighter for dark mode) */
+    --chart-3: 38 92% 60%;   /* Warning Orange (lighter for dark mode) */
+    --chart-4: 0 84% 70%;    /* Error Red (lighter for dark mode) */
+    --chart-5: 250 84% 64%;  /* Purple (lighter for dark mode) */
+    --chart-6: 158 64% 62%;  /* Teal (lighter for dark mode) */
+    --chart-7: 45 93% 57%;   /* Amber (lighter for dark mode) */
+    --chart-8: 340 82% 62%;  /* Pink (lighter for dark mode) */
   }
 }
 
