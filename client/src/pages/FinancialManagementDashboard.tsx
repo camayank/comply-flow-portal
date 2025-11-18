@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { getStatusColor, chartColors } from '@/lib/design-system-utils';
 import {
   DollarSign,
   TrendingUp,
@@ -128,19 +129,8 @@ const FinancialManagementDashboard = () => {
     queryKey: ['/api/financial/collection-metrics'],
   });
 
-  // Chart colors
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
-
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'paid': return 'bg-green-500 text-white';
-      case 'pending': return 'bg-yellow-500 text-white';
-      case 'overdue': return 'bg-red-500 text-white';
-      case 'partially_paid': return 'bg-orange-500 text-white';
-      case 'cancelled': return 'bg-gray-500 text-white';
-      default: return 'bg-gray-400 text-white';
-    }
-  };
+  // Chart colors using design system
+  const COLORS = chartColors.semantic;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -156,16 +146,16 @@ const FinancialManagementDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <header className="bg-card border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              <DollarSign className="h-8 w-8 text-green-600 dark:text-green-400" />
+              <DollarSign className="h-8 w-8 text-success" aria-hidden="true" />
               <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">Financial Management</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Revenue analytics, invoicing, and financial planning</p>
+                <h1 className="text-xl font-bold text-foreground">Financial Management</h1>
+                <p className="text-sm text-muted-foreground">Revenue analytics, invoicing, and financial planning</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -180,8 +170,8 @@ const FinancialManagementDashboard = () => {
                   <SelectItem value="yearly">Yearly</SelectItem>
                 </SelectContent>
               </Select>
-              <Button 
-                className="bg-green-600 hover:bg-green-700 text-white"
+              <Button
+                variant="success"
                 data-testid="button-create-invoice"
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -199,24 +189,24 @@ const FinancialManagementDashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Total Revenue</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  <p className="text-sm font-medium text-muted-foreground">Total Revenue</p>
+                  <p className="text-2xl font-bold text-foreground">
                     {summaryLoading ? '...' : formatCurrency(financialSummary?.totalRevenue || 0)}
                   </p>
                   <div className="flex items-center text-sm">
                     {(financialSummary?.monthlyGrowth || 0) >= 0 ? (
-                      <ArrowUpRight className="h-4 w-4 text-green-500 mr-1" />
+                      <ArrowUpRight className="h-4 w-4 text-success mr-1" aria-hidden="true" />
                     ) : (
-                      <ArrowDownRight className="h-4 w-4 text-red-500 mr-1" />
+                      <ArrowDownRight className="h-4 w-4 text-error mr-1" aria-hidden="true" />
                     )}
-                    <span className={`font-medium ${(financialSummary?.monthlyGrowth || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className={`font-medium ${(financialSummary?.monthlyGrowth || 0) >= 0 ? 'text-success' : 'text-error'}`}>
                       {formatPercentage(financialSummary?.monthlyGrowth || 0)}
                     </span>
-                    <span className="text-gray-500 ml-1">vs last month</span>
+                    <span className="text-muted-foreground ml-1">vs last month</span>
                   </div>
                 </div>
-                <div className="p-3 bg-green-100 dark:bg-green-900 rounded-lg">
-                  <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400" />
+                <div className="p-3 bg-success/10 rounded-lg">
+                  <TrendingUp className="h-6 w-6 text-success" aria-hidden="true" />
                 </div>
               </div>
             </CardContent>
@@ -226,16 +216,16 @@ const FinancialManagementDashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Outstanding Amount</p>
-                  <p className="text-2xl font-bold text-red-600">
+                  <p className="text-sm font-medium text-muted-foreground">Outstanding Amount</p>
+                  <p className="text-2xl font-bold text-error">
                     {summaryLoading ? '...' : formatCurrency(financialSummary?.outstandingAmount || 0)}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     {financialSummary?.overdueInvoices || 0} overdue invoices
                   </p>
                 </div>
-                <div className="p-3 bg-red-100 dark:bg-red-900 rounded-lg">
-                  <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                <div className="p-3 bg-error/10 rounded-lg">
+                  <AlertTriangle className="h-6 w-6 text-error" aria-hidden="true" />
                 </div>
               </div>
             </CardContent>
@@ -245,16 +235,16 @@ const FinancialManagementDashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Collection Rate</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  <p className="text-sm font-medium text-muted-foreground">Collection Rate</p>
+                  <p className="text-2xl font-bold text-foreground">
                     {collectionMetrics ? `${collectionMetrics.collectionRate}%` : '...'}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     Avg {collectionMetrics?.avgCollectionDays || 0} days
                   </p>
                 </div>
-                <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                  <Target className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                <div className="p-3 bg-primary/10 rounded-lg">
+                  <Target className="h-6 w-6 text-primary" aria-hidden="true" />
                 </div>
               </div>
             </CardContent>
@@ -264,16 +254,16 @@ const FinancialManagementDashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Net Profit Margin</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                  <p className="text-sm font-medium text-muted-foreground">Net Profit Margin</p>
+                  <p className="text-2xl font-bold text-foreground">
                     {kpisLoading ? '...' : `${kpis?.profitability.margin || 0}%`}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-muted-foreground">
                     {formatCurrency(kpis?.profitability.netProfit || 0)}
                   </p>
                 </div>
-                <div className="p-3 bg-purple-100 dark:bg-purple-900 rounded-lg">
-                  <BarChart3 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                <div className="p-3 bg-primary/10 rounded-lg">
+                  <BarChart3 className="h-6 w-6 text-primary" aria-hidden="true" />
                 </div>
               </div>
             </CardContent>
