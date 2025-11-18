@@ -52,6 +52,7 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { chartColors } from '@/lib/design-system-utils';
 
 interface ExecutiveDashboardData {
   overview: {
@@ -221,8 +222,6 @@ const ExecutiveDashboard = () => {
       default: return <ArrowUpRight className="h-4 w-4" />;
     }
   };
-
-  const chartColors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
   if (isLoading) {
     return (
@@ -523,7 +522,7 @@ const ExecutiveDashboard = () => {
                       <XAxis dataKey="month" />
                       <YAxis />
                       <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Revenue']} />
-                      <Area type="monotone" dataKey="revenue" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.3} />
+                      <Area type="monotone" dataKey="revenue" stroke={chartColors.primary} fill={chartColors.primary} fillOpacity={0.3} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -546,7 +545,7 @@ const ExecutiveDashboard = () => {
                       <XAxis dataKey="month" />
                       <YAxis />
                       <Tooltip formatter={(value) => [`${value}%`, 'Efficiency']} />
-                      <Line type="monotone" dataKey="efficiency" stroke="#10B981" strokeWidth={2} />
+                      <Line type="monotone" dataKey="efficiency" stroke={chartColors.success} strokeWidth={2} />
                     </LineChart>
                   </ResponsiveContainer>
                 </CardContent>
@@ -785,7 +784,7 @@ const ExecutiveDashboard = () => {
                           label
                         >
                           {Object.entries(dashboardData.leads.stageDistribution).map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={chartColors[index % chartColors.length]} />
+                            <Cell key={`cell-${index}`} fill={chartColors.semantic[index % chartColors.semantic.length]} />
                           ))}
                         </Pie>
                         <Tooltip />
