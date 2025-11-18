@@ -5,11 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
-  Clock, 
-  AlertTriangle, 
-  CheckCircle2, 
-  User, 
+import {
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  User,
   Calendar,
   Star,
   ArrowUpDown,
@@ -19,6 +19,9 @@ import {
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { type QualityReview } from '@shared/schema';
+import { getStatusColor } from '@/lib/design-system-utils';
+import { SkeletonCard, SkeletonList } from '@/components/ui/skeleton-loader';
+import { EmptySuccess } from '@/components/ui/empty-state';
 
 interface QCQueueItem {
   id: number;
@@ -52,22 +55,6 @@ interface QCReviewQueueProps {
 }
 
 const PRIORITY_ORDER = { critical: 5, urgent: 4, high: 3, medium: 2, low: 1 };
-const STATUS_COLORS = {
-  pending: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
-  in_progress: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  approved: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  rejected: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-  rework_required: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-  escalated: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-};
-
-const PRIORITY_COLORS = {
-  low: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-  high: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-  urgent: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-  critical: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-};
 
 export default function QCReviewQueue({ onItemSelect, showAssignmentControls = true }: QCReviewQueueProps) {
   const [sortBy, setSortBy] = useState('priority');
@@ -147,21 +134,22 @@ export default function QCReviewQueue({ onItemSelect, showAssignmentControls = t
     const now = new Date();
     const due = new Date(deadline);
     const hoursUntilDue = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
-    if (hoursUntilDue < 0) return { status: 'overdue', color: 'text-red-600', label: 'Overdue' };
-    if (hoursUntilDue < 4) return { status: 'critical', color: 'text-red-500', label: 'Critical' };
-    if (hoursUntilDue < 24) return { status: 'warning', color: 'text-orange-500', label: 'Due Soon' };
-    return { status: 'normal', color: 'text-green-500', label: 'On Track' };
+
+    if (hoursUntilDue < 0) return { status: 'overdue', color: 'text-error', label: 'Overdue' };
+    if (hoursUntilDue < 4) return { status: 'critical', color: 'text-error', label: 'Critical' };
+    if (hoursUntilDue < 24) return { status: 'warning', color: 'text-warning', label: 'Due Soon' };
+    return { status: 'normal', color: 'text-success', label: 'On Track' };
   };
 
   const formatTimeAgo = (date: string) => {
     const now = new Date();
     const past = new Date(date);
-    const diffInHours = Math.floor((now.getTime() - past.getTime()) / (1000 * 60 * 60));
-    
-    if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    return `${Math.floor(diffInHours / 24)}d ago`;
+    const diffInHours = (now.getTime() - past.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 1) return 'just now';
+    if (diffInHours < 24) return `${Math.floor(diffInHours)}h ago`;
+    const days = Math.floor(diffInHours / 24);
+    return `${days}d ago`;
   };
 
   const queueItems: QCQueueItem[] = queueData?.items || [];
@@ -195,16 +183,18 @@ export default function QCReviewQueue({ onItemSelect, showAssignmentControls = t
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="h-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <SkeletonList items={5} />
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -216,10 +206,10 @@ export default function QCReviewQueue({ onItemSelect, showAssignmentControls = t
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-300">Total Queue</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalItems}</p>
+                <p className="text-sm text-muted-foreground">Total Queue</p>
+                <p className="text-2xl font-bold text-foreground">{stats.totalItems}</p>
               </div>
-              <Clock className="h-6 w-6 text-blue-500" />
+              <Clock className="h-6 w-6 text-primary" aria-hidden="true" />
             </div>
           </CardContent>
         </Card>
@@ -228,10 +218,10 @@ export default function QCReviewQueue({ onItemSelect, showAssignmentControls = t
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-300">High Priority</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.highPriority}</p>
+                <p className="text-sm text-muted-foreground">High Priority</p>
+                <p className="text-2xl font-bold text-warning">{stats.highPriority}</p>
               </div>
-              <AlertTriangle className="h-6 w-6 text-orange-500" />
+              <AlertTriangle className="h-6 w-6 text-warning" aria-hidden="true" />
             </div>
           </CardContent>
         </Card>
@@ -240,10 +230,10 @@ export default function QCReviewQueue({ onItemSelect, showAssignmentControls = t
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-300">Overdue</p>
-                <p className="text-2xl font-bold text-red-600">{stats.overdue}</p>
+                <p className="text-sm text-muted-foreground">Overdue</p>
+                <p className="text-2xl font-bold text-error">{stats.overdue}</p>
               </div>
-              <AlertTriangle className="h-6 w-6 text-red-500" />
+              <AlertTriangle className="h-6 w-6 text-error" aria-hidden="true" />
             </div>
           </CardContent>
         </Card>
@@ -252,10 +242,10 @@ export default function QCReviewQueue({ onItemSelect, showAssignmentControls = t
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-300">Avg Wait</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.avgWaitTime}h</p>
+                <p className="text-sm text-muted-foreground">Avg Wait</p>
+                <p className="text-2xl font-bold text-foreground">{stats.avgWaitTime}h</p>
               </div>
-              <Clock className="h-6 w-6 text-blue-500" />
+              <Clock className="h-6 w-6 text-primary" aria-hidden="true" />
             </div>
           </CardContent>
         </Card>
@@ -264,10 +254,10 @@ export default function QCReviewQueue({ onItemSelect, showAssignmentControls = t
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-300">Team Utilization</p>
-                <p className="text-2xl font-bold text-green-600">{stats.qcTeamUtilization}%</p>
+                <p className="text-sm text-muted-foreground">Team Utilization</p>
+                <p className="text-2xl font-bold text-success">{stats.qcTeamUtilization}%</p>
               </div>
-              <User className="h-6 w-6 text-green-500" />
+              <User className="h-6 w-6 text-success" aria-hidden="true" />
             </div>
           </CardContent>
         </Card>
@@ -402,24 +392,19 @@ export default function QCReviewQueue({ onItemSelect, showAssignmentControls = t
           {/* Queue Items */}
           <div className="space-y-3">
             {sortedItems.length === 0 ? (
-              <div className="text-center py-8">
-                <CheckCircle2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                  Queue is empty
-                </h3>
-                <p className="text-gray-600 dark:text-gray-300">
-                  No items in the QC review queue matching your filters
-                </p>
-              </div>
+              <EmptySuccess
+                title="Queue is empty"
+                description="No items in the QC review queue matching your filters"
+              />
             ) : (
               sortedItems.map((item) => {
                 const slaStatus = getSLAStatus(item.slaDeadline);
                 return (
-                  <Card 
-                    key={item.id} 
+                  <Card
+                    key={item.id}
                     className={`hover:shadow-md transition-shadow cursor-pointer ${
-                      slaStatus.status === 'overdue' ? 'border-red-300 bg-red-50 dark:bg-red-950' :
-                      slaStatus.status === 'critical' ? 'border-orange-300 bg-orange-50 dark:bg-orange-950' : ''
+                      slaStatus.status === 'overdue' ? 'border-error/30 bg-error/5' :
+                      slaStatus.status === 'critical' ? 'border-warning/30 bg-warning/5' : ''
                     }`}
                     onClick={() => onItemSelect?.(item)}
                     data-testid={`queue-item-${item.id}`}
@@ -428,19 +413,19 @@ export default function QCReviewQueue({ onItemSelect, showAssignmentControls = t
                       <div className="flex items-center justify-between">
                         <div className="flex-1 space-y-2">
                           <div className="flex items-center gap-3">
-                            <h4 className="font-semibold">{item.clientName}</h4>
-                            <Badge className={PRIORITY_COLORS[item.priority as keyof typeof PRIORITY_COLORS]}>
+                            <h4 className="font-semibold text-foreground">{item.clientName}</h4>
+                            <Badge className={getStatusColor(item.priority)}>
                               {item.priority}
                             </Badge>
-                            <Badge className={STATUS_COLORS[item.status as keyof typeof STATUS_COLORS]}>
+                            <Badge className={getStatusColor(item.status)}>
                               {item.status}
                             </Badge>
                             <span className={`text-sm font-medium ${slaStatus.color}`}>
                               {slaStatus.label}
                             </span>
                           </div>
-                          <p className="text-gray-600 dark:text-gray-300">{item.serviceName}</p>
-                          <div className="flex items-center gap-4 text-sm text-gray-500">
+                          <p className="text-muted-foreground">{item.serviceName}</p>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-4 w-4" />
                               Assigned {formatTimeAgo(item.assignedAt)}

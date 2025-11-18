@@ -11,16 +11,19 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Mail, Phone, Plus, Search, Star, UserPlus } from 'lucide-react';
+import { getStatusColor } from '@/lib/design-system-utils';
+import { SkeletonCard, SkeletonDashboard } from '@/components/ui/skeleton-loader';
+import { EmptySearchResults } from '@/components/ui/empty-state';
 
 const LEAD_STAGES = {
-  new: { label: 'New', color: 'bg-blue-100 text-blue-800' },
-  hot_lead: { label: 'Hot', color: 'bg-red-100 text-red-800' },
-  warm_lead: { label: 'Warm', color: 'bg-orange-100 text-orange-800' },
-  cold_lead: { label: 'Cold', color: 'bg-gray-100 text-gray-800' },
-  not_answered: { label: 'Not Answered', color: 'bg-yellow-100 text-yellow-800' },
-  not_interested: { label: 'Not Interested', color: 'bg-purple-100 text-purple-800' },
-  converted: { label: 'Converted', color: 'bg-green-100 text-green-800' },
-  lost: { label: 'Lost', color: 'bg-red-100 text-red-800' },
+  new: { label: 'New' },
+  hot_lead: { label: 'Hot' },
+  warm_lead: { label: 'Warm' },
+  cold_lead: { label: 'Cold' },
+  not_answered: { label: 'Not Answered' },
+  not_interested: { label: 'Not Interested' },
+  converted: { label: 'Converted' },
+  lost: { label: 'Lost' },
 } as const;
 
 type LeadStageKey = keyof typeof LEAD_STAGES;
@@ -194,7 +197,7 @@ export default function LeadManagement() {
                 <CardTitle className="text-sm font-medium">Hot Leads</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-600">{leadStats.hotLeads || 0}</div>
+                <div className="text-2xl font-bold text-error">{leadStats.hotLeads || 0}</div>
               </CardContent>
             </Card>
             <Card>
@@ -202,7 +205,7 @@ export default function LeadManagement() {
                 <CardTitle className="text-sm font-medium">Converted</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">{leadStats.converted || 0}</div>
+                <div className="text-2xl font-bold text-success">{leadStats.converted || 0}</div>
               </CardContent>
             </Card>
             <Card>
@@ -249,7 +252,7 @@ export default function LeadManagement() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="text-center py-8">Loading leads...</div>
+              <SkeletonCard />
             ) : (
               <div className="space-y-4">
                 {filteredLeads.map((lead: any) => (
@@ -261,9 +264,13 @@ export default function LeadManagement() {
                   />
                 ))}
                 {filteredLeads.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No leads found matching your criteria
-                  </div>
+                  <EmptySearchResults
+                    searchTerm={searchTerm || filterStage !== 'all' ? 'your filters' : undefined}
+                    onClearSearch={() => {
+                      setSearchTerm('');
+                      setFilterStage('all');
+                    }}
+                  />
                 )}
               </div>
             )}
@@ -283,8 +290,8 @@ function LeadCard({ lead, onUpdate, onConvert }: LeadCardProps) {
         <div className="flex-1 space-y-2">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-lg">{lead.companyName}</h3>
-            <Badge className={stageInfo.color}>{stageInfo.label}</Badge>
-            {lead.isHot && <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
+            <Badge className={getStatusColor(lead.stage)}>{stageInfo.label}</Badge>
+            {lead.isHot && <Star className="h-4 w-4 text-warning fill-warning" aria-label="Hot lead" />}
           </div>
           
           <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
