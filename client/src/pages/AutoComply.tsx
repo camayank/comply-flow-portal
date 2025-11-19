@@ -26,6 +26,8 @@ import {
   Sparkles,
   ArrowRight,
 } from "lucide-react";
+import { SkeletonDashboard, SkeletonCard, SkeletonList } from '@/components/ui/skeleton-loader';
+import { EmptyList } from '@/components/ui/empty-state';
 
 export default function AutoComply() {
   const [selectedWorkflow, setSelectedWorkflow] = useState<any>(null);
@@ -68,8 +70,12 @@ export default function AutoComply() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">Loading AutoComply...</div>
+      <div className="min-h-screen bg-background p-4 md:p-8">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <SkeletonCard />
+          <SkeletonDashboard stats={4} />
+          <SkeletonCard />
+        </div>
       </div>
     );
   }
@@ -148,25 +154,34 @@ export default function AutoComply() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {automations?.map((workflow: any) => (
-                    <WorkflowCard
-                      key={workflow.id}
-                      workflow={workflow}
-                      onToggle={(enabled) =>
-                        toggleMutation.mutate({ id: workflow.id, enabled })
-                      }
-                      onTrigger={() =>
-                        triggerMutation.mutate({
-                          trigger: workflow.trigger,
-                          entityId: 1,
-                          entityType: 'test',
-                        })
-                      }
-                      onEdit={() => setSelectedWorkflow(workflow)}
-                    />
-                  ))}
-                </div>
+                {!automations || automations.length === 0 ? (
+                  <EmptyList
+                    title="No workflows yet"
+                    description="Create your first automation workflow to streamline your compliance processes"
+                    actionLabel="Create Workflow"
+                    onAction={() => setShowBuilder(true)}
+                  />
+                ) : (
+                  <div className="space-y-4">
+                    {automations.map((workflow: any) => (
+                      <WorkflowCard
+                        key={workflow.id}
+                        workflow={workflow}
+                        onToggle={(enabled) =>
+                          toggleMutation.mutate({ id: workflow.id, enabled })
+                        }
+                        onTrigger={() =>
+                          triggerMutation.mutate({
+                            trigger: workflow.trigger,
+                            entityId: 1,
+                            entityType: 'test',
+                          })
+                        }
+                        onEdit={() => setSelectedWorkflow(workflow)}
+                      />
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -261,11 +276,20 @@ export default function AutoComply() {
                 <CardDescription>Recent workflow executions and their status</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {history?.map((execution: any) => (
-                    <ExecutionCard key={execution.id} execution={execution} />
-                  ))}
-                </div>
+                {!history || history.length === 0 ? (
+                  <EmptyList
+                    title="No execution history"
+                    description="Workflow executions will appear here once you trigger or activate automation workflows"
+                    actionLabel="View Workflows"
+                    onAction={() => setShowBuilder(false)}
+                  />
+                ) : (
+                  <div className="space-y-3">
+                    {history.map((execution: any) => (
+                      <ExecutionCard key={execution.id} execution={execution} />
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

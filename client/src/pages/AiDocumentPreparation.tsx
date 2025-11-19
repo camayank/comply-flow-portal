@@ -22,6 +22,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { format } from 'date-fns';
+import { SkeletonList } from '@/components/ui/skeleton-loader';
+import { EmptyList } from '@/components/ui/empty-state';
 
 // ============================================================================
 // AI DOCUMENT PREPARATION & MANAGEMENT
@@ -441,13 +443,14 @@ export default function AiDocumentPreparation() {
           <CardContent>
             <div className="space-y-2 max-h-[600px] overflow-y-auto">
               {isLoading ? (
-                <div className="text-center py-4 text-muted-foreground">Loading...</div>
+                <SkeletonList items={5} />
               ) : documents.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>No documents yet</p>
-                  <p className="text-sm">Generate your first document</p>
-                </div>
+                <EmptyList
+                  title="No documents yet"
+                  description="Get started by generating your first document with AI"
+                  actionLabel="Generate with AI"
+                  onAction={() => setCreateDialogOpen(true)}
+                />
               ) : (
                 documents.map((doc) => (
                   <div
@@ -528,10 +531,12 @@ export default function AiDocumentPreparation() {
           </CardHeader>
           <CardContent>
             {!selectedDoc ? (
-              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                <FileText className="w-16 h-16 mb-4 opacity-50" />
-                <p>Select a document to preview or generate a new one</p>
-              </div>
+              <EmptyList
+                title="No Document Selected"
+                description="Select a document from the list to preview, edit, or sign it"
+                actionLabel="Generate New Document"
+                onAction={() => setCreateDialogOpen(true)}
+              />
             ) : isEditing ? (
               <Textarea
                 value={editContent}

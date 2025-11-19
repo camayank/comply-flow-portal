@@ -32,6 +32,8 @@ import {
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import type { DocumentVault } from '@shared/schema';
+import { SkeletonCard, SkeletonDashboard } from '@/components/ui/skeleton-loader';
+import { EmptyList, EmptySearchResults } from '@/components/ui/empty-state';
 
 interface DocumentWithMetrics extends DocumentVault {
   categoryName?: string;
@@ -215,19 +217,13 @@ const DocumentVault = () => {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="space-y-6">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                  <div className="h-8 bg-gray-200 rounded"></div>
-                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+      <div className="container mx-auto p-6 max-w-7xl">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Document Vault</h1>
+        </div>
+        <SkeletonDashboard stats={4} />
+        <div className="mt-6">
+          <SkeletonCard />
         </div>
       </div>
     );
@@ -493,20 +489,22 @@ const DocumentVault = () => {
               )}
 
               {sortedDocuments.length === 0 && (
-                <div className="text-center py-12">
-                  <FolderOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-lg font-semibold mb-2">No Documents Found</h3>
-                  <p className="text-gray-600 mb-4">
-                    {searchQuery 
-                      ? "No documents match your search criteria."
-                      : "Start by uploading your first document."
-                    }
-                  </p>
-                  <Button>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Document
-                  </Button>
-                </div>
+                searchQuery || selectedCategory !== 'all' ? (
+                  <EmptySearchResults
+                    searchTerm={searchQuery}
+                    onClearSearch={() => {
+                      setSearchQuery('');
+                      setSelectedCategory('all');
+                    }}
+                  />
+                ) : (
+                  <EmptyList
+                    title="No Documents Found"
+                    description="Start by uploading your first document to your secure vault"
+                    actionLabel="Upload Document"
+                    onAction={() => {/* Handle upload */}}
+                  />
+                )
               )}
             </CardContent>
           </Card>

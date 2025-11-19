@@ -28,6 +28,8 @@ import {
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import type { ComplianceTracking } from '@shared/schema';
+import { SkeletonCard, SkeletonDashboard } from '@/components/ui/skeleton-loader';
+import { EmptyList } from '@/components/ui/empty-state';
 
 interface ComplianceHealthMetrics {
   overallScore: number;
@@ -136,17 +138,9 @@ const ComplianceTrackerDashboard = () => {
     return (
       <div className="container mx-auto p-6">
         <div className="space-y-6">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="animate-pulse space-y-4">
-                  <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                  <div className="h-8 bg-gray-200 rounded"></div>
-                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          <SkeletonDashboard stats={4} />
+          <SkeletonCard />
+          <SkeletonCard />
         </div>
       </div>
     );

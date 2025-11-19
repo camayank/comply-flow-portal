@@ -21,6 +21,8 @@ import TrainingManagement from '@/components/hr/TrainingManagement';
 import AttendanceManagement from '@/components/hr/AttendanceManagement';
 import LeaveManagement from '@/components/hr/LeaveManagement';
 import HRAnalytics from '@/components/hr/HRAnalytics';
+import { SkeletonCard } from '@/components/ui/skeleton-loader';
+import { EmptyList } from '@/components/ui/empty-state';
 
 // HR Dashboard Main Component
 export default function HRDashboard() {
@@ -294,26 +296,21 @@ function EmployeeDirectory() {
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(6)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-6">
-                <div className="flex items-start space-x-4">
-                  <div className="w-12 h-12 bg-gray-300 rounded-full"></div>
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-gray-300 rounded w-3/4"></div>
-                    <div className="h-3 bg-gray-300 rounded w-1/2"></div>
-                    <div className="h-3 bg-gray-300 rounded w-2/3"></div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <SkeletonCard key={i} />
           ))}
         </div>
-      ) : (
+      ) : employees && employees.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {employees?.map((employee: any) => (
+          {employees.map((employee: any) => (
             <EmployeeCard key={employee.id} employee={employee} />
           ))}
         </div>
+      ) : (
+        <EmptyList
+          title="No employees yet"
+          description="Add your first employee to get started."
+          actionLabel="Add Employee"
+        />
       )}
     </div>
   );

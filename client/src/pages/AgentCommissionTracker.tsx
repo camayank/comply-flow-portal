@@ -31,6 +31,8 @@ import {
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { format } from 'date-fns';
+import { SkeletonTable } from '@/components/ui/skeleton-loader';
+import { EmptyList } from '@/components/ui/empty-state';
 
 export default function AgentCommissionTracker() {
   const [statusFilter, setStatusFilter] = useState('all');
@@ -252,21 +254,14 @@ export default function AgentCommissionTracker() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
+            <SkeletonTable rows={5} columns={7} />
           ) : commissions.length === 0 ? (
-            <div className="text-center py-12">
-              <DollarSign className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                No commissions yet
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400">
-                Start converting leads to earn commissions
-              </p>
-            </div>
+            <EmptyList
+              title="No commissions yet"
+              description="Start converting leads to earn commissions. Your earnings will appear here once clients complete services"
+              actionLabel="View Leads"
+              onAction={() => window.location.href = '/agent/leads'}
+            />
           ) : (
             <div className="overflow-x-auto">
               <Table>
