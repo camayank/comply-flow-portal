@@ -38,6 +38,8 @@ import {
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { SkeletonList, SkeletonCard } from '@/components/ui/skeleton-loader';
+import { EmptyList, EmptySearchResults } from '@/components/ui/empty-state';
 
 interface ClientEntity {
   id: number;
@@ -301,15 +303,22 @@ const ClientMasterDashboard = () => {
                 <ScrollArea className="h-[600px]">
                   <div className="divide-y divide-gray-200 dark:divide-gray-700">
                     {clientsLoading ? (
-                      <div className="p-8 text-center">
-                        <RefreshCw className="h-8 w-8 animate-spin mx-auto text-gray-400" />
-                        <p className="mt-2 text-gray-500">Loading clients...</p>
-                      </div>
+                      <SkeletonList items={6} />
                     ) : filteredClients.length === 0 ? (
-                      <div className="p-8 text-center">
-                        <Users className="h-12 w-12 mx-auto text-gray-300" />
-                        <p className="mt-4 text-gray-500">No clients found</p>
-                      </div>
+                      searchQuery || filterType !== 'all' ? (
+                        <EmptySearchResults
+                          searchTerm={searchQuery}
+                          onClearSearch={() => {
+                            setSearchQuery('');
+                            setFilterType('all');
+                          }}
+                        />
+                      ) : (
+                        <EmptyList
+                          title="No clients found"
+                          description="Start by adding your first client to the platform"
+                        />
+                      )
                     ) : (
                       filteredClients.map((client: ClientEntity) => (
                         <div 
@@ -453,10 +462,7 @@ const ClientMasterDashboard = () => {
           </DialogHeader>
           
           {profileLoading ? (
-            <div className="p-8 text-center">
-              <RefreshCw className="h-8 w-8 animate-spin mx-auto text-gray-400" />
-              <p className="mt-2 text-gray-500">Loading profile...</p>
-            </div>
+            <SkeletonCard />
           ) : clientProfile ? (
             <div className="space-y-6">
               {/* Basic Info */}

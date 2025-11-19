@@ -8,13 +8,11 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { GlobalErrorHandler } from "./components/GlobalErrorHandler";
 import { queryClient } from "@/lib/queryClient";
 import { ChatWidget } from "./components/ChatWidget";
+import { CommandPalette } from "./components/CommandPalette";
+import { SkeletonPage } from "./components/ui/skeleton-loader";
 
 // Loading component for lazy routes
-const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-screen">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-  </div>
-);
+const PageLoader = () => <SkeletonPage />;
 
 // Lazy load all pages for code splitting
 const UnifiedLanding = lazy(() => import("./pages/UnifiedLanding"));
@@ -108,6 +106,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <CommandPalette />
         <Router>
           <div className="min-h-screen flex flex-col">
             <main className="flex-grow">

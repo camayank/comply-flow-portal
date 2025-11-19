@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Calculator, CheckCircle2, Clock, Download, Edit, Eye, Plus, Search, Send, XCircle } from 'lucide-react';
+import { SkeletonCard } from '@/components/ui/skeleton-loader';
+import { EmptyList, EmptySearchResults } from '@/components/ui/empty-state';
 
 const PROPOSAL_STATUS = {
   draft: { label: 'Draft', color: 'bg-gray-100 text-gray-800', icon: Edit },
@@ -217,7 +219,7 @@ export default function ProposalManagement() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <div className="text-center py-8">Loading proposals...</div>
+              <SkeletonCard />
             ) : (
               <div className="space-y-4">
                 {filteredProposals.map((proposal) => (
@@ -227,10 +229,19 @@ export default function ProposalManagement() {
                     onUpdate={updateProposalMutation.mutate}
                   />
                 ))}
-                {filteredProposals.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No proposals found
-                  </div>
+                {filteredProposals.length === 0 && searchTerm && (
+                  <EmptySearchResults
+                    searchTerm={searchTerm}
+                    onClearSearch={() => setSearchTerm('')}
+                  />
+                )}
+                {filteredProposals.length === 0 && !searchTerm && (
+                  <EmptyList
+                    title="No proposals yet"
+                    description="Create your first proposal to get started."
+                    actionLabel="Create Proposal"
+                    onAction={() => setShowCreateModal(true)}
+                  />
                 )}
               </div>
             )}

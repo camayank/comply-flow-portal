@@ -22,6 +22,8 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useCurrentUser } from '@/components/ProtectedRoute';
+import { SkeletonCard } from '@/components/ui/skeleton-loader';
+import { EmptySearchResults } from '@/components/ui/empty-state';
 
 interface Service {
   id: string;
@@ -95,10 +97,21 @@ export default function ClientServiceCatalog() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading services...</p>
+      <div className="min-h-screen bg-gray-50">
+        <div className="bg-white border-b sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <h1 className="text-2xl font-bold">Service Catalog</h1>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
         </div>
       </div>
     );
@@ -212,13 +225,13 @@ export default function ClientServiceCatalog() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No services found</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Try adjusting your search or filters
-                  </p>
-                </div>
+                <EmptySearchResults
+                  searchTerm={searchQuery}
+                  onClearSearch={() => {
+                    setSearchQuery('');
+                    setSelectedCategory('all');
+                  }}
+                />
               )}
             </TabsContent>
           ))}

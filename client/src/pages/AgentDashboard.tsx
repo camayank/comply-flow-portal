@@ -26,6 +26,7 @@ import {
   Settings
 } from 'lucide-react';
 import { Link } from 'wouter';
+import { EmptyList } from '@/components/ui/empty-state';
 
 export default function AgentDashboard() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -403,16 +404,12 @@ export default function AgentDashboard() {
                 ))}
               </div>
             ) : recentLeadsData.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No leads yet</p>
-                <Link href="/pre-sales">
-                  <Button size="sm" className="mt-3" data-testid="button-add-first-lead">
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Your First Lead
-                  </Button>
-                </Link>
-              </div>
+              <EmptyList
+                title="No leads yet"
+                description="Start adding leads to track your pipeline and earn commissions"
+                actionLabel="Add Your First Lead"
+                onAction={() => window.location.href = '/pre-sales'}
+              />
             ) : (
               <div className="space-y-3">
                 {recentLeadsData.slice(0, 5).map((lead: any) => (
@@ -456,10 +453,10 @@ export default function AgentDashboard() {
                 ))}
               </div>
             ) : announcementsData.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                <Bell className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                <p>No announcements yet</p>
-              </div>
+              <EmptyList
+                title="No announcements yet"
+                description="Company announcements and updates will appear here"
+              />
             ) : (
               <div className="space-y-3">
                 {announcementsData.slice(0, 4).map((announcement: any) => (

@@ -42,6 +42,8 @@ import {
 import { Link, useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
+import { SkeletonList } from '@/components/ui/skeleton-loader';
+import { EmptyList, EmptySearchResults } from '@/components/ui/empty-state';
 
 const LEAD_STAGES = {
   NEW: 'new',
@@ -460,25 +462,25 @@ export default function AgentLeadManagement() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-24 w-full" />
-              ))}
-            </div>
+            <SkeletonList items={4} />
           ) : leads.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                No leads found
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                Start by adding your first lead to the pipeline
-              </p>
-              <Button onClick={() => setIsCreateDialogOpen(true)} data-testid="button-add-first-lead">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Your First Lead
-              </Button>
-            </div>
+            searchQuery || stageFilter !== 'all' || sourceFilter !== 'all' ? (
+              <EmptySearchResults
+                searchTerm={searchQuery}
+                onClearSearch={() => {
+                  setSearchQuery('');
+                  setStageFilter('all');
+                  setSourceFilter('all');
+                }}
+              />
+            ) : (
+              <EmptyList
+                title="No leads found"
+                description="Start by adding your first lead to the pipeline and track your conversion progress"
+                actionLabel="Add Your First Lead"
+                onAction={() => setIsCreateDialogOpen(true)}
+              />
+            )
           ) : (
             <div className="space-y-3">
               {leads.map((lead: any) => (
