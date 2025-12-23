@@ -1,364 +1,491 @@
-# 🚀 MKW Platform - Enterprise CRM Solution
+# MKW Platform - Complete Business Management System
 
-**Complete Salesforce-level CRM platform built for MKW Advisors**
+[![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg)](https://nodejs.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13+-blue.svg)](https://postgresql.org/)
+[![Express.js](https://img.shields.io/badge/Express.js-4.x-lightgrey.svg)](https://expressjs.com/)
+[![License](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
-[![React](https://img.shields.io/badge/React-18+-blue.svg)](https://reactjs.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
+A comprehensive, enterprise-grade business management platform designed for professional services companies. Built with modern technologies and security best practices.
 
-## 📋 Table of Contents
+## 🚀 Features
 
-- [Features](#features)
-- [Quick Start](#quick-start)
-- [Architecture](#architecture)
-- [API Documentation](#api-documentation)
-- [Deployment](#deployment)
-- [Development](#development)
-- [Contributing](#contributing)
+### Core Business Management
+- **Service Catalog Management** - Complete service definitions with pricing tiers
+- **Service Request Processing** - End-to-end workflow management
+- **Client Relationship Management** - Customer data and interaction tracking
+- **Document Management** - Secure file uploads with S3 integration
+- **Quality Control System** - Multi-stage review and approval workflows
+- **Payment Integration** - Razorpay integration for Indian market
+- **Communication Hub** - Email, SMS, and notification management
 
-## ✨ Features
+### Advanced Features
+- **Real-time Updates** - Socket.IO powered live notifications
+- **Role-based Access Control** - Granular permissions system
+- **Workflow Automation** - Configurable business process automation
+- **Audit Logging** - Comprehensive activity tracking
+- **Multi-tenant Architecture** - Support for multiple business units
+- **RESTful API** - Complete API with OpenAPI documentation
+- **Enterprise Security** - JWT + Session hybrid authentication
 
-### 🏢 Account Management
-- **Complete customer profiles** with billing/shipping addresses
-- **Industry categorization** and account type classification
-- **Health scoring** and relationship tracking
-- **Hierarchical account structures** (parent-child relationships)
-- **360-degree account view** with related opportunities and contacts
-
-### 🎯 Opportunity Management
-- **Visual sales pipeline** with drag-and-drop Kanban boards
-- **Probability-based forecasting** with weighted pipeline values
-- **Stage progression tracking** with automatic date logging
-- **Competitor analysis** and deal risk assessment
-- **Real-time collaboration** with Socket.IO updates
-
-### 👥 Contact & Lead Management
-- **Comprehensive contact profiles** with relationship mapping
-- **Lead scoring and qualification** workflows
-- **Communication history** tracking across all touchpoints
-- **Conversion tracking** from lead to opportunity
-
-### 📊 Business Intelligence
-- **Executive dashboard** with KPIs and trends
-- **Revenue forecasting** with pipeline analytics
-- **Performance metrics** and win/loss analysis
-- **Industry insights** and account distribution
-- **Real-time reporting** with interactive charts
-
-### 🔐 Enterprise Security
-- **JWT authentication** with refresh token support
-- **Role-based access control** (Admin, Manager, Sales Rep, User)
-- **Rate limiting** and DDoS protection
-- **Audit logging** for compliance requirements
-- **Data encryption** and secure password hashing
-
-### 📱 Modern Tech Stack
-- **React 18** with hooks and modern patterns
-- **Node.js/Express** backend with TypeScript support
-- **PostgreSQL** with optimized schemas and indexing
-- **Socket.IO** for real-time collaboration
-- **Docker** containerization for easy deployment
-- **Tailwind CSS** for responsive, beautiful UI
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js 18+
-- PostgreSQL 15+
-- Git
-- Docker (optional, recommended)
-
-### Method 1: Docker Deployment (Recommended)
-
-```bash
-# Clone repository
-git clone https://github.com/camayank/comply-flow-portal.git
-cd comply-flow-portal/mkw-platform
-
-# Start all services with Docker
-docker-compose up -d
-
-# Check health
-curl http://localhost:5000/health
-```
-
-### Method 2: Manual Setup
-
-```bash
-# Clone and navigate
-git clone https://github.com/camayank/comply-flow-portal.git
-cd comply-flow-portal/mkw-platform
-
-# Run automated setup
-npm run setup
-
-# Create database
-createdb mkw_platform
-psql -U postgres -d mkw_platform -f backend/src/database/schema.sql
-
-# Start development servers
-npm run dev:all
-```
-
-### Access Application
-
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:5000
-- **API Health**: http://localhost:5000/health
-
-**Default Login:**
-- Email: `admin@mkwadvisors.com`
-- Password: `admin123`
+### Technical Highlights
+- **Scalable Architecture** - Microservices-ready design
+- **Database Migrations** - Version-controlled schema management
+- **File Storage Options** - Local filesystem or AWS S3
+- **Email Service** - SMTP integration with template system
+- **Comprehensive Logging** - Winston-based structured logging
+- **Health Monitoring** - Built-in health checks and metrics
+- **Production Ready** - PM2 clustering and Nginx reverse proxy
 
 ## 🏗️ Architecture
 
-### System Overview
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   React Frontend│    │  Express Backend│    │  PostgreSQL DB  │
-│   (Port 3000)   │◄──►│   (Port 5000)   │◄──►│   (Port 5432)   │
-│                 │    │                 │    │                 │
-│ • Dashboard     │    │ • JWT Auth      │    │ • 12 Core Tables│
-│ • Account Mgmt  │    │ • REST APIs     │    │ • Relationships │
-│ • Pipeline View │    │ • Socket.IO     │    │ • Indexes       │
-│ • Real-time UI  │    │ • Security      │    │ • Audit Trail   │
+│   Frontend      │    │   Backend API   │    │   Database      │
+│   React App     │◄──►│   Express.js    │◄──►│   PostgreSQL    │
+│   (Separate)    │    │   + Socket.IO   │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │                        │
+                                ▼                        ▼
+                       ┌─────────────────┐    ┌─────────────────┐
+                       │  File Storage   │    │   Email/SMS     │
+                       │  Local / S3     │    │   SMTP/API      │
+                       └─────────────────┘    └─────────────────┘
 ```
 
-### Database Schema
-```sql
--- Core CRM Tables
-├── users (system users)
-├── accounts (companies/organizations)  
-├── contacts (people)
-├── opportunities (sales deals)
-├── leads (potential customers)
-├── cases (support tickets)
-├── activities (tasks/meetings/calls)
-├── campaigns (marketing campaigns)
-├── services (service catalog)
-├── service_instances (active deliveries)
-├── documents (file attachments)
-└── audit_logs (system audit trail)
+## 📋 Prerequisites
+
+- **Node.js** 18.x or higher
+- **PostgreSQL** 13.x or higher
+- **npm** 8.x or higher
+- **Redis** (optional, for session storage)
+
+## ⚡ Quick Start
+
+### 1. Clone and Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/your-username/mkw-platform.git
+cd mkw-platform/mkw-platform/backend
+
+# Install dependencies
+npm install
+
+# Copy environment configuration
+cp .env.example .env
 ```
 
-### API Endpoints
+### 2. Database Setup
+
+```bash
+# Create PostgreSQL database
+createdb mkw_platform
+
+# Run migrations
+npm run migrate
+
+# Seed initial data
+npm run seed
 ```
-/api/v1/auth/*          Authentication & user management
-/api/v1/accounts/*      Account CRUD and relationships
-/api/v1/opportunities/* Pipeline management and forecasting
-/api/v1/contacts/*      Contact relationship management
-/api/v1/leads/*         Lead capture and qualification
-/api/v1/cases/*         Support ticket management
-/api/v1/activities/*    Task and meeting management
-/api/v1/campaigns/*     Marketing campaign tracking
+
+### 3. Configure Environment
+
+Edit `.env` file with your settings:
+
+```env
+# Database
+DB_HOST=localhost
+DB_NAME=mkw_platform
+DB_USER=your_username
+DB_PASSWORD=your_password
+
+# Security (Generate strong secrets!)
+JWT_SECRET=your-jwt-secret-minimum-32-characters
+SESSION_SECRET=your-session-secret-minimum-32-characters
+CREDENTIAL_ENCRYPTION_KEY=your-encryption-key-minimum-32-characters
+
+# Email (Optional for development)
+SMTP_HOST=smtp.gmail.com
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
 ```
+
+### 4. Start Development Server
+
+```bash
+# Start in development mode
+npm run dev
+
+# Or start in production mode
+npm start
+```
+
+The API will be available at `http://localhost:5000`
+
+### 5. Default Login Credentials
+
+**Super Admin:**
+- Email: `admin@mkwadvisors.com`
+- Password: `MKW@Admin2024`
+
+**Operations Manager:**
+- Email: `operations@mkwadvisors.com`
+- Password: `MKW@Ops2024`
+
+⚠️ **Important**: Change these passwords immediately after first login!
 
 ## 📚 API Documentation
 
-### Authentication
+Interactive API documentation is available at:
+- Development: `http://localhost:5000/api/docs`
+- Raw OpenAPI spec: `http://localhost:5000/api/docs/openapi.json`
 
-**POST /api/v1/auth/login**
-```json
-{
-  "email": "admin@mkwadvisors.com",
-  "password": "admin123"
-}
+## 🗂️ Project Structure
+
+```
+mkw-platform/backend/
+├── src/
+│   ├── database/
+│   │   ├── migrations/          # Database schema migrations
+│   │   ├── seeds/              # Initial data seeding
+│   │   └── connection.js       # Database connection setup
+│   ├── middleware/
+│   │   └── sessionAuth.js      # Authentication middleware
+│   ├── routes/
+│   │   ├── admin/              # Admin panel routes
+│   │   ├── auth.js            # Authentication routes
+│   │   ├── files.js           # File management routes
+│   │   └── services.js        # Service management routes
+│   ├── utils/
+│   │   ├── email.js           # Email service utilities
+│   │   ├── logger.js          # Logging configuration
+│   │   └── validation.js      # Input validation helpers
+│   └── server.js              # Main application entry point
+├── logs/                       # Application logs
+├── uploads/                    # Local file storage
+├── .env.example               # Environment template
+├── knexfile.js               # Database configuration
+└── package.json              # Dependencies and scripts
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "user": { "id": 1, "email": "admin@mkwadvisors.com", "role": "admin" },
-    "tokens": {
-      "accessToken": "eyJhbGciOiJIUzI1NiIs...",
-      "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
-      "expiresIn": "7d"
-    }
-  }
-}
-```
-
-### Accounts
-
-**GET /api/v1/accounts**
-- Query params: `page`, `limit`, `search`, `type`, `industry`, `status`
-- Returns paginated account list with relationships
-
-**POST /api/v1/accounts**
-```json
-{
-  "name": "Acme Corporation",
-  "type": "enterprise",
-  "industry": "technology",
-  "website": "https://acme.com",
-  "phone": "+91-99999-99999",
-  "email": "contact@acme.com",
-  "billingCity": "Mumbai",
-  "billingState": "Maharashtra",
-  "annualRevenue": 50000000,
-  "numberOfEmployees": 250
-}
-```
-
-### Opportunities
-
-**GET /api/v1/opportunities/pipeline**
-- Returns Kanban pipeline data grouped by stage
-- Includes summary statistics and weighted values
-
-**POST /api/v1/opportunities**
-```json
-{
-  "name": "Q4 Software License Deal",
-  "accountId": 1,
-  "amount": 2500000,
-  "probability": 75,
-  "closeDate": "2024-12-31",
-  "stage": "proposal",
-  "description": "Enterprise software licensing opportunity"
-}
-```
-
-## 🌐 Deployment Options
-
-### AWS Deployment
-```bash
-# Deploy to AWS with RDS
-aws rds create-db-instance \
-  --db-instance-identifier mkw-platform \
-  --engine postgres \
-  --db-instance-class db.t3.micro
-
-# Deploy to EC2
-scp -r mkw-platform/ ec2-user@your-server:/home/ec2-user/
-ssh ec2-user@your-server
-cd mkw-platform
-docker-compose --profile production up -d
-```
-
-### Digital Ocean
-1. Fork this repository
-2. Connect to DigitalOcean App Platform
-3. Import from GitHub
-4. Set environment variables
-5. Deploy!
-
-### Railway/Render
-```bash
-# One-command deployment
-railway up
-# or
-render deploy
-```
-
-## 🛠️ Development
-
-### Project Structure
-```
-mkw-platform/
-├── backend/
-│   ├── src/
-│   │   ├── routes/          # API route handlers
-│   │   ├── database/        # Database schema & connection
-│   │   ├── middleware/      # Express middleware
-│   │   └── utils/          # Utility functions
-│   ├── Dockerfile          # Backend container
-│   └── package.json        # Backend dependencies
-├── frontend/
-│   ├── src/
-│   │   ├── components/     # React components
-│   │   └── App.jsx        # Main application
-│   ├── Dockerfile          # Frontend container
-│   └── package.json        # Frontend dependencies
-├── docker-compose.yml      # Container orchestration
-├── scripts/               # Automation scripts
-└── README.md              # This file
-```
-
-### Development Workflow
+## 🛠️ Available Scripts
 
 ```bash
-# Start development environment
-npm run dev:all
+# Development
+npm run dev              # Start with nodemon (auto-reload)
+npm start               # Start in production mode
+npm test                # Run tests
 
-# Run tests
-npm run test:all
+# Database
+npm run migrate         # Run database migrations
+npm run migrate:rollback # Rollback last migration
+npm run seed            # Seed database with initial data
+npm run db:setup        # Run migrations + seeds
+npm run db:reset        # Reset database completely
 
-# Lint and format code
-npm run lint:all
-
-# Build for production
-npm run build:all
+# Utilities
+npm run lint            # Check code style
+npm run lint:fix        # Fix code style issues
+npm run health          # Check application health
 ```
-
-### Adding New Features
-
-1. **Backend**: Add routes in `backend/src/routes/`
-2. **Frontend**: Add components in `frontend/src/components/`
-3. **Database**: Update `backend/src/database/schema.sql`
-4. **API**: Follow existing patterns for consistency
-
-## 📈 Performance
-
-- **Database**: Optimized indexes for all major queries
-- **API**: Response caching and pagination
-- **Frontend**: Code splitting and lazy loading
-- **Real-time**: Efficient Socket.IO event handling
-- **Security**: Rate limiting and request validation
 
 ## 🔧 Configuration
 
 ### Environment Variables
 
-**Backend (.env):**
-```env
-DB_HOST=localhost
-DB_NAME=mkw_platform
-DB_USER=mkw_user
-DB_PASSWORD=mkw_secure_2024!
-JWT_SECRET=your-super-secure-jwt-secret
-NODE_ENV=development
-PORT=5000
+The application uses environment variables for configuration. See `.env.example` for all available options:
+
+**Required Variables:**
+- `JWT_SECRET` - JWT signing secret (32+ characters)
+- `SESSION_SECRET` - Session encryption secret (32+ characters) 
+- `CREDENTIAL_ENCRYPTION_KEY` - Data encryption key (32+ characters)
+- `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` - Database connection
+
+**Optional Variables:**
+- `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` - Email configuration
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` - S3 file storage
+- `STORAGE_PROVIDER` - 'local' or 's3' (default: 'local')
+- `FRONTEND_URL` - Frontend application URL for CORS
+
+### Business Configuration
+
+After initial setup, configure business settings through the admin panel:
+
+1. **Company Information** - Name, contact details, GST number
+2. **Service Catalog** - Customize services and pricing
+3. **Workflow Templates** - Define business processes
+4. **Notification Templates** - Email and SMS templates
+5. **User Roles** - Define access permissions
+
+## 🗃️ Database Schema
+
+The system uses a comprehensive database schema with the following key entities:
+
+- **service_categories** - Service organization
+- **services** - Service definitions and pricing
+- **service_requests** - Customer service requests
+- **service_request_steps** - Workflow step tracking
+- **service_documents** - File attachments
+- **workflow_templates** - Process definitions
+- **system_users** - Internal users and staff
+- **roles** - Role-based access control
+- **audit_logs** - Activity tracking
+- **notifications** - Communication tracking
+
+### Migration Management
+
+```bash
+# Create new migration
+npm run migrate:make migration_name
+
+# Run migrations
+npm run migrate
+
+# Rollback migrations
+npm run migrate:rollback
+
+# Check migration status
+npx knex migrate:status
 ```
 
-**Frontend (.env):**
-```env
-REACT_APP_API_URL=http://localhost:5000
-REACT_APP_SOCKET_URL=http://localhost:5000
-REACT_APP_ENV=development
+## 🔐 Security Features
+
+### Authentication & Authorization
+- **Hybrid Auth System** - JWT tokens + secure sessions
+- **Role-based Access Control** - 7 predefined roles with granular permissions
+- **Session Management** - Secure session handling with fingerprinting
+- **Password Security** - bcrypt hashing with cost factor 12
+- **Account Lockout** - Brute force protection
+
+### Security Middleware
+- **Rate Limiting** - Configurable request throttling
+- **CORS Protection** - Cross-origin request validation
+- **Helmet.js** - Security headers and CSP
+- **Input Validation** - Comprehensive request validation
+- **SQL Injection Prevention** - Parameterized queries
+- **XSS Protection** - Input sanitization
+
+### Data Protection
+- **Encryption at Rest** - Sensitive data encryption
+- **Secure File Upload** - Type and size validation
+- **Audit Logging** - Comprehensive activity tracking
+- **Error Handling** - No information leakage
+
+## 📁 File Management
+
+The platform supports two storage modes:
+
+### Local Storage (Development)
+```javascript
+// Automatic setup - files stored in ./uploads/
+STORAGE_PROVIDER=local
+UPLOAD_PATH=./uploads
 ```
 
-## 📊 Monitoring
+### AWS S3 (Production)
+```javascript
+// Configure S3 credentials
+STORAGE_PROVIDER=s3
+AWS_REGION=ap-south-1
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+S3_BUCKET_NAME=your-bucket-name
+```
 
-- **Health Checks**: `/health` endpoint with database connectivity
-- **Logging**: Winston logger with file rotation
-- **Error Tracking**: Comprehensive error logging and monitoring
-- **Performance**: Request timing and memory usage tracking
+**Features:**
+- File type validation
+- Size limits (configurable)
+- Virus scanning hooks
+- Automatic thumbnails for images
+- Secure download URLs
+- Access control per document
+
+## 📧 Email Integration
+
+The platform includes a comprehensive email system:
+
+### Development Mode
+```javascript
+// Automatically uses Ethereal for testing
+// Preview URLs logged to console
+```
+
+### Production SMTP
+```javascript
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+```
+
+**Features:**
+- Template-based emails
+- Variable substitution
+- Service request notifications
+- Custom template management
+- Delivery tracking
+- Bulk email support
+
+## 🔌 Real-time Features
+
+Socket.IO integration provides:
+
+- **Live Notifications** - Instant updates for status changes
+- **Real-time Dashboards** - Live data updates
+- **Collaborative Features** - Multi-user coordination
+- **Activity Feeds** - Live activity streams
+
+```javascript
+// Client-side connection
+const socket = io('http://localhost:5000', {
+  auth: {
+    sessionId: 'your-session-id'
+  }
+});
+
+// Subscribe to service request updates
+socket.emit('subscribe:service_request', requestId);
+```
+
+## 🚀 Production Deployment
+
+For detailed production deployment instructions, see [PRODUCTION_DEPLOYMENT_GUIDE.md](PRODUCTION_DEPLOYMENT_GUIDE.md).
+
+### Quick Production Setup
+
+1. **Server Requirements**: Ubuntu 20.04+, Node.js 18+, PostgreSQL 13+
+2. **Process Management**: PM2 for clustering and auto-restart
+3. **Reverse Proxy**: Nginx with SSL termination
+4. **SSL Certificate**: Let's Encrypt via Certbot
+5. **Monitoring**: Built-in health checks and logging
+
+```bash
+# Install PM2 globally
+npm install -g pm2
+
+# Start with PM2 (cluster mode)
+pm2 start ecosystem.config.js
+
+# Save PM2 configuration
+pm2 save
+
+# Setup PM2 startup
+pm2 startup
+```
+
+## 📊 Monitoring & Observability
+
+### Health Checks
+```bash
+# Application health
+curl http://localhost:5000/health
+
+# Database health  
+curl http://localhost:5000/api/admin/health
+```
+
+### Logging
+- **Structured Logging** - JSON format with Winston
+- **Log Rotation** - Daily rotation with compression
+- **Log Levels** - Configurable verbosity
+- **Request Tracing** - Unique request IDs
+- **Error Tracking** - Comprehensive error logging
+
+### Performance Monitoring
+- **Response Time Tracking** - Built-in metrics
+- **Database Query Monitoring** - Slow query detection
+- **Memory Usage Tracking** - Heap monitoring
+- **File Upload Metrics** - Upload success rates
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run integration tests
+npm run test:integration
+
+# Run load tests
+npm run test:load
+```
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+This is a proprietary project for MKW Advisors. For internal development:
 
-## 📝 License
+1. **Branch Naming**: `feature/description`, `bugfix/description`
+2. **Commit Messages**: Use conventional commits
+3. **Code Style**: ESLint + Prettier configuration
+4. **Testing**: Add tests for new features
+5. **Documentation**: Update relevant docs
 
-Proprietary - MKW Advisors. All rights reserved.
+### Development Workflow
+
+```bash
+# Create feature branch
+git checkout -b feature/new-feature
+
+# Make changes and test
+npm run lint
+npm test
+
+# Commit with conventional format
+git commit -m "feat: add new service management feature"
+
+# Push and create pull request
+git push origin feature/new-feature
+```
 
 ## 📞 Support
 
-- **Technical Issues**: Create GitHub issues
-- **Business Questions**: Contact MKW Advisors team
-- **Documentation**: Check `/docs` folder
+### Technical Support
+- **Email**: tech@mkwadvisors.com
+- **Documentation**: Internal wiki available
+- **Issue Tracking**: GitHub issues for bug reports
+- **Emergency**: 24/7 on-call support available
+
+### Business Support
+- **Training**: User training available
+- **Customization**: Custom feature development
+- **Integration**: Third-party integration support
+- **Consulting**: Business process optimization
+
+## 📄 License
+
+This project is proprietary software owned by MKW Advisors. All rights reserved.
+
+## 🔄 Changelog
+
+### Version 1.0.0 (Current)
+- ✅ Complete service management system
+- ✅ Role-based access control
+- ✅ Document management with S3 support
+- ✅ Email notification system
+- ✅ Real-time updates via Socket.IO
+- ✅ Comprehensive audit logging
+- ✅ Production-ready security
+- ✅ API documentation
+- ✅ Database migrations and seeding
+- ✅ File upload with validation
+- ✅ Payment integration ready
+- ✅ Multi-tenant architecture foundation
+
+### Upcoming Features (v1.1.0)
+- 📋 Advanced reporting and analytics
+- 📱 Mobile app API enhancements
+- 🔔 Push notification support
+- 📊 Business intelligence dashboard
+- 🔄 Workflow automation enhancements
+- 📈 Performance optimization
+- 🌐 Multi-language support
+- 🔒 Advanced security features
 
 ---
 
-**Built with ❤️ by MKW Advisors Development Team**
+**Built with ❤️ for MKW Advisors**
 
-*Transform your business relationships with enterprise-grade CRM technology.*
+*Enterprise Business Management Platform - Empowering Professional Services*

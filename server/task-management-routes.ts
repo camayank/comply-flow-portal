@@ -1,5 +1,6 @@
 import { Express, Request, Response } from 'express';
 import { db } from './db';
+import { requireAuth } from './auth-middleware';
 import { 
   taskItems, 
   taskParticipants, 
@@ -190,11 +191,11 @@ export function registerTaskManagementRoutes(app: Express) {
   });
 
   // ========== UPDATE TASK ==========
-  app.patch('/api/tasks/:id', async (req: Request, res: Response) => {
+  app.patch('/api/tasks/:id', requireAuth, async (req: Request, res: Response) => {
     try {
       const taskId = Number(req.params.id);
       const updates = req.body;
-      const userId = req.body.userId || 1; // Should come from auth
+      const userId = req.user!.id;
 
       const [existingTask] = await db
         .select()
@@ -340,10 +341,11 @@ export function registerTaskManagementRoutes(app: Express) {
   });
 
   // ========== CLOSE/COMPLETE TASK WITH APPROVAL ==========
-  app.post('/api/tasks/:id/close', async (req: Request, res: Response) => {
+  app.post('/api/tasks/:id/close', requireAuth, async (req: Request, res: Response) => {
     try {
       const taskId = Number(req.params.id);
-      const { userId, approvedBy, comment } = req.body;
+      const { approvedBy, comment } = req.body;
+      const userId = req.user!.id;
 
       const [task] = await db
         .select()

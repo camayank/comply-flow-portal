@@ -488,30 +488,37 @@ export class SlaMonitoringService {
   private static monitoringInterval: NodeJS.Timeout | null = null;
 
   static startMonitoring(intervalMinutes: number = 15): void {
+    // Import job manager dynamically to avoid circular dependencies
+    const { jobManager } = require('./job-lifecycle-manager');
+
     if (this.monitoringInterval) {
-      clearInterval(this.monitoringInterval);
+      jobManager.stopJob('sla-monitoring');
     }
 
     console.log(`Starting SLA monitoring service (checking every ${intervalMinutes} minutes)`);
 
-    this.monitoringInterval = setInterval(async () => {
-      try {
-        await EnhancedSlaSystem.processAllSlaChecks();
-      } catch (error) {
-        console.error("SLA monitoring cycle error:", error);
-      }
-    }, intervalMinutes * 60 * 1000);
+    this.monitoringInterval = jobManager.registerInterval(
+      'sla-monitoring',
+      async () => {
+        try {
+          await EnhancedSlaSystem.processAllSlaChecks();
+        } catch (error) {
+          console.error("SLA monitoring cycle error:", error);
+        }
+      },
+      intervalMinutes * 60 * 1000,
+      'SLA compliance monitoring and escalation checks'
+    );
 
     // Run initial check
     EnhancedSlaSystem.processAllSlaChecks();
   }
 
   static stopMonitoring(): void {
-    if (this.monitoringInterval) {
-      clearInterval(this.monitoringInterval);
-      this.monitoringInterval = null;
-      console.log("SLA monitoring service stopped");
-    }
+    const { jobManager } = require('./job-lifecycle-manager');
+    jobManager.stopJob('sla-monitoring');
+    this.monitoringInterval = null;
+    console.log("SLA monitoring service stopped");
   }
 
   static async getMonitoringStatus(): Promise<any> {

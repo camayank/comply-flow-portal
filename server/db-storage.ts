@@ -1,12 +1,12 @@
 import { db } from './db';
-import { 
+import {
   leads, salesProposals, serviceRequests, businessEntities, payments,
   clientContracts, clientCommunications, clientPortfolios,
-  invoices
+  invoices, services, users
 } from '../shared/schema';
 import { eq, desc, ilike, and, or, sql, gte, lte } from 'drizzle-orm';
-import type { 
-  LeadEnhanced, InsertLeadEnhanced, 
+import type {
+  LeadEnhanced, InsertLeadEnhanced,
   SalesProposal, InsertSalesProposal,
   ServiceRequest, InsertServiceRequest,
   BusinessEntity, InsertBusinessEntity,
@@ -14,7 +14,9 @@ import type {
   ClientContract, InsertClientContract,
   ClientCommunication, InsertClientCommunication,
   ClientPortfolio, InsertClientPortfolio,
-  Invoice, InsertInvoice
+  Invoice, InsertInvoice,
+  Service, InsertService,
+  User, InsertUser
 } from '../shared/schema';
 
 // Database-backed storage for critical entities (Leads & Proposals)
@@ -656,6 +658,111 @@ export class DbFinancialsStorage {
   }
 }
 
+// Database-backed storage for Users
+// Migrates users from in-memory to persistent database storage
+export class DbUsersStorage {
+
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select()
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select()
+      .from(users)
+      .where(eq(users.username, username))
+      .limit(1);
+    return user;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
+  }
+
+  async updateUser(id: number, updates: Partial<User>): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    const [updated] = await db.update(users)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return !!updated;
+  }
+
+  async getAllUsers(filters?: { role?: string; isActive?: boolean }): Promise<User[]> {
+    const conditions = [];
+
+    if (filters?.role) {
+      conditions.push(eq(users.role, filters.role));
+    }
+
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(users.isActive, filters.isActive));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const usersData = await db.select()
+      .from(users)
+      .where(whereClause)
+      .orderBy(desc(users.createdAt));
+
+    return usersData;
+  }
+}
+
+// Database-backed storage for Services
+// Migrates services from in-memory to persistent database storage
+export class DbServicesStorage {
+
+  async getAllServices(): Promise<Service[]> {
+    const servicesData = await db.select()
+      .from(services)
+      .where(eq(services.isActive, true))
+      .orderBy(desc(services.createdAt));
+    return servicesData;
+  }
+
+  async getService(serviceId: string): Promise<Service | undefined> {
+    const [service] = await db.select()
+      .from(services)
+      .where(eq(services.serviceId, serviceId))
+      .limit(1);
+    return service;
+  }
+
+  async createService(service: InsertService): Promise<Service> {
+    const [newService] = await db.insert(services).values(service).returning();
+    return newService;
+  }
+
+  async updateService(serviceId: string, updates: Partial<Service>): Promise<Service | undefined> {
+    const [updated] = await db.update(services)
+      .set(updates)
+      .where(eq(services.serviceId, serviceId))
+      .returning();
+    return updated;
+  }
+
+  async deleteService(serviceId: string): Promise<boolean> {
+    const [updated] = await db.update(services)
+      .set({ isActive: false })
+      .where(eq(services.serviceId, serviceId))
+      .returning();
+    return !!updated;
+  }
+}
+
 // Export instances
 export const dbLeadsStorage = new DbLeadsStorage();
 export const dbProposalsStorage = new DbProposalsStorage();
@@ -664,3 +771,5 @@ export const dbBusinessEntitiesStorage = new DbBusinessEntitiesStorage();
 export const dbPaymentsStorage = new DbPaymentsStorage();
 export const dbClientMasterStorage = new DbClientMasterStorage();
 export const dbFinancialsStorage = new DbFinancialsStorage();
+export const dbUsersStorage = new DbUsersStorage();
+export const dbServicesStorage = new DbServicesStorage();

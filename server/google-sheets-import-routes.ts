@@ -96,7 +96,7 @@ export function registerGoogleSheetsImportRoutes(app: Express) {
         customForms: JSON.stringify([]),
         approvalNodes: JSON.stringify([]),
         escalationRules: JSON.stringify([]),
-        createdBy: req.user?.id || 1
+        createdBy: req.user!.id
       }).returning();
 
       // Steps are stored in workflowSteps JSON field of template

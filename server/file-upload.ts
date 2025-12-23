@@ -2,14 +2,32 @@ import { Storage } from '@google-cloud/storage';
 import multer from 'multer';
 import { nanoid } from 'nanoid';
 import path from 'path';
+import fs from 'fs/promises';
 import type { Request } from 'express';
 
-const BUCKET_ID = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID!;
+const BUCKET_ID = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
 const PRIVATE_DIR = process.env.PRIVATE_OBJECT_DIR || '/.private';
 const PUBLIC_DIR = '/public';
+const LOCAL_STORAGE_PATH = process.env.LOCAL_STORAGE_PATH || './uploads';
 
-const storage = new Storage();
-const bucket = storage.bucket(BUCKET_ID);
+// Check if GCS is configured
+const isGCSConfigured = !!BUCKET_ID && !!process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+let storage: Storage | null = null;
+let bucket: any = null;
+
+if (isGCSConfigured) {
+  try {
+    storage = new Storage();
+    bucket = storage.bucket(BUCKET_ID!);
+    console.log('✅ Google Cloud Storage configured');
+  } catch (error) {
+    console.warn('⚠️  GCS initialization failed, falling back to local storage:', error);
+  }
+} else {
+  console.log('ℹ️  Google Cloud Storage not configured - using local file storage');
+  console.log('   Set DEFAULT_OBJECT_STORAGE_BUCKET_ID and GOOGLE_APPLICATION_CREDENTIALS for production');
+}
 
 // Allowed file types with their MIME types
 export const ALLOWED_FILE_TYPES = {
@@ -50,7 +68,7 @@ export const upload = multer({
 });
 
 /**
- * Upload file to Google Cloud Storage
+ * Upload file to storage (Google Cloud Storage or local filesystem)
  * @param file - Multer file object
  * @param isPublic - Whether file should be publicly accessible
  * @param folder - Optional subfolder path
@@ -72,12 +90,34 @@ export async function uploadToStorage(
   const ext = path.extname(file.originalname);
   const safeName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
   const filename = `${fileId}_${safeName}`;
-  
+
   // Construct storage path
   const baseDir = isPublic ? PUBLIC_DIR : PRIVATE_DIR;
   const filePath = folder ? `${baseDir}/${folder}/${filename}` : `${baseDir}/${filename}`;
-  
-  // Upload to GCS
+
+  // Use GCS if configured, otherwise use local storage
+  if (isGCSConfigured && bucket) {
+    return uploadToGCS(file, filename, filePath, isPublic);
+  } else {
+    return uploadToLocal(file, filename, filePath, isPublic);
+  }
+}
+
+/**
+ * Upload file to Google Cloud Storage
+ */
+async function uploadToGCS(
+  file: Express.Multer.File,
+  filename: string,
+  filePath: string,
+  isPublic: boolean
+): Promise<{
+  url: string;
+  path: string;
+  filename: string;
+  size: number;
+  mimetype: string;
+}> {
   const blob = bucket.file(filePath);
   const blobStream = blob.createWriteStream({
     resumable: false,
@@ -92,7 +132,7 @@ export async function uploadToStorage(
 
   return new Promise((resolve, reject) => {
     blobStream.on('error', (error) => {
-      reject(new Error(`Upload failed: ${error.message}`));
+      reject(new Error(`GCS upload failed: ${error.message}`));
     });
 
     blobStream.on('finish', async () => {
@@ -127,12 +167,58 @@ export async function uploadToStorage(
 }
 
 /**
- * Delete file from Google Cloud Storage
+ * Upload file to local filesystem (development/fallback)
+ */
+async function uploadToLocal(
+  file: Express.Multer.File,
+  filename: string,
+  filePath: string,
+  isPublic: boolean
+): Promise<{
+  url: string;
+  path: string;
+  filename: string;
+  size: number;
+  mimetype: string;
+}> {
+  try {
+    // Create directory structure
+    const fullPath = path.join(LOCAL_STORAGE_PATH, filePath);
+    const directory = path.dirname(fullPath);
+
+    await fs.mkdir(directory, { recursive: true });
+
+    // Write file
+    await fs.writeFile(fullPath, file.buffer);
+
+    // Generate URL
+    // For local storage, we'll serve files from /uploads endpoint
+    const url = `/uploads${filePath}`;
+
+    return {
+      url,
+      path: filePath,
+      filename: file.originalname,
+      size: file.size,
+      mimetype: file.mimetype
+    };
+  } catch (error: any) {
+    throw new Error(`Local upload failed: ${error.message}`);
+  }
+}
+
+/**
+ * Delete file from storage (GCS or local)
  * @param filePath - Path to file in storage
  */
 export async function deleteFromStorage(filePath: string): Promise<void> {
   try {
-    await bucket.file(filePath).delete();
+    if (isGCSConfigured && bucket) {
+      await bucket.file(filePath).delete();
+    } else {
+      const fullPath = path.join(LOCAL_STORAGE_PATH, filePath);
+      await fs.unlink(fullPath);
+    }
   } catch (error: any) {
     throw new Error(`Delete failed: ${error.message}`);
   }
@@ -145,11 +231,17 @@ export async function deleteFromStorage(filePath: string): Promise<void> {
  */
 export async function getSignedUrl(filePath: string, expiresIn: number = 60 * 60 * 1000): Promise<string> {
   try {
-    const [signedUrl] = await bucket.file(filePath).getSignedUrl({
-      action: 'read',
-      expires: Date.now() + expiresIn
-    });
-    return signedUrl;
+    if (isGCSConfigured && bucket) {
+      const [signedUrl] = await bucket.file(filePath).getSignedUrl({
+        action: 'read',
+        expires: Date.now() + expiresIn
+      });
+      return signedUrl;
+    } else {
+      // For local storage, return the direct URL
+      // In production, this should be protected by authentication middleware
+      return `/uploads${filePath}`;
+    }
   } catch (error: any) {
     throw new Error(`Failed to generate signed URL: ${error.message}`);
   }

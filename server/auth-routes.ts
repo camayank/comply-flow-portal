@@ -1,20 +1,42 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { db } from './db';
 import { users, userSessions, otpStore } from '@shared/schema';
 import { eq, and, lt } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 import * as cron from 'node-cron';
+import crypto from 'crypto';
+import { emailService } from './email-service';
 
-// Production-ready PostgreSQL-based OTP storage
+// Session fingerprinting for hijack detection (Salesforce-level security)
+function generateSessionFingerprint(req: Request): string {
+  const userAgent = req.headers['user-agent'] || '';
+  const ipSubnet = (req.ip || '').split('.').slice(0, 3).join('.'); // Allow IP changes within subnet
+
+  return crypto
+    .createHash('sha256')
+    .update(userAgent)
+    .update(ipSubnet)
+    .digest('hex');
+}
+
+// Generate CSRF token for session
+function generateCSRFToken(): string {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+// Production-ready PostgreSQL-based OTP storage with hashing (Salesforce-level security)
 async function storeOTP(email: string, otp: string, expiresAt: Date): Promise<void> {
   // Delete any existing OTPs for this email
   await db.delete(otpStore).where(eq(otpStore.email, email));
-  
-  // Insert new OTP
+
+  // Hash OTP before storing (cost factor 12 like Salesforce)
+  const hashedOTP = await bcrypt.hash(otp, 12);
+
+  // Insert hashed OTP
   await db.insert(otpStore).values({
     email,
-    otp,
+    otp: hashedOTP, // Store hashed version
     expiresAt,
     attempts: 0,
   });
@@ -92,19 +114,31 @@ export function registerAuthRoutes(app: Express) {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-      // Store OTP
+      // Store hashed OTP
       await storeOTP(email, otp, expiresAt);
 
-      // TODO: Send OTP via email
-      console.log(`🔐 OTP for ${email}: ${otp}`);
-      
-      // In development, return OTP in response
+      // Send OTP via email
+      const emailSent = await emailService.sendOTP({
+        email,
+        otp,
+        expiryMinutes: 10,
+        userName: user.fullName || undefined,
+      });
+
+      if (!emailSent && process.env.NODE_ENV === 'production') {
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to send OTP. Please try again.',
+        });
+      }
+
+      // In development, return OTP in response for easy testing
       const otpInResponse = process.env.NODE_ENV === 'development' ? otp : undefined;
 
       res.json({
         success: true,
         message: 'OTP sent to your email',
-        // Only in development
+        // Only in development mode
         ...(otpInResponse && { otp: otpInResponse }),
       });
     } catch (error) {
@@ -140,17 +174,20 @@ export function registerAuthRoutes(app: Express) {
         return res.status(429).json({ error: 'Too many failed attempts. Please request a new OTP.' });
       }
 
-      if (storedOtp.otp !== otp) {
+      // Verify OTP using constant-time comparison (bcrypt.compare)
+      const isOtpValid = await bcrypt.compare(otp, storedOtp.otp);
+
+      if (!isOtpValid) {
         // Increment failed attempts
         await incrementOtpAttempts(email);
         const remainingAttempts = 3 - (storedOtp.attempts + 1);
-        
+
         if (remainingAttempts <= 0) {
           await deleteOTP(email);
           return res.status(429).json({ error: 'Too many failed attempts. Please request a new OTP.' });
         }
-        
-        return res.status(400).json({ 
+
+        return res.status(400).json({
           error: 'Invalid OTP',
           remainingAttempts
         });
@@ -170,17 +207,22 @@ export function registerAuthRoutes(app: Express) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      // Create session
+      // Create session with fingerprinting and CSRF protection
       const sessionToken = nanoid(32);
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      const fingerprint = generateSessionFingerprint(req);
+      const csrfToken = generateCSRFToken();
 
       await db.insert(userSessions).values({
         userId: user.id,
         sessionToken,
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'] || 'unknown',
+        fingerprint, // Session fingerprinting for hijack detection
+        csrfToken, // CSRF protection token
         expiresAt,
         isActive: true,
+        lastActivity: new Date(),
       });
 
       // Update last login
@@ -252,17 +294,22 @@ export function registerAuthRoutes(app: Express) {
         return res.status(403).json({ error: 'Account is deactivated. Contact administrator.' });
       }
 
-      // Create session
+      // Create session with fingerprinting and CSRF protection
       const sessionToken = nanoid(32);
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      const fingerprint = generateSessionFingerprint(req);
+      const csrfToken = generateCSRFToken();
 
       await db.insert(userSessions).values({
         userId: user.id,
         sessionToken,
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'] || 'unknown',
+        fingerprint, // Session fingerprinting for hijack detection
+        csrfToken, // CSRF protection token
         expiresAt,
         isActive: true,
+        lastActivity: new Date(),
       });
 
       // Update last login
@@ -297,10 +344,70 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
+  // Get current authenticated user (for frontend useAuth hook)
+  app.get('/api/auth/me', async (req, res) => {
+    try {
+      const sessionToken = req.cookies?.sessionToken;
+
+      if (!sessionToken) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      const [session] = await db
+        .select()
+        .from(userSessions)
+        .where(eq(userSessions.sessionToken, sessionToken))
+        .limit(1);
+
+      if (!session || !session.isActive) {
+        return res.status(401).json({ error: 'Invalid or expired session' });
+      }
+
+      if (session.expiresAt < new Date()) {
+        await db
+          .update(userSessions)
+          .set({ isActive: false })
+          .where(eq(userSessions.id, session.id));
+
+        return res.status(401).json({ error: 'Session expired' });
+      }
+
+      // Get user
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, session.userId))
+        .limit(1);
+
+      if (!user || !user.isActive) {
+        return res.status(401).json({ error: 'User not found or inactive' });
+      }
+
+      // Update last activity
+      await db
+        .update(userSessions)
+        .set({ lastActivity: new Date() })
+        .where(eq(userSessions.id, session.id));
+
+      res.json({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        department: user.department,
+        isActive: user.isActive,
+      });
+    } catch (error) {
+      console.error('Get current user error:', error);
+      res.status(500).json({ error: 'Failed to fetch user' });
+    }
+  });
+
   // Logout (both client and staff)
   app.post('/api/auth/logout', async (req, res) => {
     try {
-      const { sessionToken } = req.body;
+      const sessionToken = req.cookies?.sessionToken || req.body?.sessionToken;
 
       if (!sessionToken) {
         return res.status(400).json({ error: 'Session token required' });
@@ -432,16 +539,28 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  // Schedule OTP cleanup job (runs every hour)
-  cron.schedule('0 * * * *', async () => {
+  // Schedule OTP cleanup job (runs every hour) using JobLifecycleManager
+  const { jobManager } = require('./job-lifecycle-manager');
+
+  const otpCleanupJob = cron.schedule('0 * * * *', async () => {
     try {
       await cleanupExpiredOTPs();
       console.log('🧹 Cleaned up expired OTPs');
     } catch (error) {
       console.error('OTP cleanup error:', error);
     }
+  }, {
+    scheduled: false // Don't start automatically
   });
 
+  jobManager.registerCron(
+    'otp-cleanup',
+    otpCleanupJob,
+    'Hourly OTP cleanup - removes expired OTP entries'
+  );
+
+  otpCleanupJob.start();
+
   console.log('✅ Authentication routes registered (Client OTP + Staff Password)');
-  console.log('⏰ Scheduled OTP cleanup job (runs hourly)');
+  console.log('⏰ Scheduled OTP cleanup job (runs hourly) - managed by JobLifecycleManager');
 }

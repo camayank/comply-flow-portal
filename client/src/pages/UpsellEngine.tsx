@@ -678,7 +678,7 @@ const UpsellEngine = () => {
               </div>
               <div className="flex items-center justify-between p-3 border rounded">
                 <div>
-                  <div className="font-medium">Revenue Growth > 200% → Premium Package</div>
+                  <div className="font-medium">Revenue Growth {'>'} 200% → Premium Package</div>
                   <div className="text-sm text-gray-600">
                     Suggest premium compliance package for high-growth companies
                   </div>

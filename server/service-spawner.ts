@@ -12,14 +12,17 @@ import { eq, and, sql } from 'drizzle-orm';
 // Automated Service Order Spawner for Universal Service Provider Platform
 export class ServiceSpawner {
   private isRunning = false;
+  private cronJob: any = null;
 
   constructor() {
     this.initializeSpawner();
   }
 
   private initializeSpawner() {
+    const { jobManager } = require('./job-lifecycle-manager');
+
     // Run daily at 06:30 IST to spawn new service orders
-    cron.schedule('30 6 * * *', async () => {
+    this.cronJob = cron.schedule('30 6 * * *', async () => {
       if (this.isRunning) {
         console.log('⏳ Spawner already running, skipping this cycle');
         return;
@@ -35,11 +38,20 @@ export class ServiceSpawner {
       } finally {
         this.isRunning = false;
       }
-    }, { 
-      timezone: 'Asia/Kolkata' 
+    }, {
+      timezone: 'Asia/Kolkata',
+      scheduled: false // Don't start automatically
     });
 
-    console.log('✅ Service spawner initialized - runs daily at 06:30 IST');
+    jobManager.registerCron(
+      'service-spawner',
+      this.cronJob,
+      'Daily service order spawning at 06:30 IST - creates periodic service requests'
+    );
+
+    this.cronJob.start();
+
+    console.log('✅ Service spawner initialized - runs daily at 06:30 IST - managed by JobLifecycleManager');
   }
 
   async spawnPeriodicServices() {

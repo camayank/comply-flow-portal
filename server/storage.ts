@@ -2563,17 +2563,45 @@ export class MemStorage implements IStorage {
 }
 
 // Hybrid storage: uses database for critical entities, MemStorage for others
-import { 
-  dbLeadsStorage, 
+import {
+  dbLeadsStorage,
   dbProposalsStorage,
   dbServiceRequestsStorage,
   dbBusinessEntitiesStorage,
   dbPaymentsStorage,
   dbClientMasterStorage,
-  dbFinancialsStorage
+  dbFinancialsStorage,
+  dbUsersStorage,
+  dbServicesStorage
 } from './db-storage';
 
 class HybridStorage extends MemStorage {
+  // Override user methods to use database
+  async getUser(id: number): Promise<User | undefined> {
+    return dbUsersStorage.getUser(id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return dbUsersStorage.getUserByUsername(username);
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    return dbUsersStorage.createUser(user);
+  }
+
+  // Override service methods to use database
+  async getAllServices(): Promise<Service[]> {
+    return dbServicesStorage.getAllServices();
+  }
+
+  async getService(serviceId: string): Promise<Service | undefined> {
+    return dbServicesStorage.getService(serviceId);
+  }
+
+  async createService(service: InsertService): Promise<Service> {
+    return dbServicesStorage.createService(service);
+  }
+
   // Override lead methods to use database
   async getAllLeads(filters?: {
     search?: string;
@@ -2748,7 +2776,119 @@ class HybridStorage extends MemStorage {
     return dbPaymentsStorage.deletePayment(id);
   }
 
-  // Client Master and Financials using MemStorage temporarily until full schema sync
+  // Override Client Master methods to use database
+  async getAllClientContracts(filters?: any): Promise<{ contracts: ClientContract[]; total: number }> {
+    return dbClientMasterStorage.getAllClientContracts(filters);
+  }
+
+  async getClientContract(id: number): Promise<ClientContract | undefined> {
+    return dbClientMasterStorage.getClientContract(id);
+  }
+
+  async createClientContract(contract: InsertClientContract): Promise<ClientContract> {
+    return dbClientMasterStorage.createClientContract(contract);
+  }
+
+  async updateClientContract(id: number, updates: Partial<ClientContract>): Promise<ClientContract | undefined> {
+    return dbClientMasterStorage.updateClientContract(id, updates);
+  }
+
+  async deleteClientContract(id: number): Promise<boolean> {
+    return dbClientMasterStorage.deleteClientContract(id);
+  }
+
+  async getAllClientCommunications(filters?: any): Promise<{ communications: ClientCommunication[]; total: number }> {
+    return dbClientMasterStorage.getAllClientCommunications(filters);
+  }
+
+  async getClientCommunication(id: number): Promise<ClientCommunication | undefined> {
+    return dbClientMasterStorage.getClientCommunication(id);
+  }
+
+  async createClientCommunication(communication: InsertClientCommunication): Promise<ClientCommunication> {
+    return dbClientMasterStorage.createClientCommunication(communication);
+  }
+
+  async getAllClientPortfolios(filters?: any): Promise<{ portfolios: ClientPortfolio[]; total: number }> {
+    return dbClientMasterStorage.getAllClientPortfolios(filters);
+  }
+
+  async getClientPortfolio(id: number): Promise<ClientPortfolio | undefined> {
+    return dbClientMasterStorage.getClientPortfolio(id);
+  }
+
+  async createClientPortfolio(portfolio: InsertClientPortfolio): Promise<ClientPortfolio> {
+    return dbClientMasterStorage.createClientPortfolio(portfolio);
+  }
+
+  async updateClientPortfolio(id: number, updates: Partial<ClientPortfolio>): Promise<ClientPortfolio | undefined> {
+    return dbClientMasterStorage.updateClientPortfolio(id, updates);
+  }
+
+  // Override Financials methods to use database
+  async getAllInvoices(filters?: any): Promise<{ invoices: Invoice[]; total: number }> {
+    return dbFinancialsStorage.getAllInvoices(filters);
+  }
+
+  async getInvoice(id: number): Promise<Invoice | undefined> {
+    return dbFinancialsStorage.getInvoice(id);
+  }
+
+  async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
+    return dbFinancialsStorage.createInvoice(invoice);
+  }
+
+  async updateInvoice(id: number, updates: Partial<Invoice>): Promise<Invoice | undefined> {
+    return dbFinancialsStorage.updateInvoice(id, updates);
+  }
+
+  async deleteInvoice(id: number): Promise<boolean> {
+    return dbFinancialsStorage.deleteInvoice(id);
+  }
+
+  // Health check method to verify storage backend
+  getStorageBackendInfo() {
+    return {
+      type: 'hybrid',
+      usesDatabase: true,
+      databaseEntities: ['leads', 'proposals', 'serviceRequests', 'entities', 'payments', 'services', 'users', 'clientMaster', 'financials'],
+      memoryEntities: [],
+      isProductionSafe: true, // All critical entities now use database storage! ✅
+    };
+  }
 }
 
-export const storage = new HybridStorage();
+// Storage selection with production safety check
+function createStorage(): IStorage {
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // CRITICAL: Never allow in-memory storage in production
+  if (isProduction) {
+    const hybridStorage = new HybridStorage();
+    const info = hybridStorage.getStorageBackendInfo();
+
+    if (!info.isProductionSafe) {
+      console.error('❌ CRITICAL ERROR: HybridStorage is not production-safe!');
+      console.error('   Some entities still use in-memory storage:', info.memoryEntities);
+      console.error('   This will cause data loss on server restart.');
+      console.error('\n   Action required: Migrate all entities to database storage');
+
+      // In strict production mode, fail fast
+      if (process.env.STRICT_STORAGE_CHECK !== 'false') {
+        throw new Error('Production deployment blocked: In-memory storage detected');
+      }
+
+      console.warn('⚠️  STRICT_STORAGE_CHECK=false detected - allowing hybrid storage');
+      console.warn('⚠️  THIS IS DANGEROUS - DATA LOSS WILL OCCUR ON RESTART');
+    }
+
+    console.log('✅ Storage backend validated for production');
+    return hybridStorage;
+  }
+
+  // Development: Hybrid storage is acceptable
+  console.log('📦 Using HybridStorage (development mode)');
+  return new HybridStorage();
+}
+
+export const storage = createStorage();

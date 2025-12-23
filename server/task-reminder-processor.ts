@@ -15,42 +15,58 @@ const assigneeUser = alias(users, 'assignee');
 // ============================================================================
 
 export class TaskReminderProcessor {
-  private jobs: Map<string, cron.ScheduledTask> = new Map();
-
   constructor() {
     this.initializeProcessor();
   }
 
   private initializeProcessor() {
+    const { jobManager } = require('./job-lifecycle-manager');
+
     console.log('📋 Initializing Task Reminder Processor...');
 
     // Run every hour to check for due reminders
-    this.scheduleReminderCheck();
-    
-    // Run daily at 9 AM IST for overdue task check
-    this.scheduleOverdueCheck();
+    this.scheduleReminderCheck(jobManager);
 
-    console.log('✅ Task Reminder Processor initialized');
+    // Run daily at 9 AM IST for overdue task check
+    this.scheduleOverdueCheck(jobManager);
+
+    console.log('✅ Task Reminder Processor initialized with JobLifecycleManager');
   }
 
   // Check for reminders every hour
-  private scheduleReminderCheck() {
+  private scheduleReminderCheck(jobManager: any) {
     const job = cron.schedule('0 * * * *', async () => {
       await this.processUpcomingReminders();
+    }, {
+      scheduled: false // Don't start automatically
     });
 
-    this.jobs.set('reminder_check', job);
-    console.log('⏰ Scheduled hourly reminder check (every hour)');
+    jobManager.registerCron(
+      'task-reminder-hourly',
+      job,
+      'Hourly task reminder check - sends T-7, T-3, T-1 day reminders'
+    );
+
+    job.start();
+    console.log('⏰ Scheduled hourly reminder check (every hour) - managed by JobLifecycleManager');
   }
 
   // Check for overdue tasks daily (9 AM IST - adjust for your timezone)
-  private scheduleOverdueCheck() {
+  private scheduleOverdueCheck(jobManager: any) {
     const job = cron.schedule('0 9 * * *', async () => {
       await this.processOverdueTasks();
+    }, {
+      scheduled: false // Don't start automatically
     });
 
-    this.jobs.set('overdue_check', job);
-    console.log('⏰ Scheduled daily overdue check (9 AM IST)');
+    jobManager.registerCron(
+      'task-overdue-daily',
+      job,
+      'Daily overdue task check at 9 AM IST - sends overdue notifications'
+    );
+
+    job.start();
+    console.log('⏰ Scheduled daily overdue check (9 AM IST) - managed by JobLifecycleManager');
   }
 
   // Process upcoming reminders based on due date and offset
@@ -298,11 +314,13 @@ export class TaskReminderProcessor {
 
   // Stop all scheduled jobs
   public stopProcessor() {
-    this.jobs.forEach((job, key) => {
-      job.stop();
-      console.log(`⏹️ Stopped job: ${key}`);
-    });
-    this.jobs.clear();
+    const { jobManager } = require('./job-lifecycle-manager');
+
+    // Stop both jobs using the centralized job manager
+    jobManager.stopJob('task-reminder-hourly');
+    jobManager.stopJob('task-overdue-daily');
+
+    console.log('⏹️ Stopped task reminder processor jobs via JobLifecycleManager');
   }
 
   // Manual trigger for testing
