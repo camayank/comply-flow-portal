@@ -388,6 +388,30 @@ html {
     @apply hover:bg-accent/50 active:bg-accent;
   }
 
+  /* === RIPPLE EFFECT === */
+  .ripple {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ripple::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+  }
+
+  .ripple:active::after {
+    width: 300px;
+    height: 300px;
+  }
+
   /* === BUTTON ENHANCEMENTS === */
   .btn-gradient {
     @apply gradient-brand text-white font-medium shadow-brand;
@@ -405,11 +429,37 @@ html {
   .card-interactive {
     @apply transition-all duration-300 ease-out cursor-pointer;
     @apply hover:shadow-xl hover:-translate-y-1 hover:border-primary/20;
+    @apply hover:scale-[1.02];
+  }
+
+  .card-interactive:hover {
+    transform: translateY(-4px) scale(1.01);
   }
 
   .card-gradient {
     @apply bg-gradient-to-br from-background to-muted/30;
     @apply border border-border/50 backdrop-blur-sm;
+  }
+
+  /* === SHIMMER EFFECT FOR SKELETON LOADERS === */
+  @keyframes shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted) / 0.5) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite linear;
   }
 
   /* === STATUS INDICATORS === */
@@ -519,13 +569,28 @@ html {
 }
 
 /* =============================================================================
+   ACCESSIBILITY - MOTION PREFERENCES
+   ============================================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* =============================================================================
    PRINT STYLES
    ============================================================================= */
 
 @media print {
   .no-print { display: none !important; }
   .print-only { display: block !important; }
-  
+
   * {
     background: transparent !important;
     color: black !important;
