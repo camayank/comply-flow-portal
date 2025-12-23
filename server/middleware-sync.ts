@@ -60,7 +60,8 @@ export class MiddlewareSyncEngine {
         this.clients.delete(sessionId);
         const interval = this.syncIntervals.get(sessionId);
         if (interval) {
-          clearInterval(interval);
+          const { jobManager } = require('./job-lifecycle-manager');
+          jobManager.stopJob(`client-sync-${sessionId}`);
           this.syncIntervals.delete(sessionId);
         }
       });
@@ -201,11 +202,18 @@ export class MiddlewareSyncEngine {
   }
 
   private startClientSync(sessionId: string) {
-    const syncInterval = setInterval(async () => {
-      await this.syncClientData(sessionId);
-    }, 30000); // Sync every 30 seconds
+    const { jobManager } = require('./job-lifecycle-manager');
 
-    this.syncIntervals.set(sessionId, syncInterval);
+    const syncIntervalHandle = jobManager.registerInterval(
+      `client-sync-${sessionId}`,
+      async () => {
+        await this.syncClientData(sessionId);
+      },
+      30000, // Sync every 30 seconds
+      `Per-client sync for session ${sessionId} - sends periodic updates`
+    );
+
+    this.syncIntervals.set(sessionId, syncIntervalHandle);
   }
 
   private async syncClientData(sessionId: string) {
@@ -303,37 +311,49 @@ export class MiddlewareSyncEngine {
   }
 
   private startSyncProcesses() {
+    const { jobManager } = require('./job-lifecycle-manager');
+
     // Quality audit sync every 5 minutes
-    setInterval(async () => {
-      try {
-        const auditResults = await this.performQualityAudits();
-        if (auditResults.length > 0) {
-          this.broadcastEvent({
-            type: 'quality_audit',
-            payload: auditResults,
-            timestamp: new Date()
-          });
+    jobManager.registerInterval(
+      'middleware-quality-audit',
+      async () => {
+        try {
+          const auditResults = await this.performQualityAudits();
+          if (auditResults.length > 0) {
+            this.broadcastEvent({
+              type: 'quality_audit',
+              payload: auditResults,
+              timestamp: new Date()
+            });
+          }
+        } catch (error) {
+          console.error('Quality audit sync error:', error);
         }
-      } catch (error) {
-        console.error('Quality audit sync error:', error);
-      }
-    }, 300000);
+      },
+      300000, // 5 minutes
+      'Quality audit sync - broadcasts service quality metrics to connected clients'
+    );
 
     // Pricing optimization sync every 10 minutes
-    setInterval(async () => {
-      try {
-        const pricingUpdates = await this.checkPricingOptimization();
-        if (pricingUpdates.length > 0) {
-          this.broadcastEvent({
-            type: 'pricing_change',
-            payload: pricingUpdates,
-            timestamp: new Date()
-          });
+    jobManager.registerInterval(
+      'middleware-pricing-sync',
+      async () => {
+        try {
+          const pricingUpdates = await this.checkPricingOptimization();
+          if (pricingUpdates.length > 0) {
+            this.broadcastEvent({
+              type: 'pricing_change',
+              payload: pricingUpdates,
+              timestamp: new Date()
+            });
+          }
+        } catch (error) {
+          console.error('Pricing sync error:', error);
         }
-      } catch (error) {
-        console.error('Pricing sync error:', error);
-      }
-    }, 600000);
+      },
+      600000, // 10 minutes
+      'Pricing optimization sync - broadcasts pricing updates to connected clients'
+    );
   }
 
   // Helper methods

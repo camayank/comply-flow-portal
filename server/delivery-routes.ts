@@ -1,6 +1,7 @@
 import { eq, and, desc, sql } from "drizzle-orm";
 import { Request, Response, Application } from "express";
 import { db } from "./db";
+import { requireAuth } from "./auth-middleware";
 import {
   deliveryConfirmations,
   qualityReviews,
@@ -317,18 +318,18 @@ export function registerDeliveryRoutes(app: Application) {
   });
 
   // Initiate delivery process
-  app.post('/api/delivery/initiate', async (req: Request, res: Response) => {
+  app.post('/api/delivery/initiate', requireAuth, async (req: Request, res: Response) => {
     try {
-      const { 
-        serviceRequestId, 
-        qualityReviewId, 
-        deliveryMethod, 
+      const {
+        serviceRequestId,
+        qualityReviewId,
+        deliveryMethod,
         deliveryNotes,
         deliverables,
-        accessInstructions 
+        accessInstructions
       } = req.body;
-      
-      const currentUserId = req.session?.userId || 1;
+
+      const currentUserId = req.user!.id;
 
       // Get service request details
       const [serviceRequest] = await db

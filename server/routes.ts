@@ -4,6 +4,7 @@ import { createHash } from "crypto";
 import { nanoid } from "nanoid";
 import { storage } from "./storage";
 import { workflowEngine, type WorkflowCustomization } from "./workflow-engine";
+import { requireAuth } from "./auth-middleware";
 import { EnhancedSlaSystem, SlaMonitoringService } from "./enhanced-sla-system";
 import { WorkflowValidator, WorkflowExecutor } from "./workflow-validator";
 import { 
@@ -333,13 +334,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Workflow Instances API
-  app.post("/api/workflow-instances", async (req: Request, res: Response) => {
+  app.post("/api/workflow-instances", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { templateId, userId, serviceRequestId, customizations } = req.body;
-      
+      const { templateId, serviceRequestId, customizations } = req.body;
+      const userId = req.user!.id;
+
       const instance = workflowEngine.createWorkflowInstance(
         templateId,
-        userId || 1,
+        userId,
         serviceRequestId,
         customizations || []
       );
@@ -1111,7 +1113,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerWorkflowRoutes(app);
   
   // Register admin config routes BEFORE client routes to prevent conflicts
-  const { registerAdminConfigRoutes } = await import('./admin-config-routes-fixed');
+  const { registerAdminConfigRoutes } = await import('./admin-config-routes');
   registerAdminConfigRoutes(app);
   
   // Register service orders routes for ops board
@@ -1123,7 +1125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerOperationsRoutes(app);
   
   // Register client portal routes
-  const { registerClientRoutes } = await import('./client-routes-working');
+  const { registerClientRoutes } = await import('./client-routes');
   registerClientRoutes(app);
   
   // Register leads management routes for Practice Management System

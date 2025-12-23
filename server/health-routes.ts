@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { db } from './db';
 import { sql } from 'drizzle-orm';
+import { storage } from './storage';
 
 export function registerHealthRoutes(app: Express) {
   
@@ -52,6 +53,41 @@ export function registerHealthRoutes(app: Express) {
       nodeVersion: process.version
     };
 
+    // Check storage backend (critical for production)
+    try {
+      const storageInfo = (storage as any).getStorageBackendInfo?.();
+      if (storageInfo) {
+        const isProduction = process.env.NODE_ENV === 'production';
+        const isProductionSafe = storageInfo.isProductionSafe;
+
+        healthStatus.checks.storage = {
+          status: (isProduction && !isProductionSafe) ? 'warning' : 'ok',
+          type: storageInfo.type,
+          usesDatabase: storageInfo.usesDatabase,
+          databaseEntities: storageInfo.databaseEntities,
+          memoryEntities: storageInfo.memoryEntities,
+          isProductionSafe: storageInfo.isProductionSafe,
+          warning: (isProduction && !isProductionSafe)
+            ? 'DANGER: Using in-memory storage in production - data loss will occur on restart'
+            : undefined
+        };
+
+        if (isProduction && !isProductionSafe) {
+          healthStatus.status = 'degraded';
+        }
+      } else {
+        healthStatus.checks.storage = {
+          status: 'unknown',
+          message: 'Storage backend info not available'
+        };
+      }
+    } catch (error) {
+      healthStatus.checks.storage = {
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Storage check failed'
+      };
+    }
+
     const statusCode = healthStatus.status === 'ok' ? 200 : 503;
     res.status(statusCode).json(healthStatus);
   });
@@ -72,6 +108,28 @@ export function registerHealthRoutes(app: Express) {
   // Liveness check (for container orchestration)
   app.get('/live', (req, res) => {
     res.status(200).json({ alive: true });
+  });
+
+  // Background jobs status (for operational monitoring)
+  app.get('/health/jobs', (req, res) => {
+    const { jobManager } = require('./job-lifecycle-manager');
+
+    const jobs = jobManager.getStatus();
+    const activeCount = jobManager.getActiveJobCount();
+
+    res.json({
+      status: 'ok',
+      activeJobs: activeCount,
+      jobs: jobs.map((job: any) => ({
+        id: job.id,
+        type: job.type,
+        description: job.description,
+        startedAt: job.startedAt,
+        lastRun: job.lastRun,
+        runCount: job.runCount,
+        uptime: Date.now() - new Date(job.startedAt).getTime()
+      }))
+    });
   });
 
   console.log('✅ Health check routes registered');

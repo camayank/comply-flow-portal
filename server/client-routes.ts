@@ -3,285 +3,215 @@ import { db } from './db';
 import { 
   serviceRequests,
   businessEntities,
-  serviceDocTypes,
-  documentsUploads
+  complianceTracking
 } from '@shared/schema';
-import { eq, and, sql } from 'drizzle-orm';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, 'uploads'),
-  filename: (req, file, cb) => {
-    const ts = Date.now();
-    const safe = file.originalname.replace(/[^\w.\-]+/g, '_');
-    cb(null, `${ts}_${safe}`);
-  }
-});
-
-const upload = multer({ storage });
+import { eq, desc, and, gte, lte, or } from 'drizzle-orm';
+import { COMPLIANCE_KNOWLEDGE_BASE, getComplianceByCode } from './compliance-knowledge-base';
 
 export function registerClientRoutes(app: Express) {
 
-  /**
-   * GET: list service orders for a client entity
-   * /client/entities/:entityId/service-orders
-   */
-  app.get('/client/entities/:entityId/service-orders', async (req, res) => {
+  // Get all business entities for client
+  app.get('/api/client/entities', async (req, res) => {
     try {
-      const entityId = parseInt(req.params.entityId);
-      
-      // Get service orders from service_requests table (using businessEntityId)
-      const orders = await db
+      const entities = await db
         .select()
-        .from(serviceRequests)
-        .where(eq(serviceRequests.businessEntityId, entityId))
-        .orderBy(serviceRequests.createdAt);
+        .from(businessEntities)
+        .where(eq(businessEntities.isActive, true))
+        .orderBy(desc(businessEntities.createdAt));
 
-      // Simplified document counts for working system
-      const ordersWithCounts = orders.map(order => ({
-        ...order,
-        docsApproved: 0,
-        docsPending: 0,
-        docsRejected: 0,
-        documentsRequired: 3,
-        documentsUploaded: 0
-      }));
-
-      res.json(ordersWithCounts);
+      res.json(entities);
     } catch (error) {
-      console.error('Error fetching service orders:', error);
-      res.status(500).json({ error: 'Failed to fetch service orders' });
+      console.error('Error fetching entities:', error);
+      res.status(500).json({ error: 'Failed to fetch entities' });
     }
   });
 
-  /**
-   * GET: required client-upload doc types for a service order
-   * /client/service-orders/:soId/required-docs
-   */
-  app.get('/client/service-orders/:soId/required-docs', async (req, res) => {
+  // Get service requests for client
+  app.get('/api/client/service-requests', async (req, res) => {
     try {
-      const soId = parseInt(req.params.soId);
+      const { entityId } = req.query;
       
-      // Get service order
-      const [serviceOrder] = await db
+      let query = db
         .select()
         .from(serviceRequests)
-        .where(eq(serviceRequests.id, soId));
+        .orderBy(desc(serviceRequests.createdAt));
 
-      if (!serviceOrder) {
-        return res.status(404).json({ error: 'Service order not found' });
-      }
+      const requests = entityId 
+        ? await db
+            .select()
+            .from(serviceRequests)
+            .where(eq(serviceRequests.businessEntityId, parseInt(entityId as string)))
+            .orderBy(desc(serviceRequests.createdAt))
+        : await query;
 
-      // Get required document types for this service
-      const docTypes = await db
-        .select({
-          doctype: serviceDocTypes.doctype,
-          label: serviceDocTypes.label,
-          clientUploads: serviceDocTypes.clientUploads,
-          versioned: serviceDocTypes.versioned,
-          mandatory: serviceDocTypes.mandatory
-        })
-        .from(serviceDocTypes)
-        .where(
-          and(
-            eq(serviceDocTypes.serviceKey, serviceOrder.serviceType),
-            eq(serviceDocTypes.clientUploads, true)
-          )
-        )
-        .orderBy(serviceDocTypes.label);
 
-      res.json(docTypes);
+      res.json(requests);
     } catch (error) {
-      console.error('Error fetching required docs:', error);
-      res.status(500).json({ error: 'Failed to fetch required documents' });
+      console.error('Error fetching service requests:', error);
+      res.status(500).json({ error: 'Failed to fetch service requests' });
     }
   });
 
-  /**
-   * GET: list uploaded documents for a service order
-   * /client/service-orders/:soId/documents
-   */
-  app.get('/client/service-orders/:soId/documents', async (req, res) => {
+  // Get service request details
+  app.get('/api/client/service-requests/:id', async (req, res) => {
     try {
-      const soId = parseInt(req.params.soId);
+      const requestId = parseInt(req.params.id);
       
-      const docs = await db
-        .select({
-          id: documentsUploads.id,
-          doctype: documentsUploads.doctype,
-          filename: documentsUploads.filename,
-          sizeBytes: documentsUploads.sizeBytes,
-          uploader: documentsUploads.uploader,
-          status: documentsUploads.status,
-          rejectionReason: documentsUploads.rejectionReason,
-          version: documentsUploads.version,
-          createdAt: documentsUploads.createdAt
-        })
-        .from(documentsUploads)
-        .where(eq(documentsUploads.serviceOrderId, soId))
-        .orderBy(documentsUploads.createdAt);
+      const [request] = await db
+        .select()
+        .from(serviceRequests)
+        .where(eq(serviceRequests.id, requestId));
 
-      res.json(docs);
+      if (!request) {
+        return res.status(404).json({ error: 'Service request not found' });
+      }
+
+      res.json(request);
     } catch (error) {
-      console.error('Error fetching documents:', error);
-      res.status(500).json({ error: 'Failed to fetch documents' });
+      console.error('Error fetching service request:', error);
+      res.status(500).json({ error: 'Failed to fetch service request' });
     }
   });
 
-  /**
-   * POST: upload a client document
-   * /client/service-orders/:soId/upload?doctype=...
-   * multipart form-data: file=<file>
-   */
-  app.post('/client/service-orders/:soId/upload', upload.single('file'), async (req, res) => {
+  // Update service request status (client actions)
+  app.patch('/api/client/service-requests/:id', async (req, res) => {
     try {
-      const soId = parseInt(req.params.soId);
-      const { doctype } = req.query;
+      const requestId = parseInt(req.params.id);
+      const { status, clientNotes } = req.body;
 
-      if (!doctype) {
-        return res.status(400).json({ error: 'doctype is required' });
-      }
-
-      if (!req.file) {
-        return res.status(400).json({ error: 'file is required' });
-      }
-
-      // Get service order to verify it exists and get entity ID
-      const [serviceOrder] = await db
-        .select()
-        .from(serviceRequests)
-        .where(eq(serviceRequests.id, soId));
-
-      if (!serviceOrder) {
-        return res.status(404).json({ error: 'Service order not found' });
-      }
-
-      // Get current version for this doctype
-      const [maxVersion] = await db
-        .select({ maxVersion: sql`COALESCE(MAX(version), 0)` })
-        .from(documentsUploads)
-        .where(
-          and(
-            eq(documentsUploads.serviceOrderId, soId),
-            eq(documentsUploads.doctype, doctype as string)
-          )
-        );
-
-      const version = (maxVersion?.maxVersion as number || 0) + 1;
-
-      // Insert document record
-      const [newDoc] = await db
-        .insert(documentsUploads)
-        .values({
-          serviceOrderId: soId,
-          entityId: serviceOrder.entityId!,
-          doctype: doctype as string,
-          filename: req.file.originalname,
-          path: path.join('uploads', req.file.filename),
-          sizeBytes: req.file.size,
-          uploader: 'client',
-          status: 'pending_review',
-          version
+      const [updated] = await db
+        .update(serviceRequests)
+        .set({ 
+          status,
+          clientNotes,
+          updatedAt: new Date()
         })
+        .where(eq(serviceRequests.id, requestId))
         .returning();
 
-      console.log(`📄 Document uploaded: ${req.file.originalname} for service order ${soId}`);
+      if (!updated) {
+        return res.status(404).json({ error: 'Service request not found' });
+      }
 
-      res.json({ 
-        ok: true, 
-        version, 
-        filename: req.file.originalname,
-        documentId: newDoc.id
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating service request:', error);
+      res.status(500).json({ error: 'Failed to update service request' });
+    }
+  });
+
+  // Get compliance tracking items for client
+  app.get('/api/client/compliance-tracking', async (req, res) => {
+    try {
+      const { userId, startDate, endDate, status } = req.query;
+      
+      // Build the query with optional filters
+      let conditions = [];
+      
+      if (userId) {
+        conditions.push(eq(complianceTracking.userId, parseInt(userId as string)));
+      }
+      
+      if (startDate) {
+        conditions.push(gte(complianceTracking.dueDate, new Date(startDate as string)));
+      }
+      
+      if (endDate) {
+        conditions.push(lte(complianceTracking.dueDate, new Date(endDate as string)));
+      }
+      
+      if (status) {
+        conditions.push(eq(complianceTracking.status, status as string));
+      }
+
+      // Query compliance tracking data
+      const complianceItems = conditions.length > 0
+        ? await db
+            .select()
+            .from(complianceTracking)
+            .where(and(...conditions))
+            .orderBy(complianceTracking.dueDate)
+        : await db
+            .select()
+            .from(complianceTracking)
+            .orderBy(complianceTracking.dueDate);
+
+      // Enrich with compliance knowledge base data
+      const transformedItems = complianceItems.map(item => {
+        // Try to find matching rule in knowledge base by serviceId
+        const knowledgeRule = getComplianceByCode(item.serviceId);
+        
+        return {
+          id: item.id,
+          serviceType: item.serviceType || item.complianceType,
+          entityName: item.entityName,
+          dueDate: item.dueDate?.toISOString() || new Date().toISOString(),
+          status: item.status,
+          priority: item.priority,
+          complianceType: item.complianceType,
+          healthScore: item.healthScore || 100,
+          penaltyRisk: item.penaltyRisk || false,
+          estimatedPenalty: item.estimatedPenalty || 0,
+          serviceId: item.serviceId,
+          // Enhanced regulatory knowledge from knowledge base
+          regulatoryInfo: knowledgeRule ? {
+            formNumber: knowledgeRule.formNumber,
+            regulationCategory: knowledgeRule.regulationCategory,
+            description: knowledgeRule.description,
+            dueDateInfo: knowledgeRule.dueDateInfo,
+            penaltyInfo: knowledgeRule.penaltyInfo,
+            requiredDocuments: knowledgeRule.requiredDocuments,
+            priorityLevel: knowledgeRule.priorityLevel,
+            penaltyRiskLevel: knowledgeRule.penaltyRiskLevel
+          } : null
+        };
       });
+
+      res.json(transformedItems);
     } catch (error) {
-      console.error('Error uploading document:', error);
-      res.status(500).json({ error: 'Failed to upload document' });
+      console.error('Error fetching compliance tracking:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance tracking data' });
     }
   });
 
-  /**
-   * GET: download a document (for approved documents)
-   * /client/documents/:docId/download
-   */
-  app.get('/client/documents/:docId/download', async (req, res) => {
+  // Get compliance summary/stats for client dashboard
+  app.get('/api/client/compliance-summary', async (req, res) => {
     try {
-      const docId = parseInt(req.params.docId);
+      const { userId } = req.query;
       
-      const [doc] = await db
-        .select()
-        .from(documentsUploads)
-        .where(eq(documentsUploads.id, docId));
+      const conditions = userId 
+        ? [eq(complianceTracking.userId, parseInt(userId as string))]
+        : [];
 
-      if (!doc) {
-        return res.status(404).json({ error: 'Document not found' });
-      }
+      const allItems = conditions.length > 0
+        ? await db
+            .select()
+            .from(complianceTracking)
+            .where(and(...conditions))
+        : await db
+            .select()
+            .from(complianceTracking);
 
-      // Only allow download of approved documents or client's own uploads
-      if (doc.status !== 'approved' && doc.uploader !== 'client') {
-        return res.status(403).json({ error: 'Document not available for download' });
-      }
+      const today = new Date();
+      const sevenDaysFromNow = new Date();
+      sevenDaysFromNow.setDate(today.getDate() + 7);
 
-      // Check if file exists
-      if (!fs.existsSync(doc.path)) {
-        return res.status(404).json({ error: 'File not found on disk' });
-      }
+      const summary = {
+        totalCompliance: allItems.length,
+        overdue: allItems.filter(item => item.dueDate && item.dueDate < today && item.status !== 'completed').length,
+        dueThisWeek: allItems.filter(item => item.dueDate && item.dueDate >= today && item.dueDate <= sevenDaysFromNow && item.status !== 'completed').length,
+        upcoming: allItems.filter(item => item.dueDate && item.dueDate > sevenDaysFromNow && item.status !== 'completed').length,
+        completed: allItems.filter(item => item.status === 'completed').length,
+        averageHealthScore: allItems.length > 0 
+          ? Math.round(allItems.reduce((sum, item) => sum + (item.healthScore || 100), 0) / allItems.length)
+          : 100,
+        highPriorityPending: allItems.filter(item => item.priority === 'high' || item.priority === 'critical').length
+      };
 
-      // Set appropriate headers
-      res.setHeader('Content-Disposition', `attachment; filename="${doc.filename}"`);
-      res.setHeader('Content-Type', 'application/octet-stream');
-      
-      // Stream the file
-      const fileStream = fs.createReadStream(doc.path);
-      fileStream.pipe(res);
-      
+      res.json(summary);
     } catch (error) {
-      console.error('Error downloading document:', error);
-      res.status(500).json({ error: 'Failed to download document' });
-    }
-  });
-
-  /**
-   * GET: get deliverables for completed service orders
-   * /client/service-orders/:soId/deliverables
-   */
-  app.get('/client/service-orders/:soId/deliverables', async (req, res) => {
-    try {
-      const soId = parseInt(req.params.soId);
-      
-      // Get service order to check if completed
-      const [serviceOrder] = await db
-        .select()
-        .from(serviceRequests)
-        .where(eq(serviceRequests.id, soId));
-
-      if (!serviceOrder) {
-        return res.status(404).json({ error: 'Service order not found' });
-      }
-
-      if (serviceOrder.status !== 'Completed') {
-        return res.status(400).json({ error: 'Service order not yet completed' });
-      }
-
-      // Get deliverable documents (uploaded by ops and approved)
-      const deliverables = await db
-        .select()
-        .from(documentsUploads)
-        .where(
-          and(
-            eq(documentsUploads.serviceOrderId, soId),
-            eq(documentsUploads.uploader, 'ops'),
-            eq(documentsUploads.status, 'approved')
-          )
-        )
-        .orderBy(documentsUploads.createdAt);
-
-      res.json(deliverables);
-    } catch (error) {
-      console.error('Error fetching deliverables:', error);
-      res.status(500).json({ error: 'Failed to fetch deliverables' });
+      console.error('Error fetching compliance summary:', error);
+      res.status(500).json({ error: 'Failed to fetch compliance summary' });
     }
   });
 

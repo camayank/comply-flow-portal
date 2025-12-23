@@ -1,6 +1,7 @@
 import { eq, and, desc, asc, like, inArray, isNull, sql, count, avg } from "drizzle-orm";
 import { Request, Response, Application } from "express";
 import { db } from "./db";
+import { requireAuth } from "./auth-middleware";
 import {
   qualityReviews,
   deliveryConfirmations,
@@ -26,10 +27,10 @@ export function registerQCRoutes(app: Application) {
   console.log('🔍 Registering QC routes...');
 
   // ========== QC DASHBOARD ==========
-  app.get('/api/qc/dashboard', async (req: Request, res: Response) => {
+  app.get('/api/qc/dashboard', requireAuth, async (req: Request, res: Response) => {
     try {
       const { tab = 'pending', search, priority, status, sort = 'assignedAt', order = 'desc' } = req.query;
-      const currentUserId = req.session?.userId || 1; // TODO: Get from session
+      const currentUserId = req.user!.id;
 
       // Base query for service requests ready for QC
       let baseQuery = db
@@ -392,10 +393,10 @@ export function registerQCRoutes(app: Application) {
   // ========== QC REVIEW OPERATIONS ==========
   
   // Start QC Review
-  app.post('/api/qc/reviews/:reviewId/start', async (req: Request, res: Response) => {
+  app.post('/api/qc/reviews/:reviewId/start', requireAuth, async (req: Request, res: Response) => {
     try {
       const { reviewId } = req.params;
-      const currentUserId = req.session?.userId || 1;
+      const currentUserId = req.user!.id;
 
       await db
         .update(qualityReviews)
@@ -416,20 +417,20 @@ export function registerQCRoutes(app: Application) {
   });
 
   // Submit QC Review
-  app.post('/api/qc/reviews/:reviewId/submit', async (req: Request, res: Response) => {
+  app.post('/api/qc/reviews/:reviewId/submit', requireAuth, async (req: Request, res: Response) => {
     try {
       const { reviewId } = req.params;
-      const { 
-        status, 
-        qualityScore, 
-        checklist, 
-        reviewNotes, 
+      const {
+        status,
+        qualityScore,
+        checklist,
+        reviewNotes,
         internalComments,
         clientFacingNotes,
-        reworkInstructions 
+        reworkInstructions
       } = req.body;
 
-      const currentUserId = req.session?.userId || 1;
+      const currentUserId = req.user!.id;
 
       // Update quality review
       await db

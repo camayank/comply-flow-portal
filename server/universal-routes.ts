@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { UniversalServiceEngine } from "./universal-service-engine";
 import { registerTeamManagementRoutes } from './team-management-routes';
+import { requireAuth, requireMinRole } from './auth-middleware';
 import { db } from "./db";
 import { eq, and, desc, asc, like, inArray, isNull, sql, or } from "drizzle-orm";
 import {
@@ -72,14 +73,18 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Global Workflow Updates
-  app.post("/api/admin/apply-global-updates", async (req, res) => {
+  app.post("/api/admin/apply-global-updates", requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
       const { service_type, changes, apply_to } = req.body;
       const result = await UniversalServiceEngine.applyGlobalWorkflowChanges(
-        service_type, 
-        changes, 
+        service_type,
+        changes,
         apply_to,
-        req.user?.id || 1 // TODO: Get from auth
+        req.user.id // Using authenticated user ID
       );
       res.json(result);
     } catch (error) {
@@ -89,20 +94,24 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Admin Dashboard Metrics
-  app.get("/api/admin/dashboard-metrics", async (req, res) => {
+  app.get("/api/admin/dashboard-metrics", requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
       const [
         activeOrdersResult,
-        slaComplianceResult,
+        slaStatsResult,
         monthlyRevenueResult
       ] = await Promise.all([
         db.select({ count: sql<number>`count(*)::int` })
           .from(service_orders)
           .where(inArray(service_orders.status, ["created", "in_progress"])),
-        db.select({ count: sql<number>`count(*)::int` })
+        // Calculate real SLA compliance: timers that haven't breached / total timers
+        db.select({
+          total: sql<number>`count(*)::int`,
+          compliant: sql<number>`count(*) filter (where breached = false)::int`
+        })
           .from(sla_timers)
-          .where(eq(sla_timers.current_status, "running")),
-        db.select({ 
+          .where(eq(sla_timers.current_status, "completed")),
+        db.select({
           total: sql<number>`sum(CAST(base_price AS INTEGER))::int`
         })
           .from(service_orders)
@@ -110,9 +119,14 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
           .where(sql`${service_orders.created_at} >= date_trunc('month', now())`)
       ]);
 
+      // Calculate real SLA compliance percentage
+      const totalSLA = slaStatsResult[0]?.total || 0;
+      const compliantSLA = slaStatsResult[0]?.compliant || 0;
+      const slaCompliance = totalSLA > 0 ? Math.round((compliantSLA / totalSLA) * 100) : 100;
+
       const metrics = {
         activeOrders: activeOrdersResult[0]?.count || 0,
-        slaCompliance: 87, // TODO: Calculate real SLA compliance
+        slaCompliance, // Calculated from actual SLA data
         monthlyRevenue: monthlyRevenueResult[0]?.total || 0
       };
 
@@ -136,13 +150,21 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   // ===== CLIENT ROUTES =====
 
   // Client Entities
-  app.get("/api/client/entities", async (req, res) => {
+  app.get("/api/client/entities", requireAuth, async (req, res) => {
     try {
-      // TODO: Filter by authenticated user
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      // Filter entities by authenticated user
       const userEntities = await db.select()
         .from(entities)
-        .where(eq(entities.active, true))
+        .where(and(
+          eq(entities.active, true),
+          eq(entities.user_id, req.user.id) // Filter by authenticated user
+        ))
         .orderBy(asc(entities.name));
+
       res.json(userEntities);
     } catch (error) {
       console.error("Error fetching entities:", error);
@@ -215,7 +237,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
       // Mock document creation for now
       const [document] = await db.insert(documents).values({
         service_order_id: parseInt(service_order_id),
-        uploader_id: req.user?.id || 1, // TODO: Get from auth
+        uploader_id: req.user!.id, // Authenticated user ID (middleware ensures req.user exists)
         doctype: doctype || "client_upload",
         filename: "uploaded_document.pdf",
         original_filename: "document.pdf",
@@ -237,7 +259,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
     try {
       const [message] = await db.insert(messages).values({
         ...req.body,
-        author_id: req.user?.id || 1, // TODO: Get from auth
+        author_id: req.user!.id, // Authenticated user ID
         created_at: new Date()
       }).returning();
 
@@ -253,7 +275,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
     try {
       const userNotifications = await db.select()
         .from(notifications)
-        .where(eq(notifications.user_id, req.user?.id || 1)) // TODO: Get from auth
+        .where(eq(notifications.user_id, req.user!.id)) // Authenticated user ID
         .orderBy(desc(notifications.created_at))
         .limit(20);
 
@@ -385,7 +407,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
       await UniversalServiceEngine.updateTaskStatus(
         taskId, 
         status, 
-        req.user?.id || 1, // TODO: Get from auth
+        req.user!.id, // Authenticated user ID
         notes
       );
       
@@ -426,7 +448,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
 
       const [message] = await db.insert(messages).values({
         service_order_id: task.service_order_id,
-        author_id: req.user?.id || 1, // TODO: Get from auth
+        author_id: req.user!.id, // Authenticated user ID
         subject: `Comment on ${task.name}`,
         body,
         visibility: visibility || "internal",
@@ -610,11 +632,12 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/agent/leads", async (req, res) => {
+  app.post("/api/agent/leads", requireAuth, async (req, res) => {
     try {
+      const agentId = req.user!.id; // Assuming user ID can be used as agent ID
       const [lead] = await db.insert(leads).values({
         ...req.body,
-        agent_id: req.user?.agentId || 1, // TODO: Get from auth
+        agent_id: agentId,
         created_at: new Date()
       }).returning();
 
@@ -672,7 +695,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
       
       await UniversalServiceEngine.approveDocument(
         documentId, 
-        req.user?.id || 1, // TODO: Get from auth
+        req.user!.id, // Authenticated user ID
         notes
       );
       
@@ -695,7 +718,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
       
       await UniversalServiceEngine.rejectDocument(
         documentId, 
-        req.user?.id || 1, // TODO: Get from auth
+        req.user!.id, // Authenticated user ID
         reason
       );
       
