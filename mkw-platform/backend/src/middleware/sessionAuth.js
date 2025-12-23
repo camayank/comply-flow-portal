@@ -1,9 +1,8 @@
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
 const db = require('../database/connection');
 
-// Salesforce-level session management
+// Session Manager Class
 class SessionManager {
   constructor() {
     this.activeSessions = new Map(); // In production: Redis
@@ -18,7 +17,7 @@ class SessionManager {
     const sessionData = {
       id: sessionId,
       userId: user.id,
-      userRole: user.role,
+      userRole: user.role_name || user.role,
       fingerprint,
       ip: req.ip,
       userAgent: req.headers['user-agent'] || '',
@@ -161,7 +160,12 @@ class SessionManager {
       return null;
     }
     
-    const user = await db('users').where('id', validation.session.userId).first();
+    const user = await db('system_users')
+      .leftJoin('roles', 'system_users.role_id', 'roles.id')
+      .select('system_users.*', 'roles.name as role_name')
+      .where('system_users.id', validation.session.userId)
+      .first();
+    
     if (!user) {
       return null;
     }
@@ -191,7 +195,7 @@ class SessionManager {
   
   // Cleanup expired sessions
   async cleanupExpiredSessions() {
-    await db('user_sessions')
+    const deletedCount = await db('user_sessions')
       .where('expires_at', '<', new Date())
       .delete();
     
@@ -201,6 +205,12 @@ class SessionManager {
         this.activeSessions.delete(sessionId);
       }
     }
+    
+    if (deletedCount > 0) {
+      logger.info('Cleaned up expired sessions', { count: deletedCount });
+    }
+    
+    return deletedCount;
   }
 }
 
@@ -241,9 +251,15 @@ const sessionAuthMiddleware = async (req, res, next) => {
     }
     
     // Get user details
-    const user = await db('users')
-      .where('id', validation.session.userId)
-      .where('status', 'active')
+    const user = await db('system_users')
+      .leftJoin('roles', 'system_users.role_id', 'roles.id')
+      .select(
+        'system_users.*',
+        'roles.name as role_name',
+        'roles.permissions'
+      )
+      .where('system_users.id', validation.session.userId)
+      .where('system_users.status', 'active')
       .first();
     
     if (!user) {
@@ -274,67 +290,75 @@ const sessionAuthMiddleware = async (req, res, next) => {
   }
 };
 
-// JWT-based auth for stateless APIs (optional)
-const jwtAuthMiddleware = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+// Role-based authorization middleware
+const requireRole = (requiredRoles) => {
+  return (req, res, next) => {
+    if (!req.user) {
       return res.status(401).json({
         success: false,
-        error: 'Bearer token required'
+        error: 'Authentication required'
       });
     }
     
-    const token = authHeader.substring(7);
+    const userRole = req.user.role_name;
+    const allowedRoles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
     
-    // Check if token is revoked
-    if (sessionManager.revokedTokens.has(token)) {
-      return res.status(401).json({
+    if (!allowedRoles.includes(userRole)) {
+      logger.warn('Insufficient privileges attempted', {
+        userId: req.user.id,
+        userRole,
+        requiredRoles: allowedRoles,
+        ip: req.ip,
+        path: req.path
+      });
+      
+      return res.status(403).json({
         success: false,
-        error: 'Token has been revoked'
+        error: 'Insufficient privileges'
       });
     }
     
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Get user details
-    const user = await db('users')
-      .where('id', decoded.userId)
-      .where('status', 'active')
-      .first();
-    
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not found or inactive'
-      });
-    }
-    
-    req.user = user;
     next();
-  } catch (error) {
-    if (error.name === 'TokenExpiredError') {
+  };
+};
+
+// Permission-based authorization middleware
+const requirePermission = (requiredPermissions) => {
+  return (req, res, next) => {
+    if (!req.user) {
       return res.status(401).json({
         success: false,
-        error: 'Token expired'
+        error: 'Authentication required'
       });
     }
     
-    logger.error('JWT authentication error', {
-      error: error.message,
-      ip: req.ip
-    });
+    const userPermissions = JSON.parse(req.user.permissions || '[]');
+    const requiredPerms = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
     
-    res.status(401).json({
-      success: false,
-      error: 'Invalid token'
-    });
-  }
+    const hasPermission = requiredPerms.some(perm => userPermissions.includes(perm));
+    
+    if (!hasPermission) {
+      logger.warn('Insufficient permissions attempted', {
+        userId: req.user.id,
+        userPermissions,
+        requiredPermissions: requiredPerms,
+        ip: req.ip,
+        path: req.path
+      });
+      
+      return res.status(403).json({
+        success: false,
+        error: 'Insufficient permissions'
+      });
+    }
+    
+    next();
+  };
 };
 
 module.exports = {
   sessionManager,
   sessionAuthMiddleware,
-  jwtAuthMiddleware
+  requireRole,
+  requirePermission
 };
