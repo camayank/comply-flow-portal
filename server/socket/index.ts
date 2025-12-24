@@ -9,8 +9,8 @@
 import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import { logger } from '../config/logger';
-import { setupOperationsSocket, getActiveUsers, isUserOnline } from './operations';
-import { setupClientSocket, isClientOnline, getOnlineClientCount } from './clients';
+import { setupOperationsSocket, getActiveUsers, isUserOnline, stopSlaMonitor } from './operations';
+import { setupClientSocket, isClientOnline, getOnlineClientCount, stopComplianceReminderMonitor } from './clients';
 
 // ============ TYPES ============
 
@@ -87,6 +87,10 @@ export async function shutdownSocketIO(): Promise<void> {
   if (!socketManager) return;
 
   logger.info('Shutting down Socket.IO...');
+
+  // Stop background monitors first
+  stopSlaMonitor();
+  stopComplianceReminderMonitor();
 
   // Disconnect all clients gracefully
   const io = socketManager.io;

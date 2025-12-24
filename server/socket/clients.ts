@@ -29,6 +29,9 @@ import {
 
 const clientConnections = new Map<number, Set<string>>();
 
+// Compliance reminder interval reference for cleanup
+let complianceReminderInterval: NodeJS.Timeout | null = null;
+
 // ============ NAMESPACE SETUP ============
 
 /**
@@ -234,8 +237,13 @@ async function getComplianceEvents(userId: number): Promise<any[]> {
 }
 
 function startComplianceReminders(namespace: Namespace): void {
+  // Clear existing interval if any
+  if (complianceReminderInterval) {
+    clearInterval(complianceReminderInterval);
+  }
+
   // Check for upcoming deadlines every hour
-  const intervalId = setInterval(async () => {
+  complianceReminderInterval = setInterval(async () => {
     try {
       const now = new Date();
       const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -287,11 +295,18 @@ function startComplianceReminders(namespace: Namespace): void {
     }
   }, 60 * 60 * 1000); // Every hour
 
-  // Cleanup on process exit
-  process.on('SIGTERM', () => clearInterval(intervalId));
-  process.on('SIGINT', () => clearInterval(intervalId));
-
   logger.info('Compliance reminder checker started (1 hour interval)');
+}
+
+/**
+ * Stop compliance reminder monitor - called during graceful shutdown
+ */
+export function stopComplianceReminderMonitor(): void {
+  if (complianceReminderInterval) {
+    clearInterval(complianceReminderInterval);
+    complianceReminderInterval = null;
+    logger.info('Compliance reminder monitor stopped');
+  }
 }
 
 // ============ EXPORTED NOTIFICATION FUNCTIONS ============

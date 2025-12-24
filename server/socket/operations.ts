@@ -6,7 +6,7 @@
  * Handles task updates, SLA alerts, team notifications
  */
 
-import { Server, Namespace } from 'socket.io';
+import { Server, Namespace, Socket } from 'socket.io';
 import { db } from '../config/database';
 import {
   taskItems,
@@ -25,11 +25,13 @@ import {
   TaskData,
   SlaAlert,
   TaskFilters,
-  TaskUpdatedPayload,
   CommentAddedPayload,
   ServerToClientEvents,
   ClientToServerEvents
 } from './types';
+
+// SLA monitor interval reference for cleanup
+let slaMonitorInterval: NodeJS.Timeout | null = null;
 
 // ============ CONNECTION TRACKING ============
 
@@ -666,8 +668,13 @@ function emitSlaWarning(namespace: Namespace, task: TaskData): void {
 }
 
 function startSlaMonitor(namespace: Namespace): void {
+  // Clear existing monitor if any
+  if (slaMonitorInterval) {
+    clearInterval(slaMonitorInterval);
+  }
+
   // Check SLA every 5 minutes
-  const intervalId = setInterval(async () => {
+  slaMonitorInterval = setInterval(async () => {
     try {
       const now = new Date();
       const fourHoursFromNow = new Date(now.getTime() + 4 * 60 * 60 * 1000);
@@ -747,11 +754,18 @@ function startSlaMonitor(namespace: Namespace): void {
     }
   }, 5 * 60 * 1000); // Every 5 minutes
 
-  // Cleanup on process exit
-  process.on('SIGTERM', () => clearInterval(intervalId));
-  process.on('SIGINT', () => clearInterval(intervalId));
-
   logger.info('SLA monitor started (5 minute interval)');
+}
+
+/**
+ * Stop SLA monitor - called during graceful shutdown
+ */
+export function stopSlaMonitor(): void {
+  if (slaMonitorInterval) {
+    clearInterval(slaMonitorInterval);
+    slaMonitorInterval = null;
+    logger.info('SLA monitor stopped');
+  }
 }
 
 // ============ UTILITY FUNCTIONS ============
