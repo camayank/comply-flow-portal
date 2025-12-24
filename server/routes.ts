@@ -1215,6 +1215,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { registerIntegrationRoutes } = await import('./integration-routes');
   registerIntegrationRoutes(app);
 
+  // Register Admin Metrics routes for system and business analytics
+  const { registerAdminMetricsRoutes } = await import('./admin-metrics-routes');
+  registerAdminMetricsRoutes(app);
+  console.log('✅ Admin Metrics routes registered');
+
   const httpServer = createServer(app);
   return httpServer;
 }
