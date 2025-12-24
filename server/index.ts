@@ -12,6 +12,7 @@ import { logger, requestLogger, attachLogger, logStartup, logShutdown } from "./
 import { errorHandler, notFoundHandler, handleUncaughtException, handleUnhandledRejection } from "./error-middleware";
 import { createBackwardCompatibilityMiddleware, apiVersionMiddleware } from "./api-versioning";
 import { jobManager } from "./job-lifecycle-manager";
+import { initializeSocketIO, shutdownSocketIO, getConnectionStats } from "./socket";
 
 // Validate environment variables on startup
 const env = validateEnv();
@@ -179,6 +180,10 @@ app.use((req, res, next) => {
   initializeComplianceScheduler();
   console.log('📅 Compliance scheduler initialized');
 
+  // Initialize Socket.IO for real-time communication
+  const socketManager = initializeSocketIO(server);
+  console.log('🔌 Socket.IO initialized with namespaces:', ['/operations', '/client']);
+
   // Initialize platform-wide synchronization orchestrator
   // const { platformSyncOrchestrator } = await import('./platform-sync-orchestrator');
   console.log('Platform sync orchestrator initialized');
@@ -229,7 +234,12 @@ app.use((req, res, next) => {
     }, 30000); // 30 seconds
 
     try {
-      // Stop compliance scheduler first
+      // Stop Socket.IO first (notifies clients)
+      logger.info('Stopping Socket.IO...');
+      await shutdownSocketIO();
+      logger.info('Socket.IO stopped');
+
+      // Stop compliance scheduler
       logger.info('Stopping compliance scheduler...');
       const { stopComplianceScheduler } = await import('./jobs/compliance-scheduler');
       stopComplianceScheduler();
