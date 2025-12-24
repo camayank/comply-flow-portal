@@ -1220,6 +1220,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerAdminMetricsRoutes(app);
   console.log('✅ Admin Metrics routes registered');
 
+  // Register Stripe Webhook routes (payment processing)
+  const stripeWebhookRoutes = await import('./stripe-webhook-routes');
+  app.use('/api', stripeWebhookRoutes.default);
+  console.log('✅ Stripe Webhook routes registered');
+
+  // Register Agent Portal routes (leads, commissions, performance)
+  const agentRoutes = await import('./agent-routes');
+  app.use('/api/v1/agent', agentRoutes.default);
+  console.log('✅ Agent Portal routes registered');
+
   const httpServer = createServer(app);
   return httpServer;
 }

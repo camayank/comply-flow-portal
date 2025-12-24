@@ -10,3 +10,4 @@ export * from './useForm';
 export * from './use-mobile';
 export * from './use-toast';
 export * from './usePlatformSync';
+export * from './useOperationsSocket';

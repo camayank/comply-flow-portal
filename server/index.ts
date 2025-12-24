@@ -33,6 +33,11 @@ app.use(cors({
   credentials: true,
 }));
 app.use(cookieParser());
+
+// IMPORTANT: Stripe webhooks need raw body for signature verification
+// This must be BEFORE express.json() middleware
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(express.static('public'));
