@@ -173,7 +173,12 @@ app.use((req, res, next) => {
   // Initialize task reminder processor
   const { taskReminderProcessor } = await import('./task-reminder-processor');
   console.log('📋 Task reminder processor initialized');
-  
+
+  // Initialize compliance scheduler (cron jobs for compliance automation)
+  const { initializeComplianceScheduler, stopComplianceScheduler, getSchedulerStatus } = await import('./jobs/compliance-scheduler');
+  initializeComplianceScheduler();
+  console.log('📅 Compliance scheduler initialized');
+
   // Initialize platform-wide synchronization orchestrator
   // const { platformSyncOrchestrator } = await import('./platform-sync-orchestrator');
   console.log('Platform sync orchestrator initialized');
@@ -224,7 +229,13 @@ app.use((req, res, next) => {
     }, 30000); // 30 seconds
 
     try {
-      // Stop all background jobs first
+      // Stop compliance scheduler first
+      logger.info('Stopping compliance scheduler...');
+      const { stopComplianceScheduler } = await import('./jobs/compliance-scheduler');
+      stopComplianceScheduler();
+      logger.info('Compliance scheduler stopped');
+
+      // Stop all background jobs
       logger.info('Stopping background jobs...');
       await jobManager.stopAll();
       logger.info('Background jobs stopped');
