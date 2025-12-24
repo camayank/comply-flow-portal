@@ -2,35 +2,105 @@
  * ADMIN METRICS API ROUTES
  * File: server/admin-metrics-routes.ts
  *
- * System and business metrics APIs for Admin Dashboard
+ * Comprehensive system and business metrics APIs for Admin Dashboard
+ * Features: Caching, Trend Analysis, Alerts, Exports, Real-time Performance
  */
 
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { db } from './config/database';
 import {
   users,
-  businessEntities,
-  serviceRequests,
-  taskItems,
-  payments,
-  invoices,
-  commissionRecords,
-  leads,
-  agentProfiles,
-  complianceTracking,
-  auditLogs
+  auditLogs,
+  systemConfiguration
 } from '../shared/schema';
-import { eq, and, gte, lte, desc, asc, sql, count, sum } from 'drizzle-orm';
+import { eq, and, gte, lte, desc, sql, count } from 'drizzle-orm';
 import { authenticateToken } from './middleware/auth';
 import { requireMinimumRole, USER_ROLES } from './rbac-middleware';
 import { logger } from './config/logger';
 import os from 'os';
 
+// Import metrics service
+import {
+  metricsCache,
+  getDatabaseMetrics,
+  getRevenueMetrics,
+  getClientMetrics,
+  getServiceMetrics,
+  getComplianceMetrics,
+  getLeadMetrics,
+  getAgentMetrics,
+  getUserActivityMetrics,
+  getTrendComparison,
+  getSystemConfig,
+  updateSystemConfig,
+  performanceTracker,
+  checkSystemAlerts,
+  getDashboardSummary
+} from './services/metricsService';
+
 const router = Router();
+
+// ============ MIDDLEWARE ============
 
 // All routes require admin authentication
 router.use(authenticateToken);
 router.use(requireMinimumRole(USER_ROLES.ADMIN));
+
+// Performance tracking middleware
+router.use((req: Request, res: Response, next: NextFunction) => {
+  const start = Date.now();
+
+  res.on('finish', () => {
+    performanceTracker.record({
+      endpoint: req.path,
+      method: req.method,
+      responseTime: Date.now() - start,
+      statusCode: res.statusCode,
+      timestamp: new Date()
+    });
+  });
+
+  next();
+});
+
+// Input validation schemas
+const periodSchema = z.object({
+  period: z.string().regex(/^\d+$/).optional().default('30')
+});
+
+const paginationSchema = z.object({
+  page: z.string().regex(/^\d+$/).optional().default('1'),
+  limit: z.string().regex(/^\d+$/).optional().default('50')
+});
+
+const dateRangeSchema = z.object({
+  dateFrom: z.string().datetime().optional(),
+  dateTo: z.string().datetime().optional()
+});
+
+// ============ DASHBOARD SUMMARY ============
+
+/**
+ * GET /api/v1/admin/dashboard
+ * Single endpoint for complete dashboard overview
+ */
+router.get('/dashboard', async (req: Request, res: Response) => {
+  try {
+    const { period = '30' } = req.query;
+    const days = parseInt(period as string) || 30;
+
+    const summary = await getDashboardSummary(days);
+
+    res.json({
+      success: true,
+      data: summary
+    });
+  } catch (error: any) {
+    logger.error('Error fetching dashboard summary', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to fetch dashboard summary' });
+  }
+});
 
 // ============ SYSTEM METRICS ============
 
@@ -40,74 +110,48 @@ router.use(requireMinimumRole(USER_ROLES.ADMIN));
  */
 router.get('/metrics/system', async (req: Request, res: Response) => {
   try {
-    // Database counts
-    const [userCount] = await db.select({ count: count() }).from(users);
-    const [clientCount] = await db.select({ count: count() }).from(businessEntities);
-    const [serviceCount] = await db.select({ count: count() }).from(serviceRequests);
-    const [taskCount] = await db.select({ count: count() }).from(taskItems);
-    const [paymentCount] = await db.select({ count: count() }).from(payments);
+    const dbMetrics = await getDatabaseMetrics();
 
-    // Active sessions (users logged in last 24h)
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [activeUsers] = await db.select({ count: count() })
-      .from(users)
-      .where(gte(users.lastLogin, oneDayAgo));
-
-    // Application metrics
     const uptime = process.uptime();
     const memoryUsage = process.memoryUsage();
     const cpuUsage = os.loadavg();
 
-    // Database size (PostgreSQL)
-    let dbSize = 'N/A';
-    try {
-      const [sizeResult] = await db.execute(sql`
-        SELECT pg_size_pretty(pg_database_size(current_database())) as size
-      `);
-      dbSize = (sizeResult as any)?.size || 'N/A';
-    } catch (e) {
-      // Ignore if not PostgreSQL
-    }
-
     res.json({
-      database: {
-        totalUsers: userCount?.count || 0,
-        totalClients: clientCount?.count || 0,
-        totalServiceRequests: serviceCount?.count || 0,
-        totalTasks: taskCount?.count || 0,
-        totalPayments: paymentCount?.count || 0,
-        size: dbSize,
-      },
-      application: {
-        uptime: {
-          seconds: Math.floor(uptime),
-          formatted: formatUptime(uptime),
+      success: true,
+      data: {
+        database: dbMetrics,
+        application: {
+          uptime: {
+            seconds: Math.floor(uptime),
+            formatted: formatUptime(uptime),
+          },
+          memory: {
+            heapUsed: formatBytes(memoryUsage.heapUsed),
+            heapTotal: formatBytes(memoryUsage.heapTotal),
+            heapUsedRaw: memoryUsage.heapUsed,
+            heapTotalRaw: memoryUsage.heapTotal,
+            rss: formatBytes(memoryUsage.rss),
+            external: formatBytes(memoryUsage.external),
+            usagePercent: ((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100).toFixed(1)
+          },
+          cpu: {
+            load1m: cpuUsage[0]?.toFixed(2),
+            load5m: cpuUsage[1]?.toFixed(2),
+            load15m: cpuUsage[2]?.toFixed(2),
+            cores: os.cpus().length,
+          },
+          nodeVersion: process.version,
+          platform: os.platform(),
+          arch: os.arch(),
+          hostname: os.hostname()
         },
-        memory: {
-          heapUsed: formatBytes(memoryUsage.heapUsed),
-          heapTotal: formatBytes(memoryUsage.heapTotal),
-          rss: formatBytes(memoryUsage.rss),
-          external: formatBytes(memoryUsage.external),
-        },
-        cpu: {
-          load1m: cpuUsage[0]?.toFixed(2),
-          load5m: cpuUsage[1]?.toFixed(2),
-          load15m: cpuUsage[2]?.toFixed(2),
-          cores: os.cpus().length,
-        },
-        nodeVersion: process.version,
-        platform: os.platform(),
-      },
-      users: {
-        total: userCount?.count || 0,
-        activeIn24h: activeUsers?.count || 0,
-      },
-      timestamp: new Date().toISOString(),
+        cache: metricsCache.getStats(),
+        timestamp: new Date().toISOString(),
+      }
     });
-
   } catch (error: any) {
     logger.error('Error fetching system metrics', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch system metrics' });
+    res.status(500).json({ success: false, error: 'Failed to fetch system metrics' });
   }
 });
 
@@ -120,188 +164,73 @@ router.get('/metrics/system', async (req: Request, res: Response) => {
 router.get('/metrics/business', async (req: Request, res: Response) => {
   try {
     const { period = '30' } = req.query;
-    const days = parseInt(period as string);
+    const days = parseInt(period as string) || 30;
+
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // Revenue metrics
-    const [totalRevenue] = await db.select({
-      total: sum(payments.amount),
-      count: count(),
-    })
-      .from(payments)
-      .where(and(
-        eq(payments.status, 'completed'),
-        gte(payments.createdAt, startDate)
-      ));
-
-    const [pendingPayments] = await db.select({
-      total: sum(payments.amount),
-      count: count(),
-    })
-      .from(payments)
-      .where(eq(payments.status, 'pending'));
-
-    // Revenue by month
-    const monthlyRevenue = await db.execute(sql`
-      SELECT
-        DATE_TRUNC('month', created_at) as month,
-        SUM(amount) as revenue,
-        COUNT(*) as transactions
-      FROM payments
-      WHERE status = 'completed'
-      AND created_at >= ${startDate}
-      GROUP BY DATE_TRUNC('month', created_at)
-      ORDER BY month DESC
-    `);
-
-    // Client metrics
-    const [totalClients] = await db.select({ count: count() })
-      .from(businessEntities);
-
-    const [activeClients] = await db.select({ count: count() })
-      .from(businessEntities)
-      .where(eq(businessEntities.clientStatus, 'active'));
-
-    const [newClients] = await db.select({ count: count() })
-      .from(businessEntities)
-      .where(gte(businessEntities.createdAt, startDate));
-
-    // Clients by entity type (instead of subscription plan)
-    const clientsByType = await db.select({
-      type: businessEntities.entityType,
-      count: count(),
-    })
-      .from(businessEntities)
-      .where(eq(businessEntities.clientStatus, 'active'))
-      .groupBy(businessEntities.entityType);
-
-    // Service metrics
-    const [serviceStats] = await db.select({
-      total: count(),
-      completed: sql<number>`COUNT(CASE WHEN status = 'completed' THEN 1 END)`,
-      inProgress: sql<number>`COUNT(CASE WHEN status = 'in_progress' THEN 1 END)`,
-      pending: sql<number>`COUNT(CASE WHEN status = 'initiated' THEN 1 END)`,
-    })
-      .from(serviceRequests)
-      .where(gte(serviceRequests.createdAt, startDate));
-
-    // Average completion time
-    const [avgCompletion] = await db.execute(sql`
-      SELECT AVG(EXTRACT(EPOCH FROM (actual_completion - created_at)) / 3600) as avg_hours
-      FROM service_requests
-      WHERE status = 'completed'
-      AND actual_completion IS NOT NULL
-      AND created_at >= ${startDate}
-    `);
-
-    // Task SLA compliance
-    const [taskStats] = await db.select({
-      total: count(),
-      completed: sql<number>`COUNT(CASE WHEN status = 'completed' THEN 1 END)`,
-    })
-      .from(taskItems)
-      .where(gte(taskItems.createdAt, startDate));
-
-    const taskCompletionRate = taskStats?.total
-      ? Math.round((taskStats.completed || 0) / taskStats.total * 100)
-      : 100;
-
-    // Agent metrics
-    const [agentStats] = await db.select({
-      total: count(),
-      active: sql<number>`COUNT(CASE WHEN status = 'active' THEN 1 END)`,
-    })
-      .from(agentProfiles);
-
-    const [commissionStats] = await db.select({
-      total: sum(commissionRecords.commissionAmount),
-      pending: sql<number>`SUM(CASE WHEN status = 'pending' THEN commission_amount ELSE 0 END)`,
-      paid: sql<number>`SUM(CASE WHEN status = 'paid' THEN commission_amount ELSE 0 END)`,
-    })
-      .from(commissionRecords)
-      .where(gte(commissionRecords.createdAt, startDate));
-
-    // Lead metrics
-    const [leadStats] = await db.select({
-      total: count(),
-      converted: sql<number>`COUNT(CASE WHEN status = 'converted' THEN 1 END)`,
-    })
-      .from(leads)
-      .where(gte(leads.createdAt, startDate));
-
-    const conversionRate = leadStats?.total
-      ? Math.round((leadStats.converted || 0) / leadStats.total * 100)
-      : 0;
-
-    // Top services
-    const topServices = await db.select({
-      serviceId: serviceRequests.serviceId,
-      count: count(),
-      revenue: sum(serviceRequests.totalAmount),
-    })
-      .from(serviceRequests)
-      .where(gte(serviceRequests.createdAt, startDate))
-      .groupBy(serviceRequests.serviceId)
-      .orderBy(desc(count()))
-      .limit(10);
+    const [revenue, clients, services, agents, leads] = await Promise.all([
+      getRevenueMetrics(days),
+      getClientMetrics(days),
+      getServiceMetrics(days),
+      getAgentMetrics(days),
+      getLeadMetrics(days)
+    ]);
 
     res.json({
-      period: {
-        days,
-        startDate: startDate.toISOString(),
-        endDate: new Date().toISOString(),
-      },
-      revenue: {
-        total: Number(totalRevenue?.total || 0),
-        transactions: totalRevenue?.count || 0,
-        pending: Number(pendingPayments?.total || 0),
-        pendingCount: pendingPayments?.count || 0,
-        averageTransaction: totalRevenue?.count
-          ? Math.round(Number(totalRevenue.total || 0) / totalRevenue.count)
-          : 0,
-        monthly: monthlyRevenue.rows,
-      },
-      clients: {
-        total: totalClients?.count || 0,
-        active: activeClients?.count || 0,
-        new: newClients?.count || 0,
-        byType: clientsByType,
-        retentionRate: totalClients?.count
-          ? Math.round((activeClients?.count || 0) / totalClients.count * 100)
-          : 0,
-      },
-      services: {
-        total: serviceStats?.total || 0,
-        completed: serviceStats?.completed || 0,
-        inProgress: serviceStats?.inProgress || 0,
-        pending: serviceStats?.pending || 0,
-        completionRate: serviceStats?.total
-          ? Math.round((serviceStats.completed || 0) / serviceStats.total * 100)
-          : 0,
-        avgCompletionHours: Math.round(Number((avgCompletion.rows[0] as any)?.avg_hours || 0)),
-        taskCompletionRate,
-        topServices,
-      },
-      agents: {
-        total: agentStats?.total || 0,
-        active: agentStats?.active || 0,
-        commissions: {
-          total: Number(commissionStats?.total || 0),
-          pending: Number(commissionStats?.pending || 0),
-          paid: Number(commissionStats?.paid || 0),
+      success: true,
+      data: {
+        period: {
+          days,
+          startDate: startDate.toISOString(),
+          endDate: new Date().toISOString(),
         },
-      },
-      leads: {
-        total: leadStats?.total || 0,
-        converted: leadStats?.converted || 0,
-        conversionRate,
-      },
+        revenue,
+        clients,
+        services,
+        agents,
+        leads
+      }
     });
-
   } catch (error: any) {
     logger.error('Error fetching business metrics', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch business metrics' });
+    res.status(500).json({ success: false, error: 'Failed to fetch business metrics' });
+  }
+});
+
+// ============ TREND ANALYSIS ============
+
+/**
+ * GET /api/v1/admin/metrics/trends
+ * Period-over-period comparison
+ */
+router.get('/metrics/trends', async (req: Request, res: Response) => {
+  try {
+    const { period = '30' } = req.query;
+    const days = parseInt(period as string) || 30;
+
+    const [revenue, clients, services, leads] = await Promise.all([
+      getTrendComparison('revenue', days),
+      getTrendComparison('clients', days),
+      getTrendComparison('services', days),
+      getTrendComparison('leads', days)
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        period: days,
+        comparisons: {
+          revenue,
+          clients,
+          services,
+          leads
+        }
+      }
+    });
+  } catch (error: any) {
+    logger.error('Error fetching trend analysis', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to fetch trend analysis' });
   }
 });
 
@@ -313,83 +242,89 @@ router.get('/metrics/business', async (req: Request, res: Response) => {
  */
 router.get('/metrics/compliance', async (req: Request, res: Response) => {
   try {
-    const [complianceStats] = await db.select({
-      total: count(),
-      completed: sql<number>`COUNT(CASE WHEN status = 'completed' THEN 1 END)`,
-      overdue: sql<number>`COUNT(CASE WHEN status = 'overdue' THEN 1 END)`,
-      pending: sql<number>`COUNT(CASE WHEN status = 'pending' THEN 1 END)`,
-    })
-      .from(complianceTracking);
-
-    // Overdue by compliance type
-    const overdueByType = await db.select({
-      complianceType: complianceTracking.complianceType,
-      count: count(),
-    })
-      .from(complianceTracking)
-      .where(eq(complianceTracking.status, 'overdue'))
-      .groupBy(complianceTracking.complianceType);
-
-    // Upcoming deadlines (next 30 days)
-    const thirtyDaysFromNow = new Date();
-    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-
-    const upcomingDeadlines = await db.select({
-      id: complianceTracking.id,
-      serviceType: complianceTracking.serviceType,
-      dueDate: complianceTracking.dueDate,
-      entityName: complianceTracking.entityName,
-      priority: complianceTracking.priority,
-    })
-      .from(complianceTracking)
-      .where(and(
-        eq(complianceTracking.status, 'pending'),
-        lte(complianceTracking.dueDate, thirtyDaysFromNow)
-      ))
-      .orderBy(asc(complianceTracking.dueDate))
-      .limit(20);
-
-    // Health score distribution
-    const healthScoreDistribution = await db.execute(sql`
-      SELECT
-        CASE
-          WHEN compliance_score >= 90 THEN 'Excellent'
-          WHEN compliance_score >= 75 THEN 'Good'
-          WHEN compliance_score >= 50 THEN 'Fair'
-          ELSE 'Poor'
-        END as category,
-        COUNT(*) as count
-      FROM business_entities
-      WHERE client_status = 'active'
-      GROUP BY
-        CASE
-          WHEN compliance_score >= 90 THEN 'Excellent'
-          WHEN compliance_score >= 75 THEN 'Good'
-          WHEN compliance_score >= 50 THEN 'Fair'
-          ELSE 'Poor'
-        END
-    `);
-
-    const overallComplianceRate = complianceStats?.total
-      ? Math.round((complianceStats.completed || 0) / complianceStats.total * 100)
-      : 100;
+    const compliance = await getComplianceMetrics();
 
     res.json({
-      summary: {
-        total: complianceStats?.total || 0,
-        completed: complianceStats?.completed || 0,
-        overdue: complianceStats?.overdue || 0,
-        pending: complianceStats?.pending || 0,
-        complianceRate: overallComplianceRate,
-      },
-      overdueByType,
-      upcomingDeadlines,
-      healthScoreDistribution: healthScoreDistribution.rows,
+      success: true,
+      data: compliance
     });
-
   } catch (error: any) {
     logger.error('Error fetching compliance metrics', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch compliance metrics' });
+    res.status(500).json({ success: false, error: 'Failed to fetch compliance metrics' });
+  }
+});
+
+// ============ USER ACTIVITY ============
+
+/**
+ * GET /api/v1/admin/metrics/users
+ * User activity analytics
+ */
+router.get('/metrics/users', async (req: Request, res: Response) => {
+  try {
+    const { period = '30' } = req.query;
+    const days = parseInt(period as string) || 30;
+
+    const activity = await getUserActivityMetrics(days);
+
+    res.json({
+      success: true,
+      data: activity
+    });
+  } catch (error: any) {
+    logger.error('Error fetching user activity metrics', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to fetch user activity metrics' });
+  }
+});
+
+// ============ PERFORMANCE METRICS ============
+
+/**
+ * GET /api/v1/admin/metrics/performance
+ * Real-time API performance metrics
+ */
+router.get('/metrics/performance', async (req: Request, res: Response) => {
+  try {
+    const { minutes = '60' } = req.query;
+    const mins = parseInt(minutes as string) || 60;
+
+    const stats = performanceTracker.getStats(mins);
+
+    res.json({
+      success: true,
+      data: {
+        period: `${mins} minutes`,
+        ...stats
+      }
+    });
+  } catch (error: any) {
+    logger.error('Error fetching performance metrics', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to fetch performance metrics' });
+  }
+});
+
+// ============ ALERTS ============
+
+/**
+ * GET /api/v1/admin/alerts
+ * System alerts and threshold warnings
+ */
+router.get('/alerts', async (req: Request, res: Response) => {
+  try {
+    const alerts = await checkSystemAlerts();
+
+    res.json({
+      success: true,
+      data: {
+        count: alerts.length,
+        critical: alerts.filter(a => a.type === 'critical').length,
+        warnings: alerts.filter(a => a.type === 'warning').length,
+        alerts
+      }
+    });
+  } catch (error: any) {
+    logger.error('Error fetching system alerts', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to fetch system alerts' });
   }
 });
 
@@ -411,26 +346,35 @@ router.get('/audit-log', async (req: Request, res: Response) => {
       limit = '50'
     } = req.query;
 
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string) || 50));
 
     // Build conditions
     let conditions: any[] = [];
 
     if (userId) {
-      conditions.push(eq(auditLogs.userId, parseInt(userId as string)));
+      const uid = parseInt(userId as string);
+      if (!isNaN(uid)) {
+        conditions.push(eq(auditLogs.userId, uid));
+      }
     }
-    if (action) {
-      conditions.push(eq(auditLogs.action, action as string));
+    if (action && typeof action === 'string') {
+      conditions.push(eq(auditLogs.action, action));
     }
-    if (entity) {
-      conditions.push(eq(auditLogs.entityType, entity as string));
+    if (entity && typeof entity === 'string') {
+      conditions.push(eq(auditLogs.entityType, entity));
     }
-    if (dateFrom) {
-      conditions.push(gte(auditLogs.createdAt, new Date(dateFrom as string)));
+    if (dateFrom && typeof dateFrom === 'string') {
+      const date = new Date(dateFrom);
+      if (!isNaN(date.getTime())) {
+        conditions.push(gte(auditLogs.createdAt, date));
+      }
     }
-    if (dateTo) {
-      conditions.push(lte(auditLogs.createdAt, new Date(dateTo as string)));
+    if (dateTo && typeof dateTo === 'string') {
+      const date = new Date(dateTo);
+      if (!isNaN(date.getTime())) {
+        conditions.push(lte(auditLogs.createdAt, date));
+      }
     }
 
     // Get total count
@@ -451,17 +395,16 @@ router.get('/audit-log', async (req: Request, res: Response) => {
       .limit(limitNum)
       .offset((pageNum - 1) * limitNum);
 
-    // Get available actions for filter dropdown
-    const actions = await db.selectDistinct({ action: auditLogs.action })
-      .from(auditLogs)
-      .limit(50);
+    // Get available filters
+    const [actions, entities] = await Promise.all([
+      db.selectDistinct({ action: auditLogs.action }).from(auditLogs).limit(50),
+      db.selectDistinct({ entity: auditLogs.entityType }).from(auditLogs).limit(50)
+    ]);
 
-    // Get available entities for filter dropdown
-    const entities = await db.selectDistinct({ entity: auditLogs.entityType })
-      .from(auditLogs)
-      .limit(50);
+    const total = countResult?.count || 0;
 
     res.json({
+      success: true,
       data: logs.map(l => ({
         id: l.log.id,
         action: l.log.action,
@@ -479,18 +422,101 @@ router.get('/audit-log', async (req: Request, res: Response) => {
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total: countResult?.count || 0,
-        totalPages: Math.ceil((countResult?.count || 0) / limitNum),
+        total,
+        totalPages: Math.ceil(total / limitNum),
+        hasNext: pageNum * limitNum < total,
+        hasPrev: pageNum > 1
       },
       filters: {
-        actions: actions.map(a => a.action),
-        entities: entities.map(e => e.entity),
+        actions: actions.map(a => a.action).filter(Boolean),
+        entities: entities.map(e => e.entity).filter(Boolean),
       },
     });
-
   } catch (error: any) {
     logger.error('Error fetching audit log', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch audit log' });
+    res.status(500).json({ success: false, error: 'Failed to fetch audit log' });
+  }
+});
+
+// ============ EXPORT METRICS ============
+
+/**
+ * GET /api/v1/admin/export/:type
+ * Export metrics to CSV format
+ */
+router.get('/export/:type', async (req: Request, res: Response) => {
+  try {
+    const { type } = req.params;
+    const { period = '30' } = req.query;
+    const days = parseInt(period as string) || 30;
+
+    let data: any[] = [];
+    let filename = '';
+
+    switch (type) {
+      case 'revenue':
+        const revenue = await getRevenueMetrics(days);
+        data = revenue.monthly.map((m: any) => ({
+          month: m.month,
+          revenue: m.revenue,
+          transactions: m.transactions
+        }));
+        filename = `revenue_report_${days}d.csv`;
+        break;
+
+      case 'clients':
+        const clients = await getClientMetrics(days);
+        data = clients.byType.map((c: any) => ({
+          entityType: c.type,
+          count: c.count
+        }));
+        filename = `client_report_${days}d.csv`;
+        break;
+
+      case 'services':
+        const services = await getServiceMetrics(days);
+        data = services.topServices.map((s: any) => ({
+          serviceId: s.serviceId,
+          count: s.count,
+          revenue: s.revenue
+        }));
+        filename = `services_report_${days}d.csv`;
+        break;
+
+      case 'compliance':
+        const compliance = await getComplianceMetrics();
+        data = compliance.upcomingDeadlines.map((d: any) => ({
+          serviceType: d.serviceType,
+          entityName: d.entityName,
+          dueDate: d.dueDate,
+          priority: d.priority
+        }));
+        filename = `compliance_report.csv`;
+        break;
+
+      default:
+        return res.status(400).json({ success: false, error: 'Invalid export type' });
+    }
+
+    // Convert to CSV
+    if (data.length === 0) {
+      return res.status(404).json({ success: false, error: 'No data to export' });
+    }
+
+    const headers = Object.keys(data[0]).join(',');
+    const rows = data.map(row =>
+      Object.values(row).map(v =>
+        typeof v === 'string' && v.includes(',') ? `"${v}"` : v
+      ).join(',')
+    );
+    const csv = [headers, ...rows].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(csv);
+  } catch (error: any) {
+    logger.error('Error exporting metrics', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to export metrics' });
   }
 });
 
@@ -502,8 +528,13 @@ router.get('/audit-log', async (req: Request, res: Response) => {
  */
 router.get('/config', async (req: Request, res: Response) => {
   try {
-    // Fetch from systemConfig table or return defaults
-    const config = {
+    const { category } = req.query;
+
+    // Get from database
+    const dbConfig = await getSystemConfig(category as string);
+
+    // Merge with defaults
+    const defaults = {
       general: {
         appName: process.env.APP_NAME || 'Comply Flow',
         supportEmail: process.env.SUPPORT_EMAIL || 'support@complyflow.in',
@@ -536,11 +567,13 @@ router.get('/config', async (req: Request, res: Response) => {
       },
     };
 
-    res.json(config);
-
+    res.json({
+      success: true,
+      data: { ...defaults, ...dbConfig }
+    });
   } catch (error: any) {
     logger.error('Error fetching config', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch configuration' });
+    res.status(500).json({ success: false, error: 'Failed to fetch configuration' });
   }
 });
 
@@ -551,7 +584,22 @@ router.get('/config', async (req: Request, res: Response) => {
 router.put('/config/:key', requireMinimumRole(USER_ROLES.SUPER_ADMIN), async (req: Request, res: Response) => {
   try {
     const { key } = req.params;
-    const { value } = req.body;
+    const { value, category = 'general' } = req.body;
+
+    if (!key || value === undefined) {
+      return res.status(400).json({ success: false, error: 'Key and value are required' });
+    }
+
+    // Get previous value for audit
+    const previous = await getSystemConfig();
+    const oldValue = previous[key];
+
+    // Update config
+    const success = await updateSystemConfig(key, value, category, req.user!.id);
+
+    if (!success) {
+      return res.status(500).json({ success: false, error: 'Failed to update configuration' });
+    }
 
     // Log the change
     await db.insert(auditLogs).values({
@@ -559,7 +607,7 @@ router.put('/config/:key', requireMinimumRole(USER_ROLES.SUPER_ADMIN), async (re
       action: 'CONFIG_UPDATE',
       entityType: 'SYSTEM_CONFIG',
       entityId: key,
-      oldValue: JSON.stringify({}), // Would fetch previous value in real implementation
+      oldValue: JSON.stringify(oldValue || {}),
       newValue: JSON.stringify(value),
       ipAddress: req.ip || null,
       userAgent: req.headers['user-agent'] || null,
@@ -567,10 +615,62 @@ router.put('/config/:key', requireMinimumRole(USER_ROLES.SUPER_ADMIN), async (re
     });
 
     res.json({ success: true, message: `Configuration ${key} updated` });
-
   } catch (error: any) {
     logger.error('Error updating config', { error: error.message });
-    res.status(500).json({ error: 'Failed to update configuration' });
+    res.status(500).json({ success: false, error: 'Failed to update configuration' });
+  }
+});
+
+// ============ CACHE MANAGEMENT ============
+
+/**
+ * POST /api/v1/admin/cache/invalidate
+ * Invalidate metrics cache (Super Admin only)
+ */
+router.post('/cache/invalidate', requireMinimumRole(USER_ROLES.SUPER_ADMIN), async (req: Request, res: Response) => {
+  try {
+    const { pattern } = req.body;
+
+    metricsCache.invalidate(pattern);
+
+    // Log the action
+    await db.insert(auditLogs).values({
+      userId: req.user!.id,
+      action: 'CACHE_INVALIDATE',
+      entityType: 'SYSTEM_CACHE',
+      entityId: pattern || 'all',
+      oldValue: null,
+      newValue: null,
+      ipAddress: req.ip || null,
+      userAgent: req.headers['user-agent'] || null,
+      createdAt: new Date(),
+    });
+
+    res.json({
+      success: true,
+      message: pattern ? `Cache invalidated for pattern: ${pattern}` : 'All cache invalidated'
+    });
+  } catch (error: any) {
+    logger.error('Error invalidating cache', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to invalidate cache' });
+  }
+});
+
+/**
+ * GET /api/v1/admin/cache/stats
+ * Get cache statistics
+ */
+router.get('/cache/stats', async (req: Request, res: Response) => {
+  try {
+    const stats = metricsCache.getStats();
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error: any) {
+    logger.error('Error fetching cache stats', { error: error.message });
+    res.status(500).json({ success: false, error: 'Failed to fetch cache stats' });
   }
 });
 
@@ -581,6 +681,7 @@ router.put('/config/:key', requireMinimumRole(USER_ROLES.SUPER_ADMIN), async (re
  * Detailed health check
  */
 router.get('/health', async (req: Request, res: Response) => {
+  const startTime = Date.now();
   const health: any = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -589,8 +690,13 @@ router.get('/health', async (req: Request, res: Response) => {
 
   // Database check
   try {
+    const dbStart = Date.now();
     await db.execute(sql`SELECT 1`);
-    health.checks.database = { status: 'healthy', latency: '< 10ms' };
+    const dbLatency = Date.now() - dbStart;
+    health.checks.database = {
+      status: dbLatency < 100 ? 'healthy' : 'warning',
+      latency: `${dbLatency}ms`
+    };
   } catch (e) {
     health.checks.database = { status: 'unhealthy', error: 'Connection failed' };
     health.status = 'unhealthy';
@@ -600,14 +706,46 @@ router.get('/health', async (req: Request, res: Response) => {
   const memUsage = process.memoryUsage();
   const memUsagePct = (memUsage.heapUsed / memUsage.heapTotal) * 100;
   health.checks.memory = {
-    status: memUsagePct < 90 ? 'healthy' : 'warning',
+    status: memUsagePct < 80 ? 'healthy' : memUsagePct < 95 ? 'warning' : 'critical',
     usagePercent: memUsagePct.toFixed(1),
+    heapUsed: formatBytes(memUsage.heapUsed),
+    heapTotal: formatBytes(memUsage.heapTotal)
   };
 
-  // Disk check (simplified)
-  health.checks.disk = { status: 'healthy' };
+  if (memUsagePct >= 95) {
+    health.status = 'unhealthy';
+  } else if (memUsagePct >= 80 && health.status === 'healthy') {
+    health.status = 'warning';
+  }
 
-  res.status(health.status === 'healthy' ? 200 : 503).json(health);
+  // CPU check
+  const cpuLoad = os.loadavg()[0];
+  const cpuCores = os.cpus().length;
+  const cpuUsagePct = (cpuLoad / cpuCores) * 100;
+  health.checks.cpu = {
+    status: cpuUsagePct < 70 ? 'healthy' : cpuUsagePct < 90 ? 'warning' : 'critical',
+    load: cpuLoad.toFixed(2),
+    cores: cpuCores,
+    usagePercent: cpuUsagePct.toFixed(1)
+  };
+
+  // Cache check
+  const cacheStats = metricsCache.getStats();
+  health.checks.cache = {
+    status: 'healthy',
+    entries: cacheStats.size
+  };
+
+  // Uptime
+  health.checks.uptime = {
+    status: 'healthy',
+    seconds: Math.floor(process.uptime()),
+    formatted: formatUptime(process.uptime())
+  };
+
+  health.responseTime = `${Date.now() - startTime}ms`;
+
+  res.status(health.status === 'healthy' ? 200 : health.status === 'warning' ? 200 : 503).json(health);
 });
 
 // ============ HELPER FUNCTIONS ============
