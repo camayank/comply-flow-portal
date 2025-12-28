@@ -1,18 +1,69 @@
 import type { Express } from "express";
+import { z } from 'zod';
 import { db } from './db';
 import { 
   serviceRequests,
-  businessEntities
+  businessEntities,
+  notificationRules,
+  notificationOutbox,
+  notificationTemplates,
 } from '@shared/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
+import { notificationEngine } from './notification-engine';
+import { serviceTemplateSeeder } from './service-template-seeder';
+import { requireAuth, requireMinRole } from './auth-middleware';
+import { log } from './logger';
+
+const nonEmptyBodySchema = z
+  .record(z.any())
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'Request body is required',
+  });
+
+const ruleIdSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+const templateKeySchema = z.object({
+  templateKey: z.string().trim().min(1),
+});
+
+const outboxQuerySchema = z.object({
+  status: z.enum(['QUEUED', 'SENT', 'FAILED', 'PROCESSING']).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(50),
+  offset: z.coerce.number().int().min(0).optional().default(0),
+});
+
+const manualTriggerSchema = z.object({
+  ruleKey: z.string().trim().min(1),
+  serviceRequestId: z.coerce.number().int().positive(),
+  entityId: z.coerce.number().int().positive().optional(),
+});
+
+const testTemplateSchema = z.object({
+  templateKey: z.string().trim().min(1),
+  testData: z.record(z.any()).optional().default({}),
+});
+
+const statusChangeSchema = z.object({
+  fromStatus: z.string().trim().min(1),
+  toStatus: z.string().trim().min(1),
+});
+
+const documentRejectSchema = z.object({
+  serviceRequestId: z.coerce.number().int().positive(),
+  documentType: z.string().trim().min(1),
+  reason: z.string().trim().min(1),
+});
 
 export function registerNotificationRoutes(app: Express) {
   
   // Initialize/Seed Templates and Rules
-  app.post('/api/admin/seed-templates', async (req, res) => {
+  app.post('/api/admin/seed-templates', requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
       await serviceTemplateSeeder.seedAllTemplates();
       res.json({ message: 'All service templates seeded successfully' });
+      log.business('Notification templates seeded', { userId: req.user?.id });
     } catch (error) {
       console.error('Error seeding templates:', error);
       res.status(500).json({ error: 'Failed to seed templates' });
@@ -20,7 +71,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // Notification Rules Management
-  app.get('/api/admin/notification-rules', async (req, res) => {
+  app.get('/api/admin/notification-rules', requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
       const rules = await db
         .select()
@@ -34,46 +85,62 @@ export function registerNotificationRoutes(app: Express) {
     }
   });
 
-  app.post('/api/admin/notification-rules', async (req, res) => {
+  app.post('/api/admin/notification-rules', requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
-      const rule = await notificationEngine.createRule(req.body);
+      const rulePayload = nonEmptyBodySchema.parse(req.body);
+      const rule = await notificationEngine.createRule(rulePayload);
       res.json(rule);
+      log.business('Notification rule created', { userId: req.user?.id, ruleKey: rule.ruleKey });
     } catch (error) {
       console.error('Error creating notification rule:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: 'Failed to create notification rule' });
     }
   });
 
-  app.put('/api/admin/notification-rules/:id', async (req, res) => {
+  app.put('/api/admin/notification-rules/:id', requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
+      const { id } = ruleIdSchema.parse(req.params);
+      const rulePayload = nonEmptyBodySchema.parse(req.body);
       const rule = await notificationEngine.updateRule(
-        parseInt(req.params.id), 
-        req.body
+        id, 
+        rulePayload
       );
       res.json(rule);
+      log.business('Notification rule updated', { userId: req.user?.id, ruleId: id });
     } catch (error) {
       console.error('Error updating notification rule:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: 'Failed to update notification rule' });
     }
   });
 
-  app.delete('/api/admin/notification-rules/:id', async (req, res) => {
+  app.delete('/api/admin/notification-rules/:id', requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
+      const { id } = ruleIdSchema.parse(req.params);
       await db
         .update(notificationRules)
         .set({ isEnabled: false })
-        .where(eq(notificationRules.id, parseInt(req.params.id)));
+        .where(eq(notificationRules.id, id));
       
       await notificationEngine.reloadRules();
       res.json({ message: 'Notification rule disabled successfully' });
+      log.business('Notification rule disabled', { userId: req.user?.id, ruleId: id });
     } catch (error) {
       console.error('Error disabling notification rule:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: 'Failed to disable notification rule' });
     }
   });
 
   // Notification Templates Management
-  app.get('/api/admin/notification-templates', async (req, res) => {
+  app.get('/api/admin/notification-templates', requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
       const templates = await db
         .select()
@@ -87,39 +154,50 @@ export function registerNotificationRoutes(app: Express) {
     }
   });
 
-  app.post('/api/admin/notification-templates', async (req, res) => {
+  app.post('/api/admin/notification-templates', requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
+      const templatePayload = nonEmptyBodySchema.parse(req.body);
       const [template] = await db
         .insert(notificationTemplates)
-        .values(req.body)
+        .values(templatePayload)
         .returning();
       
       res.json(template);
+      log.business('Notification template created', { userId: req.user?.id, templateKey: template.templateKey });
     } catch (error) {
       console.error('Error creating notification template:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: 'Failed to create notification template' });
     }
   });
 
-  app.put('/api/admin/notification-templates/:templateKey', async (req, res) => {
+  app.put('/api/admin/notification-templates/:templateKey', requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
+      const { templateKey } = templateKeySchema.parse(req.params);
+      const templatePayload = nonEmptyBodySchema.parse(req.body);
       const [template] = await db
         .update(notificationTemplates)
-        .set({ ...req.body, updatedAt: new Date().toISOString() })
-        .where(eq(notificationTemplates.templateKey, req.params.templateKey))
+        .set({ ...templatePayload, updatedAt: new Date().toISOString() })
+        .where(eq(notificationTemplates.templateKey, templateKey))
         .returning();
       
       res.json(template);
+      log.business('Notification template updated', { userId: req.user?.id, templateKey });
     } catch (error) {
       console.error('Error updating notification template:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: 'Failed to update notification template' });
     }
   });
 
   // Notification Outbox Monitoring
-  app.get('/api/admin/notification-outbox', async (req, res) => {
+  app.get('/api/admin/notification-outbox', requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
-      const { status, limit = 50, offset = 0 } = req.query;
+      const { status, limit, offset } = outboxQuerySchema.parse(req.query);
       
       let query = db
         .select({
@@ -129,8 +207,8 @@ export function registerNotificationRoutes(app: Express) {
         .from(notificationOutbox)
         .leftJoin(businessEntities, eq(notificationOutbox.entityId, businessEntities.id))
         .orderBy(desc(notificationOutbox.createdAt))
-        .limit(parseInt(limit as string))
-        .offset(parseInt(offset as string));
+        .limit(limit)
+        .offset(offset);
 
       if (status) {
         query = query.where(eq(notificationOutbox.status, status as string));
@@ -140,12 +218,15 @@ export function registerNotificationRoutes(app: Express) {
       res.json(notifications);
     } catch (error) {
       console.error('Error fetching notification outbox:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: 'Failed to fetch notification outbox' });
     }
   });
 
   // Notification Analytics
-  app.get('/api/admin/notification-analytics', async (req, res) => {
+  app.get('/api/admin/notification-analytics', requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
       const analytics = await db
         .select({
@@ -188,9 +269,9 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // Trigger Manual Notifications
-  app.post('/api/admin/trigger-notification', async (req, res) => {
+  app.post('/api/admin/trigger-notification', requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
-      const { ruleKey, serviceRequestId, entityId } = req.body;
+      const { ruleKey, serviceRequestId } = manualTriggerSchema.parse(req.body);
       
       // Get service request details
       const serviceRequest = await db
@@ -218,16 +299,24 @@ export function registerNotificationRoutes(app: Express) {
       await notificationEngine.executeScheduledRule(rule[0]);
       
       res.json({ message: 'Notification triggered successfully' });
+      log.business('Manual notification triggered', {
+        userId: req.user?.id,
+        ruleKey,
+        serviceRequestId,
+      });
     } catch (error) {
       console.error('Error triggering manual notification:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: 'Failed to trigger notification' });
     }
   });
 
   // Test Notification Templates
-  app.post('/api/admin/test-template', async (req, res) => {
+  app.post('/api/admin/test-template', requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
-      const { templateKey, testData } = req.body;
+      const { templateKey, testData } = testTemplateSchema.parse(req.body);
       
       const template = await db
         .select()
@@ -253,17 +342,25 @@ export function registerNotificationRoutes(app: Express) {
         renderedBody: body,
         testData
       });
+      log.business('Notification template tested', { userId: req.user?.id, templateKey });
     } catch (error) {
       console.error('Error testing template:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: 'Failed to test template' });
     }
   });
 
   // Service Status Change Events (for triggering notifications)
-  app.post('/api/service-requests/:id/status-change', async (req, res) => {
+  app.post(
+    '/api/service-requests/:id/status-change',
+    requireAuth,
+    requireMinRole('ops_executive'),
+    async (req, res) => {
     try {
-      const { fromStatus, toStatus } = req.body;
-      const serviceRequestId = parseInt(req.params.id);
+      const { fromStatus, toStatus } = statusChangeSchema.parse(req.body);
+      const { id: serviceRequestId } = ruleIdSchema.parse(req.params);
 
       // Update service request status
       await db
@@ -278,32 +375,50 @@ export function registerNotificationRoutes(app: Express) {
       notificationEngine.emitServiceStatusChanged(serviceRequestId, fromStatus, toStatus);
 
       res.json({ message: 'Status updated and notifications triggered' });
+      log.business('Service status change notified', {
+        userId: req.user?.id,
+        serviceRequestId,
+        fromStatus,
+        toStatus,
+      });
     } catch (error) {
       console.error('Error updating service status:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: 'Failed to update service status' });
     }
   });
 
   // Document Rejection Events
-  app.post('/api/documents/:id/reject', async (req, res) => {
+  app.post('/api/documents/:id/reject', requireAuth, requireMinRole('ops_executive'), async (req, res) => {
     try {
-      const { serviceRequestId, documentType, reason } = req.body;
+      const { serviceRequestId, documentType, reason } = documentRejectSchema.parse(req.body);
       
       // Trigger document rejection notification
       notificationEngine.emitDocumentRejected(serviceRequestId, documentType, reason);
 
       res.json({ message: 'Document rejection notification triggered' });
+      log.business('Document rejection notification triggered', {
+        userId: req.user?.id,
+        serviceRequestId,
+        documentType,
+      });
     } catch (error) {
       console.error('Error handling document rejection:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: 'Failed to handle document rejection' });
     }
   });
 
   // Reload Notification Engine
-  app.post('/api/admin/reload-notification-engine', async (req, res) => {
+  app.post('/api/admin/reload-notification-engine', requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
       await notificationEngine.reloadRules();
       res.json({ message: 'Notification engine reloaded successfully' });
+      log.business('Notification engine reloaded', { userId: req.user?.id });
     } catch (error) {
       console.error('Error reloading notification engine:', error);
       res.status(500).json({ error: 'Failed to reload notification engine' });
@@ -311,7 +426,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // Get notification statistics
-  app.get('/api/admin/notification-stats', async (req, res) => {
+  app.get('/api/admin/notification-stats', requireAuth, requireMinRole('admin'), async (req, res) => {
     try {
       const stats = {
         activeRules: await db

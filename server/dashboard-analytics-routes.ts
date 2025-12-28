@@ -7,6 +7,66 @@ import {
 } from '../shared/schema';
 import { eq, and, or, desc, asc, sql, count, avg, sum, gte, lte, between } from 'drizzle-orm';
 import { storage } from './storage';
+import { z } from 'zod';
+import { requireAuth, requireMinRole } from './auth-middleware';
+import { log } from './logger';
+
+const dateRangeSchema = z
+  .object({
+    dateRange: z.coerce.number().int().min(1).max(365).optional(),
+    startDate: z.string().optional(),
+    endDate: z.string().optional(),
+  })
+  .refine(
+    (value) => (!value.startDate && !value.endDate) || (value.startDate && value.endDate),
+    {
+      message: 'startDate and endDate must be provided together',
+      path: ['startDate'],
+    }
+  )
+  .refine(
+    (value) => !value.startDate || !Number.isNaN(Date.parse(value.startDate)),
+    { message: 'Invalid startDate', path: ['startDate'] }
+  )
+  .refine(
+    (value) => !value.endDate || !Number.isNaN(Date.parse(value.endDate)),
+    { message: 'Invalid endDate', path: ['endDate'] }
+  );
+
+const timeframeSchema = z.enum(['weekly', 'monthly', 'quarterly', 'yearly']);
+const comparisonSchema = z.enum(['previous', 'year_over_year', 'none']);
+const metricSchema = z.enum(['revenue', 'quality', 'efficiency', 'client_satisfaction']);
+
+const intelligenceQuerySchema = z.object({
+  timeframe: timeframeSchema.optional().default('quarterly'),
+  comparison: comparisonSchema.optional().default('previous'),
+  metrics: z.preprocess(
+    (value) => {
+      if (Array.isArray(value)) return value;
+      if (typeof value === 'string') return [value];
+      return undefined;
+    },
+    z.array(metricSchema).default(['revenue', 'quality', 'efficiency', 'client_satisfaction'])
+  ),
+});
+
+const trendQuerySchema = z.object({
+  period: z.enum(['daily', 'weekly', 'monthly', 'quarterly', 'yearly']).optional().default('monthly'),
+  compare: comparisonSchema.optional().default('year_over_year'),
+});
+
+const exportQuerySchema = z.object({
+  format: z.enum(['json', 'csv']).optional().default('json'),
+  dateRange: z.string().optional(),
+  filters: z.unknown().optional(),
+});
+
+const reportTypeSchema = z.enum([
+  'executive-summary',
+  'financial-report',
+  'operational-report',
+  'client-report',
+]);
 
 export function registerDashboardAnalyticsRoutes(app: Express) {
   console.log('📊 Registering Dashboard Analytics routes...');
@@ -16,16 +76,22 @@ export function registerDashboardAnalyticsRoutes(app: Express) {
   // ============================================================================
 
   // Main executive dashboard with unified KPIs from all modules
-  app.get('/api/analytics/executive-dashboard', async (req: Request, res: Response) => {
+  app.get(
+    '/api/analytics/executive-dashboard',
+    requireAuth,
+    requireMinRole('ops_executive'),
+    async (req: Request, res: Response) => {
     try {
-      const { dateRange = '30', startDate, endDate } = req.query;
+      const parsedQuery = dateRangeSchema.parse(req.query);
+      const { startDate, endDate } = parsedQuery;
+      const dateRange = parsedQuery.dateRange ?? 30;
       
       // Calculate date filter
       let dateFilter;
       if (startDate && endDate) {
         dateFilter = between(serviceRequests.createdAt, new Date(startDate as string), new Date(endDate as string));
       } else {
-        const days = parseInt(dateRange as string);
+        const days = dateRange;
         const fromDate = new Date();
         fromDate.setDate(fromDate.getDate() - days);
         dateFilter = gte(serviceRequests.createdAt, fromDate);
@@ -115,22 +181,29 @@ export function registerDashboardAnalyticsRoutes(app: Express) {
       };
 
       res.json(dashboard);
+      log.business('Executive dashboard analytics accessed', {
+        userId: req.user?.id,
+        dateRange: startDate && endDate ? { startDate, endDate } : { days: dateRange },
+      });
     } catch (error) {
       console.error('Error fetching executive dashboard:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: 'Failed to fetch executive dashboard data' });
     }
   });
 
   // Business Intelligence with advanced analytics
-  app.get('/api/analytics/business-intelligence', async (req: Request, res: Response) => {
+  app.get(
+    '/api/analytics/business-intelligence',
+    requireAuth,
+    requireMinRole('ops_executive'),
+    async (req: Request, res: Response) => {
     try {
-      const { 
-        timeframe = 'quarterly',
-        comparison = 'previous',
-        metrics = ['revenue', 'quality', 'efficiency', 'client_satisfaction']
-      } = req.query;
-
-      const metricsArray = Array.isArray(metrics) ? metrics : [metrics];
+      const parsedQuery = intelligenceQuerySchema.parse(req.query);
+      const { timeframe, comparison, metrics } = parsedQuery;
+      const metricsArray = metrics;
       const intelligence = {
         summary: await getBusinessSummary(timeframe as string),
         forecasting: await getRevenueForecasting(),
@@ -166,14 +239,27 @@ export function registerDashboardAnalyticsRoutes(app: Express) {
       filteredIntelligence.benchmarks = intelligence.benchmarks;
 
       res.json(filteredIntelligence);
+      log.business('Business intelligence analytics accessed', {
+        userId: req.user?.id,
+        timeframe,
+        comparison,
+        metrics: metricsArray,
+      });
     } catch (error) {
       console.error('Error fetching business intelligence:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: 'Failed to fetch business intelligence data' });
     }
   });
 
   // Real-time KPI monitoring
-  app.get('/api/analytics/real-time-kpis', async (req: Request, res: Response) => {
+  app.get(
+    '/api/analytics/real-time-kpis',
+    requireAuth,
+    requireMinRole('ops_executive'),
+    async (req: Request, res: Response) => {
     try {
       const realTimeKPIs = {
         timestamp: new Date().toISOString(),
@@ -187,6 +273,7 @@ export function registerDashboardAnalyticsRoutes(app: Express) {
       };
 
       res.json(realTimeKPIs);
+      log.business('Real-time KPI analytics accessed', { userId: req.user?.id });
     } catch (error) {
       console.error('Error fetching real-time KPIs:', error);
       res.status(500).json({ error: 'Failed to fetch real-time KPIs' });
@@ -194,9 +281,14 @@ export function registerDashboardAnalyticsRoutes(app: Express) {
   });
 
   // Performance trends and comparative analysis
-  app.get('/api/analytics/performance-trends', async (req: Request, res: Response) => {
+  app.get(
+    '/api/analytics/performance-trends',
+    requireAuth,
+    requireMinRole('ops_executive'),
+    async (req: Request, res: Response) => {
     try {
-      const { period = 'monthly', compare = 'year_over_year' } = req.query;
+      const parsedQuery = trendQuerySchema.parse(req.query);
+      const { period, compare } = parsedQuery;
       
       const trends = {
         revenueTrends: await getRevenueTrends(period as string),
@@ -210,14 +302,26 @@ export function registerDashboardAnalyticsRoutes(app: Express) {
       };
 
       res.json(trends);
+      log.business('Performance trend analytics accessed', {
+        userId: req.user?.id,
+        period,
+        compare,
+      });
     } catch (error) {
       console.error('Error fetching performance trends:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: 'Failed to fetch performance trends' });
     }
   });
 
   // Mobile dashboard optimized data
-  app.get('/api/analytics/mobile-dashboard', async (req: Request, res: Response) => {
+  app.get(
+    '/api/analytics/mobile-dashboard',
+    requireAuth,
+    requireMinRole('ops_executive'),
+    async (req: Request, res: Response) => {
     try {
       const mobileDashboard = {
         criticalMetrics: await getCriticalMobileMetrics(),
@@ -229,6 +333,7 @@ export function registerDashboardAnalyticsRoutes(app: Express) {
       };
 
       res.json(mobileDashboard);
+      log.business('Mobile analytics dashboard accessed', { userId: req.user?.id });
     } catch (error) {
       console.error('Error fetching mobile dashboard:', error);
       res.status(500).json({ error: 'Failed to fetch mobile dashboard data' });
@@ -236,10 +341,14 @@ export function registerDashboardAnalyticsRoutes(app: Express) {
   });
 
   // Export functionality for reports
-  app.get('/api/analytics/export/:reportType', async (req: Request, res: Response) => {
+  app.get(
+    '/api/analytics/export/:reportType',
+    requireAuth,
+    requireMinRole('ops_executive'),
+    async (req: Request, res: Response) => {
     try {
-      const { reportType } = req.params;
-      const { format = 'json', dateRange, filters } = req.query;
+      const { reportType } = reportTypeSchema.parse(req.params);
+      const { format, dateRange, filters } = exportQuerySchema.parse(req.query);
 
       let reportData;
       switch (reportType) {
@@ -268,8 +377,16 @@ export function registerDashboardAnalyticsRoutes(app: Express) {
         res.setHeader('Content-Disposition', `attachment; filename="${reportType}-${new Date().toISOString().split('T')[0]}.json"`);
         res.json(reportData);
       }
+      log.business('Analytics report exported', {
+        userId: req.user?.id,
+        reportType,
+        format,
+      });
     } catch (error) {
       console.error('Error exporting report:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Validation error', details: error.errors });
+      }
       res.status(500).json({ error: 'Failed to export report' });
     }
   });
