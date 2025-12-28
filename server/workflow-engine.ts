@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { DIGICOMPLY_WORKFLOW_TEMPLATES } from './digicomply-workflows';
+import { SERVICE_CATALOG } from './service-catalog-data';
 
 // Flexible Workflow Engine for KOSHIKA Services SOPs
 export interface WorkflowTemplate {
@@ -268,6 +269,84 @@ const STANDARD_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
   }
 ];
 
+const DEFAULT_SLA_DAYS: Record<string, number> = {
+  MONTHLY: 5,
+  QUARTERLY: 7,
+  ANNUAL: 10,
+  ONGOING: 3,
+  ONE_TIME: 6
+};
+
+const buildCatalogWorkflowTemplates = (): WorkflowTemplate[] => {
+  return SERVICE_CATALOG.map(service => {
+    const totalDays = DEFAULT_SLA_DAYS[service.periodicity] ?? 6;
+
+    const steps: WorkflowStepTemplate[] = [
+      {
+        id: 'intake',
+        name: 'Requirement Intake',
+        description: `Collect inputs and documents for ${service.name}`,
+        type: 'documentation',
+        isRequired: true,
+        canBeModified: true,
+        estimatedDays: Math.max(1, Math.round(totalDays * 0.3)),
+        dependencies: [],
+        requiredDocs: []
+      },
+      {
+        id: 'execution',
+        name: 'Service Execution',
+        description: `Execute ${service.name} workflow`,
+        type: 'filing',
+        isRequired: true,
+        canBeModified: true,
+        estimatedDays: Math.max(1, Math.round(totalDays * 0.4)),
+        dependencies: ['intake'],
+        requiredDocs: []
+      },
+      {
+        id: 'review',
+        name: 'Quality Review',
+        description: 'Perform QA review and validations',
+        type: 'verification',
+        isRequired: true,
+        canBeModified: true,
+        estimatedDays: Math.max(1, Math.round(totalDays * 0.2)),
+        dependencies: ['execution'],
+        requiredDocs: []
+      },
+      {
+        id: 'delivery',
+        name: 'Client Delivery',
+        description: 'Deliver outputs and close the service request',
+        type: 'approval',
+        isRequired: true,
+        canBeModified: true,
+        estimatedDays: Math.max(1, Math.round(totalDays * 0.1)),
+        dependencies: ['review'],
+        requiredDocs: []
+      }
+    ];
+
+    return {
+      id: service.serviceKey,
+      name: service.name,
+      category: service.category,
+      type: service.serviceKey,
+      isStandard: true,
+      version: '1.0',
+      metadata: {
+        estimatedDuration: `${totalDays} days`,
+        totalCost: 0,
+        requiredPersonnel: ['Operations Executive', 'QA Reviewer'],
+        complianceDeadlines: [`${service.periodicity.toLowerCase()} cycle`],
+        eligibilityCriteria: [service.description]
+      },
+      steps
+    };
+  });
+};
+
 // Workflow Engine Class
 export class WorkflowEngine {
   private templates: Map<string, WorkflowTemplate> = new Map();
@@ -286,6 +365,13 @@ export class WorkflowEngine {
     // Also load the original incorporation template for backwards compatibility
     STANDARD_WORKFLOW_TEMPLATES.forEach(template => {
       this.templates.set(template.id, template);
+    });
+
+    // Load catalog-driven templates for every service entry
+    buildCatalogWorkflowTemplates().forEach(template => {
+      if (!this.templates.has(template.id)) {
+        this.templates.set(template.id, template);
+      }
     });
   }
 

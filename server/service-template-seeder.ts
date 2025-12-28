@@ -6,6 +6,8 @@ import {
   notificationRules
 } from '@shared/schema';
 import { adminWorkflowBuilder } from './admin-workflow-builder';
+import { SERVICE_CATALOG } from './service-catalog-data';
+import { eq } from 'drizzle-orm';
 
 // Comprehensive Service Template Seeder for Universal Platform
 export class ServiceTemplateSeeder {
@@ -28,8 +30,114 @@ export class ServiceTemplateSeeder {
     await this.seedAnnualFilingsWorkflow();
     await this.seedITRWorkflow();
     await this.seedBSPLWorkflow();
+    await this.seedCatalogDefaultTemplates();
     
     console.log('✅ All service templates seeded successfully');
+  }
+
+  private async seedCatalogDefaultTemplates() {
+    const serviceKeysWithCustomTemplates = new Set([
+      'incorporation',
+      'gst_registration',
+      'gst_returns',
+      'tds_quarterly',
+      'accounting_monthly',
+      'pf_esi_monthly',
+      'annual_filings_roc',
+      'itr_annual',
+      'bs_pl_annual',
+      'post_incorporation',
+      'quarterly_statutory_generic'
+    ]);
+
+    for (const service of SERVICE_CATALOG) {
+      if (serviceKeysWithCustomTemplates.has(service.serviceKey)) {
+        continue;
+      }
+
+      const existing = await db
+        .select({ id: workflowTemplates.id })
+        .from(workflowTemplates)
+        .where(eq(workflowTemplates.serviceCode, service.serviceKey))
+        .limit(1);
+
+      if (existing.length > 0) {
+        continue;
+      }
+
+      const normalizedPeriodicity = this.normalizePeriodicity(service.periodicity);
+      const slaDays = this.estimateSlaDays(normalizedPeriodicity);
+
+      await adminWorkflowBuilder.createServiceTemplate({
+        serviceKey: service.serviceKey,
+        name: service.name,
+        description: service.description,
+        periodicity: normalizedPeriodicity,
+        dependencies: [],
+        workflow: [
+          {
+            stepKey: 'intake',
+            name: 'Requirement Intake',
+            description: `Collect inputs and documents for ${service.name}`,
+            clientTasks: ['Share required details', 'Upload supporting documents'],
+            opsChecklist: ['Validate inputs', 'Confirm scope with client'],
+            slaDays: Math.max(1, Math.round(slaDays * 0.3)),
+            qaRequired: false
+          },
+          {
+            stepKey: 'execution',
+            name: 'Service Execution',
+            description: `Execute ${service.name} workflow`,
+            opsChecklist: ['Prepare working papers', 'Complete filing or submission'],
+            slaDays: Math.max(1, Math.round(slaDays * 0.4)),
+            qaRequired: true
+          },
+          {
+            stepKey: 'review',
+            name: 'Quality Review',
+            description: 'Perform QA review and validations',
+            opsChecklist: ['Review outputs', 'Verify compliance requirements'],
+            slaDays: Math.max(1, Math.round(slaDays * 0.2)),
+            qaRequired: true
+          },
+          {
+            stepKey: 'delivery',
+            name: 'Client Delivery',
+            description: 'Deliver outputs and close the service request',
+            opsChecklist: ['Share deliverables', 'Capture client sign-off'],
+            slaDays: Math.max(1, Math.round(slaDays * 0.1)),
+            qaRequired: false,
+            deliverables: ['final_report', 'acknowledgment']
+          }
+        ]
+      });
+    }
+  }
+
+  private normalizePeriodicity(periodicity: string): 'ONE_TIME' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' {
+    if (periodicity === 'ONGOING') {
+      return 'MONTHLY';
+    }
+
+    if (periodicity === 'ONE_TIME' || periodicity === 'MONTHLY' || periodicity === 'QUARTERLY' || periodicity === 'ANNUAL') {
+      return periodicity;
+    }
+
+    return 'ONE_TIME';
+  }
+
+  private estimateSlaDays(periodicity: 'ONE_TIME' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL') {
+    switch (periodicity) {
+      case 'MONTHLY':
+        return 5;
+      case 'QUARTERLY':
+        return 7;
+      case 'ANNUAL':
+        return 10;
+      case 'ONE_TIME':
+      default:
+        return 6;
+    }
   }
 
   async seedNotificationTemplates() {
