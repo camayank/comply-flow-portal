@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,14 +6,30 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Shield, Mail, Lock, Smartphone } from "lucide-react";
-import { getRoleDashboardRoute } from "@/utils/roleBasedRouting";
+import { canAccessRoute, getRoleDashboardRoute } from "@/utils/roleBasedRouting";
 
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<"client" | "staff">("client");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const selectedRole = params.get('role') || sessionStorage.getItem('selectedRole');
+
+    if (selectedRole) {
+      const normalizedRole = selectedRole.toLowerCase();
+      if (normalizedRole === 'client') {
+        setActiveTab('client');
+      } else {
+        setActiveTab('staff');
+      }
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
@@ -28,7 +44,7 @@ export default function Login() {
 
         <Card>
           <CardHeader>
-            <Tabs defaultValue="client" className="w-full">
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "client" | "staff")} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="client">Client Login</TabsTrigger>
                 <TabsTrigger value="staff">Staff Login</TabsTrigger>
@@ -64,6 +80,7 @@ function ClientLogin() {
   const [otp, setOtp] = useState("");
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
 
   const sendOtpMutation = useMutation({
     mutationFn: (email: string) => apiRequest('/api/auth/client/send-otp', 'POST', { email }),
@@ -91,10 +108,15 @@ function ClientLogin() {
         title: "Success",
         description: "Login successful!",
       });
-      // Store user data and navigate to role-specific dashboard
-      localStorage.setItem('user', JSON.stringify(data.user));
+      const redirectPath = sessionStorage.getItem('redirectAfterLogin');
       const dashboardRoute = getRoleDashboardRoute(data.user.role);
-      setLocation(dashboardRoute);
+      if (redirectPath && canAccessRoute(data.user.role, redirectPath)) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        setLocation(redirectPath);
+      } else {
+        setLocation(dashboardRoute);
+      }
+      queryClient.invalidateQueries({ queryKey: ['auth', 'user'] });
     },
     onError: (error: any) => {
       toast({
@@ -221,6 +243,7 @@ function StaffLogin() {
   const [password, setPassword] = useState("");
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
 
   const loginMutation = useMutation({
     mutationFn: (data: { username: string; password: string }) =>
@@ -230,10 +253,15 @@ function StaffLogin() {
         title: "Success",
         description: "Login successful!",
       });
-      // Store user data and navigate to role-specific dashboard
-      localStorage.setItem('user', JSON.stringify(data.user));
+      const redirectPath = sessionStorage.getItem('redirectAfterLogin');
       const dashboardRoute = getRoleDashboardRoute(data.user.role);
-      setLocation(dashboardRoute);
+      if (redirectPath && canAccessRoute(data.user.role, redirectPath)) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        setLocation(redirectPath);
+      } else {
+        setLocation(dashboardRoute);
+      }
+      queryClient.invalidateQueries({ queryKey: ['auth', 'user'] });
     },
     onError: (error: any) => {
       toast({

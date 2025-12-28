@@ -2,8 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { UniversalServiceEngine } from "./universal-service-engine";
 import { registerTeamManagementRoutes } from './team-management-routes';
-import { requireAuth, requireMinRole } from './auth-middleware';
+import { requireAuth } from './auth-middleware';
 import { db } from "./db";
+import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES } from './rbac-middleware';
 import { eq, and, desc, asc, like, inArray, isNull, sql, or } from "drizzle-orm";
 import {
   users,
@@ -26,11 +27,13 @@ import {
 } from "@shared/universal-schema";
 
 export async function registerUniversalRoutes(app: Express): Promise<Server> {
+  const requireAdminAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ADMIN)] as const;
+  const requireOpsAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE)] as const;
 
   // ===== ADMIN ROUTES =====
   
   // Service Catalog Management
-  app.get("/api/admin/service-types", async (req, res) => {
+  app.get("/api/admin/service-types", ...requireAdminAccess, async (req, res) => {
     try {
       const serviceTypes = await UniversalServiceEngine.getAllServiceTypes();
       res.json(serviceTypes);
@@ -40,7 +43,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/service-types", async (req, res) => {
+  app.post("/api/admin/service-types", ...requireAdminAccess, async (req, res) => {
     try {
       const serviceType = await UniversalServiceEngine.createServiceType(req.body);
       res.json(serviceType);
@@ -51,7 +54,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Workflow Template Management
-  app.get("/api/admin/workflow-templates", async (req, res) => {
+  app.get("/api/admin/workflow-templates", ...requireAdminAccess, async (req, res) => {
     try {
       const templates = await db.select().from(workflow_templates)
         .orderBy(desc(workflow_templates.created_at));
@@ -62,7 +65,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/workflow-templates", async (req, res) => {
+  app.post("/api/admin/workflow-templates", ...requireAdminAccess, async (req, res) => {
     try {
       const template = await UniversalServiceEngine.createWorkflowTemplate(req.body);
       res.json(template);
@@ -73,7 +76,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Global Workflow Updates
-  app.post("/api/admin/apply-global-updates", requireAuth, requireMinRole('admin'), async (req, res) => {
+  app.post("/api/admin/apply-global-updates", ...requireAdminAccess, async (req, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Authentication required' });
@@ -94,7 +97,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Admin Dashboard Metrics
-  app.get("/api/admin/dashboard-metrics", requireAuth, requireMinRole('admin'), async (req, res) => {
+  app.get("/api/admin/dashboard-metrics", ...requireAdminAccess, async (req, res) => {
     try {
       const [
         activeOrdersResult,
@@ -137,7 +140,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/operational-metrics", async (req, res) => {
+  app.get("/api/admin/operational-metrics", ...requireOpsAccess, async (req, res) => {
     try {
       const metrics = await UniversalServiceEngine.getOperationalMetrics();
       res.json(metrics);
@@ -173,7 +176,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Client Service Orders
-  app.get("/api/client/service-orders", async (req, res) => {
+  app.get("/api/client/service-orders", requireAuth, async (req, res) => {
     try {
       const { entity_id } = req.query;
       
@@ -229,7 +232,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Client Document Upload
-  app.post("/api/client/documents/upload", async (req, res) => {
+  app.post("/api/client/documents/upload", requireAuth, async (req, res) => {
     try {
       // TODO: Implement file upload with storage service
       const { service_order_id, doctype } = req.body;

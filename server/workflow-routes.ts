@@ -4,11 +4,14 @@ import {
   serviceRequests
 } from '@shared/schema';
 import { eq, desc, sql } from 'drizzle-orm';
+import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES } from './rbac-middleware';
 
 export function registerWorkflowRoutes(app: Express) {
+  const requireAdminAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ADMIN)] as const;
+  const requireOpsAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE)] as const;
   
   // Workflow Templates Management
-  app.get('/api/admin/workflow-templates', async (req, res) => {
+  app.get('/api/admin/workflow-templates', ...requireAdminAccess, async (req, res) => {
     try {
       const templates = await db
         .select()
@@ -22,7 +25,7 @@ export function registerWorkflowRoutes(app: Express) {
     }
   });
 
-  app.get('/api/admin/workflow-templates/:id', async (req, res) => {
+  app.get('/api/admin/workflow-templates/:id', ...requireAdminAccess, async (req, res) => {
     try {
       const template = await db
         .select()
@@ -51,7 +54,7 @@ export function registerWorkflowRoutes(app: Express) {
     }
   });
 
-  app.post('/api/admin/workflow-templates', async (req, res) => {
+  app.post('/api/admin/workflow-templates', ...requireAdminAccess, async (req, res) => {
     try {
       const template = await adminWorkflowBuilder.createServiceTemplate(req.body);
       res.json(template);
@@ -61,7 +64,7 @@ export function registerWorkflowRoutes(app: Express) {
     }
   });
 
-  app.put('/api/admin/workflow-templates/:id', async (req, res) => {
+  app.put('/api/admin/workflow-templates/:id', ...requireAdminAccess, async (req, res) => {
     try {
       const { applyToInFlight = false, ...updates } = req.body;
       
@@ -78,7 +81,7 @@ export function registerWorkflowRoutes(app: Express) {
     }
   });
 
-  app.delete('/api/admin/workflow-templates/:id', async (req, res) => {
+  app.delete('/api/admin/workflow-templates/:id', ...requireAdminAccess, async (req, res) => {
     try {
       await db
         .update(workflowTemplates)
@@ -96,7 +99,7 @@ export function registerWorkflowRoutes(app: Express) {
   });
 
   // Template Impact Analysis
-  app.post('/api/admin/workflow-templates/:id/impact-preview', async (req, res) => {
+  app.post('/api/admin/workflow-templates/:id/impact-preview', ...requireAdminAccess, async (req, res) => {
     try {
       const impact = await adminWorkflowBuilder.getTemplateImpactPreview(
         parseInt(req.params.id),
@@ -111,7 +114,7 @@ export function registerWorkflowRoutes(app: Express) {
   });
 
   // Clone Template
-  app.post('/api/admin/workflow-templates/:id/clone', async (req, res) => {
+  app.post('/api/admin/workflow-templates/:id/clone', ...requireAdminAccess, async (req, res) => {
     try {
       const { newName, customizations = {} } = req.body;
       
@@ -129,7 +132,7 @@ export function registerWorkflowRoutes(app: Express) {
   });
 
   // Workflow Analytics
-  app.get('/api/admin/workflow-analytics', async (req, res) => {
+  app.get('/api/admin/workflow-analytics', ...requireAdminAccess, async (req, res) => {
     try {
       const { serviceCode } = req.query;
       
@@ -145,7 +148,7 @@ export function registerWorkflowRoutes(app: Express) {
   });
 
   // Workflow Execution Management
-  app.get('/api/workflow-executions', async (req, res) => {
+  app.get('/api/workflow-executions', ...requireOpsAccess, async (req, res) => {
     try {
       const { serviceRequestId, status } = req.query;
       
@@ -174,7 +177,7 @@ export function registerWorkflowRoutes(app: Express) {
     }
   });
 
-  app.get('/api/workflow-executions/:id', async (req, res) => {
+  app.get('/api/workflow-executions/:id', ...requireOpsAccess, async (req, res) => {
     try {
       const execution = await db
         .select({
@@ -200,7 +203,7 @@ export function registerWorkflowRoutes(app: Express) {
   });
 
   // Update workflow execution step
-  app.put('/api/workflow-executions/:id/steps/:stepKey', async (req, res) => {
+  app.put('/api/workflow-executions/:id/steps/:stepKey', ...requireOpsAccess, async (req, res) => {
     try {
       const { status, assigneeId, notes, completedAt } = req.body;
       const executionId = parseInt(req.params.id);
