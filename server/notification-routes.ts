@@ -5,11 +5,13 @@ import {
   businessEntities
 } from '@shared/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
+import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES } from './rbac-middleware';
 
 export function registerNotificationRoutes(app: Express) {
+  const requireAdminAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ADMIN)] as const;
   
   // Initialize/Seed Templates and Rules
-  app.post('/api/admin/seed-templates', async (req, res) => {
+  app.post('/api/admin/seed-templates', ...requireAdminAccess, async (req, res) => {
     try {
       await serviceTemplateSeeder.seedAllTemplates();
       res.json({ message: 'All service templates seeded successfully' });
@@ -20,7 +22,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // Notification Rules Management
-  app.get('/api/admin/notification-rules', async (req, res) => {
+  app.get('/api/admin/notification-rules', ...requireAdminAccess, async (req, res) => {
     try {
       const rules = await db
         .select()
@@ -34,7 +36,7 @@ export function registerNotificationRoutes(app: Express) {
     }
   });
 
-  app.post('/api/admin/notification-rules', async (req, res) => {
+  app.post('/api/admin/notification-rules', ...requireAdminAccess, async (req, res) => {
     try {
       const rule = await notificationEngine.createRule(req.body);
       res.json(rule);
@@ -44,7 +46,7 @@ export function registerNotificationRoutes(app: Express) {
     }
   });
 
-  app.put('/api/admin/notification-rules/:id', async (req, res) => {
+  app.put('/api/admin/notification-rules/:id', ...requireAdminAccess, async (req, res) => {
     try {
       const rule = await notificationEngine.updateRule(
         parseInt(req.params.id), 
@@ -57,7 +59,7 @@ export function registerNotificationRoutes(app: Express) {
     }
   });
 
-  app.delete('/api/admin/notification-rules/:id', async (req, res) => {
+  app.delete('/api/admin/notification-rules/:id', ...requireAdminAccess, async (req, res) => {
     try {
       await db
         .update(notificationRules)
@@ -73,7 +75,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // Notification Templates Management
-  app.get('/api/admin/notification-templates', async (req, res) => {
+  app.get('/api/admin/notification-templates', ...requireAdminAccess, async (req, res) => {
     try {
       const templates = await db
         .select()
@@ -87,7 +89,7 @@ export function registerNotificationRoutes(app: Express) {
     }
   });
 
-  app.post('/api/admin/notification-templates', async (req, res) => {
+  app.post('/api/admin/notification-templates', ...requireAdminAccess, async (req, res) => {
     try {
       const [template] = await db
         .insert(notificationTemplates)
@@ -101,7 +103,7 @@ export function registerNotificationRoutes(app: Express) {
     }
   });
 
-  app.put('/api/admin/notification-templates/:templateKey', async (req, res) => {
+  app.put('/api/admin/notification-templates/:templateKey', ...requireAdminAccess, async (req, res) => {
     try {
       const [template] = await db
         .update(notificationTemplates)
@@ -117,7 +119,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // Notification Outbox Monitoring
-  app.get('/api/admin/notification-outbox', async (req, res) => {
+  app.get('/api/admin/notification-outbox', ...requireAdminAccess, async (req, res) => {
     try {
       const { status, limit = 50, offset = 0 } = req.query;
       
@@ -145,7 +147,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // Notification Analytics
-  app.get('/api/admin/notification-analytics', async (req, res) => {
+  app.get('/api/admin/notification-analytics', ...requireAdminAccess, async (req, res) => {
     try {
       const analytics = await db
         .select({
@@ -188,7 +190,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // Trigger Manual Notifications
-  app.post('/api/admin/trigger-notification', async (req, res) => {
+  app.post('/api/admin/trigger-notification', ...requireAdminAccess, async (req, res) => {
     try {
       const { ruleKey, serviceRequestId, entityId } = req.body;
       
@@ -225,7 +227,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // Test Notification Templates
-  app.post('/api/admin/test-template', async (req, res) => {
+  app.post('/api/admin/test-template', ...requireAdminAccess, async (req, res) => {
     try {
       const { templateKey, testData } = req.body;
       
@@ -300,7 +302,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // Reload Notification Engine
-  app.post('/api/admin/reload-notification-engine', async (req, res) => {
+  app.post('/api/admin/reload-notification-engine', ...requireAdminAccess, async (req, res) => {
     try {
       await notificationEngine.reloadRules();
       res.json({ message: 'Notification engine reloaded successfully' });
@@ -311,7 +313,7 @@ export function registerNotificationRoutes(app: Express) {
   });
 
   // Get notification statistics
-  app.get('/api/admin/notification-stats', async (req, res) => {
+  app.get('/api/admin/notification-stats', ...requireAdminAccess, async (req, res) => {
     try {
       const stats = {
         activeRules: await db

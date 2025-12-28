@@ -8,11 +8,13 @@ import {
   documentsUploads
 } from '@shared/schema';
 import { eq, desc } from 'drizzle-orm';
+import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES } from './rbac-middleware';
 
 export function registerAdminConfigRoutes(app: Express) {
+  const requireAdminAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ADMIN)] as const;
 
   // ========== SERVICES CATALOG ==========
-  app.get('/api/admin/services', async (req, res) => {
+  app.get('/api/admin/services', ...requireAdminAccess, async (req, res) => {
     try {
       // Get services from the services_catalog table (real implementation)
       const servicesList = await db
@@ -30,7 +32,7 @@ export function registerAdminConfigRoutes(app: Express) {
     }
   });
 
-  app.post('/api/admin/services', async (req, res) => {
+  app.post('/api/admin/services', ...requireAdminAccess, async (req, res) => {
     try {
       const { serviceKey, name, periodicity, description, category, price } = req.body;
       
@@ -53,7 +55,7 @@ export function registerAdminConfigRoutes(app: Express) {
     }
   });
 
-  app.put('/api/admin/services/:serviceKey', async (req, res) => {
+  app.put('/api/admin/services/:serviceKey', ...requireAdminAccess, async (req, res) => {
     try {
       const { name, periodicity, description, category, price } = req.body;
       
@@ -77,7 +79,7 @@ export function registerAdminConfigRoutes(app: Express) {
   });
 
   // ========== WORKFLOW TEMPLATES ==========
-  app.get('/api/admin/workflows/:serviceKey', async (req, res) => {
+  app.get('/api/admin/workflows/:serviceKey', ...requireAdminAccess, async (req, res) => {
     try {
       // Mock workflow template data for demonstration
       const templates = [
@@ -104,7 +106,7 @@ export function registerAdminConfigRoutes(app: Express) {
     }
   });
 
-  app.post('/api/admin/workflows/:serviceKey/publish', async (req, res) => {
+  app.post('/api/admin/workflows/:serviceKey/publish', ...requireAdminAccess, async (req, res) => {
     try {
       const { templateJson } = req.body;
       
@@ -123,7 +125,7 @@ export function registerAdminConfigRoutes(app: Express) {
   });
 
   // ========== DOCUMENT TYPES ==========
-  app.post('/api/admin/services/:serviceKey/doc-types', async (req, res) => {
+  app.post('/api/admin/services/:serviceKey/doc-types', ...requireAdminAccess, async (req, res) => {
     try {
       const { doctype, label, mandatory, clientUploads } = req.body;
       
@@ -146,7 +148,7 @@ export function registerAdminConfigRoutes(app: Express) {
   });
 
   // ========== DUE DATE RULES ==========
-  app.post('/api/admin/due-dates/:serviceKey', async (req, res) => {
+  app.post('/api/admin/due-dates/:serviceKey', ...requireAdminAccess, async (req, res) => {
     try {
       const { jurisdiction, ruleJson } = req.body;
       
@@ -169,7 +171,7 @@ export function registerAdminConfigRoutes(app: Express) {
   });
 
   // ========== ENTITY SERVICES ==========
-  app.post('/api/admin/entities/:entityId/services', async (req, res) => {
+  app.post('/api/admin/entities/:entityId/services', ...requireAdminAccess, async (req, res) => {
     try {
       const { serviceKey, periodicityOverride, jurisdiction } = req.body;
       const entityId = parseInt(req.params.entityId);
@@ -194,7 +196,7 @@ export function registerAdminConfigRoutes(app: Express) {
   });
 
   // ========== DASHBOARD STATS ==========
-  app.get('/api/admin/stats', async (req, res) => {
+  app.get('/api/admin/stats', ...requireAdminAccess, async (req, res) => {
     try {
       // Get accurate counts from database
       const totalServices = await db.select().from(servicesCatalog).then(r => r.length);

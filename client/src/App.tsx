@@ -1,15 +1,17 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Router, Route, Switch } from "wouter";
+import { Router, Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { GlobalErrorHandler } from "./components/GlobalErrorHandler";
 import { queryClient } from "@/lib/queryClient";
 import { ChatWidget } from "./components/ChatWidget";
 import { CommandPalette } from "./components/CommandPalette";
 import { SkeletonPage } from "./components/ui/skeleton-loader";
+import { useAuth } from "@/hooks/use-auth";
+import { canAccessRoute, getRoleDashboardRoute } from "@/utils/roleBasedRouting";
 
 // Loading component for lazy routes
 const PageLoader = () => <SkeletonPage />;
@@ -99,19 +101,73 @@ const DigiComplyWorkflowDashboard = lazy(() => import("./components/DigiComplyWo
 const OperationsManager = lazy(() => import("./components/OperationsManager"));
 const Footer = lazy(() => import("./components/Footer"));
 
-const App = () => (
-  <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <GlobalErrorHandler />
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <CommandPalette />
-        <Router>
-          <div className="min-h-screen flex flex-col">
-            <main className="flex-grow">
-              <Suspense fallback={<PageLoader />}>
-                <Switch>
+const publicRoutePrefixes = [
+  '/',
+  '/landing',
+  '/login',
+  '/signin',
+  '/register',
+  '/client-registration',
+  '/signup',
+  '/onboarding',
+  '/onboarding-flow',
+  '/platform-demo',
+  '/select-role',
+  '/role-selection',
+  '/mobile-landing',
+  '/smart-start',
+  '/whatsapp-onboarding',
+  '/design-system',
+  '/universal-landing',
+  '/compliance-scorecard',
+  '/10k',
+];
+
+const isPublicRoute = (path: string) =>
+  publicRoutePrefixes.some((route) => path === route || path.startsWith(`${route}/`));
+
+const App = () => {
+  const [location, setLocation] = useLocation();
+  const { user, isAuthenticated, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+
+    const isPublic = isPublicRoute(location);
+
+    if (!isAuthenticated && !isPublic) {
+      sessionStorage.setItem('redirectAfterLogin', location);
+      setLocation('/login');
+      return;
+    }
+
+    if (isAuthenticated && user?.role) {
+      if (['/login', '/signin', '/select-role', '/role-selection'].includes(location)) {
+        setLocation(getRoleDashboardRoute(user.role));
+        return;
+      }
+
+      if (!isPublic && !canAccessRoute(user.role, location)) {
+        setLocation(getRoleDashboardRoute(user.role));
+      }
+    }
+  }, [isAuthenticated, isLoading, location, setLocation, user]);
+
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <GlobalErrorHandler />
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <CommandPalette />
+          <Router>
+            <div className="min-h-screen flex flex-col">
+              <main className="flex-grow">
+                <Suspense fallback={<PageLoader />}>
+                  <Switch>
                 <Route path="/" component={UnifiedLanding} />
                 <Route path="/dashboard" component={UnifiedDashboard} />
                 <Route path="/select-role" component={RoleSelection} />

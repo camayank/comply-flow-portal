@@ -29,6 +29,8 @@ import { registerHealthRoutes } from "./health-routes";
 import customerServiceRoutes from "./customer-service-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  const requireAdminAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ADMIN)] as const;
+  const requireOpsAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE)] as const;
   
   // Register health check routes first (before any auth/protection)
   registerHealthRoutes(app);
@@ -570,7 +572,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/combo-configurations", async (req: Request, res: Response) => {
+  app.post("/api/admin/combo-configurations", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { adminEngine } = await import('./admin-engine');
       const combo = adminEngine.createComboConfiguration(req.body);
@@ -580,7 +582,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/combo-suggestions", async (req: Request, res: Response) => {
+  app.post("/api/admin/combo-suggestions", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { adminEngine } = await import('./admin-engine');
       const { selectedServices, clientProfile } = req.body;
@@ -591,7 +593,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/quality-standards", async (req: Request, res: Response) => {
+  app.post("/api/admin/quality-standards", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { adminEngine } = await import('./admin-engine');
       const standard = adminEngine.createQualityStandard(req.body);
@@ -601,7 +603,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/quality-audit/:serviceId", async (req: Request, res: Response) => {
+  app.post("/api/admin/quality-audit/:serviceId", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { adminEngine } = await import('./admin-engine');
       const { serviceId } = req.params;
@@ -612,7 +614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/retainership-plans", async (req: Request, res: Response) => {
+  app.post("/api/admin/retainership-plans", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { adminEngine } = await import('./admin-engine');
       const plan = adminEngine.createRetainershipPlan(req.body);
@@ -622,7 +624,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/retainership-value/:planId", async (req: Request, res: Response) => {
+  app.get("/api/admin/retainership-value/:planId", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { adminEngine } = await import('./admin-engine');
       const { planId } = req.params;
@@ -634,7 +636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/performance-report", async (req: Request, res: Response) => {
+  app.get("/api/admin/performance-report", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { adminEngine } = await import('./admin-engine');
       const report = adminEngine.generateServicePerformanceReport();
@@ -644,7 +646,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/custom-workflow-steps", async (req: Request, res: Response) => {
+  app.post("/api/admin/custom-workflow-steps", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { adminEngine } = await import('./admin-engine');
       const { workflowId, stepData, reason } = req.body;
@@ -655,7 +657,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/pricing-optimization", async (req: Request, res: Response) => {
+  app.get("/api/admin/pricing-optimization", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { adminEngine } = await import('./admin-engine');
       const services = adminEngine.getAllServiceConfigurations();
@@ -692,7 +694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/client-segmentation", async (req: Request, res: Response) => {
+  app.get("/api/admin/client-segmentation", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const segmentation = {
         segments: [
@@ -732,7 +734,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Legacy routes for backward compatibility
-  app.post("/api/admin/services", async (req: Request, res: Response) => {
+  app.post("/api/admin/services", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const serviceData = req.body;
       const service = await storage.createService({
@@ -745,7 +747,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/combo-triggers", async (req: Request, res: Response) => {
+  app.get("/api/admin/combo-triggers", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { adminEngine } = await import('./admin-engine');
       
@@ -811,7 +813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Platform Synchronization Health Endpoints
-  app.get("/api/platform/health", async (req: Request, res: Response) => {
+  app.get("/api/platform/health", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { platformSyncOrchestrator } = await import('./platform-sync-orchestrator');
       const healthStatus = platformSyncOrchestrator.getHealthStatus();
@@ -821,7 +823,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/platform/state", async (req: Request, res: Response) => {
+  app.get("/api/platform/state", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { platformSyncOrchestrator } = await import('./platform-sync-orchestrator');
       const platformState = platformSyncOrchestrator.getPlatformState();
@@ -831,7 +833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/platform/sync", async (req: Request, res: Response) => {
+  app.post("/api/platform/sync", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { platformSyncOrchestrator } = await import('./platform-sync-orchestrator');
       await platformSyncOrchestrator.forcePlatformSync();
@@ -841,7 +843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/platform/metrics", async (req: Request, res: Response) => {
+  app.get("/api/platform/metrics", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const metrics = {
         uptime: process.uptime(),
@@ -860,7 +862,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Enhanced SLA Management API
-  app.get("/api/sla/metrics", async (req: Request, res: Response) => {
+  app.get("/api/sla/metrics", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const days = parseInt(req.query.days as string) || 30;
       const metrics = await EnhancedSlaSystem.getSlaMetrics(days);
@@ -870,7 +872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/sla/exception/:serviceRequestId", async (req: Request, res: Response) => {
+  app.post("/api/sla/exception/:serviceRequestId", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { serviceRequestId } = req.params;
       const { extensionHours, reason, approvedBy } = req.body;
@@ -888,7 +890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/sla/pause/:serviceRequestId", async (req: Request, res: Response) => {
+  app.post("/api/sla/pause/:serviceRequestId", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { serviceRequestId } = req.params;
       const { reason } = req.body;
@@ -900,7 +902,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/sla/resume/:serviceRequestId", async (req: Request, res: Response) => {
+  app.post("/api/sla/resume/:serviceRequestId", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { serviceRequestId } = req.params;
       const { reason } = req.body;
@@ -912,7 +914,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/sla/status/:serviceRequestId", async (req: Request, res: Response) => {
+  app.get("/api/sla/status/:serviceRequestId", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { serviceRequestId } = req.params;
       const status = EnhancedSlaSystem.getServiceTimerStatus(parseInt(serviceRequestId));
