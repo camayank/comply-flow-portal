@@ -170,12 +170,12 @@ const routes: RouteInfo[] = [
   {
     path: "/compliance-calendar",
     name: "Compliance Calendar",
-    description: "Calendar view of compliance deadlines",
+    description: "Calendar view with real-time compliance data",
     role: "Client - Core",
     icon: Calendar,
     color: "bg-green-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/service-requests",
@@ -210,12 +210,12 @@ const routes: RouteInfo[] = [
   {
     path: "/vault",
     name: "Document Vault",
-    description: "Secure document storage and management",
+    description: "Secure document storage with backend API",
     role: "Client - Core",
     icon: FolderOpen,
     color: "bg-purple-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
 
   // ============ COMPLIANCE & TAX ============
@@ -232,42 +232,42 @@ const routes: RouteInfo[] = [
   {
     path: "/tracker",
     name: "Compliance Tracker",
-    description: "Track compliance status and deadlines",
+    description: "Track compliance status with state engine",
     role: "Compliance",
     icon: Target,
     color: "bg-green-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/taxtracker",
     name: "Tax Tracker",
-    description: "GST, TDS, Income Tax tracking",
+    description: "GST, TDS, Income Tax tracking with real-time API",
     role: "Compliance",
     icon: Calculator,
     color: "bg-amber-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/digiscore",
     name: "DigiScore",
-    description: "Compliance health score and ratings",
+    description: "Compliance health score with backend scoring engine",
     role: "Compliance",
     icon: Gauge,
     color: "bg-emerald-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/autocomply",
     name: "AutoComply",
-    description: "Automated compliance workflows",
+    description: "Automated compliance workflows with backend triggers",
     role: "Compliance",
     icon: Workflow,
     color: "bg-violet-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/10k",
@@ -304,12 +304,12 @@ const routes: RouteInfo[] = [
   {
     path: "/esign-agreements",
     name: "E-Sign Agreements",
-    description: "Digital signature for agreements",
+    description: "Digital signature with backend verification",
     role: "Documents",
     icon: PenTool,
     color: "bg-purple-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
   {
     path: "/tasks",
