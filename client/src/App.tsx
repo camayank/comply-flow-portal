@@ -60,8 +60,6 @@ const StreamlinedOnboarding = lazy(() => import("./pages/StreamlinedOnboarding")
 const SmartStart = lazy(() => import("./pages/SmartStart"));
 const WhatsAppOnboarding = lazy(() => import("./pages/WhatsAppOnboarding"));
 const ComplianceScorecard = lazy(() => import("./pages/ComplianceScorecard"));
-const ClientPortal = lazy(() => import("./pages/ClientPortal"));
-const MobileClientPortal = lazy(() => import("./pages/MobileClientPortal"));
 const ClientServiceCatalog = lazy(() => import("./pages/ClientServiceCatalog"));
 const ServiceRequestCreate = lazy(() => import("./pages/ServiceRequestCreate"));
 const ServiceRequestDetail = lazy(() => import("./pages/ServiceRequestDetail"));
@@ -72,7 +70,6 @@ const AgentPortal = lazy(() => import("./pages/AgentPortal"));
 const MobileAgentPortal = lazy(() => import("./pages/MobileAgentPortal"));
 const MasterBlueprintDashboard = lazy(() => import("./pages/MasterBlueprintDashboard"));
 const UniversalAdminPanel = lazy(() => import("./pages/UniversalAdminPanel"));
-const UniversalClientPortal = lazy(() => import("./pages/UniversalClientPortal"));
 const UniversalOperationsPanel = lazy(() => import("./pages/UniversalOperationsPanel"));
 const UniversalLandingPage = lazy(() => import("./pages/UniversalLandingPage"));
 const WorkflowImport = lazy(() => import("./pages/WorkflowImport"));
@@ -81,6 +78,11 @@ const PreSalesManager = lazy(() => import("./pages/PreSalesManager"));
 const SalesProposalManager = lazy(() => import("./pages/SalesProposalManager"));
 const QCDashboard = lazy(() => import("./pages/QCDashboard"));
 const QualityMetricsDashboard = lazy(() => import("./pages/QualityMetricsDashboard"));
+const AccountIndex = lazy(() => import("./pages/portal-v2/AccountIndex"));
+const AccountBusinesses = lazy(() => import("./pages/portal-v2/AccountBusinesses"));
+const AccountBilling = lazy(() => import("./pages/portal-v2/AccountBilling"));
+const AccountDocuments = lazy(() => import("./pages/portal-v2/AccountDocuments"));
+const AccountSecurity = lazy(() => import("./pages/portal-v2/AccountSecurity"));
 const DeliveryConfirmation = lazy(() => import("./pages/DeliveryConfirmation"));
 const HRDashboard = lazy(() => import("./pages/HRDashboard"));
 const ClientMasterDashboard = lazy(() => import("./pages/ClientMasterDashboard"));
@@ -96,10 +98,23 @@ const AgentProfileSettings = lazy(() => import("./pages/AgentProfileSettings"));
 const CustomerServiceDashboard = lazy(() => import("./pages/CustomerServiceDashboard"));
 const SuperAdminPortal = lazy(() => import("./pages/SuperAdminPortal"));
 const RoleSelection = lazy(() => import("./pages/RoleSelection"));
+const LifecycleDashboard = lazy(() => import("./pages/LifecycleDashboard"));
+const ComplianceDetail = lazy(() => import("./pages/ComplianceDetail"));
+const ServicesDetail = lazy(() => import("./pages/ServicesDetail"));
+const DocumentsDetail = lazy(() => import("./pages/DocumentsDetail"));
+const FundingDetail = lazy(() => import("./pages/FundingDetail"));
+const Timeline = lazy(() => import("./pages/Timeline"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const DigiComplyWorkflowDashboard = lazy(() => import("./components/DigiComplyWorkflowDashboard"));
 const OperationsManager = lazy(() => import("./components/OperationsManager"));
 const Footer = lazy(() => import("./components/Footer"));
+const FounderLiteDashboard = lazy(() => import("./pages/FounderLiteDashboard"));
+const MobileClientPortalRefactored = lazy(() => import("./pages/MobileClientPortalRefactored"));
+const ClientPortalV2 = lazy(() => import("./pages/ClientPortalV2"));
+const MobileOperationsPanelRefactored = lazy(() => import("./pages/MobileOperationsPanelRefactored"));
+const MobileAdminPanelRefactored = lazy(() => import("./pages/MobileAdminPanelRefactored"));
+const SalesProposalManagerRefactored = lazy(() => import("./pages/SalesProposalManagerRefactored"));
+const DevHub = lazy(() => import("./pages/DevHub"));
 
 const publicRoutePrefixes = [
   '/',
@@ -126,10 +141,12 @@ const publicRoutePrefixes = [
 const isPublicRoute = (path: string) =>
   publicRoutePrefixes.some((route) => path === route || path.startsWith(`${route}/`));
 
-const App = () => {
+const AppContent = () => {
   const [location, setLocation] = useLocation();
   const { user, isAuthenticated, isLoading } = useAuth();
 
+  // 🔓 DEV MODE: Disable all route protection
+  /* ORIGINAL ROUTE PROTECTION - COMMENTED FOR DEV
   useEffect(() => {
     if (isLoading) {
       return;
@@ -154,10 +171,10 @@ const App = () => {
       }
     }
   }, [isAuthenticated, isLoading, location, setLocation, user]);
+  */
 
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
         <GlobalErrorHandler />
         <TooltipProvider>
           <Toaster />
@@ -168,7 +185,10 @@ const App = () => {
               <main className="flex-grow">
                 <Suspense fallback={<PageLoader />}>
                   <Switch>
-                <Route path="/" component={UnifiedLanding} />
+                <Route path="/" component={DevHub} />
+                <Route path="/hub" component={DevHub} />
+                <Route path="/dev" component={DevHub} />
+                <Route path="/landing" component={UnifiedLanding} />
                 <Route path="/dashboard" component={UnifiedDashboard} />
                 <Route path="/select-role" component={RoleSelection} />
                 <Route path="/role-selection" component={RoleSelection} />
@@ -200,8 +220,8 @@ const App = () => {
                 <Route path="/tasks" component={TaskManagement} />
                 <Route path="/task-management" component={TaskManagement} />
                 <Route path="/my-tasks" component={TaskManagement} />
-                <Route path="/documents" component={AiDocumentPreparation} />
                 <Route path="/ai-documents" component={AiDocumentPreparation} />
+                <Route path="/doc-prep" component={AiDocumentPreparation} />
                 <Route path="/document-preparation" component={AiDocumentPreparation} />
                 <Route path="/doc-generator" component={AiDocumentPreparation} />
                 <Route path="/design-system" component={DesignSystemShowcase} />
@@ -215,29 +235,42 @@ const App = () => {
                 <Route path="/service-request/:id" component={ServiceRequestDetail} />
                 <Route path="/compliance-calendar" component={ClientComplianceCalendar} />
                 <Route path="/client-profile" component={ClientProfile} />
-                <Route path="/workflows" component={DigiComplyWorkflowDashboard} />
+                <Route path="/workflow-dashboard" component={DigiComplyWorkflowDashboard} />
                 <Route path="/smart-start" component={SmartStart} />
                 <Route path="/whatsapp-onboarding" component={WhatsAppOnboarding} />
                 <Route path="/10k" component={ComplianceScorecard} />
                 <Route path="/compliance-scorecard" component={ComplianceScorecard} />
-                <Route path="/portal" component={MobileClientPortal} />
-                <Route path="/client-portal" component={MobileClientPortal} />
-                <Route path="/operations" component={MobileOperationsPanel} />
-                <Route path="/ops" component={MobileOperationsPanel} />
+                <Route path="/lifecycle" component={LifecycleDashboard} />
+                <Route path="/lifecycle-dashboard" component={LifecycleDashboard} />
+                <Route path="/lifecycle/compliance" component={ComplianceDetail} />
+                <Route path="/lifecycle/services" component={ServicesDetail} />
+                <Route path="/lifecycle/documents" component={DocumentsDetail} />
+                <Route path="/lifecycle/funding" component={FundingDetail} />
+                <Route path="/lifecycle/timeline" component={Timeline} />
+                <Route path="/lifecycle/compliance" component={ComplianceDetail} />
+                <Route path="/lifecycle/services" component={ServicesDetail} />
+                <Route path="/portal-v2" component={ClientPortalV2} />
+                <Route path="/portal-v2/account" component={AccountIndex} />
+                <Route path="/portal-v2/account/businesses" component={AccountBusinesses} />
+                <Route path="/portal-v2/account/billing" component={AccountBilling} />
+                <Route path="/portal-v2/account/documents" component={AccountDocuments} />
+                <Route path="/portal-v2/account/security" component={AccountSecurity} />
+                <Route path="/portal" component={MobileClientPortalRefactored} />
+                <Route path="/client-portal" component={MobileClientPortalRefactored} />
+                <Route path="/operations" component={MobileOperationsPanelRefactored} />
+                <Route path="/ops" component={MobileOperationsPanelRefactored} />
                 <Route path="/operations-manager" component={OperationsManager} />
                 <Route path="/ops-manager" component={OperationsManager} />
-                <Route path="/admin" component={MobileAdminPanel} />
-                <Route path="/admin-control" component={MobileAdminPanel} />
+                <Route path="/admin" component={MobileAdminPanelRefactored} />
+                <Route path="/admin-control" component={MobileAdminPanelRefactored} />
                 <Route path="/blueprint" component={MasterBlueprintDashboard} />
                 <Route path="/master-blueprint" component={MasterBlueprintDashboard} />
                 <Route path="/universal-admin" component={UniversalAdminPanel} />
-                <Route path="/universal-client" component={UniversalClientPortal} />
                 <Route path="/universal-ops" component={UniversalOperationsPanel} />
                 <Route path="/admin-config" component={AdminServiceConfig} />
                 <Route path="/workflow-import" component={WorkflowImport} />
                 <Route path="/pre-sales" component={PreSalesManager} />
-                <Route path="/proposals" component={SalesProposalManager} />
-                <Route path="/sales-proposals" component={SalesProposalManager} />
+                <Route path="/sales-proposals" component={SalesProposalManagerRefactored} />
                 <Route path="/qc" component={QCDashboard} />
                 <Route path="/qc-dashboard" component={QCDashboard} />
                 <Route path="/quality-control" component={QCDashboard} />
@@ -261,6 +294,8 @@ const App = () => {
                 <Route path="/mobile-dashboard" component={MobileDashboard} />
                 <Route path="/mobile" component={MobileDashboard} />
                 <Route path="/command-center" component={MobileDashboard} />
+                <Route path="/founder" component={FounderLiteDashboard} />
+                <Route path="/compliance-state" component={FounderLiteDashboard} />
                 <Route path="/agent" component={MobileAgentPortal} />
                 <Route path="/agent/dashboard" component={AgentDashboard} />
                 <Route path="/agent/leads" component={AgentLeadManagement} />
@@ -302,8 +337,17 @@ const App = () => {
           </div>
         </Router>
       </TooltipProvider>
+    </ErrorBoundary>
+  );
+};
+
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <GlobalErrorHandler />
+      <AppContent />
     </QueryClientProvider>
-  </ErrorBoundary>
-);
+  );
+};
 
 export default App;

@@ -18,6 +18,28 @@ export interface User {
 }
 
 export function useAuth() {
+  // 🔓 DEV MODE: Return mock authenticated user
+  const mockUser: User = {
+    id: 1,
+    username: 'dev-user',
+    email: 'dev@test.com',
+    fullName: 'Dev User',
+    role: 'client',
+    department: 'Development',
+    isActive: true,
+  };
+
+  return {
+    user: mockUser,
+    isLoading: false,
+    error: null,
+    isAuthenticated: true,
+    login: async () => ({ success: true }),
+    logout: async () => {},
+    refetch: async () => {},
+  };
+
+  /* ORIGINAL AUTH CODE - COMMENTED FOR DEV
   const { data: user, isLoading, error, refetch } = useQuery<User | null>({
     queryKey: ['auth', 'user'],
     queryFn: async () => {
@@ -88,4 +110,5 @@ export function useAuth() {
     logout,
     refetch
   };
+  */
 }

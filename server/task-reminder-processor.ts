@@ -19,8 +19,8 @@ export class TaskReminderProcessor {
     this.initializeProcessor();
   }
 
-  private initializeProcessor() {
-    const { jobManager } = require('./job-lifecycle-manager');
+  private async initializeProcessor() {
+    const { jobManager } = await import('./job-lifecycle-manager.js');
 
     console.log('📋 Initializing Task Reminder Processor...');
 
@@ -313,8 +313,8 @@ export class TaskReminderProcessor {
   }
 
   // Stop all scheduled jobs
-  public stopProcessor() {
-    const { jobManager } = require('./job-lifecycle-manager');
+  public async stopProcessor() {
+    const { jobManager } = await import('./job-lifecycle-manager.js');
 
     // Stop both jobs using the centralized job manager
     jobManager.stopJob('task-reminder-hourly');

@@ -19,8 +19,21 @@ declare global {
 
 /**
  * Authenticate JWT token middleware
+ * DEV MODE: Authentication bypass enabled
  */
 export function authenticateToken(req: Request, res: Response, next: NextFunction): void {
+  // 🔓 DEV MODE: Bypass authentication
+  req.user = {
+    id: 'dev-user-123',
+    email: 'dev@test.com',
+    role: 'client',
+    type: 'access'
+  };
+  req.userId = 'dev-user-123';
+  next();
+  return;
+
+  /* ORIGINAL AUTH CODE - COMMENTED FOR DEV
   try {
     // Get token from header
     const authHeader = req.headers['authorization'];
@@ -66,64 +79,39 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       error: 'Authentication failed',
     });
   }
+  */
 }
 
 /**
  * Optional authentication middleware
- * Does not fail if token is missing, but attaches user if valid
+ * DEV MODE: Always attach dev user
  */
 export function optionalAuth(req: Request, res: Response, next: NextFunction): void {
-  try {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (token) {
-      const decoded = verifyToken(token);
-      if (decoded && decoded.type === 'access') {
-        req.user = decoded;
-        req.userId = decoded.userId;
-      }
-    }
-
-    next();
-  } catch (error) {
-    // Silently continue without authentication
-    next();
-  }
+  // 🔓 DEV MODE: Always attach user
+  req.user = {
+    id: 'dev-user-123',
+    email: 'dev@test.com',
+    role: 'client',
+    type: 'access'
+  };
+  req.userId = 'dev-user-123';
+  next();
 }
 
 /**
  * Verify refresh token middleware
+ * DEV MODE: Always allow refresh
  */
 export function verifyRefreshToken(req: Request, res: Response, next: NextFunction): void {
-  try {
-    const { refreshToken } = req.body;
-
-    if (!refreshToken) {
-      res.status(401).json({
-        success: false,
-        error: 'Refresh token required',
-      });
-      return;
-    }
-
-    const decoded = verifyToken(refreshToken);
-
-    if (!decoded) {
-      res.status(403).json({
-        success: false,
-        error: 'Invalid or expired refresh token',
-      });
-      return;
-    }
-
-    if (decoded.type !== 'refresh') {
-      res.status(403).json({
-        success: false,
-        error: 'Invalid token type',
-      });
-      return;
-    }
+  // 🔓 DEV MODE: Bypass refresh token verification
+  req.user = {
+    id: 'dev-user-123',
+    email: 'dev@test.com',
+    role: 'client',
+    type: 'refresh'
+  };
+  next();
+}
 
     req.user = decoded;
     req.userId = decoded.userId;

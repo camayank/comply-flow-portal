@@ -82,7 +82,7 @@ async function cleanupExpiredOTPs(): Promise<void> {
   await db.delete(otpStore).where(lt(otpStore.expiresAt, new Date()));
 }
 
-export function registerAuthRoutes(app: Express) {
+export async function registerAuthRoutes(app: Express) {
 
   // CLIENT AUTHENTICATION (OTP-based)
   
@@ -540,7 +540,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // Schedule OTP cleanup job (runs every hour) using JobLifecycleManager
-  const { jobManager } = require('./job-lifecycle-manager');
+  const { jobManager } = await import('./job-lifecycle-manager.js');
 
   const otpCleanupJob = cron.schedule('0 * * * *', async () => {
     try {

@@ -12,7 +12,7 @@ import { Request, Response, NextFunction, Router, Express } from 'express';
 import { logger } from './logger';
 
 export const CURRENT_API_VERSION = 'v1';
-export const SUPPORTED_VERSIONS = ['v1'] as const;
+export const SUPPORTED_VERSIONS = ['v1', 'v2'] as const;
 export type ApiVersion = typeof SUPPORTED_VERSIONS[number];
 
 /**

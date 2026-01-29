@@ -11,10 +11,13 @@ interface ProtectedRouteProps {
 
 /**
  * ProtectedRoute Component
- * WordPress-style route protection based on user role
- * Redirects unauthorized users to their dashboard or login
+ * 🔓 DEV MODE: Route protection disabled
  */
 export function ProtectedRoute({ children, requiredRole, redirectTo }: ProtectedRouteProps) {
+  // 🔓 DEV MODE: Render children without any protection
+  return <>{children}</>;
+
+  /* ORIGINAL ROUTE PROTECTION - COMMENTED FOR DEV
   const [location, setLocation] = useLocation();
   const { user, isAuthenticated, isLoading } = useSessionAuth();
   
@@ -47,6 +50,7 @@ export function ProtectedRoute({ children, requiredRole, redirectTo }: Protected
   }, [isAuthenticated, isLoading, location, redirectTo, requiredRole, setLocation, user]);
   
   return <>{children}</>;
+  */
 }
 
 /**

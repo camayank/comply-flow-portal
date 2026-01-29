@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +17,39 @@ import {
   FileText,
   Award,
   Target,
+  Loader2,
 } from "lucide-react";
+
+interface ScoreData {
+  overallScore: number;
+  previousScore: number;
+  scoreChange: number;
+  grade: string;
+  rank: string;
+  categories: Array<{
+    name: string;
+    score: number;
+    maxScore: number;
+    status: string;
+    weight: number;
+  }>;
+  riskFactors: Array<{
+    title: string;
+    impact: string;
+    count: number;
+    status: string;
+  }>;
+  recommendations: Array<{
+    title: string;
+    description: string;
+    priority: string;
+    estimatedImpact: string;
+  }>;
+  timeline: Array<{
+    month: string;
+    score: number;
+  }>;
+}
 
 export default function DigiScore() {
   const [selectedClient, setSelectedClient] = useState("1");
@@ -25,54 +58,34 @@ export default function DigiScore() {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
 
-  // Mock data - in production would come from API
-  const scoreData = {
-    overallScore: 87,
-    previousScore: 82,
-    scoreChange: 5,
-    grade: "A",
-    rank: "Excellent",
-    categories: [
-      { name: "GST Compliance", score: 92, maxScore: 100, status: "excellent", weight: 30 },
-      { name: "TDS Compliance", score: 88, maxScore: 100, status: "good", weight: 25 },
-      { name: "ROC Filings", score: 85, maxScore: 100, status: "good", weight: 20 },
-      { name: "ITR Filings", score: 90, maxScore: 100, status: "excellent", weight: 15 },
-      { name: "PF/ESI Compliance", score: 75, maxScore: 100, status: "fair", weight: 10 },
-    ],
-    riskFactors: [
-      { title: "Pending GST Returns", impact: "Medium", count: 0, status: "resolved" },
-      { title: "Delayed ROC Filings", impact: "High", count: 1, status: "active" },
-      { title: "TDS Payment Delays", impact: "Low", count: 0, status: "resolved" },
-    ],
-    recommendations: [
-      {
-        title: "File Annual ROC Returns",
-        description: "Complete your Form AOC-4 and MGT-7 filing to avoid penalties",
-        priority: "high",
-        estimatedImpact: "+8 points",
-      },
-      {
-        title: "Update PF/ESI Records",
-        description: "Ensure monthly PF/ESI filings are up to date",
-        priority: "medium",
-        estimatedImpact: "+5 points",
-      },
-      {
-        title: "Enable Auto-Reminders",
-        description: "Set up automated deadline reminders for all filings",
-        priority: "low",
-        estimatedImpact: "+3 points",
-      },
-    ],
-    timeline: [
-      { month: "Jan", score: 78 },
-      { month: "Feb", score: 80 },
-      { month: "Mar", score: 79 },
-      { month: "Apr", score: 82 },
-      { month: "May", score: 84 },
-      { month: "Jun", score: 87 },
-    ],
+  // Fetch compliance score from API
+  const { data: scoreData, isLoading, error } = useQuery<ScoreData>({
+    queryKey: ['/api/compliance-state', selectedClient, 'score'],
+    queryFn: async () => {
+      const response = await fetch(`/api/compliance-state/${selectedClient}/score`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch compliance score');
+      }
+      return response.json();
+    },
+  });
+
+  // Default data for loading/error states
+  const defaultScoreData: ScoreData = {
+    overallScore: 0,
+    previousScore: 0,
+    scoreChange: 0,
+    grade: "-",
+    rank: "Loading",
+    categories: [],
+    riskFactors: [],
+    recommendations: [],
+    timeline: [],
   };
+
+  const displayData = scoreData || defaultScoreData;
 
   const getScoreColor = (score: number) => {
     if (score >= 85) return "text-green-600";
@@ -94,6 +107,38 @@ export default function DigiScore() {
     if (status === "fair") return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
     return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading compliance score...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="pt-6 text-center">
+            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Error Loading Score</h3>
+            <p className="text-muted-foreground mb-4">
+              Unable to fetch your compliance score. Please try again.
+            </p>
+            <Button onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -131,30 +176,30 @@ export default function DigiScore() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <div className="flex items-baseline gap-2 mb-2">
-                    <span className={`text-6xl font-bold ${getScoreColor(scoreData.overallScore)}`}>
-                      {scoreData.overallScore}
+                    <span className={`text-6xl font-bold ${getScoreColor(displayData.overallScore)}`}>
+                      {displayData.overallScore}
                     </span>
                     <span className="text-2xl text-muted-foreground">/100</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    {scoreData.scoreChange > 0 ? (
+                    {displayData.scoreChange > 0 ? (
                       <TrendingUp className="h-5 w-5 text-green-600" />
                     ) : (
                       <TrendingDown className="h-5 w-5 text-red-600" />
                     )}
                     <span className="text-sm text-muted-foreground">
-                      {scoreData.scoreChange > 0 ? '+' : ''}{scoreData.scoreChange} points from last month
+                      {displayData.scoreChange > 0 ? '+' : ''}{displayData.scoreChange} points from last month
                     </span>
                   </div>
                 </div>
                 <div className="text-center">
-                  <Badge className={`${getGradeBadgeColor(scoreData.grade)} text-white text-2xl px-6 py-3 mb-2`}>
-                    Grade {scoreData.grade}
+                  <Badge className={`${getGradeBadgeColor(displayData.grade)} text-white text-2xl px-6 py-3 mb-2`}>
+                    Grade {displayData.grade}
                   </Badge>
-                  <p className="text-sm text-muted-foreground">{scoreData.rank}</p>
+                  <p className="text-sm text-muted-foreground">{displayData.rank}</p>
                 </div>
               </div>
-              <Progress value={scoreData.overallScore} className="h-3" />
+              <Progress value={displayData.overallScore} className="h-3" />
             </CardContent>
           </Card>
 
@@ -168,16 +213,16 @@ export default function DigiScore() {
             <CardContent className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm">Previous Score</span>
-                <span className="font-semibold">{scoreData.previousScore}</span>
+                <span className="font-semibold">{displayData.previousScore}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm">Current Score</span>
-                <span className="font-semibold text-green-600">{scoreData.overallScore}</span>
+                <span className="font-semibold text-green-600">{displayData.overallScore}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm">Score Change</span>
                 <span className="font-semibold text-green-600">
-                  +{scoreData.scoreChange} pts
+                  +{displayData.scoreChange} pts
                 </span>
               </div>
               <div className="flex justify-between items-center pt-3 border-t">
@@ -210,7 +255,7 @@ export default function DigiScore() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {scoreData.categories.map((category, index) => (
+                  {displayData.categories.map((category, index) => (
                     <div key={index} className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -247,7 +292,7 @@ export default function DigiScore() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {scoreData.riskFactors.map((risk, index) => (
+                  {displayData.riskFactors.map((risk, index) => (
                     <div
                       key={index}
                       className={`border rounded-lg p-4 ${
@@ -289,7 +334,7 @@ export default function DigiScore() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {scoreData.recommendations.map((rec, index) => (
+                  {displayData.recommendations.map((rec, index) => (
                     <div
                       key={index}
                       className="border rounded-lg p-4 hover:shadow-sm transition-shadow"
@@ -338,7 +383,7 @@ export default function DigiScore() {
               <CardContent>
                 <div className="space-y-6">
                   <div className="h-64 flex items-end justify-between gap-2">
-                    {scoreData.timeline.map((point, index) => (
+                    {displayData.timeline.map((point, index) => (
                       <div key={index} className="flex-1 flex flex-col items-center gap-2">
                         <div className="w-full bg-primary rounded-t" style={{ height: `${point.score * 2.5}px` }} />
                         <span className="text-sm font-semibold">{point.score}</span>

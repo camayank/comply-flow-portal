@@ -237,6 +237,53 @@ export function registerTaskManagementRoutes(app: Express) {
     }
   });
 
+  // ========== DELETE TASK ==========
+  app.delete('/api/tasks/:id', requireAuth, async (req: Request, res: Response) => {
+    try {
+      const taskId = Number(req.params.id);
+      const userId = (req as any).user?.id;
+
+      // Get the task first to check status
+      const [existingTask] = await db
+        .select()
+        .from(taskItems)
+        .where(eq(taskItems.id, taskId));
+
+      if (!existingTask) {
+        return res.status(404).json({ error: 'Task not found' });
+      }
+
+      // Only allow deletion of pending or draft tasks
+      const deletableStatuses = ['pending', 'draft', 'not_started'];
+      if (!deletableStatuses.includes(existingTask.status || '')) {
+        return res.status(400).json({
+          error: 'Cannot delete task',
+          message: 'Only pending or draft tasks can be deleted. Consider closing the task instead.'
+        });
+      }
+
+      // Delete related activity logs first
+      await db
+        .delete(taskActivityLog)
+        .where(eq(taskActivityLog.taskId, taskId));
+
+      // Delete the task
+      const [deletedTask] = await db
+        .delete(taskItems)
+        .where(eq(taskItems.id, taskId))
+        .returning();
+
+      res.json({
+        success: true,
+        message: 'Task deleted successfully',
+        deletedTask,
+      });
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      res.status(500).json({ error: 'Failed to delete task' });
+    }
+  });
+
   // ========== ASSIGN TASK ==========
   app.post('/api/tasks/:id/assign', async (req: Request, res: Response) => {
     try {

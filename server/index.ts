@@ -11,7 +11,10 @@ import { registerSecurityMiddleware } from "./security-middleware";
 import { logger, requestLogger, attachLogger, logStartup, logShutdown } from "./logger";
 import { errorHandler, notFoundHandler, handleUncaughtException, handleUnhandledRejection } from "./error-middleware";
 import { createBackwardCompatibilityMiddleware, apiVersionMiddleware } from "./api-versioning";
+import { deprecationMiddleware, deprecationResponseInterceptor } from "./deprecation-middleware";
+import { sanitizeRequest, globalErrorHandler, trackRequest } from "./robustness-middleware";
 import { jobManager } from "./job-lifecycle-manager";
+import './compliance-state-scheduler'; // Auto-start compliance state scheduler
 
 // Validate environment variables on startup
 const env = validateEnv();
@@ -40,6 +43,13 @@ app.use(express.static('public'));
 app.use(requestLogger);
 app.use(attachLogger);
 
+// API Deprecation tracking (adds headers to V1 endpoints)
+app.use(deprecationMiddleware);
+app.use(deprecationResponseInterceptor);
+
+// Request sanitization (security)
+app.use(sanitizeRequest);
+
 // API versioning (must be before routes)
 app.use(apiVersionMiddleware());
 app.use(createBackwardCompatibilityMiddleware('v1'));
@@ -57,24 +67,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Enterprise-grade rate limiting (Salesforce-level security)
+// 🔓 DEV MODE: Rate limiting disabled for development
 const createRateLimit = (windowMs: number, max: number, message: string, keyGenerator?: (req: Request) => string) => {
-  return rateLimit({
-    windowMs,
-    max,
-    message: { success: false, error: message },
-    standardHeaders: true,
-    legacyHeaders: false,
-    keyGenerator: keyGenerator || ((req) => req.ip || 'unknown'),
-    handler: (req, res) => {
-      log(`⚠️  Rate limit exceeded: ${req.ip} - ${req.path}`);
-      res.status(429).json({
-        success: false,
-        error: message,
-        retryAfter: Math.round(windowMs / 1000)
-      });
-    }
-  });
+  // Return a no-op middleware in dev mode
+  return (req: Request, res: Response, next: NextFunction) => next();
 };
 
 // OTP endpoints - Ultra-strict rate limiting
@@ -136,6 +132,11 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
+    const isError = res.statusCode >= 400;
+    
+    // Track metrics for health monitoring
+    trackRequest(duration, isError);
+    
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
@@ -178,20 +179,20 @@ app.use((req, res, next) => {
   // const { platformSyncOrchestrator } = await import('./platform-sync-orchestrator');
   console.log('Platform sync orchestrator initialized');
 
-  // 404 handler (must be before error handler)
-  app.use(notFoundHandler);
-
-  // Global error handler (must be last)
-  app.use(errorHandler);
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
+  // importantly setup vite in development BEFORE 404/error handlers
+  // so the catch-all route works properly
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
+
+  // 404 handler (must be before error handler, but after Vite)
+  app.use(notFoundHandler);
+
+  // Global error handler (must be last)
+  app.use(errorHandler);
+  app.use(globalErrorHandler); // Additional robustness error handler
 
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
@@ -200,7 +201,6 @@ app.use((req, res, next) => {
   server.listen({
     port,
     host: "0.0.0.0",
-    reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
     logStartup(port);

@@ -199,6 +199,17 @@ router.post('/tasks/:id/complete', asyncHandler(async (req: Request, res: Respon
     throw new NotFoundError('Task');
   }
 
+  // TRIGGER: Task completed → recalculate compliance state
+  const task = result.rows[0];
+  if (task.client_id) {
+    const { triggerEntityRecalculation } = require('../compliance-event-emitter');
+    triggerEntityRecalculation(task.client_id, 'task_completed', {
+      taskId: task.id,
+      taskTitle: task.title,
+      serviceId: task.service_id,
+    });
+  }
+
   res.json({
     success: true,
     message: 'Task marked as completed',

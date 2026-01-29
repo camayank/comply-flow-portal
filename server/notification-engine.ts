@@ -73,7 +73,7 @@ export class NotificationEngine {
 
   private registerScheduledRule(rule: any) {
     try {
-      const { jobManager } = require('./job-lifecycle-manager');
+      const { jobManager } = await import('./job-lifecycle-manager.js');
       const scheduleConfig = JSON.parse(rule.scheduleJson);
       const { cron: cronExpr, timezone = 'Asia/Kolkata' } = scheduleConfig;
 
@@ -302,7 +302,7 @@ export class NotificationEngine {
   }
 
   private startOutboxProcessor() {
-    const { jobManager } = require('./job-lifecycle-manager');
+    const { jobManager } = await import('./job-lifecycle-manager.js');
 
     // Process outbox every 30 seconds
     jobManager.registerInterval(
@@ -441,7 +441,7 @@ export class NotificationEngine {
 
   // Admin methods for rule management
   public async reloadRules() {
-    const { jobManager } = require('./job-lifecycle-manager');
+    const { jobManager } = await import('./job-lifecycle-manager.js');
 
     // Stop existing scheduled jobs using JobLifecycleManager
     for (const [ruleKey, job] of this.scheduledJobs) {

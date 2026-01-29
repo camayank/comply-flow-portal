@@ -10,6 +10,7 @@ import { authenticateToken } from '../middleware/auth';
 import { requireAdmin, requireSuperAdmin } from '../middleware/rbac';
 import { apiLimiter } from '../middleware/rateLimiter';
 import { asyncHandler, NotFoundError, ValidationError, ConflictError } from '../middleware/errorHandler';
+import { getDeprecationStats } from '../deprecation-middleware';
 
 const router = Router();
 
@@ -277,6 +278,20 @@ router.put('/settings/:key', requireSuperAdmin, asyncHandler(async (req: Request
     success: true,
     message: 'Setting updated successfully',
     data: result.rows[0],
+  });
+}));
+
+/**
+ * GET /api/v1/admin/deprecation-stats
+ * Get API deprecation statistics for monitoring
+ */
+router.get('/deprecation-stats', asyncHandler(async (req: Request, res: Response) => {
+  const stats = getDeprecationStats();
+  
+  res.json({
+    success: true,
+    data: stats,
+    message: 'Deprecation statistics retrieved successfully'
   });
 }));
 

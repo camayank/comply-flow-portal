@@ -194,6 +194,14 @@ router.post('/documents', requireRole('client'), asyncHandler(async (req: Reques
     [clientId, documentType, documentName, filePath, fileSize || null, userId, 'pending']
   );
 
+  // TRIGGER: Document uploaded → recalculate compliance state
+  const { triggerEntityRecalculation } = require('../compliance-event-emitter');
+  triggerEntityRecalculation(clientId, 'document_uploaded', { 
+    documentType, 
+    documentName,
+    userId 
+  });
+
   res.status(201).json({
     success: true,
     message: 'Document uploaded successfully',
@@ -388,6 +396,14 @@ router.post('/book', requireRole('client'), asyncHandler(async (req: Request, re
   }
 
   const clientId = clientResult.rows[0].id;
+
+  // TRIGGER: Service booked → recalculate compliance state
+  const { triggerEntityRecalculation } = require('../compliance-event-emitter');
+  triggerEntityRecalculation(clientId, 'service_updated', {
+    serviceId: service.id,
+    serviceName: service.name,
+    action: 'booked',
+  });
 
   // Create service booking
   const result = await pool.query(

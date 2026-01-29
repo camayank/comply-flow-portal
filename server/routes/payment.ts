@@ -108,6 +108,20 @@ router.post('/webhook', asyncHandler(async (req: Request, res: Response) => {
   switch (event) {
     case 'payment.captured':
       await updateTransactionStatus(paymentEntity.id, 'success');
+      
+      // TRIGGER: Payment completed → recalculate compliance state
+      // Get client_id from transaction
+      const txResult = await pool.query(
+        'SELECT client_id, amount FROM transactions WHERE razorpay_payment_id = $1',
+        [paymentEntity.id]
+      );
+      if (txResult.rows.length > 0) {
+        const { triggerEntityRecalculation } = require('../compliance-event-emitter');
+        triggerEntityRecalculation(txResult.rows[0].client_id, 'payment_completed', {
+          paymentId: paymentEntity.id,
+          amount: txResult.rows[0].amount,
+        });
+      }
       break;
     case 'payment.failed':
       await updateTransactionStatus(paymentEntity.id, 'failed');

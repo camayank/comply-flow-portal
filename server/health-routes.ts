@@ -111,8 +111,8 @@ export function registerHealthRoutes(app: Express) {
   });
 
   // Background jobs status (for operational monitoring)
-  app.get('/health/jobs', (req, res) => {
-    const { jobManager } = require('./job-lifecycle-manager');
+  app.get('/health/jobs', async (req, res) => {
+    const { jobManager } = await import('./job-lifecycle-manager.js');
 
     const jobs = jobManager.getStatus();
     const activeCount = jobManager.getActiveJobCount();

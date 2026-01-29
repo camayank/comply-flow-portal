@@ -18,8 +18,8 @@ export class ServiceSpawner {
     this.initializeSpawner();
   }
 
-  private initializeSpawner() {
-    const { jobManager } = require('./job-lifecycle-manager');
+  private async initializeSpawner() {
+    const { jobManager } = await import('./job-lifecycle-manager.js');
 
     // Run daily at 06:30 IST to spawn new service orders
     this.cronJob = cron.schedule('30 6 * * *', async () => {

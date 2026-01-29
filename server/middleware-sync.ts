@@ -60,7 +60,7 @@ export class MiddlewareSyncEngine {
         this.clients.delete(sessionId);
         const interval = this.syncIntervals.get(sessionId);
         if (interval) {
-          const { jobManager } = require('./job-lifecycle-manager');
+          const { jobManager } = await import('./job-lifecycle-manager.js');
           jobManager.stopJob(`client-sync-${sessionId}`);
           this.syncIntervals.delete(sessionId);
         }
@@ -202,7 +202,7 @@ export class MiddlewareSyncEngine {
   }
 
   private startClientSync(sessionId: string) {
-    const { jobManager } = require('./job-lifecycle-manager');
+    const { jobManager } = await import('./job-lifecycle-manager.js');
 
     const syncIntervalHandle = jobManager.registerInterval(
       `client-sync-${sessionId}`,
@@ -311,7 +311,7 @@ export class MiddlewareSyncEngine {
   }
 
   private startSyncProcesses() {
-    const { jobManager } = require('./job-lifecycle-manager');
+    const { jobManager } = await import('./job-lifecycle-manager.js');
 
     // Quality audit sync every 5 minutes
     jobManager.registerInterval(

@@ -163,7 +163,37 @@ export function registerHRRoutes(app: any) {
       res.status(500).json({ error: 'Failed to update employee' });
     }
   });
-  
+
+  // Delete (soft delete) employee
+  app.delete('/api/hr/employees/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+
+      // Soft delete - set status to 'terminated' instead of hard delete
+      const [employee] = await db.update(employees)
+        .set({
+          status: 'terminated',
+          terminationDate: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(employees.id, parseInt(id)))
+        .returning();
+
+      if (!employee) {
+        return res.status(404).json({ error: 'Employee not found' });
+      }
+
+      res.json({
+        success: true,
+        message: 'Employee terminated successfully',
+        employee,
+      });
+    } catch (error) {
+      console.error('Error deleting employee:', error);
+      res.status(500).json({ error: 'Failed to delete employee' });
+    }
+  });
+
   // ========== SKILLS MANAGEMENT ==========
   
   // Get employee skills

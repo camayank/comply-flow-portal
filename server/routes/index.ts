@@ -6,10 +6,13 @@
 import { Express } from 'express';
 import authRoutes from './auth';
 import clientRoutes from './client';
+import clientV2Routes from './client-v2';
+import lifecycleApiRoutes from './lifecycle-api';
 import salesRoutes from './sales';
 import operationsRoutes from './operations';
 import adminRoutes from './admin';
 import paymentRoutes from './payment';
+import complianceStateRoutes from '../compliance-state-routes';
 
 /**
  * Register all API routes
@@ -37,5 +40,19 @@ export function registerApiRoutes(app: Express): void {
   // Payment routes
   app.use(`${API_PREFIX}/payments`, paymentRoutes);
 
+  // Compliance State routes
+  app.use(`${API_PREFIX}/compliance-state`, complianceStateRoutes);
+
   console.log('✅ API v1 routes registered');
+
+  // API v2 routes (US-Style Portal)
+  const API_V2_PREFIX = '/api/v2';
+
+  // Client portal v2 routes (status-first design)
+  app.use(`${API_V2_PREFIX}/client`, clientV2Routes);
+
+  // Lifecycle management routes (high-level + drill-down)
+  app.use(`${API_V2_PREFIX}/lifecycle`, lifecycleApiRoutes);
+
+  console.log('✅ API v2 routes registered (US-Style Portal with Lifecycle Management)');
 }

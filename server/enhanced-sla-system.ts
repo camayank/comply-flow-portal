@@ -487,9 +487,9 @@ export class EnhancedSlaSystem {
 export class SlaMonitoringService {
   private static monitoringInterval: NodeJS.Timeout | null = null;
 
-  static startMonitoring(intervalMinutes: number = 15): void {
+  static async startMonitoring(intervalMinutes: number = 15): Promise<void> {
     // Import job manager dynamically to avoid circular dependencies
-    const { jobManager } = require('./job-lifecycle-manager');
+    const { jobManager } = await import('./job-lifecycle-manager.js');
 
     if (this.monitoringInterval) {
       jobManager.stopJob('sla-monitoring');
@@ -514,8 +514,8 @@ export class SlaMonitoringService {
     EnhancedSlaSystem.processAllSlaChecks();
   }
 
-  static stopMonitoring(): void {
-    const { jobManager } = require('./job-lifecycle-manager');
+  static async stopMonitoring(): Promise<void> {
+    const { jobManager } = await import('./job-lifecycle-manager.js');
     jobManager.stopJob('sla-monitoring');
     this.monitoringInterval = null;
     console.log("SLA monitoring service stopped");
