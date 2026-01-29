@@ -195,6 +195,148 @@ export function registerQCRoutes(app: Application) {
     }
   });
 
+  // ========== QC METRICS ==========
+  app.get('/api/qc/metrics', async (req: Request, res: Response) => {
+    try {
+      const { timeRange = '7d', serviceFilter = 'all', reviewerFilter = 'all' } = req.query;
+
+      // Calculate date range
+      let startDate: Date;
+      switch (timeRange) {
+        case '24h':
+          startDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          break;
+        case '7d':
+          startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case '30d':
+          startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case '90d':
+          startDate = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      }
+
+      // Get all reviews in the date range
+      const reviews = await db.select()
+        .from(qualityReviews)
+        .where(sql`${qualityReviews.createdAt} >= ${startDate}`)
+        .orderBy(desc(qualityReviews.createdAt));
+
+      // Calculate metrics
+      const totalReviews = reviews.length;
+      const approvedReviews = reviews.filter(r => r.status === 'approved').length;
+      const rejectedReviews = reviews.filter(r => r.status === 'rejected').length;
+      const pendingReviews = reviews.filter(r => r.status === 'pending' || r.status === 'in_progress').length;
+      const reworkRequired = reviews.filter(r => r.status === 'rework_required').length;
+
+      const avgQualityScore = reviews.length > 0
+        ? reviews.reduce((sum, r) => sum + (Number(r.qualityScore) || 0), 0) / reviews.length
+        : 0;
+
+      // Calculate average review time (in minutes)
+      const completedReviews = reviews.filter(r => r.completedAt && r.startedAt);
+      const avgReviewTime = completedReviews.length > 0
+        ? completedReviews.reduce((sum, r) => {
+            const start = new Date(r.startedAt!).getTime();
+            const end = new Date(r.completedAt!).getTime();
+            return sum + (end - start) / (1000 * 60);
+          }, 0) / completedReviews.length
+        : 0;
+
+      // Calculate SLA compliance
+      const slaCompliant = reviews.filter(r => {
+        if (!r.slaDeadline || !r.completedAt) return true;
+        return new Date(r.completedAt) <= new Date(r.slaDeadline);
+      }).length;
+
+      // Generate trend data (last 7 days)
+      const trendData = [];
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dayStart = new Date(date.setHours(0, 0, 0, 0));
+        const dayEnd = new Date(date.setHours(23, 59, 59, 999));
+
+        const dayReviews = reviews.filter(r => {
+          const created = new Date(r.createdAt || Date.now());
+          return created >= dayStart && created <= dayEnd;
+        });
+
+        trendData.push({
+          date: dayStart.toISOString().split('T')[0],
+          total: dayReviews.length,
+          approved: dayReviews.filter(r => r.status === 'approved').length,
+          rejected: dayReviews.filter(r => r.status === 'rejected').length,
+          avgScore: dayReviews.length > 0
+            ? dayReviews.reduce((sum, r) => sum + (Number(r.qualityScore) || 0), 0) / dayReviews.length
+            : 0,
+        });
+      }
+
+      // Get top reviewers
+      const reviewerStats: Record<number, { count: number, approved: number, avgScore: number, scores: number[] }> = {};
+      reviews.forEach(r => {
+        if (r.reviewerId) {
+          if (!reviewerStats[r.reviewerId]) {
+            reviewerStats[r.reviewerId] = { count: 0, approved: 0, avgScore: 0, scores: [] };
+          }
+          reviewerStats[r.reviewerId].count++;
+          if (r.status === 'approved') reviewerStats[r.reviewerId].approved++;
+          if (r.qualityScore) reviewerStats[r.reviewerId].scores.push(Number(r.qualityScore));
+        }
+      });
+
+      const topReviewers = Object.entries(reviewerStats)
+        .map(([id, stats]) => ({
+          reviewerId: parseInt(id),
+          reviewCount: stats.count,
+          approvalRate: stats.count > 0 ? Math.round((stats.approved / stats.count) * 100) : 0,
+          avgScore: stats.scores.length > 0 ? stats.scores.reduce((a, b) => a + b, 0) / stats.scores.length : 0,
+        }))
+        .sort((a, b) => b.reviewCount - a.reviewCount)
+        .slice(0, 5);
+
+      const metrics = {
+        summary: {
+          totalReviews,
+          approvedReviews,
+          rejectedReviews,
+          pendingReviews,
+          reworkRequired,
+          approvalRate: totalReviews > 0 ? Math.round((approvedReviews / totalReviews) * 100) : 0,
+          rejectionRate: totalReviews > 0 ? Math.round((rejectedReviews / totalReviews) * 100) : 0,
+          avgQualityScore: Math.round(avgQualityScore * 10) / 10,
+          avgReviewTime: Math.round(avgReviewTime),
+          slaCompliance: totalReviews > 0 ? Math.round((slaCompliant / totalReviews) * 100) : 100,
+        },
+        trends: trendData,
+        topReviewers,
+        breakdown: {
+          byStatus: {
+            approved: approvedReviews,
+            rejected: rejectedReviews,
+            pending: pendingReviews,
+            rework: reworkRequired,
+          },
+          byPriority: {
+            critical: reviews.filter(r => r.priority === 'critical').length,
+            high: reviews.filter(r => r.priority === 'high').length,
+            medium: reviews.filter(r => r.priority === 'medium').length,
+            low: reviews.filter(r => r.priority === 'low').length,
+          },
+        },
+      };
+
+      res.json(metrics);
+    } catch (error) {
+      console.error('Error fetching QC metrics:', error);
+      res.status(500).json({ error: 'Failed to fetch QC metrics' });
+    }
+  });
+
   // ========== QC QUEUE MANAGEMENT ==========
   app.get('/api/qc/queue', async (req: Request, res: Response) => {
     try {

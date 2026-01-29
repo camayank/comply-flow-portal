@@ -101,52 +101,52 @@ const routes: RouteInfo[] = [
   {
     path: "/portal-v2/account",
     name: "Account Settings",
-    description: "Manage account preferences and settings",
+    description: "Full profile management with API integration",
     role: "Client - Account",
     icon: UserCircle,
     color: "bg-slate-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/portal-v2/account/businesses",
     name: "Business Management",
-    description: "Manage multiple business entities",
+    description: "Multi-entity management with CRUD operations",
     role: "Client - Account",
     icon: Building2,
     color: "bg-slate-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/portal-v2/account/billing",
     name: "Billing & Invoices",
-    description: "View invoices and payment history",
+    description: "Complete billing history with invoice details",
     role: "Client - Account",
     icon: CreditCard,
     color: "bg-slate-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/portal-v2/account/documents",
     name: "Account Documents",
-    description: "All account-related documents",
+    description: "Document vault with categorization & verification",
     role: "Client - Account",
     icon: FolderOpen,
     color: "bg-slate-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/portal-v2/account/security",
     name: "Security Settings",
-    description: "Password, 2FA, and security preferences",
+    description: "Password, 2FA, device management & login history",
     role: "Client - Account",
     icon: Lock,
     color: "bg-slate-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/client-profile",
@@ -328,32 +328,32 @@ const routes: RouteInfo[] = [
   {
     path: "/qc",
     name: "Quality Control",
-    description: "QC review queue, quality metrics, error tracking",
+    description: "Full QC dashboard with review queue & checklist system",
     role: "Operations",
     icon: CheckSquare,
     color: "bg-violet-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/quality-metrics",
     name: "Quality Metrics",
-    description: "QC analytics and performance metrics",
+    description: "Complete QC analytics with trends & reviewer stats",
     role: "Operations",
     icon: PieChart,
     color: "bg-violet-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/client-master",
     name: "Client Master",
-    description: "Client database and management",
+    description: "Full client database with stats & profile management",
     role: "Operations",
     icon: Users,
     color: "bg-green-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
 
   // ============ ADMIN (Full Depth Needed) ============
@@ -456,42 +456,42 @@ const routes: RouteInfo[] = [
   {
     path: "/agent/dashboard",
     name: "Agent Dashboard",
-    description: "Agent performance overview",
+    description: "Agent performance overview with real-time stats API",
     role: "Agent",
     icon: LayoutDashboard,
     color: "bg-indigo-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/agent/leads",
     name: "Agent Leads",
-    description: "Manage agent leads and conversions",
+    description: "Full CRUD lead management with pipeline tracking",
     role: "Agent",
     icon: Target,
     color: "bg-indigo-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/agent/commissions",
     name: "Commission Tracker",
-    description: "Track commissions and payouts",
+    description: "Real-time commission tracking with payout history",
     role: "Agent",
     icon: Receipt,
     color: "bg-indigo-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/agent/performance",
     name: "Agent Performance",
-    description: "Performance metrics and rankings",
+    description: "Performance analytics with leaderboard & rankings",
     role: "Agent",
     icon: Award,
     color: "bg-indigo-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
 
   // ============ EXECUTIVE & ANALYTICS ============

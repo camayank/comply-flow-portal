@@ -272,4 +272,49 @@ router.get('/clients/:clientId/profile', async (req, res) => {
   }
 });
 
+// Client Master Stats for Dashboard
+router.get('/stats', async (req, res) => {
+  try {
+    // Get all business entities for stats calculation
+    const result = await storage.getAllBusinessEntitiesWithDetails({ limit: 1000, offset: 0 });
+    const clients = result.clients || result || [];
+
+    const stats = {
+      totalClients: clients.length,
+      activeClients: clients.filter((c: any) => c.status === 'active').length,
+      inactiveClients: clients.filter((c: any) => c.status !== 'active').length,
+      // By entity type
+      byEntityType: {
+        privateLimited: clients.filter((c: any) => c.entityType === 'private_limited').length,
+        llp: clients.filter((c: any) => c.entityType === 'llp').length,
+        partnership: clients.filter((c: any) => c.entityType === 'partnership').length,
+        proprietorship: clients.filter((c: any) => c.entityType === 'proprietorship').length,
+        other: clients.filter((c: any) => !['private_limited', 'llp', 'partnership', 'proprietorship'].includes(c.entityType)).length,
+      },
+      // By value segment
+      byValueSegment: {
+        enterprise: clients.filter((c: any) => c.valueSegment === 'enterprise').length,
+        premium: clients.filter((c: any) => c.valueSegment === 'premium').length,
+        standard: clients.filter((c: any) => c.valueSegment === 'standard').length,
+        basic: clients.filter((c: any) => c.valueSegment === 'basic' || !c.valueSegment).length,
+      },
+      // Recent activity
+      recentlyOnboarded: clients.filter((c: any) => {
+        const created = new Date(c.createdAt || Date.now());
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        return created > thirtyDaysAgo;
+      }).length,
+      // Compliance status
+      complianceGreen: clients.filter((c: any) => c.complianceStatus === 'green').length,
+      complianceAmber: clients.filter((c: any) => c.complianceStatus === 'amber').length,
+      complianceRed: clients.filter((c: any) => c.complianceStatus === 'red').length,
+    };
+
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching client master stats:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

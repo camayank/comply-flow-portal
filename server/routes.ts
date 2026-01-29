@@ -1321,7 +1321,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register E-Sign routes for digital document signing
   const { registerESignRoutes } = await import('./esign-routes');
   registerESignRoutes(app);
-  
+
+  // Register Agent Portal routes
+  const { registerAgentRoutes } = await import('./agent-routes');
+  registerAgentRoutes(app);
+
+  // Register Client Account Management routes
+  const { registerClientAccountRoutes } = await import('./client-account-routes');
+  registerClientAccountRoutes(app);
+
   // Register Service-Document Integration routes
   const { registerServiceDocumentIntegration } = await import('./service-document-integration');
   registerServiceDocumentIntegration(app);
