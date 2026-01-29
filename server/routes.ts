@@ -7,11 +7,13 @@ import { workflowEngine, type WorkflowCustomization } from "./workflow-engine";
 import { requireAuth } from "./auth-middleware";
 import { EnhancedSlaSystem, SlaMonitoringService } from "./enhanced-sla-system";
 import { WorkflowValidator, WorkflowExecutor } from "./workflow-validator";
-import { 
-  insertServiceRequestSchema, 
+import {
+  insertServiceRequestSchema,
   insertPaymentSchema,
-  type Service 
+  type Service,
+  leads as leadsTable
 } from "@shared/schema";
+import { db } from "./db";
 import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES, type AuthenticatedRequest } from "./rbac-middleware";
 import { registerProposalRoutes } from "./proposals-routes";
 import { registerDashboardAnalyticsRoutes } from "./dashboard-analytics-routes";
@@ -1167,6 +1169,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register leads management routes for Practice Management System
   const { registerLeadsRoutes } = await import('./leads-routes');
   registerLeadsRoutes(app);
+
+  // Add alias for /api/stats/dashboard (frontend expects this path)
+  app.get('/api/stats/dashboard', async (req, res) => {
+    try {
+      // Reuse leads stats endpoint
+      const leads = await db.select().from(leadsTable);
+      const now = new Date();
+      const thisMonth = leads.filter(l => {
+        const created = new Date(l.createdAt || Date.now());
+        return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+      });
+
+      res.json({
+        totalLeads: leads.length,
+        newThisMonth: thisMonth.length,
+        hotLeads: leads.filter(l => l.stage === 'hot_lead').length,
+        warmLeads: leads.filter(l => l.stage === 'warm_lead').length,
+        coldLeads: leads.filter(l => l.stage === 'cold_lead').length,
+        converted: leads.filter(l => l.stage === 'converted').length,
+        lost: leads.filter(l => l.stage === 'lost').length,
+        conversionRate: leads.length > 0 ? Math.round((leads.filter(l => l.stage === 'converted').length / leads.length) * 100) : 0,
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      res.status(500).json({ error: 'Failed to fetch stats' });
+    }
+  });
 
   // Register proposal management routes for Sales Proposal System
   registerProposalRoutes(app);

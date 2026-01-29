@@ -171,12 +171,12 @@ const routes: RouteInfo[] = [
   {
     path: "/service-requests",
     name: "My Service Requests",
-    description: "View and track all service requests",
+    description: "Full service request tracking with status & documents",
     role: "Client - Core",
     icon: ClipboardList,
     color: "bg-blue-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/service-request/create",
@@ -191,12 +191,12 @@ const routes: RouteInfo[] = [
   {
     path: "/referrals",
     name: "Referrals & Wallet",
-    description: "Referral program and wallet credits",
+    description: "Full referral tracking with wallet & credit history",
     role: "Client - Core",
     icon: Gift,
     color: "bg-pink-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/vault",
@@ -213,12 +213,12 @@ const routes: RouteInfo[] = [
   {
     path: "/compliance-dashboard",
     name: "Compliance Dashboard",
-    description: "Overview of all compliance obligations",
+    description: "Full compliance tracking with state engine integration",
     role: "Compliance",
     icon: Shield,
     color: "bg-green-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/tracker",
@@ -305,12 +305,12 @@ const routes: RouteInfo[] = [
   {
     path: "/tasks",
     name: "Task Management",
-    description: "Manage tasks and to-dos",
+    description: "Full task CRUD with assignment & workflow integration",
     role: "Tasks",
     icon: ListTodo,
     color: "bg-blue-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
 
   // ============ OPERATIONS (Full Depth Needed) ============
@@ -413,32 +413,32 @@ const routes: RouteInfo[] = [
   {
     path: "/sales-proposals",
     name: "Sales Proposals",
-    description: "Proposal creation, tracking, conversion analytics",
+    description: "Full CRUD proposals with send, stats & conversion tracking",
     role: "Sales",
     icon: FileText,
     color: "bg-orange-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
   {
     path: "/pre-sales",
     name: "Pre-Sales Manager",
-    description: "Lead qualification, demos, requirement gathering",
+    description: "Complete lead management with stats & pipeline tracking",
     role: "Sales",
     icon: Rocket,
     color: "bg-orange-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
   {
     path: "/leads",
     name: "Lead Management",
-    description: "Lead tracking, conversion pipeline, follow-ups",
+    description: "Full CRUD leads with interactions & dashboard stats",
     role: "Sales",
     icon: TrendingUp,
     color: "bg-orange-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
 
   // ============ AGENT PORTAL ============
@@ -530,24 +530,24 @@ const routes: RouteInfo[] = [
   {
     path: "/financial-management",
     name: "Financial Management",
-    description: "Finance, accounting, revenue analytics",
+    description: "Full finance dashboard with revenue & payment tracking",
     role: "Finance",
     icon: DollarSign,
     color: "bg-yellow-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
 
   // ============ HR ============
   {
     path: "/hr",
     name: "HR Dashboard",
-    description: "Human resources management",
+    description: "Full HR management with employees, leave & training",
     role: "HR",
     icon: Users,
     color: "bg-pink-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
 
   // ============ ONBOARDING & LANDING ============
