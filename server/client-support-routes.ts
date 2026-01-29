@@ -14,24 +14,14 @@ import {
   USER_ROLES,
   type AuthenticatedRequest
 } from './rbac-middleware';
+import { generateTicketId } from './services/id-generator';
 
 // Client-only access middleware
 const requireClientAccess = [sessionAuthMiddleware, requireRole(USER_ROLES.CLIENT)] as const;
 
-// Generate ticket number
+// Generate ticket number using centralized ID generator
 async function generateTicketNumber(): Promise<string> {
-  const lastTicket = await db.select({ ticketNumber: supportTickets.ticketNumber })
-    .from(supportTickets)
-    .orderBy(desc(supportTickets.id))
-    .limit(1);
-
-  if (lastTicket.length === 0) {
-    return 'T00001';
-  }
-
-  const lastNumber = parseInt(lastTicket[0].ticketNumber.substring(1));
-  const newNumber = lastNumber + 1;
-  return `T${newNumber.toString().padStart(5, '0')}`;
+  return generateTicketId();
 }
 
 // Calculate ticket age

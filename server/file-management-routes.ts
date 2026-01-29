@@ -1,16 +1,17 @@
 import { Router, type Request, type Response } from 'express';
 import { storage } from './storage';
-import { 
-  upload, 
-  uploadToStorage, 
-  deleteFromStorage, 
+import {
+  upload,
+  uploadToStorage,
+  deleteFromStorage,
   getSignedUrl,
   validateFileSize,
-  ALLOWED_FILE_TYPES 
+  ALLOWED_FILE_TYPES
 } from './file-upload';
 import { db } from './db';
 import { documentsUploads } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
+import { generateDocumentId } from './services/id-generator';
 
 const router = Router();
 
@@ -73,8 +74,12 @@ router.post('/service-requests/:serviceRequestId/documents', upload.array('files
           `service-requests/${serviceRequestId}`
         );
 
+        // Generate unique document ID using centralized ID generator
+        const documentId = await generateDocumentId();
+
         // Create database record
         const insertData: any = {
+          documentId, // DOC26000001 - human-readable ID
           entityId: serviceRequest.businessEntityId,
           serviceRequestId: serviceRequestId,
           doctype: doctype,

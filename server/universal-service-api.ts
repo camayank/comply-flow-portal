@@ -18,6 +18,7 @@
 
 import { Router } from 'express';
 import { db } from './db';
+import { generateQcReviewId, generateServiceRequestId } from './services/id-generator';
 import {
   servicesCatalog,
   serviceRequests,
@@ -712,9 +713,13 @@ router.post('/qc/review', async (req, res) => {
 
     const reviewerId = (req as any).user?.id || 1;
 
+    // Generate QC review ID using centralized ID generator
+    const reviewId = await generateQcReviewId();
+
     // Create review record
     const [review] = await db.insert(qualityReviews)
       .values({
+        reviewId, // QC26000001 - human-readable ID
         serviceRequestId: service_request_id,
         reviewerId,
         reviewType: 'final',
@@ -724,7 +729,7 @@ router.post('/qc/review', async (req, res) => {
         comments,
         recommendations,
         reviewedAt: new Date()
-      })
+      } as any)
       .returning();
 
     // Update service request status based on review

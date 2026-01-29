@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { DIGICOMPLY_WORKFLOW_TEMPLATES } from './digicomply-workflows';
 import { SERVICE_CATALOG } from './service-catalog-data';
+import { idGenerator, ID_TYPES } from './services/id-generator';
 
 // Flexible Workflow Engine for KOSHIKA Services SOPs
 export interface WorkflowTemplate {
@@ -386,18 +387,19 @@ export class WorkflowEngine {
   }
 
   // Create workflow instance from template
-  createWorkflowInstance(
-    templateId: string, 
-    userId: number, 
+  async createWorkflowInstance(
+    templateId: string,
+    userId: number,
     serviceRequestId: number,
     customizations: WorkflowCustomization[] = []
-  ): WorkflowInstance {
+  ): Promise<WorkflowInstance> {
     const template = this.templates.get(templateId);
     if (!template) {
       throw new Error(`Template ${templateId} not found`);
     }
 
-    const instanceId = `wf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Generate readable workflow instance ID using centralized ID generator
+    const instanceId = await idGenerator.generateId(ID_TYPES.WORKFLOW_INSTANCE);
     
     // Apply customizations to steps
     let steps = template.steps.map(stepTemplate => ({

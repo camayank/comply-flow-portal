@@ -1,11 +1,11 @@
 import { Express, Request, Response } from 'express';
 import { db } from './db';
 import { requireAuth } from './auth-middleware';
-import { 
-  taskItems, 
-  taskParticipants, 
-  taskDependencies, 
-  taskSubtasks, 
+import {
+  taskItems,
+  taskParticipants,
+  taskDependencies,
+  taskSubtasks,
   taskActivityLog,
   userTaskTemplates,
   taskReminders,
@@ -19,6 +19,7 @@ import {
   type InsertTaskItem,
 } from '@shared/schema';
 import { eq, and, or, desc, sql, asc } from 'drizzle-orm';
+import { generateTaskId } from './services/id-generator';
 
 // ============================================================================
 // UNIVERSAL TASK MANAGEMENT SYSTEM API
@@ -143,7 +144,7 @@ export function registerTaskManagementRoutes(app: Express) {
       const taskData = insertTaskItemSchema.parse(req.body);
       
       // Generate task number
-      const taskNumber = `TASK-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+      const taskNumber = await generateTaskId();
 
       const [newTask] = await db.insert(taskItems).values({
         ...taskData,
@@ -476,7 +477,7 @@ export function registerTaskManagementRoutes(app: Express) {
       const createdTasks = [];
 
       for (const taskData of tasks) {
-        const taskNumber = `TASK-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+        const taskNumber = await generateTaskId();
         
         const [newTask] = await db.insert(taskItems).values({
           ...taskData,
@@ -562,7 +563,7 @@ export function registerTaskManagementRoutes(app: Express) {
         return res.status(404).json({ error: 'Template not found' });
       }
 
-      const taskNumber = `TASK-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+      const taskNumber = await generateTaskId();
 
       const [newTask] = await db.insert(taskItems).values({
         taskNumber,

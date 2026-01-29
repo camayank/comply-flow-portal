@@ -167,6 +167,7 @@ export const services = pgTable("services", {
 
 export const serviceRequests = pgTable("service_requests", {
   id: serial("id").primaryKey(),
+  requestId: text("request_id").unique(), // SR2600001 - human-readable ID
   userId: integer("user_id"),
   businessEntityId: integer("business_entity_id"),
   serviceId: text("service_id").notNull(),
@@ -733,6 +734,7 @@ export const DELIVERY_STATUS = {
 // Quality Control Reviews
 export const qualityReviews = pgTable("quality_reviews", {
   id: serial("id").primaryKey(),
+  reviewId: text("review_id").unique(), // QC26000001 - human-readable ID
   serviceRequestId: integer("service_request_id").notNull(),
   reviewerId: integer("reviewer_id").notNull(), // QC team member
   assignedAt: timestamp("assigned_at").defaultNow(),
@@ -1670,6 +1672,7 @@ export type WorkflowExecution = typeof workflowExecutions.$inferSelect;
 // Client document uploads table
 export const documentsUploads = pgTable("documents", {
   id: serial("id").primaryKey(),
+  documentId: text("document_id").unique(), // DOC26000001 - human-readable ID
   serviceOrderId: integer("service_order_id"),
   serviceRequestId: integer("service_request_id"),
   entityId: integer("entity_id").notNull(),

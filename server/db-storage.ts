@@ -18,7 +18,17 @@ import type {
   Service, InsertService,
   User, InsertUser
 } from '../shared/schema';
-import { generateLeadId, generateServiceRequestId, generatePaymentId, generateInvoiceId } from './services/id-generator';
+import {
+  generateLeadId,
+  generateServiceRequestId,
+  generatePaymentId,
+  generateInvoiceId,
+  generateDocumentId,
+  generateQcReviewId,
+  generateTicketId,
+  generateWorkItemId,
+  generateTaskId
+} from './services/id-generator';
 
 // Database-backed storage for critical entities (Leads & Proposals)
 // This ensures data persists across server restarts
@@ -325,7 +335,12 @@ export class DbServiceRequestsStorage {
   }
   
   async createServiceRequest(request: InsertServiceRequest): Promise<ServiceRequest> {
-    const [newRequest] = await db.insert(serviceRequests).values(request).returning();
+    // Generate readable request ID using centralized ID generator
+    const requestId = await generateServiceRequestId();
+    const [newRequest] = await db.insert(serviceRequests).values({
+      ...request,
+      requestId
+    } as any).returning();
     return newRequest;
   }
   
@@ -448,7 +463,12 @@ export class DbPaymentsStorage {
   }
   
   async createPayment(payment: InsertPayment): Promise<Payment> {
-    const [newPayment] = await db.insert(payments).values(payment).returning();
+    // Generate readable payment ID using centralized ID generator
+    const paymentId = await generatePaymentId();
+    const [newPayment] = await db.insert(payments).values({
+      ...payment,
+      paymentId
+    }).returning();
     return newPayment;
   }
   
@@ -650,7 +670,12 @@ export class DbFinancialsStorage {
   }
   
   async createInvoice(invoice: InsertInvoice): Promise<Invoice> {
-    const [newInvoice] = await db.insert(invoices).values(invoice).returning();
+    // Generate readable invoice number using centralized ID generator
+    const invoiceNumber = await generateInvoiceId();
+    const [newInvoice] = await db.insert(invoices).values({
+      ...invoice,
+      invoiceNumber
+    }).returning();
     return newInvoice;
   }
   

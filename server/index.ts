@@ -194,6 +194,15 @@ app.use((req, res, next) => {
     console.warn('⚠️ ID sequences migration skipped (may already exist):', (error as Error).message);
   }
 
+  // Run readable IDs migration (adds columns for SR, DOC, QC, etc.)
+  try {
+    const { runAddReadableIdsMigration } = await import('./migrations/add-readable-ids');
+    await runAddReadableIdsMigration();
+    console.log('✅ Readable ID columns initialized');
+  } catch (error) {
+    console.warn('⚠️ Readable IDs migration skipped:', (error as Error).message);
+  }
+
   console.log('✅ Service management systems initialized');
   
   // Initialize task reminder processor
