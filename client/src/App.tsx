@@ -35,7 +35,8 @@ const DesignSystemShowcase = lazy(() => import("./components/DesignSystemShowcas
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const OnboardingFlow = lazy(() => import("./pages/OnboardingFlow"));
 const PlatformDemo = lazy(() => import("./pages/PlatformDemo"));
-const Onboarding = lazy(() => import("./pages/Onboarding"));
+// DEPRECATED: Consolidated into SmartStart
+// const Onboarding = lazy(() => import("./pages/Onboarding"));
 const BusinessType = lazy(() => import("./pages/BusinessType"));
 const PackageSelection = lazy(() => import("./pages/PackageSelection"));
 const FounderDetails = lazy(() => import("./pages/FounderDetails"));
@@ -48,15 +49,17 @@ const PaymentGateway = lazy(() => import("./pages/PaymentGateway"));
 const ComplianceTracker = lazy(() => import("./pages/ComplianceTracker"));
 const Confirmation = lazy(() => import("./pages/Confirmation"));
 const AdminPanel = lazy(() => import("./pages/AdminPanel"));
-const MobileOperationsPanel = lazy(() => import("./pages/MobileOperationsPanel"));
-const MobileAdminPanel = lazy(() => import("./pages/MobileAdminPanel"));
+// DEPRECATED: Using refactored versions instead
+// const MobileOperationsPanel = lazy(() => import("./pages/MobileOperationsPanel"));
+// const MobileAdminPanel = lazy(() => import("./pages/MobileAdminPanel"));
 const SyncDashboard = lazy(() => import("./pages/SyncDashboard"));
 const PlatformShowcase = lazy(() => import("./pages/PlatformShowcase"));
 const ComplianceTrackerDashboard = lazy(() => import("./pages/ComplianceTrackerDashboard"));
 const RetainershipPlans = lazy(() => import("./pages/RetainershipPlans"));
 const SmartSuggestionsEngine = lazy(() => import("./pages/SmartSuggestionsEngine"));
 const DocumentVault = lazy(() => import("./pages/DocumentVault"));
-const StreamlinedOnboarding = lazy(() => import("./pages/StreamlinedOnboarding"));
+// DEPRECATED: Consolidated into SmartStart
+// const StreamlinedOnboarding = lazy(() => import("./pages/StreamlinedOnboarding"));
 const SmartStart = lazy(() => import("./pages/SmartStart"));
 const WhatsAppOnboarding = lazy(() => import("./pages/WhatsAppOnboarding"));
 const ComplianceScorecard = lazy(() => import("./pages/ComplianceScorecard"));
@@ -66,11 +69,12 @@ const ServiceRequestDetail = lazy(() => import("./pages/ServiceRequestDetail"));
 const ClientComplianceCalendar = lazy(() => import("./pages/ClientComplianceCalendar"));
 const ClientProfile = lazy(() => import("./pages/ClientProfile"));
 const OperationsPanel = lazy(() => import("./pages/OperationsPanel"));
-const AgentPortal = lazy(() => import("./pages/AgentPortal"));
+// DEPRECATED: Consolidated into MobileAgentPortal
+// const AgentPortal = lazy(() => import("./pages/AgentPortal"));
 const MobileAgentPortal = lazy(() => import("./pages/MobileAgentPortal"));
 const MasterBlueprintDashboard = lazy(() => import("./pages/MasterBlueprintDashboard"));
-const UniversalAdminPanel = lazy(() => import("./pages/UniversalAdminPanel"));
-const UniversalOperationsPanel = lazy(() => import("./pages/UniversalOperationsPanel"));
+// CONSOLIDATED: UniversalAdminPanel merged into MobileAdminPanelRefactored
+// CONSOLIDATED: UniversalOperationsPanel merged into MobileOperationsPanelRefactored
 const UniversalLandingPage = lazy(() => import("./pages/UniversalLandingPage"));
 const WorkflowImport = lazy(() => import("./pages/WorkflowImport"));
 const AdminServiceConfig = lazy(() => import("./pages/AdminServiceConfig"));
@@ -89,7 +93,8 @@ const ClientMasterDashboard = lazy(() => import("./pages/ClientMasterDashboard")
 const FinancialManagementDashboard = lazy(() => import("./pages/FinancialManagementDashboard"));
 const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
 const BusinessIntelligence = lazy(() => import("./pages/BusinessIntelligence"));
-const MobileDashboard = lazy(() => import("./pages/MobileDashboard"));
+// DEPRECATED: Consolidated into ClientPortalV2
+// const MobileDashboard = lazy(() => import("./pages/MobileDashboard"));
 const AgentDashboard = lazy(() => import("./pages/AgentDashboard"));
 const AgentLeadManagement = lazy(() => import("./pages/AgentLeadManagement"));
 const AgentCommissionTracker = lazy(() => import("./pages/AgentCommissionTracker"));
@@ -259,14 +264,12 @@ const AppContent = () => {
                 <Route path="/client-portal" component={MobileClientPortalRefactored} />
                 <Route path="/operations" component={MobileOperationsPanelRefactored} />
                 <Route path="/ops" component={MobileOperationsPanelRefactored} />
-                <Route path="/operations-manager" component={OperationsManager} />
-                <Route path="/ops-manager" component={OperationsManager} />
+                {/* CONSOLIDATED: /operations-manager merged into /operations */}
                 <Route path="/admin" component={MobileAdminPanelRefactored} />
                 <Route path="/admin-control" component={MobileAdminPanelRefactored} />
                 <Route path="/blueprint" component={MasterBlueprintDashboard} />
                 <Route path="/master-blueprint" component={MasterBlueprintDashboard} />
-                <Route path="/universal-admin" component={UniversalAdminPanel} />
-                <Route path="/universal-ops" component={UniversalOperationsPanel} />
+                {/* CONSOLIDATED: /universal-admin and /universal-ops merged into /admin and /operations */}
                 <Route path="/admin-config" component={AdminServiceConfig} />
                 <Route path="/workflow-import" component={WorkflowImport} />
                 <Route path="/pre-sales" component={PreSalesManager} />
@@ -291,9 +294,10 @@ const AppContent = () => {
                 <Route path="/business-intelligence" component={BusinessIntelligence} />
                 <Route path="/bi" component={BusinessIntelligence} />
                 <Route path="/insights" component={BusinessIntelligence} />
-                <Route path="/mobile-dashboard" component={MobileDashboard} />
-                <Route path="/mobile" component={MobileDashboard} />
-                <Route path="/command-center" component={MobileDashboard} />
+                {/* CONSOLIDATED: Mobile routes redirect to responsive portal-v2 */}
+                <Route path="/mobile-dashboard" component={ClientPortalV2} />
+                <Route path="/mobile" component={ClientPortalV2} />
+                <Route path="/command-center" component={ClientPortalV2} />
                 <Route path="/founder" component={FounderLiteDashboard} />
                 <Route path="/compliance-state" component={FounderLiteDashboard} />
                 <Route path="/agent" component={MobileAgentPortal} />
@@ -302,14 +306,16 @@ const AppContent = () => {
                 <Route path="/agent/commissions" component={AgentCommissionTracker} />
                 <Route path="/agent/performance" component={AgentPerformance} />
                 <Route path="/agent/profile" component={AgentProfileSettings} />
-                <Route path="/agents" component={AgentPortal} />
-                <Route path="/agent-portal" component={AgentPortal} />
-                <Route path="/partner" component={AgentPortal} />
-                <Route path="/partners" component={AgentPortal} />
+                {/* CONSOLIDATED: All agent portal routes point to main agent */}
+                <Route path="/agents" component={MobileAgentPortal} />
+                <Route path="/agent-portal" component={MobileAgentPortal} />
+                <Route path="/partner" component={MobileAgentPortal} />
+                <Route path="/partners" component={MobileAgentPortal} />
                 <Route path="/customer-service" component={CustomerServiceDashboard} />
                 <Route path="/super-admin" component={SuperAdminPortal} />
-                <Route path="/onboarding" component={Onboarding} />
-                <Route path="/streamlined-onboarding" component={StreamlinedOnboarding} />
+                {/* CONSOLIDATED: Single onboarding flow */}
+                <Route path="/onboarding" component={SmartStart} />
+                <Route path="/streamlined-onboarding" component={SmartStart} />
                 <Route path="/business-type" component={BusinessType} />
                 <Route path="/package-selection" component={PackageSelection} />
                 <Route path="/founder-details" component={FounderDetails} />

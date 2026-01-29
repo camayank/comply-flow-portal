@@ -97,16 +97,7 @@ const routes: RouteInfo[] = [
     status: 'active',
     depth: 'full'
   },
-  {
-    path: "/portal",
-    name: "Client Portal (Mobile)",
-    description: "Mobile-optimized client dashboard",
-    role: "Client - Core",
-    icon: Smartphone,
-    color: "bg-blue-500",
-    status: 'active',
-    depth: 'partial'
-  },
+  // CONSOLIDATED: /portal merged into /portal-v2 (responsive)
   {
     path: "/portal-v2/account",
     name: "Account Settings",
@@ -326,33 +317,14 @@ const routes: RouteInfo[] = [
   {
     path: "/operations",
     name: "Operations Dashboard",
-    description: "Task queue, service delivery, client management",
+    description: "Consolidated task queue, service delivery, workflow tracking",
     role: "Operations",
     icon: UserCog,
     color: "bg-green-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
-  {
-    path: "/universal-ops",
-    name: "Universal Operations",
-    description: "Complete ops panel with workflow tracking",
-    role: "Operations",
-    icon: Briefcase,
-    color: "bg-green-500",
-    status: 'active',
-    depth: 'partial'
-  },
-  {
-    path: "/operations-manager",
-    name: "Operations Manager",
-    description: "Advanced operations management tools",
-    role: "Operations",
-    icon: Settings,
-    color: "bg-green-600",
-    status: 'active',
-    depth: 'partial'
-  },
+  // CONSOLIDATED: /universal-ops and /operations-manager merged into /operations
   {
     path: "/qc",
     name: "Quality Control",
@@ -388,23 +360,14 @@ const routes: RouteInfo[] = [
   {
     path: "/admin",
     name: "Admin Panel",
-    description: "User management, client management, system config",
+    description: "Consolidated user management, system config, controls",
     role: "Admin",
     icon: ShieldCheck,
     color: "bg-purple-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
-  {
-    path: "/universal-admin",
-    name: "Universal Admin",
-    description: "Complete admin dashboard with all controls",
-    role: "Admin",
-    icon: Settings,
-    color: "bg-purple-500",
-    status: 'active',
-    depth: 'partial'
-  },
+  // CONSOLIDATED: /universal-admin merged into /admin
   {
     path: "/admin-config",
     name: "Admin Service Config",
@@ -479,25 +442,16 @@ const routes: RouteInfo[] = [
   },
 
   // ============ AGENT PORTAL ============
+  // CONSOLIDATED: /agent-portal merged into /agent
   {
-    path: "/agent-portal",
+    path: "/agent",
     name: "Agent Portal",
-    description: "Partner/agent dashboard with commission tracking",
+    description: "Consolidated agent dashboard with commissions & leads",
     role: "Agent",
     icon: Users,
     color: "bg-indigo-500",
     status: 'active',
-    depth: 'basic'
-  },
-  {
-    path: "/agent",
-    name: "Mobile Agent Portal",
-    description: "Mobile-optimized agent dashboard",
-    role: "Agent",
-    icon: Smartphone,
-    color: "bg-indigo-500",
-    status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/agent/dashboard",
@@ -627,36 +581,18 @@ const routes: RouteInfo[] = [
     status: 'active',
     depth: 'basic'
   },
-  {
-    path: "/onboarding",
-    name: "Onboarding",
-    description: "Client onboarding flow",
-    role: "Onboarding",
-    icon: Rocket,
-    color: "bg-cyan-500",
-    status: 'active',
-    depth: 'partial'
-  },
+  // CONSOLIDATED: /onboarding merged into /smart-start
   {
     path: "/smart-start",
     name: "Smart Start",
-    description: "Quick start wizard for new users",
+    description: "Consolidated onboarding wizard for all channels",
     role: "Onboarding",
     icon: Zap,
     color: "bg-cyan-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
-  {
-    path: "/whatsapp-onboarding",
-    name: "WhatsApp Onboarding",
-    description: "Onboarding via WhatsApp",
-    role: "Onboarding",
-    icon: MessageCircle,
-    color: "bg-green-500",
-    status: 'active',
-    depth: 'partial'
-  },
+  // CONSOLIDATED: /whatsapp-onboarding is a channel option in /smart-start
   {
     path: "/founder",
     name: "Founder Lite",
@@ -667,16 +603,7 @@ const routes: RouteInfo[] = [
     status: 'active',
     depth: 'partial'
   },
-  {
-    path: "/mobile-dashboard",
-    name: "Mobile Dashboard",
-    description: "Mobile command center",
-    role: "Client - Core",
-    icon: Smartphone,
-    color: "bg-blue-500",
-    status: 'active',
-    depth: 'partial'
-  },
+  // CONSOLIDATED: /mobile-dashboard merged into /portal-v2 (responsive)
   {
     path: "/retainership",
     name: "Retainership Plans",
