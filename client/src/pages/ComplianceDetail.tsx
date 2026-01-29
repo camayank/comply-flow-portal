@@ -1,20 +1,29 @@
 /**
  * Compliance Detail Page
- * 
+ *
  * Deep-dive into compliance status with:
  * - Monthly/Quarterly/Annual checkpoint breakdown
  * - Document requirements for each checkpoint
  * - Risk analysis and prioritization
  * - Action items with deadlines
  * - Penalty exposure tracking
+ * - Mark Complete & Request Extension actions
  */
 
 import React, { useEffect, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { lifecycleService, type ComplianceDetail } from '@/services/lifecycleService';
-import { 
-  Shield, 
-  AlertCircle, 
-  CheckCircle2, 
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Shield,
+  AlertCircle,
+  CheckCircle2,
   Clock,
   FileText,
   TrendingUp,
@@ -22,7 +31,10 @@ import {
   DollarSign,
   ArrowLeft,
   AlertTriangle,
-  ArrowRight
+  ArrowRight,
+  ClockIcon,
+  Check,
+  Loader2
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 
@@ -40,14 +52,117 @@ const RISK_COLORS = {
 
 export default function ComplianceDetailPage() {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [detail, setDetail] = useState<ComplianceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'monthly' | 'quarterly' | 'annual'>('annual');
 
+  // Action dialog states
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+  const [extensionDialogOpen, setExtensionDialogOpen] = useState(false);
+  const [selectedCheckpoint, setSelectedCheckpoint] = useState<any>(null);
+  const [filingReference, setFilingReference] = useState('');
+  const [completionDate, setCompletionDate] = useState('');
+  const [extensionReason, setExtensionReason] = useState('');
+  const [requestedDate, setRequestedDate] = useState('');
+
   useEffect(() => {
     loadDetail();
   }, []);
+
+  // Mark compliance as complete mutation
+  const markCompleteMutation = useMutation({
+    mutationFn: async (data: { itemId: number; filingReference?: string; completionDate?: string }) => {
+      return apiRequest('POST', `/api/compliance-state/tracking/${data.itemId}/complete`, {
+        filingReference: data.filingReference,
+        completionDate: data.completionDate,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Compliance Marked Complete',
+        description: 'The compliance item has been marked as completed successfully.',
+      });
+      setCompleteDialogOpen(false);
+      setFilingReference('');
+      setCompletionDate('');
+      setSelectedCheckpoint(null);
+      loadDetail(); // Refresh data
+      queryClient.invalidateQueries({ queryKey: ['/api/client/compliance-tracking'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/client/compliance-calendar'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to mark compliance as complete',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Request extension mutation
+  const requestExtensionMutation = useMutation({
+    mutationFn: async (data: { itemId: number; reason: string; requestedDate: string }) => {
+      return apiRequest('POST', `/api/compliance/items/${data.itemId}/extension`, {
+        reason: data.reason,
+        requestedDate: data.requestedDate,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Extension Requested',
+        description: 'Your extension request has been submitted for review.',
+      });
+      setExtensionDialogOpen(false);
+      setExtensionReason('');
+      setRequestedDate('');
+      setSelectedCheckpoint(null);
+      loadDetail(); // Refresh data
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to request extension',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleMarkComplete = (checkpoint: any) => {
+    setSelectedCheckpoint(checkpoint);
+    setCompletionDate(new Date().toISOString().split('T')[0]);
+    setCompleteDialogOpen(true);
+  };
+
+  const handleRequestExtension = (checkpoint: any) => {
+    setSelectedCheckpoint(checkpoint);
+    // Default to 15 days after current due date
+    if (checkpoint.nextDue) {
+      const dueDate = new Date(checkpoint.nextDue);
+      dueDate.setDate(dueDate.getDate() + 15);
+      setRequestedDate(dueDate.toISOString().split('T')[0]);
+    }
+    setExtensionDialogOpen(true);
+  };
+
+  const submitComplete = () => {
+    if (!selectedCheckpoint?.id) return;
+    markCompleteMutation.mutate({
+      itemId: selectedCheckpoint.id,
+      filingReference,
+      completionDate,
+    });
+  };
+
+  const submitExtension = () => {
+    if (!selectedCheckpoint?.id || !extensionReason || !requestedDate) return;
+    requestExtensionMutation.mutate({
+      itemId: selectedCheckpoint.id,
+      reason: extensionReason,
+      requestedDate,
+    });
+  };
 
   const loadDetail = async () => {
     try {
@@ -305,10 +420,36 @@ export default function ComplianceDetailPage() {
                               </span>
                             ))}
                           </div>
-                          
-                          <button className="mt-3 text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+
+                          <button
+                            onClick={() => setLocation('/lifecycle/documents')}
+                            className="mt-3 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                          >
                             Upload Documents →
                           </button>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      {status !== 'completed' && (
+                        <div className="flex gap-3 mt-4 pt-4 border-t border-gray-200">
+                          <Button
+                            size="sm"
+                            onClick={() => handleMarkComplete(checkpoint)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <Check className="h-4 w-4 mr-2" />
+                            Mark Complete
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRequestExtension(checkpoint)}
+                            className="border-yellow-500 text-yellow-700 hover:bg-yellow-50"
+                          >
+                            <ClockIcon className="h-4 w-4 mr-2" />
+                            Request Extension
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -393,6 +534,150 @@ export default function ComplianceDetailPage() {
           </button>
         </div>
       </div>
+
+      {/* Mark Complete Dialog */}
+      <Dialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              Mark Compliance Complete
+            </DialogTitle>
+            <DialogDescription>
+              Confirm that you have completed: {selectedCheckpoint?.name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="completionDate">Completion Date</Label>
+              <Input
+                id="completionDate"
+                type="date"
+                value={completionDate}
+                onChange={(e) => setCompletionDate(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+            <div>
+              <Label htmlFor="filingReference">Filing Reference (Optional)</Label>
+              <Input
+                id="filingReference"
+                placeholder="e.g., ARN-123456789 or Acknowledgment Number"
+                value={filingReference}
+                onChange={(e) => setFilingReference(e.target.value)}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Enter the reference number from your filing receipt
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={submitComplete}
+              disabled={markCompleteMutation.isPending}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {markCompleteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Confirm Complete
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Request Extension Dialog */}
+      <Dialog open={extensionDialogOpen} onOpenChange={setExtensionDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClockIcon className="h-5 w-5 text-yellow-600" />
+              Request Extension
+            </DialogTitle>
+            <DialogDescription>
+              Request more time for: {selectedCheckpoint?.name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-yellow-800">
+                  <strong>Current Due Date:</strong>{' '}
+                  {selectedCheckpoint?.nextDue
+                    ? new Date(selectedCheckpoint.nextDue).toLocaleDateString('en-IN', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric',
+                      })
+                    : 'Not set'}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="requestedDate">Requested New Date *</Label>
+              <Input
+                id="requestedDate"
+                type="date"
+                value={requestedDate}
+                onChange={(e) => setRequestedDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="extensionReason">Reason for Extension *</Label>
+              <Textarea
+                id="extensionReason"
+                placeholder="Please explain why you need additional time..."
+                value={extensionReason}
+                onChange={(e) => setExtensionReason(e.target.value)}
+                rows={3}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Provide a clear reason to help us process your request faster
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExtensionDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={submitExtension}
+              disabled={requestExtensionMutation.isPending || !extensionReason || !requestedDate}
+              className="bg-yellow-600 hover:bg-yellow-700"
+            >
+              {requestExtensionMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <ClockIcon className="h-4 w-4 mr-2" />
+                  Submit Request
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

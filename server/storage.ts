@@ -2618,6 +2618,10 @@ class HybridStorage extends MemStorage {
     return dbLeadsStorage.getLead(id);
   }
 
+  async getLeadByLeadId(leadId: string): Promise<LeadEnhanced | undefined> {
+    return dbLeadsStorage.getLeadByLeadId(leadId);
+  }
+
   async createLead(lead: InsertLeadEnhanced): Promise<LeadEnhanced> {
     return dbLeadsStorage.createLead(lead);
   }

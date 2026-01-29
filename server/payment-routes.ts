@@ -1,8 +1,19 @@
-import type { Express } from "express";
+import type { Express, Response } from "express";
 import { db } from './db';
 import { payments, serviceRequests, businessEntities, users } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and, desc, or } from 'drizzle-orm';
 import Stripe from 'stripe';
+import {
+  sessionAuthMiddleware,
+  requireRole,
+  requireMinimumRole,
+  USER_ROLES,
+  type AuthenticatedRequest
+} from './rbac-middleware';
+
+// Client authentication middleware
+const clientAuth = [sessionAuthMiddleware, requireRole(USER_ROLES.CLIENT)] as const;
+const staffAuth = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE)] as const;
 
 // Payment gateway structure - Ready for Stripe integration
 // NOTE: STRIPE_SECRET_KEY and VITE_STRIPE_PUBLIC_KEY will be added when needed
@@ -17,10 +28,312 @@ const getStripeInstance = () => {
   });
 };
 
+// Helper to get user's business entity ID
+async function getUserEntityId(userId: number): Promise<number | null> {
+  try {
+    const [entity] = await db
+      .select()
+      .from(businessEntities)
+      .where(or(
+        eq(businessEntities.primaryContactId, userId),
+        eq(businessEntities.clientId, `U${userId}`)
+      ));
+    return entity?.id || null;
+  } catch (error) {
+    console.error('Error getting user entity ID:', error);
+    return null;
+  }
+}
+
 export function registerPaymentRoutes(app: Express) {
 
-  // Create payment intent for service
-  app.post('/api/payments/create-intent', async (req, res) => {
+  // ==========================================================================
+  // CLIENT PAYMENT ENDPOINTS - Authenticated client access
+  // ==========================================================================
+
+  // Get pending payments for authenticated client
+  app.get('/api/client/payments/pending', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const entityId = await getUserEntityId(userId);
+      if (!entityId) {
+        return res.json([]);
+      }
+
+      // Get service requests with pending payments
+      const pendingRequests = await db
+        .select({
+          id: serviceRequests.id,
+          serviceType: serviceRequests.serviceType,
+          serviceName: serviceRequests.serviceName,
+          status: serviceRequests.status,
+          totalAmount: serviceRequests.totalAmount,
+          createdAt: serviceRequests.createdAt,
+        })
+        .from(serviceRequests)
+        .where(and(
+          eq(serviceRequests.businessEntityId, entityId),
+          eq(serviceRequests.status, 'pending_payment')
+        ))
+        .orderBy(desc(serviceRequests.createdAt));
+
+      res.json(pendingRequests);
+    } catch (error) {
+      console.error('Get pending payments error:', error);
+      res.status(500).json({ error: 'Failed to fetch pending payments' });
+    }
+  });
+
+  // Get payment history for authenticated client
+  app.get('/api/client/payments/history', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const entityId = await getUserEntityId(userId);
+      if (!entityId) {
+        return res.json([]);
+      }
+
+      // Get all payments for this client's service requests
+      const clientPayments = await db
+        .select({
+          id: payments.id,
+          amount: payments.amount,
+          paymentMethod: payments.paymentMethod,
+          paymentStatus: payments.paymentStatus,
+          transactionId: payments.transactionId,
+          paidAt: payments.paidAt,
+          createdAt: payments.createdAt,
+          serviceRequestId: payments.serviceRequestId,
+          serviceName: serviceRequests.serviceName,
+        })
+        .from(payments)
+        .leftJoin(serviceRequests, eq(payments.serviceRequestId, serviceRequests.id))
+        .where(eq(serviceRequests.businessEntityId, entityId))
+        .orderBy(desc(payments.createdAt));
+
+      res.json(clientPayments);
+    } catch (error) {
+      console.error('Get payment history error:', error);
+      res.status(500).json({ error: 'Failed to fetch payment history' });
+    }
+  });
+
+  // Initiate payment for a service request (client)
+  app.post('/api/client/payments/initiate', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { serviceRequestId, amount, paymentMethod = 'card' } = req.body;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ error: 'Invalid amount' });
+      }
+
+      const entityId = await getUserEntityId(userId);
+
+      // Verify service request belongs to user if provided
+      if (serviceRequestId) {
+        const [request] = await db
+          .select()
+          .from(serviceRequests)
+          .where(and(
+            eq(serviceRequests.id, serviceRequestId),
+            eq(serviceRequests.businessEntityId, entityId!)
+          ))
+          .limit(1);
+
+        if (!request) {
+          return res.status(403).json({ error: 'Service request not found or access denied' });
+        }
+      }
+
+      const stripe = getStripeInstance();
+
+      // If Stripe is not configured, create a simulation payment record
+      if (!stripe) {
+        // Create a simulated payment record for demo/development
+        const [payment] = await db
+          .insert(payments)
+          .values({
+            serviceRequestId: serviceRequestId || null,
+            amount: amount.toString(),
+            paymentMethod: paymentMethod,
+            paymentStatus: 'pending',
+            transactionId: `SIM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          })
+          .returning();
+
+        return res.json({
+          paymentId: payment.id,
+          mode: 'simulation',
+          message: 'Payment gateway not configured - running in simulation mode',
+          simulationUrl: `/api/client/payments/${payment.id}/simulate-success`
+        });
+      }
+
+      // Create payment intent with Stripe
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to smallest currency unit (paise)
+        currency: 'inr',
+        metadata: {
+          serviceRequestId: serviceRequestId?.toString() || 'direct',
+          userId: userId.toString(),
+        },
+      });
+
+      // Record payment in database
+      const [payment] = await db
+        .insert(payments)
+        .values({
+          serviceRequestId: serviceRequestId || null,
+          amount: amount.toString(),
+          paymentMethod: paymentMethod,
+          paymentStatus: 'pending',
+          transactionId: paymentIntent.id,
+        })
+        .returning();
+
+      res.json({
+        paymentId: payment.id,
+        clientSecret: paymentIntent.client_secret,
+        amount: payment.amount,
+        mode: 'live'
+      });
+    } catch (error: any) {
+      console.error('Initiate payment error:', error);
+      res.status(500).json({
+        error: 'Failed to initiate payment',
+        message: error.message
+      });
+    }
+  });
+
+  // Simulate successful payment (for demo/development when Stripe not configured)
+  app.post('/api/client/payments/:id/simulate-success', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const paymentId = parseInt(req.params.id);
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      // Get payment
+      const [payment] = await db
+        .select()
+        .from(payments)
+        .where(eq(payments.id, paymentId))
+        .limit(1);
+
+      if (!payment) {
+        return res.status(404).json({ error: 'Payment not found' });
+      }
+
+      // Only allow simulation for simulated payments
+      if (!payment.transactionId?.startsWith('SIM_')) {
+        return res.status(400).json({ error: 'Cannot simulate real payments' });
+      }
+
+      // Update payment status to completed
+      await db
+        .update(payments)
+        .set({
+          paymentStatus: 'completed',
+          paidAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(payments.id, paymentId));
+
+      // Update service request status if applicable
+      if (payment.serviceRequestId) {
+        await db
+          .update(serviceRequests)
+          .set({
+            status: 'in_progress',
+            updatedAt: new Date(),
+          })
+          .where(eq(serviceRequests.id, payment.serviceRequestId));
+      }
+
+      res.json({
+        success: true,
+        message: 'Payment simulated successfully',
+        paymentId: payment.id,
+        status: 'completed'
+      });
+    } catch (error) {
+      console.error('Simulate payment error:', error);
+      res.status(500).json({ error: 'Failed to simulate payment' });
+    }
+  });
+
+  // Get payment receipt/details (client)
+  app.get('/api/client/payments/:id', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const paymentId = parseInt(req.params.id);
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const entityId = await getUserEntityId(userId);
+
+      // Get payment with service request to verify ownership
+      const [payment] = await db
+        .select({
+          id: payments.id,
+          amount: payments.amount,
+          paymentMethod: payments.paymentMethod,
+          paymentStatus: payments.paymentStatus,
+          transactionId: payments.transactionId,
+          paidAt: payments.paidAt,
+          createdAt: payments.createdAt,
+          serviceRequestId: payments.serviceRequestId,
+          serviceName: serviceRequests.serviceName,
+          entityId: serviceRequests.businessEntityId,
+        })
+        .from(payments)
+        .leftJoin(serviceRequests, eq(payments.serviceRequestId, serviceRequests.id))
+        .where(eq(payments.id, paymentId))
+        .limit(1);
+
+      if (!payment) {
+        return res.status(404).json({ error: 'Payment not found' });
+      }
+
+      // Verify ownership
+      if (payment.entityId && payment.entityId !== entityId) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+
+      res.json({
+        ...payment,
+        invoiceNumber: `INV-${payment.id.toString().padStart(6, '0')}`,
+      });
+    } catch (error) {
+      console.error('Get payment error:', error);
+      res.status(500).json({ error: 'Failed to fetch payment details' });
+    }
+  });
+
+  // ==========================================================================
+  // STAFF/ADMIN PAYMENT ENDPOINTS
+  // ==========================================================================
+
+  // Create payment intent for service (staff - for creating payments on behalf of clients)
+  app.post('/api/payments/create-intent', ...staffAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { serviceRequestId, amount, currency = 'inr' } = req.body;
 
@@ -30,9 +343,22 @@ export function registerPaymentRoutes(app: Express) {
 
       const stripe = getStripeInstance();
       if (!stripe) {
-        return res.status(503).json({ 
-          error: 'Payment gateway not configured',
-          message: 'Please contact support to enable payments'
+        // Create simulation record for demo
+        const [payment] = await db
+          .insert(payments)
+          .values({
+            serviceRequestId: serviceRequestId || null,
+            amount: amount.toString(),
+            paymentMethod: 'stripe',
+            paymentStatus: 'pending',
+            transactionId: `SIM_STAFF_${Date.now()}`,
+          })
+          .returning();
+
+        return res.json({
+          paymentId: payment.id,
+          mode: 'simulation',
+          message: 'Payment gateway not configured - simulation mode'
         });
       }
 
@@ -61,12 +387,13 @@ export function registerPaymentRoutes(app: Express) {
         paymentId: payment.id,
         clientSecret: paymentIntent.client_secret,
         amount: payment.amount,
+        mode: 'live'
       });
     } catch (error: any) {
       console.error('Create payment intent error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to create payment',
-        message: error.message 
+        message: error.message
       });
     }
   });
@@ -146,8 +473,8 @@ export function registerPaymentRoutes(app: Express) {
     }
   });
 
-  // Get payment history for a client
-  app.get('/api/payments/client/:clientId', async (req, res) => {
+  // Get payment history for a client (staff access)
+  app.get('/api/payments/client/:clientId', ...staffAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const clientId = req.params.clientId;
 
@@ -186,8 +513,8 @@ export function registerPaymentRoutes(app: Express) {
     }
   });
 
-  // Get payment details
-  app.get('/api/payments/:id', async (req, res) => {
+  // Get payment details (staff access)
+  app.get('/api/payments/:id', ...staffAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const paymentId = parseInt(req.params.id);
 
@@ -208,8 +535,8 @@ export function registerPaymentRoutes(app: Express) {
     }
   });
 
-  // Generate invoice PDF (placeholder for future implementation)
-  app.get('/api/payments/:id/invoice', async (req, res) => {
+  // Generate invoice PDF (staff access)
+  app.get('/api/payments/:id/invoice', ...staffAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const paymentId = parseInt(req.params.id);
 
@@ -236,8 +563,8 @@ export function registerPaymentRoutes(app: Express) {
     }
   });
 
-  // Refund payment
-  app.post('/api/payments/:id/refund', async (req, res) => {
+  // Refund payment (staff access - requires accountant or higher)
+  app.post('/api/payments/:id/refund', sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ACCOUNTANT), async (req: AuthenticatedRequest, res: Response) => {
     try {
       const paymentId = parseInt(req.params.id);
       const { amount, reason } = req.body;

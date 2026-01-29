@@ -1,14 +1,16 @@
 /**
  * Client V2 API Routes - Robust US-Style Implementation
- * 
+ *
  * Following best practices from:
  * - Vanta: Real-time compliance state calculation
  * - Drata: Prioritized action recommendations
  * - Stripe: Activity audit trails and clean API design
  * - Secureframe: Document management with integrity checks
+ *
+ * SECURITY: All routes require authentication and validate user ownership
  */
 
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { pool } from '../db';
 import multer from 'multer';
 import path from 'path';
@@ -31,7 +33,24 @@ import {
   getClientDocuments,
 } from '../services/document-service';
 
+import {
+  sessionAuthMiddleware,
+  requireRole,
+  USER_ROLES,
+  type AuthenticatedRequest
+} from '../rbac-middleware';
+
 const router = Router();
+
+// Apply authentication to ALL routes in this router
+router.use(sessionAuthMiddleware as any);
+router.use(requireRole(USER_ROLES.CLIENT) as any);
+
+// Helper to get authenticated user ID - NEVER accept from query/body params
+function getAuthenticatedUserId(req: Request): string | null {
+  const user = (req as AuthenticatedRequest).user;
+  return user?.id ? String(user.id) : null;
+}
 
 // Configure multer for secure file uploads
 const storage = multer.diskStorage({
@@ -63,89 +82,30 @@ const upload = multer({
 
 /**
  * GET /api/v2/client/status
- * 
+ *
  * Single aggregated endpoint for entire portal dashboard
  * Returns: compliance state, next action, recent activities
- * 
+ *
  * Vanta-style real-time compliance calculation
+ * SECURITY: Uses authenticated user ID only - never from query params
  */
 router.get('/status', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id || req.query.userId as string || 'dev-user-123';
+    // SECURITY: Get userId ONLY from authenticated session - never from query/body
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
 
-    // ✅ USE NEW V2 SERVICE LAYER (Vanta/Drata architecture)
+    // Use V2 service layer (Vanta/Drata architecture)
     const client = await ClientService.getClientByUserId(userId);
 
     if (!client) {
-      // DEV MODE: Return mock data when no client exists
-      console.log('No client found, returning enhanced mock data for development');
-      
-      return res.json({
-        complianceState: 'AMBER',
-        daysSafe: 12,
-        nextDeadline: 'February 5, 2026',
-        penaltyExposure: 5000,
-        stats: {
-          compliantItems: 15,
-          pendingItems: 2,
-          overdueItems: 0,
-        },
-        nextAction: {
-          id: 'action-gst-jan-2026',
-          title: 'Upload January 2026 GST documents',
-          timeEstimate: '5 minutes',
-          whyMatters: {
-            benefits: [
-              'Complete your GST filing before deadline',
-              'Avoid ₹5,000 late filing penalty',
-              'Maintain good compliance record',
-              'Enable ITC claims for next month',
-            ],
-            socialProof: '3,241 businesses completed this action this month',
-          },
-          actionType: 'upload',
-          instructions: [
-            'Gather all sales invoices for January 2026',
-            'Prepare purchase invoices and input credit documents',
-            'Ensure all documents are in PDF format (max 10MB each)',
-            'Click the upload button below to attach files',
-            'Review and submit for processing',
-          ],
-          documentType: 'GST Return Documents',
-          dueDate: '2026-02-05',
-        },
-        recentActivities: [
-          {
-            id: 'activity-1',
-            type: 'document_uploaded',
-            description: 'December 2025 GST returns filed successfully',
-            timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 'activity-2',
-            type: 'payment_completed',
-            description: 'GST payment of ₹45,000 completed',
-            timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 'activity-3',
-            type: 'document_approved',
-            description: 'TDS return for Q3 FY 2025-26 approved',
-            timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 'activity-4',
-            type: 'filing_initiated',
-            description: 'Professional tax filing initiated',
-            timestamp: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 'activity-5',
-            type: 'document_uploaded',
-            description: 'Bank statement for December uploaded',
-            timestamp: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-        ],
+      // No client profile found - user needs to complete onboarding
+      return res.status(404).json({
+        error: 'Client profile not found',
+        message: 'Please complete your profile setup to access the dashboard',
+        needsOnboarding: true
       });
     }
 
@@ -217,110 +177,56 @@ router.get('/status', async (req: Request, res: Response) => {
     });
 
   } catch (dbError) {
-    console.error('Database error:', (dbError as Error).message);
-    
-    // Fallback to mock data on DB errors (dev mode safety)
-    return res.json({
-      complianceState: 'AMBER',
-      daysSafe: 12,
-      nextDeadline: 'February 5, 2026',
-      penaltyExposure: 5000,
-      stats: {
-        compliantItems: 15,
-        pendingItems: 2,
-        overdueItems: 0,
-      },
-      nextAction: {
-        id: 'action-gst-jan-2026',
-        title: 'Upload January 2026 GST documents',
-        timeEstimate: '5 minutes',
-        whyMatters: {
-          benefits: [
-            'Complete your GST filing before deadline',
-            'Avoid ₹5,000 late filing penalty',
-            'Maintain good compliance record',
-            'Enable ITC claims for next month',
-          ],
-          socialProof: '3,241 businesses completed this action this month',
-        },
-        actionType: 'upload',
-        instructions: [
-          'Gather all sales invoices for January 2026',
-          'Prepare purchase invoices and input credit documents',
-          'Ensure all documents are in PDF format (max 10MB each)',
-          'Click the upload button below to attach files',
-          'Review and submit for processing',
-        ],
-        documentType: 'GST Return Documents',
-        dueDate: '2026-02-05',
-      },
-      recentActivities: [
-        {
-          id: 'activity-1',
-          type: 'document_uploaded',
-          description: 'December 2025 GST returns filed successfully',
-          timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 'activity-2',
-          type: 'payment_completed',
-          description: 'GST payment of ₹45,000 completed',
-          timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 'activity-3',
-          type: 'document_approved',
-          description: 'TDS return for Q3 FY 2025-26 approved',
-          timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 'activity-4',
-          type: 'filing_initiated',
-          description: 'Professional tax filing initiated',
-          timestamp: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        {
-          id: 'activity-5',
-          type: 'document_uploaded',
-          description: 'Bank statement for December uploaded',
-          timestamp: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-      ],
+    console.error('Database error in /api/v2/client/status:', (dbError as Error).message);
+    return res.status(500).json({
+      error: 'Failed to fetch compliance status',
+      message: 'Please try again later'
     });
   }
 });
 
 /**
  * POST /api/v2/client/actions/complete
- * 
+ *
  * Complete an action with optional document uploads
  * Secureframe-style document handling with integrity checks
+ * SECURITY: Uses authenticated user ID only - validates ownership of action
  */
 router.post('/actions/complete', upload.array('documents', 10), async (req: Request, res: Response) => {
   try {
-    const { actionId, userId } = req.body;
+    // SECURITY: Get userId ONLY from authenticated session
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { actionId } = req.body;
+    if (!actionId) {
+      return res.status(400).json({ error: 'actionId is required' });
+    }
+
     const files = req.files as Express.Multer.File[];
 
-    // Get client
+    // Get client for authenticated user
     const clientResult = await pool.query(
       'SELECT id FROM clients WHERE user_id = $1',
-      [userId || 'dev-user-123']
+      [userId]
     );
 
     if (clientResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Client not found' });
+      return res.status(404).json({ error: 'Client profile not found' });
     }
 
     const clientId = clientResult.rows[0].id;
 
-    // Get action details
+    // Get action details - verify it belongs to this client
     const actionResult = await pool.query(
       'SELECT * FROM compliance_actions WHERE id = $1 AND client_id = $2',
       [actionId, clientId]
     );
 
     if (actionResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Action not found' });
+      return res.status(404).json({ error: 'Action not found or access denied' });
     }
 
     const action = actionResult.rows[0];
@@ -336,17 +242,17 @@ router.post('/actions/complete', upload.array('documents', 10), async (req: Requ
           filePath: file.path,
           fileSizeBytes: file.size,
           mimeType: file.mimetype,
-          uploadedBy: userId || 'dev-user-123',
+          uploadedBy: userId,
         });
       }
     }
 
     // Update action status
     await pool.query(
-      `UPDATE compliance_actions 
+      `UPDATE compliance_actions
        SET status = 'completed', completed_at = CURRENT_TIMESTAMP, completed_by = $1
        WHERE id = $2`,
-      [userId || 'dev-user-123', actionId]
+      [userId, actionId]
     );
 
     // Log activity (Stripe-style audit trail)
@@ -354,7 +260,7 @@ router.post('/actions/complete', upload.array('documents', 10), async (req: Requ
       clientId,
       'action_completed',
       `Completed: ${action.title}`,
-      userId || 'dev-user-123',
+      userId,
       { actionId, actionTitle: action.title }
     );
 
@@ -377,22 +283,28 @@ router.post('/actions/complete', upload.array('documents', 10), async (req: Requ
 
 /**
  * GET /api/v2/client/actions/history
- * 
+ *
  * Get complete activity timeline (Stripe-style)
+ * SECURITY: Uses authenticated user ID only
  */
 router.get('/actions/history', async (req: Request, res: Response) => {
   try {
-    const userId = req.query.userId as string || 'dev-user-123';
+    // SECURITY: Get userId ONLY from authenticated session
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const limit = parseInt(req.query.limit as string) || 50;
 
-    // Get client
+    // Get client for authenticated user
     const clientResult = await pool.query(
       'SELECT id FROM clients WHERE user_id = $1',
       [userId]
     );
 
     if (clientResult.rows.length === 0) {
-      return res.json({ activities: [] });
+      return res.json({ activities: [], count: 0 });
     }
 
     const clientId = clientResult.rows[0].id;
@@ -414,12 +326,17 @@ router.get('/actions/history', async (req: Request, res: Response) => {
 
 /**
  * GET /api/v2/client/actions/pending
- * 
+ *
  * Get all pending actions (Drata-style prioritization)
+ * SECURITY: Uses authenticated user ID only
  */
 router.get('/actions/pending', async (req: Request, res: Response) => {
   try {
-    const userId = req.query.userId as string || 'dev-user-123';
+    // SECURITY: Get userId ONLY from authenticated session
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
 
     const clientResult = await pool.query(
       'SELECT id FROM clients WHERE user_id = $1',
@@ -427,7 +344,7 @@ router.get('/actions/pending', async (req: Request, res: Response) => {
     );
 
     if (clientResult.rows.length === 0) {
-      return res.json({ actions: [] });
+      return res.json({ actions: [], count: 0 });
     }
 
     const clientId = clientResult.rows[0].id;
@@ -474,12 +391,17 @@ router.get('/actions/pending', async (req: Request, res: Response) => {
 
 /**
  * GET /api/v2/client/documents
- * 
+ *
  * Get all client documents (Secureframe-style document tracking)
+ * SECURITY: Uses authenticated user ID only
  */
 router.get('/documents', async (req: Request, res: Response) => {
   try {
-    const userId = req.query.userId as string || 'dev-user-123';
+    // SECURITY: Get userId ONLY from authenticated session
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
 
     const clientResult = await pool.query(
       'SELECT id FROM clients WHERE user_id = $1',
@@ -487,7 +409,7 @@ router.get('/documents', async (req: Request, res: Response) => {
     );
 
     if (clientResult.rows.length === 0) {
-      return res.json({ documents: [] });
+      return res.json({ documents: [], count: 0 });
     }
 
     const clientId = clientResult.rows[0].id;
@@ -520,12 +442,18 @@ router.get('/documents', async (req: Request, res: Response) => {
 
 /**
  * GET /api/v2/client/deadlines
- * 
+ *
  * Get upcoming deadlines with risk assessment
+ * SECURITY: Uses authenticated user ID only
  */
 router.get('/deadlines', async (req: Request, res: Response) => {
   try {
-    const userId = req.query.userId as string || 'dev-user-123';
+    // SECURITY: Get userId ONLY from authenticated session
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const daysAhead = parseInt(req.query.daysAhead as string) || 90;
 
     const clientResult = await pool.query(
@@ -534,7 +462,7 @@ router.get('/deadlines', async (req: Request, res: Response) => {
     );
 
     if (clientResult.rows.length === 0) {
-      return res.json({ deadlines: [] });
+      return res.json({ deadlines: [], count: 0 });
     }
 
     const clientId = clientResult.rows[0].id;
@@ -580,19 +508,24 @@ router.get('/deadlines', async (req: Request, res: Response) => {
 
 /**
  * GET /api/v2/client/services
- * 
+ *
  * Get all 96 services from catalog with client subscription status
  * Vanta-style service marketplace
+ * SECURITY: Uses authenticated user ID only
  */
 router.get('/services', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id || req.query.userId as string || 'dev-user-123';
-    
-    // Get client
+    // SECURITY: Get userId ONLY from authenticated session
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Get client for authenticated user
     const client = await ClientService.getClientByUserId(userId);
-    
+
     if (!client) {
-      return res.status(404).json({ error: 'Client not found' });
+      return res.status(404).json({ error: 'Client profile not found' });
     }
 
     // Get all services from catalog
@@ -650,24 +583,30 @@ router.get('/services/by-category/:category', async (req: Request, res: Response
 
 /**
  * POST /api/v2/client/services/subscribe
- * 
+ *
  * Subscribe client to a new service
  * Generates initial compliance actions automatically
+ * SECURITY: Uses authenticated user ID only
  */
 router.post('/services/subscribe', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id || req.body.userId || 'dev-user-123';
+    // SECURITY: Get userId ONLY from authenticated session
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const { serviceKey } = req.body;
-    
+
     if (!serviceKey) {
       return res.status(400).json({ error: 'serviceKey is required' });
     }
 
-    // Get client
+    // Get client for authenticated user
     const client = await ClientService.getClientByUserId(userId);
-    
+
     if (!client) {
-      return res.status(404).json({ error: 'Client not found' });
+      return res.status(404).json({ error: 'Client profile not found' });
     }
 
     // Subscribe to service
@@ -692,19 +631,24 @@ router.post('/services/subscribe', async (req: Request, res: Response) => {
 
 /**
  * GET /api/v2/client/services/compliance-summary
- * 
+ *
  * Get compliance status grouped by subscribed services
  * Shows which services are healthy and which need attention
+ * SECURITY: Uses authenticated user ID only
  */
 router.get('/services/compliance-summary', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user?.id || req.query.userId as string || 'dev-user-123';
-    
-    // Get client
+    // SECURITY: Get userId ONLY from authenticated session
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Get client for authenticated user
     const client = await ClientService.getClientByUserId(userId);
-    
+
     if (!client) {
-      return res.status(404).json({ error: 'Client not found' });
+      return res.status(404).json({ error: 'Client profile not found' });
     }
 
     const summary = await ServiceCatalogService.getServiceComplianceSummary(client.id);

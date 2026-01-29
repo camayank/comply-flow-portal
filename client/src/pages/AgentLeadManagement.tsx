@@ -88,16 +88,26 @@ export default function AgentLeadManagement() {
     state: '',
   });
 
+  // Use agent-specific API endpoints
   const { data: leadsData, isLoading } = useQuery({
-    queryKey: ['/api/leads', { search: searchQuery, stage: stageFilter, source: sourceFilter }],
+    queryKey: ['/api/agent/leads', { stage: stageFilter !== 'all' ? stageFilter : undefined }],
+  });
+
+  // Get agent stats for dashboard cards
+  const { data: agentStats } = useQuery({
+    queryKey: ['/api/agent/stats'],
   });
 
   const createLeadMutation = useMutation({
     mutationFn: async (leadData: typeof newLead) => {
-      return apiRequest('POST', '/api/leads', leadData);
+      return apiRequest('POST', '/api/agent/leads', {
+        ...leadData,
+        stage: leadData.leadStage, // Map leadStage to stage for agent API
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/leads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/stats'] });
       toast({
         title: 'Success',
         description: 'Lead created successfully',
@@ -116,10 +126,11 @@ export default function AgentLeadManagement() {
 
   const updateLeadStageMutation = useMutation({
     mutationFn: async ({ leadId, stage }: { leadId: number; stage: string }) => {
-      return apiRequest('PUT', `/api/leads/${leadId}`, { leadStage: stage, status: stage });
+      return apiRequest('PATCH', `/api/agent/leads/${leadId}`, { stage });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/leads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/agent/stats'] });
       toast({
         title: 'Success',
         description: 'Lead status updated',
@@ -187,7 +198,8 @@ export default function AgentLeadManagement() {
   };
 
   const leads = (leadsData as any)?.leads || [];
-  const stats = (leadsData as any)?.stats || {};
+  const stats = (agentStats as any)?.leadsByStage || {};
+  const totalLeads = (agentStats as any)?.totalLeads || 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6 lg:p-8">
@@ -385,13 +397,13 @@ export default function AgentLeadManagement() {
         <Card>
           <CardHeader className="pb-3">
             <CardDescription>Total Leads</CardDescription>
-            <CardTitle className="text-2xl">{stats.total || 0}</CardTitle>
+            <CardTitle className="text-2xl">{totalLeads}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
-            <CardDescription>Hot Leads</CardDescription>
-            <CardTitle className="text-2xl text-red-600">{stats.hot_lead || 0}</CardTitle>
+            <CardDescription>New Leads</CardDescription>
+            <CardTitle className="text-2xl text-blue-600">{stats.new || 0}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
@@ -495,10 +507,10 @@ export default function AgentLeadManagement() {
                         <h3 className="font-semibold text-gray-900 dark:text-white">
                           {lead.companyName || lead.contactName}
                         </h3>
-                        <Badge className={getStageColor(lead.leadStage)} variant="secondary">
-                          {getStageIcon(lead.leadStage)}
+                        <Badge className={getStageColor(lead.stage || lead.leadStage)} variant="secondary">
+                          {getStageIcon(lead.stage || lead.leadStage)}
                           <span className="ml-1">
-                            {lead.leadStage?.replace('_', ' ').toUpperCase()}
+                            {(lead.stage || lead.leadStage)?.replace('_', ' ').toUpperCase()}
                           </span>
                         </Badge>
                       </div>
@@ -521,7 +533,7 @@ export default function AgentLeadManagement() {
                     </div>
                     <div className="flex gap-2 ml-4">
                       <Select
-                        value={lead.leadStage}
+                        value={lead.stage || lead.leadStage}
                         onValueChange={(value) =>
                           updateLeadStageMutation.mutate({ leadId: lead.id, stage: value })
                         }

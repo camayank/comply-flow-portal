@@ -1,19 +1,30 @@
 import express from 'express';
 import { storage } from './storage';
-import { 
+import {
   insertLeadEnhancedSchema,
   insertSalesProposalSchema,
   LeadEnhanced,
   SalesProposal
 } from '../shared/schema';
 import { z } from 'zod';
+import {
+  sessionAuthMiddleware,
+  requireMinimumRole,
+  USER_ROLES,
+  AuthenticatedRequest
+} from './rbac-middleware';
 
 const router = express.Router();
 
 // Lead ID generation is now handled by storage layer
 
+// Apply authentication to all lead routes
+router.use('/leads', sessionAuthMiddleware);
+router.use('/stats', sessionAuthMiddleware);
+router.use('/executives', sessionAuthMiddleware);
+
 // GET /api/leads - Get all leads with filtering and pagination
-router.get('/leads', async (req, res) => {
+router.get('/leads', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
     const { 
       search, 
@@ -58,7 +69,7 @@ router.get('/leads', async (req, res) => {
 });
 
 // GET /api/leads/:id - Get specific lead
-router.get('/leads/:id', async (req, res) => {
+router.get('/leads/:id', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
     const lead = await storage.getLead(parseInt(req.params.id));
 
@@ -80,7 +91,7 @@ router.get('/leads/:id', async (req, res) => {
 });
 
 // POST /api/leads - Create new lead
-router.post('/leads', async (req, res) => {
+router.post('/leads', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
     const validatedData = insertLeadEnhancedSchema.omit({ leadId: true }).parse(req.body);
     
@@ -104,7 +115,7 @@ router.post('/leads', async (req, res) => {
 });
 
 // PUT /api/leads/:id - Update lead
-router.put('/leads/:id', async (req, res) => {
+router.put('/leads/:id', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
     const validatedData = insertLeadEnhancedSchema.omit({ leadId: true }).partial().parse(req.body);
     
@@ -124,8 +135,8 @@ router.put('/leads/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/leads/:id - Delete lead
-router.delete('/leads/:id', async (req, res) => {
+// DELETE /api/leads/:id - Delete lead (Admin only)
+router.delete('/leads/:id', requireMinimumRole(USER_ROLES.ADMIN), async (req: AuthenticatedRequest, res) => {
   try {
     const deleted = await storage.deleteLead(parseInt(req.params.id));
 
@@ -141,7 +152,7 @@ router.delete('/leads/:id', async (req, res) => {
 });
 
 // POST /api/leads/:id/interaction - Add interaction to lead
-router.post('/leads/:id/interaction', async (req, res) => {
+router.post('/leads/:id/interaction', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
     const { type, notes, executive } = req.body;
     
@@ -163,7 +174,7 @@ router.post('/leads/:id/interaction', async (req, res) => {
 });
 
 // GET /api/leads/stats/dashboard - Get dashboard statistics
-router.get('/stats/dashboard', async (req, res) => {
+router.get('/stats/dashboard', requireMinimumRole(USER_ROLES.OPS_EXECUTIVE), async (req: AuthenticatedRequest, res) => {
   try {
     const stats = await storage.getLeadStats();
 
@@ -175,7 +186,7 @@ router.get('/stats/dashboard', async (req, res) => {
 });
 
 // GET /api/leads/executives - Get list of pre-sales executives
-router.get('/executives', async (req, res) => {
+router.get('/executives', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
     const executives = await storage.getPreSalesExecutives();
 
@@ -183,6 +194,153 @@ router.get('/executives', async (req, res) => {
   } catch (error) {
     console.error('Error fetching executives:', error);
     res.status(500).json({ error: 'Failed to fetch executives' });
+  }
+});
+
+// POST /api/leads/:id/convert - Convert lead to client (CRITICAL ENDPOINT)
+router.post('/leads/:id/convert', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+    const {
+      createServiceRequest = false,
+      selectedServiceId,
+      notes,
+      convertedBy
+    } = req.body;
+
+    // 1. Get the lead
+    const lead = await storage.getLead(leadId);
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    // Check if already converted
+    if (lead.leadStage === 'converted' || lead.status === 'converted') {
+      return res.status(400).json({ error: 'Lead has already been converted' });
+    }
+
+    // 2. Generate unique client ID (C0001 format)
+    const existingEntities = await storage.getAllBusinessEntities();
+    const clientNumber = existingEntities.length + 1;
+    const clientId = `C${clientNumber.toString().padStart(4, '0')}`;
+
+    // 3. Generate temporary password (should be changed on first login)
+    const tempPassword = `DigiComply${Math.random().toString(36).slice(-8)}`;
+
+    // 4. Create user account
+    const userData = {
+      username: lead.email || `client_${clientId.toLowerCase()}`,
+      password: tempPassword, // In production, this should be hashed
+      email: lead.email || `${clientId.toLowerCase()}@pending.digicomply.in`,
+      phone: lead.phone || null,
+      fullName: lead.companyName || lead.contactPerson || 'New Client',
+      role: 'client' as const,
+      isActive: true,
+      emailVerified: false
+    };
+
+    const newUser = await storage.createUser(userData);
+
+    // 5. Create business entity
+    const entityData = {
+      clientId: clientId,
+      userId: newUser.id,
+      companyName: lead.companyName || 'New Company',
+      entityType: lead.businessType || 'private_limited',
+      incorporationDate: null,
+      gstin: null,
+      pan: null,
+      cin: null,
+      registeredAddress: lead.city || null,
+      operatingAddress: null,
+      state: lead.state || 'Delhi',
+      pincode: null,
+      industry: lead.industry || null,
+      annualTurnover: lead.estimatedBudget?.toString() || null,
+      employeeCount: null,
+      website: lead.website || null,
+      contactPerson: lead.contactPerson || null,
+      contactEmail: lead.email || null,
+      contactPhone: lead.phone || null,
+      complianceStatus: 'pending',
+      riskLevel: 'low',
+      onboardingStatus: 'pending',
+      assignedManager: null,
+      notes: notes || `Converted from lead ${lead.leadId}`,
+      isActive: true,
+      lifecycleStage: 'onboarding'
+    };
+
+    const newEntity = await storage.createBusinessEntity(entityData);
+
+    // 6. Update lead status to converted
+    const updatedLead = await storage.updateLead(leadId, {
+      leadStage: 'converted',
+      status: 'converted',
+      convertedAt: new Date(),
+      conversionNotes: `Converted to client ${clientId} by ${convertedBy || req.user?.username || 'system'}`
+    });
+
+    // 7. Optionally create initial service request
+    let serviceRequest = null;
+    if (createServiceRequest && selectedServiceId) {
+      serviceRequest = await storage.createServiceRequest({
+        serviceId: selectedServiceId,
+        businessEntityId: newEntity.id,
+        status: 'initiated',
+        priority: lead.priority || 'medium',
+        progress: 0,
+        currentMilestone: 'initiated',
+        notes: `Auto-created from lead conversion`,
+        assignedTeamMember: null
+      });
+    }
+
+    // 8. Log the conversion activity
+    try {
+      await storage.createActivityLog({
+        userId: req.user?.id || newUser.id,
+        action: 'lead_converted',
+        entityType: 'lead',
+        entityId: leadId,
+        details: JSON.stringify({
+          leadId: lead.leadId,
+          clientId: clientId,
+          userId: newUser.id,
+          entityId: newEntity.id,
+          serviceRequestId: serviceRequest?.id || null
+        }),
+        ipAddress: req.ip || null
+      });
+    } catch (logError) {
+      console.warn('Failed to log conversion activity:', logError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Lead converted to client successfully',
+      data: {
+        lead: updatedLead,
+        user: {
+          id: newUser.id,
+          username: newUser.username,
+          email: newUser.email,
+          temporaryPassword: tempPassword // Send once for admin to share with client
+        },
+        businessEntity: {
+          id: newEntity.id,
+          clientId: clientId,
+          companyName: newEntity.companyName
+        },
+        serviceRequest: serviceRequest ? {
+          id: serviceRequest.id,
+          status: serviceRequest.status
+        } : null
+      }
+    });
+  } catch (error) {
+    console.error('Error converting lead:', error);
+    res.status(500).json({ error: 'Failed to convert lead to client' });
   }
 });
 

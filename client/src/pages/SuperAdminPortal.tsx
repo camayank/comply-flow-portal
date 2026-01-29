@@ -41,24 +41,48 @@ import { useToast } from '@/hooks/use-toast';
 const USER_ROLES = {
   super_admin: { label: 'Super Admin', color: 'bg-purple-500', icon: Crown },
   admin: { label: 'Admin', color: 'bg-blue-500', icon: Shield },
+  ops_manager: { label: 'Operations Manager', color: 'bg-teal-500', icon: Users },
   ops_executive: { label: 'Operations Executive', color: 'bg-green-500', icon: Users },
   customer_service: { label: 'Customer Service', color: 'bg-yellow-500', icon: Activity },
+  qc_executive: { label: 'QC Executive', color: 'bg-indigo-500', icon: CheckCircle },
+  accountant: { label: 'Accountant', color: 'bg-cyan-500', icon: BarChart3 },
   agent: { label: 'Agent', color: 'bg-orange-500', icon: TrendingUp },
   client: { label: 'Client', color: 'bg-gray-500', icon: Users }
 };
 
-const PERMISSIONS = [
-  { id: 'user_management', label: 'User Management', category: 'Admin' },
-  { id: 'role_assignment', label: 'Role Assignment', category: 'Admin' },
-  { id: 'service_config', label: 'Service Configuration', category: 'Admin' },
-  { id: 'workflow_management', label: 'Workflow Management', category: 'Admin' },
-  { id: 'financial_access', label: 'Financial Access', category: 'Finance' },
-  { id: 'client_data_access', label: 'Client Data Access', category: 'Operations' },
-  { id: 'document_approval', label: 'Document Approval', category: 'Operations' },
-  { id: 'task_assignment', label: 'Task Assignment', category: 'Operations' },
-  { id: 'report_generation', label: 'Report Generation', category: 'Analytics' },
-  { id: 'system_settings', label: 'System Settings', category: 'Admin' },
-];
+interface AuditLog {
+  id: number;
+  userId: number;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  oldValue: any;
+  newValue: any;
+  ipAddress: string | null;
+  timestamp: string;
+  userName: string | null;
+  userEmail: string | null;
+}
+
+interface RoleData {
+  role: string;
+  displayName: string;
+  level: number;
+  permissions: string[];
+  permissionCount: number;
+}
+
+interface SystemHealth {
+  status: string;
+  database: string;
+  uptime: number;
+  memory: { heapUsed: number; heapTotal: number };
+  metrics: {
+    totalUsers: number;
+    auditLogsLast24h: number;
+    activityLogsLast24h: number;
+  };
+}
 
 interface User {
   id: number;
@@ -85,11 +109,13 @@ interface SystemStats {
 export default function SuperAdminPortal() {
   const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false);
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [activeTab, setActiveTab] = useState('users');
   const [showPassword, setShowPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
   const { toast } = useToast();
 
   // Fetch system stats
@@ -102,9 +128,30 @@ export default function SuperAdminPortal() {
     queryKey: ['/api/super-admin/users', { search: searchTerm, role: roleFilter }],
   });
 
-  // Fetch activity logs
-  const { data: activityLogs = [] } = useQuery({
-    queryKey: ['/api/super-admin/activity-logs'],
+  // Fetch audit logs with pagination
+  const [auditPage, setAuditPage] = useState(1);
+  const { data: auditLogsData } = useQuery<{ logs: AuditLog[]; pagination: { page: number; total: number; totalPages: number } }>({
+    queryKey: ['/api/super-admin/audit-logs', { page: auditPage, limit: 20 }],
+    enabled: activeTab === 'activity',
+  });
+
+  // Fetch roles and permissions
+  const { data: rolesData } = useQuery<{ roles: RoleData[]; allPermissions: string[] }>({
+    queryKey: ['/api/super-admin/roles'],
+    enabled: activeTab === 'roles',
+  });
+
+  // Fetch system health
+  const { data: systemHealth } = useQuery<SystemHealth>({
+    queryKey: ['/api/super-admin/health'],
+    enabled: activeTab === 'settings',
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  // Fetch system configuration
+  const { data: configData } = useQuery<{ configs: any[]; grouped: Record<string, any[]> }>({
+    queryKey: ['/api/super-admin/config'],
+    enabled: activeTab === 'settings',
   });
 
   // Create user mutation
@@ -184,6 +231,76 @@ export default function SuperAdminPortal() {
       });
     },
   });
+
+  // Reset password mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ id, newPassword }: { id: number; newPassword: string }) => {
+      return await apiRequest(`/api/super-admin/users/${id}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({ newPassword }),
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Success',
+        description: 'Password reset successfully',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to reset password',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Update role permissions mutation
+  const updateRolePermissionsMutation = useMutation({
+    mutationFn: async ({ role, permissions }: { role: string; permissions: string[] }) => {
+      return await apiRequest(`/api/super-admin/roles/${role}/permissions`, {
+        method: 'PUT',
+        body: JSON.stringify({ permissions }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/super-admin/roles'] });
+      toast({
+        title: 'Success',
+        description: 'Role permissions updated successfully',
+      });
+    },
+  });
+
+  // Export audit logs
+  const handleExportAuditLogs = async (format: 'json' | 'csv') => {
+    try {
+      const response = await fetch(`/api/super-admin/audit-logs/export?format=${format}`, {
+        credentials: 'include',
+      });
+      if (format === 'csv') {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `audit-logs-${Date.now()}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        const data = await response.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `audit-logs-${Date.now()}.json`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
+      toast({ title: 'Success', description: `Audit logs exported as ${format.toUpperCase()}` });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to export audit logs', variant: 'destructive' });
+    }
+  };
 
   const handleCreateUser = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -404,6 +521,7 @@ export default function SuperAdminPortal() {
                                 setSelectedUser(user);
                                 setIsEditUserDialogOpen(true);
                               }}
+                              title="Edit user"
                               data-testid={`button-edit-user-${user.id}`}
                             >
                               <Edit className="h-4 w-4" />
@@ -411,7 +529,21 @@ export default function SuperAdminPortal() {
                             <Button
                               variant="outline"
                               size="sm"
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setNewPassword('');
+                                setIsResetPasswordDialogOpen(true);
+                              }}
+                              title="Reset password"
+                              data-testid={`button-reset-password-${user.id}`}
+                            >
+                              <Key className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
                               onClick={() => handleToggleStatus(user)}
+                              title={user.isActive ? 'Deactivate user' : 'Activate user'}
                               data-testid={`button-toggle-status-${user.id}`}
                             >
                               {user.isActive ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
@@ -421,6 +553,7 @@ export default function SuperAdminPortal() {
                               size="sm"
                               onClick={() => handleDeleteUser(user)}
                               className="text-red-600 hover:text-red-700"
+                              title="Delete user"
                               data-testid={`button-delete-user-${user.id}`}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -440,33 +573,71 @@ export default function SuperAdminPortal() {
             <Card>
               <CardHeader>
                 <CardTitle>Role-Based Access Control</CardTitle>
-                <CardDescription>Configure permissions for each user role</CardDescription>
+                <CardDescription>Configure permissions for each user role. Higher-level roles inherit permissions from lower levels.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
-                  {Object.entries(USER_ROLES).map(([roleKey, roleInfo]) => (
-                    <div key={roleKey} className="border rounded-lg p-4">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className={`p-2 rounded-lg ${roleInfo.color} bg-opacity-10`}>
-                          <roleInfo.icon className={`h-5 w-5 ${roleInfo.color.replace('bg-', 'text-')}`} />
-                        </div>
-                        <div>
-                          <h3 className="font-medium dark:text-white">{roleInfo.label}</h3>
-                          <p className="text-sm text-gray-500">Configure permissions for this role</p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {PERMISSIONS.map((permission) => (
-                          <div key={permission.id} className="flex items-center space-x-2">
-                            <Switch id={`${roleKey}-${permission.id}`} />
-                            <Label htmlFor={`${roleKey}-${permission.id}`} className="text-sm cursor-pointer">
-                              {permission.label}
-                            </Label>
+                  {rolesData?.roles ? (
+                    rolesData.roles.map((roleData) => {
+                      const roleInfo = USER_ROLES[roleData.role as keyof typeof USER_ROLES];
+                      const RoleIcon = roleInfo?.icon || Users;
+                      const isReadOnly = roleData.role === 'super_admin';
+
+                      return (
+                        <div key={roleData.role} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg ${roleInfo?.color || 'bg-gray-500'} bg-opacity-10`}>
+                                <RoleIcon className={`h-5 w-5 ${roleInfo?.color?.replace('bg-', 'text-') || 'text-gray-500'}`} />
+                              </div>
+                              <div>
+                                <h3 className="font-medium dark:text-white">{roleData.displayName}</h3>
+                                <p className="text-sm text-gray-500">
+                                  Level {roleData.level} • {roleData.permissionCount} permissions
+                                  {isReadOnly && ' (Read-only)'}
+                                </p>
+                              </div>
+                            </div>
+                            <Badge variant={roleData.level >= 90 ? 'default' : roleData.level >= 50 ? 'secondary' : 'outline'}>
+                              {roleData.level >= 90 ? 'Admin' : roleData.level >= 50 ? 'Staff' : 'External'}
+                            </Badge>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                            {rolesData.allPermissions.map((permission) => {
+                              const hasPermission = roleData.permissions.includes(permission);
+                              const permLabel = permission.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                              return (
+                                <div key={permission} className="flex items-center space-x-2">
+                                  <Switch
+                                    id={`${roleData.role}-${permission}`}
+                                    checked={hasPermission}
+                                    disabled={isReadOnly || updateRolePermissionsMutation.isPending}
+                                    onCheckedChange={(checked) => {
+                                      const newPermissions = checked
+                                        ? [...roleData.permissions, permission]
+                                        : roleData.permissions.filter(p => p !== permission);
+                                      updateRolePermissionsMutation.mutate({
+                                        role: roleData.role,
+                                        permissions: newPermissions,
+                                      });
+                                    }}
+                                  />
+                                  <Label
+                                    htmlFor={`${roleData.role}-${permission}`}
+                                    className={`text-xs cursor-pointer ${hasPermission ? 'text-green-600 dark:text-green-400' : 'text-gray-500'}`}
+                                  >
+                                    {permLabel}
+                                  </Label>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">Loading roles...</div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -476,24 +647,74 @@ export default function SuperAdminPortal() {
           <TabsContent value="activity" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>System Activity Logs</CardTitle>
-                <CardDescription>Monitor all system activities and user actions</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Audit Logs</CardTitle>
+                    <CardDescription>Monitor all system activities and user actions</CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleExportAuditLogs('csv')}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Export CSV
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleExportAuditLogs('json')}>
+                      <Database className="h-4 w-4 mr-2" />
+                      Export JSON
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {(activityLogs as any[]).length > 0 ? (
-                    (activityLogs as any[]).map((log: any, index: number) => (
-                      <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
-                        <Clock className="h-4 w-4 text-gray-400" />
-                        <div className="flex-1">
-                          <p className="text-sm dark:text-white">{log.action}</p>
-                          <p className="text-xs text-gray-500">{log.user} • {log.timestamp}</p>
+                  {auditLogsData?.logs && auditLogsData.logs.length > 0 ? (
+                    <>
+                      {auditLogsData.logs.map((log) => (
+                        <div key={log.id} className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                          <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium dark:text-white">{log.action.replace(/_/g, ' ').toUpperCase()}</p>
+                              <Badge variant="outline" className="text-xs">{log.entityType}</Badge>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              {log.userName || 'System'} ({log.userEmail || 'N/A'}) • {new Date(log.timestamp).toLocaleString()}
+                            </p>
+                            {log.entityId && (
+                              <p className="text-xs text-gray-400">Entity ID: {log.entityId}</p>
+                            )}
+                            {log.ipAddress && (
+                              <p className="text-xs text-gray-400">IP: {log.ipAddress}</p>
+                            )}
+                          </div>
                         </div>
-                        <Badge>{log.status}</Badge>
+                      ))}
+                      {/* Pagination */}
+                      <div className="flex items-center justify-between pt-4">
+                        <p className="text-sm text-gray-500">
+                          Page {auditLogsData.pagination.page} of {auditLogsData.pagination.totalPages} ({auditLogsData.pagination.total} total)
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAuditPage(p => Math.max(1, p - 1))}
+                            disabled={auditPage <= 1}
+                          >
+                            Previous
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAuditPage(p => p + 1)}
+                            disabled={auditPage >= auditLogsData.pagination.totalPages}
+                          >
+                            Next
+                          </Button>
+                        </div>
                       </div>
-                    ))
+                    </>
                   ) : (
-                    <div className="text-center py-8 text-gray-500">No activity logs available</div>
+                    <div className="text-center py-8 text-gray-500">No audit logs available</div>
                   )}
                 </div>
               </CardContent>
@@ -502,6 +723,89 @@ export default function SuperAdminPortal() {
 
           {/* System Settings Tab */}
           <TabsContent value="settings" className="space-y-4">
+            {/* System Health Card */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  System Health
+                </CardTitle>
+                <CardDescription>Real-time system status and metrics</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {systemHealth ? (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        {systemHealth.status === 'Optimal' ? (
+                          <CheckCircle className="h-5 w-5 text-green-500" />
+                        ) : (
+                          <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                        )}
+                        <span className="font-medium">Status</span>
+                      </div>
+                      <p className={`text-2xl font-bold ${systemHealth.status === 'Optimal' ? 'text-green-600' : 'text-yellow-600'}`}>
+                        {systemHealth.status}
+                      </p>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Database className="h-5 w-5 text-blue-500" />
+                        <span className="font-medium">Database</span>
+                      </div>
+                      <p className={`text-2xl font-bold ${systemHealth.database === 'healthy' ? 'text-green-600' : 'text-red-600'}`}>
+                        {systemHealth.database === 'healthy' ? 'Connected' : 'Error'}
+                      </p>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock className="h-5 w-5 text-purple-500" />
+                        <span className="font-medium">Uptime</span>
+                      </div>
+                      <p className="text-2xl font-bold">
+                        {Math.floor(systemHealth.uptime / 3600)}h {Math.floor((systemHealth.uptime % 3600) / 60)}m
+                      </p>
+                    </div>
+                    <div className="p-4 border rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <BarChart3 className="h-5 w-5 text-orange-500" />
+                        <span className="font-medium">Memory</span>
+                      </div>
+                      <p className="text-2xl font-bold">
+                        {Math.round(systemHealth.memory.heapUsed / 1024 / 1024)}MB
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        of {Math.round(systemHealth.memory.heapTotal / 1024 / 1024)}MB
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-gray-500">Loading health data...</div>
+                )}
+
+                {systemHealth?.metrics && (
+                  <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                    <h4 className="font-medium mb-2">Last 24 Hours</h4>
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-2xl font-bold text-blue-600">{systemHealth.metrics.totalUsers}</p>
+                        <p className="text-xs text-gray-500">Total Users</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-green-600">{systemHealth.metrics.auditLogsLast24h}</p>
+                        <p className="text-xs text-gray-500">Audit Events</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-purple-600">{systemHealth.metrics.activityLogsLast24h}</p>
+                        <p className="text-xs text-gray-500">User Activities</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* System Configuration Card */}
             <Card>
               <CardHeader>
                 <CardTitle>System Configuration</CardTitle>
@@ -515,14 +819,14 @@ export default function SuperAdminPortal() {
                   </AlertDescription>
                 </Alert>
                 <div className="mt-6 space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
                       <h4 className="font-medium dark:text-white">Two-Factor Authentication</h4>
                       <p className="text-sm text-gray-500">Require 2FA for all admin users</p>
                     </div>
                     <Switch />
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
                       <h4 className="font-medium dark:text-white">Session Timeout</h4>
                       <p className="text-sm text-gray-500">Auto-logout after inactivity</p>
@@ -535,15 +839,30 @@ export default function SuperAdminPortal() {
                         <SelectItem value="1800">30 min</SelectItem>
                         <SelectItem value="3600">1 hour</SelectItem>
                         <SelectItem value="7200">2 hours</SelectItem>
+                        <SelectItem value="14400">4 hours</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
                       <h4 className="font-medium dark:text-white">Email Notifications</h4>
-                      <p className="text-sm text-gray-500">Send system notifications</p>
+                      <p className="text-sm text-gray-500">Send system notifications via email</p>
                     </div>
                     <Switch defaultChecked />
+                  </div>
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h4 className="font-medium dark:text-white">Audit Logging</h4>
+                      <p className="text-sm text-gray-500">Track all user actions for compliance</p>
+                    </div>
+                    <Switch defaultChecked disabled />
+                  </div>
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h4 className="font-medium dark:text-white">Rate Limiting</h4>
+                      <p className="text-sm text-gray-500">Protect API endpoints from abuse</p>
+                    </div>
+                    <Badge className="bg-green-500">Enabled</Badge>
                   </div>
                 </div>
               </CardContent>
@@ -714,6 +1033,64 @@ export default function SuperAdminPortal() {
               </div>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={isResetPasswordDialogOpen} onOpenChange={setIsResetPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {selectedUser?.fullName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                This will immediately change the user's password. They will need to use the new password to log in.
+              </AlertDescription>
+            </Alert>
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="new-password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password (min 8 characters)"
+                  minLength={8}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button variant="outline" onClick={() => setIsResetPasswordDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (selectedUser && newPassword.length >= 8) {
+                    resetPasswordMutation.mutate({ id: selectedUser.id, newPassword });
+                    setIsResetPasswordDialogOpen(false);
+                  }
+                }}
+                disabled={resetPasswordMutation.isPending || newPassword.length < 8}
+              >
+                {resetPasswordMutation.isPending ? 'Resetting...' : 'Reset Password'}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

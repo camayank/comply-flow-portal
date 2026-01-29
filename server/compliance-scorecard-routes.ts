@@ -224,6 +224,136 @@ router.get('/:entityId/report', async (req: Request, res: Response) => {
   }
 });
 
+// Generate Compliance Certificate PDF
+router.get('/:entityId/certificate/:type', async (req: Request, res: Response) => {
+  try {
+    const { entityId, type } = req.params;
+    const { download = 'false' } = req.query;
+
+    // Import certificate service
+    const { generateComplianceCertificate, getCertificateStream } = await import('./services/certificateService');
+
+    // Validate certificate type
+    const validTypes = ['compliance_status', 'gst_filing', 'roc_filing', 'tax_clearance', 'funding_readiness', 'digicomply_score'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({ error: 'Invalid certificate type', validTypes });
+    }
+
+    // Get additional data from query params
+    const additionalData: Record<string, any> = {};
+    if (req.query.period) additionalData.period = req.query.period;
+    if (req.query.returnType) additionalData.returnType = req.query.returnType;
+    if (req.query.formType) additionalData.formType = req.query.formType;
+    if (req.query.year) additionalData.year = parseInt(req.query.year as string);
+    if (req.query.assessmentYear) additionalData.assessmentYear = req.query.assessmentYear;
+
+    // Generate certificate
+    const result = await generateComplianceCertificate({
+      entityId: Number(entityId),
+      certificateType: type as any,
+      validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year validity
+      additionalData
+    });
+
+    if (!result.success || !result.pdfBuffer) {
+      return res.status(500).json({ error: result.error || 'Failed to generate certificate' });
+    }
+
+    // Set response headers
+    const filename = `DigiComply-Certificate-${result.certificateId}.pdf`;
+
+    if (download === 'true') {
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    } else {
+      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    }
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Length', result.pdfBuffer.length);
+    res.setHeader('X-Certificate-ID', result.certificateId || '');
+
+    // Send PDF
+    res.send(result.pdfBuffer);
+
+  } catch (error) {
+    console.error('Error generating certificate:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// List available certificate types
+router.get('/:entityId/certificates', async (req: Request, res: Response) => {
+  try {
+    const { entityId } = req.params;
+
+    // Get entity to check eligibility
+    const [entity] = await db.select()
+      .from(businessEntities)
+      .where(eq(businessEntities.id, Number(entityId)))
+      .limit(1);
+
+    if (!entity) {
+      return res.status(404).json({ error: 'Entity not found' });
+    }
+
+    const certificates = [
+      {
+        type: 'compliance_status',
+        name: 'Compliance Status Certificate',
+        description: 'Overall compliance standing across all checkpoints',
+        available: true,
+        downloadUrl: `/api/compliance-scorecard/${entityId}/certificate/compliance_status`
+      },
+      {
+        type: 'digicomply_score',
+        name: 'DigiComply Score Certificate',
+        description: '10K compliance scorecard certificate',
+        available: true,
+        downloadUrl: `/api/compliance-scorecard/${entityId}/certificate/digicomply_score`
+      },
+      {
+        type: 'funding_readiness',
+        name: 'Funding Readiness Certificate',
+        description: 'Investor due diligence readiness score',
+        available: true,
+        downloadUrl: `/api/compliance-scorecard/${entityId}/certificate/funding_readiness`
+      },
+      {
+        type: 'gst_filing',
+        name: 'GST Filing Certificate',
+        description: 'GST return filing confirmation',
+        available: !!entity.gstin,
+        downloadUrl: `/api/compliance-scorecard/${entityId}/certificate/gst_filing`
+      },
+      {
+        type: 'roc_filing',
+        name: 'ROC Filing Certificate',
+        description: 'Registrar of Companies filing confirmation',
+        available: !!entity.cin,
+        downloadUrl: `/api/compliance-scorecard/${entityId}/certificate/roc_filing`
+      },
+      {
+        type: 'tax_clearance',
+        name: 'Tax Clearance Certificate',
+        description: 'No outstanding tax liabilities confirmation',
+        available: true,
+        downloadUrl: `/api/compliance-scorecard/${entityId}/certificate/tax_clearance`
+      }
+    ];
+
+    res.json({
+      entityId: Number(entityId),
+      entityName: entity.entityName,
+      certificates,
+      generatedAt: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('Error listing certificates:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================

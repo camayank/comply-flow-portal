@@ -67,13 +67,29 @@ app.use((req, res, next) => {
   next();
 });
 
-// 🔓 DEV MODE: Rate limiting disabled for development
+// PRODUCTION READY: Rate limiting enabled
+// Helper to create rate limiter with validation disabled for custom key generators
 const createRateLimit = (windowMs: number, max: number, message: string, keyGenerator?: (req: Request) => string) => {
-  // Return a no-op middleware in dev mode
-  return (req: Request, res: Response, next: NextFunction) => next();
+  return rateLimit({
+    windowMs,
+    max,
+    message: { success: false, error: message },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Disable all validation to suppress IPv6/custom key generator warnings
+    validate: false,
+    ...(keyGenerator ? { keyGenerator } : {}),
+    handler: (req: Request, res: Response) => {
+      res.status(429).json({
+        success: false,
+        error: message,
+        retryAfter: Math.ceil(windowMs / 1000),
+      });
+    },
+  });
 };
 
-// OTP endpoints - Ultra-strict rate limiting
+// OTP endpoints - Ultra-strict rate limiting (prevent abuse)
 const otpPerEmailLimiter = createRateLimit(
   15 * 60 * 1000, // 15 minutes
   3, // 3 OTP requests per email
@@ -88,7 +104,7 @@ const otpPerIPLimiter = createRateLimit(
   (req) => req.ip || 'unknown'
 );
 
-// Authentication endpoints - Strict limiting
+// Authentication endpoints - Strict limiting (prevent brute force)
 const authLimiter = createRateLimit(
   15 * 60 * 1000, // 15 minutes
   10, // 10 login attempts per IP
@@ -96,18 +112,18 @@ const authLimiter = createRateLimit(
   (req) => req.ip || 'unknown'
 );
 
-// Admin endpoints - Ultra-strict limiting
+// Admin endpoints - Ultra-strict limiting (protect sensitive operations)
 const adminLimiter = createRateLimit(
   15 * 60 * 1000, // 15 minutes
-  5, // 5 admin operations per IP
+  30, // 30 admin operations per IP (increased for normal admin work)
   'Admin operations rate limited. Please wait 15 minutes.',
   (req) => req.ip || 'unknown'
 );
 
-// General API protection
+// General API protection (prevent abuse)
 const apiLimiter = createRateLimit(
   15 * 60 * 1000, // 15 minutes
-  100, // 100 requests per IP
+  200, // 200 requests per IP (reasonable for normal usage)
   'API rate limit exceeded. Please slow down.',
   (req) => req.ip || 'unknown'
 );

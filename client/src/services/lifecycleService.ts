@@ -225,10 +225,10 @@ export interface Timeline {
 class LifecycleService {
   /**
    * Get lifecycle dashboard data
+   * Authentication is required - uses session cookie
    */
-  async getDashboard(userId?: string): Promise<LifecycleDashboard> {
+  async getDashboard(): Promise<LifecycleDashboard> {
     const response = await axios.get(`${V2_BASE}/dashboard`, {
-      params: { userId: userId || 'dev-user-123' },
       withCredentials: true
     });
     return response.data;
@@ -236,10 +236,10 @@ class LifecycleService {
 
   /**
    * Get compliance detail
+   * Authentication is required - uses session cookie
    */
-  async getComplianceDetail(userId?: string): Promise<ComplianceDetail> {
+  async getComplianceDetail(): Promise<ComplianceDetail> {
     const response = await axios.get(`${V2_BASE}/compliance-detail`, {
-      params: { userId: userId || 'dev-user-123' },
       withCredentials: true
     });
     return response.data;
@@ -247,10 +247,10 @@ class LifecycleService {
 
   /**
    * Get services detail
+   * Authentication is required - uses session cookie
    */
-  async getServicesDetail(userId?: string): Promise<ServicesDetail> {
+  async getServicesDetail(): Promise<ServicesDetail> {
     const response = await axios.get(`${V2_BASE}/services-detail`, {
-      params: { userId: userId || 'dev-user-123' },
       withCredentials: true
     });
     return response.data;
@@ -258,10 +258,10 @@ class LifecycleService {
 
   /**
    * Get documents detail
+   * Authentication is required - uses session cookie
    */
-  async getDocumentsDetail(userId?: string): Promise<DocumentsDetail> {
+  async getDocumentsDetail(): Promise<DocumentsDetail> {
     const response = await axios.get(`${V2_BASE}/documents-detail`, {
-      params: { userId: userId || 'dev-user-123' },
       withCredentials: true
     });
     return response.data;
@@ -269,10 +269,10 @@ class LifecycleService {
 
   /**
    * Get funding detail
+   * Authentication is required - uses session cookie
    */
-  async getFundingDetail(userId?: string): Promise<FundingDetail> {
+  async getFundingDetail(): Promise<FundingDetail> {
     const response = await axios.get(`${V2_BASE}/funding-detail`, {
-      params: { userId: userId || 'dev-user-123' },
       withCredentials: true
     });
     return response.data;
@@ -280,10 +280,10 @@ class LifecycleService {
 
   /**
    * Get timeline
+   * Authentication is required - uses session cookie
    */
-  async getTimeline(userId?: string): Promise<Timeline> {
+  async getTimeline(): Promise<Timeline> {
     const response = await axios.get(`${V2_BASE}/timeline`, {
-      params: { userId: userId || 'dev-user-123' },
       withCredentials: true
     });
     return response.data;

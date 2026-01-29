@@ -11,9 +11,12 @@ import {
   insertServiceRequestSchema,
   insertPaymentSchema,
   type Service,
-  leads as leadsTable
+  leads as leadsTable,
+  serviceRequests,
+  documentsUploads
 } from "@shared/schema";
 import { db } from "./db";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES, type AuthenticatedRequest } from "./rbac-middleware";
 import { registerProposalRoutes } from "./proposals-routes";
 import { registerDashboardAnalyticsRoutes } from "./dashboard-analytics-routes";
@@ -32,6 +35,7 @@ import customerServiceRoutes from "./customer-service-routes";
 import clientV2Routes from "./routes/client-v2-robust"; // Robust US-style implementation
 import lifecycleApiRoutes from "./routes/lifecycle-api"; // Lifecycle management with drill-down
 import { complianceStateRoutes } from "./compliance-state-routes"; // Compliance state & score management
+import { registerClientSupportRoutes } from "./client-support-routes"; // Client support ticket routes
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const requireAdminAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ADMIN)] as const;
@@ -160,6 +164,191 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true, message: "Service request deleted successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete service request" });
+    }
+  });
+
+  // Get Service Request Timeline
+  app.get("/api/service-requests/:id/timeline", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const serviceRequest = await storage.getServiceRequest(id);
+
+      if (!serviceRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      // Build timeline from service request history and activity logs
+      const timeline: any[] = [];
+
+      // Add creation event
+      timeline.push({
+        id: `event-created`,
+        type: 'created',
+        status: 'initiated',
+        title: 'Service Request Created',
+        description: `Service request #${id} was created`,
+        timestamp: serviceRequest.createdAt,
+        user: 'System'
+      });
+
+      // Add status changes based on current status and milestones
+      const statusTimeline: Record<string, { title: string; description: string }> = {
+        'initiated': { title: 'Request Initiated', description: 'Service request submitted for processing' },
+        'docs_uploaded': { title: 'Documents Uploaded', description: 'Client uploaded required documents' },
+        'in_progress': { title: 'Work In Progress', description: 'Operations team is working on the request' },
+        'qc_review': { title: 'QC Review', description: 'Quality control review in progress' },
+        'qc_approved': { title: 'QC Approved', description: 'Quality review passed successfully' },
+        'ready_for_delivery': { title: 'Ready for Delivery', description: 'Documents prepared for client delivery' },
+        'sending': { title: 'Delivery Initiated', description: 'Documents being sent to client' },
+        'delivered': { title: 'Delivered', description: 'Documents delivered to client' },
+        'confirmed': { title: 'Delivery Confirmed', description: 'Client confirmed receipt of documents' },
+        'completed': { title: 'Completed', description: 'Service request completed successfully' }
+      };
+
+      // Add current milestone
+      if (serviceRequest.currentMilestone && statusTimeline[serviceRequest.currentMilestone]) {
+        const milestone = statusTimeline[serviceRequest.currentMilestone];
+        timeline.push({
+          id: `event-${serviceRequest.currentMilestone}`,
+          type: 'milestone',
+          status: serviceRequest.currentMilestone,
+          title: milestone.title,
+          description: milestone.description,
+          timestamp: serviceRequest.updatedAt,
+          user: 'Operations'
+        });
+      }
+
+      // Get activity logs for this service request
+      try {
+        const activities = await storage.getActivityLogs({
+          entityType: 'service_request',
+          entityId: id
+        });
+
+        activities.forEach((activity: any, index: number) => {
+          timeline.push({
+            id: `activity-${activity.id || index}`,
+            type: 'activity',
+            status: activity.action,
+            title: activity.action.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+            description: activity.details || `Activity: ${activity.action}`,
+            timestamp: activity.createdAt,
+            user: activity.userId ? `User #${activity.userId}` : 'System'
+          });
+        });
+      } catch (e) {
+        // Activity logs may not exist for all requests
+      }
+
+      // Sort timeline by timestamp
+      timeline.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      res.json({
+        serviceRequestId: id,
+        currentStatus: serviceRequest.status,
+        progress: serviceRequest.progress || 0,
+        timeline
+      });
+    } catch (error) {
+      console.error('Error fetching service request timeline:', error);
+      res.status(500).json({ error: "Failed to fetch service request timeline" });
+    }
+  });
+
+  // Get Service Request Documents
+  app.get("/api/service-requests/:id/documents", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const serviceRequest = await storage.getServiceRequest(id);
+
+      if (!serviceRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      // Get documents from documents_uploads table
+      const { documentsUploads } = await import('@shared/schema');
+      const documents = await db
+        .select()
+        .from(documentsUploads)
+        .where(eq(documentsUploads.serviceRequestId, id))
+        .orderBy(desc(documentsUploads.uploadedAt));
+
+      // Categorize documents
+      const categorized = {
+        required: documents.filter(d =>
+          ['pan_card', 'aadhar_card', 'incorporation_cert', 'bank_statement'].includes(d.doctype)
+        ),
+        uploaded: documents.filter(d => d.status !== 'approved'),
+        approved: documents.filter(d => d.status === 'approved'),
+        rejected: documents.filter(d => d.status === 'rejected')
+      };
+
+      res.json({
+        serviceRequestId: id,
+        totalDocuments: documents.length,
+        documents,
+        categorized,
+        stats: {
+          total: documents.length,
+          pending: documents.filter(d => d.status === 'pending_review').length,
+          approved: documents.filter(d => d.status === 'approved').length,
+          rejected: documents.filter(d => d.status === 'rejected').length
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching service request documents:', error);
+      res.status(500).json({ error: "Failed to fetch service request documents" });
+    }
+  });
+
+  // Get all service requests for a user (list view)
+  app.get("/api/service-requests", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { status, entityId, page = '1', limit = '20' } = req.query;
+
+      const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
+
+      let conditions: any[] = [];
+
+      // Filter by entity if user has an associated entity
+      if (entityId) {
+        conditions.push(eq(serviceRequests.businessEntityId, parseInt(entityId as string)));
+      }
+
+      // Filter by status if provided
+      if (status && status !== 'all') {
+        conditions.push(eq(serviceRequests.status, status as string));
+      }
+
+      const { serviceRequests: srTable } = await import('@shared/schema');
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const [requests, [{ count }]] = await Promise.all([
+        db.select()
+          .from(srTable)
+          .where(whereClause)
+          .orderBy(desc(srTable.createdAt))
+          .limit(parseInt(limit as string))
+          .offset(offset),
+        db.select({ count: sql<number>`count(*)::int` })
+          .from(srTable)
+          .where(whereClause)
+      ]);
+
+      res.json({
+        serviceRequests: requests,
+        pagination: {
+          total: count,
+          page: parseInt(page as string),
+          limit: parseInt(limit as string),
+          totalPages: Math.ceil(count / parseInt(limit as string))
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching service requests:', error);
+      res.status(500).json({ error: "Failed to fetch service requests" });
     }
   });
 
@@ -1212,6 +1401,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { registerHRRoutes } = await import('./hr-routes');
   registerHRRoutes(app);
 
+  // Register Quality Monitoring routes for continuous quality checks
+  const { registerQualityMonitoringRoutes } = await import('./quality-monitoring-service');
+  registerQualityMonitoringRoutes(app);
+
   // Register Client Master Management routes
   const clientMasterRoutes = await import('./client-master-routes');
   app.use('/api/client-master', clientMasterRoutes.default);
@@ -1246,67 +1439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/v1/compliance-state', complianceStateRoutes);
   console.log('✅ Compliance State routes registered');
 
-  // Client Compliance Calendar endpoint handler
-  const complianceCalendarHandler = async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const userId = req.user?.id;
-
-      // Get user's business entity
-      const user = userId ? await storage.getUser(userId) : null;
-      const entityId = user?.businessEntityId || 1;
-
-      // Import compliance tracking table
-      const { complianceTracking } = await import('@shared/schema');
-      const { db } = await import('./db');
-      const { eq, and, gte, lte, asc } = await import('drizzle-orm');
-
-      // Get current month range
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0);
-
-      // Get compliance items for the entity
-      const items = await db.select()
-        .from(complianceTracking)
-        .where(
-          and(
-            eq(complianceTracking.businessEntityId, entityId),
-            gte(complianceTracking.dueDate, startOfMonth),
-            lte(complianceTracking.dueDate, endOfMonth)
-          )
-        )
-        .orderBy(asc(complianceTracking.dueDate));
-
-      // Transform to expected format
-      const complianceItems = items.map(item => ({
-        id: item.id,
-        title: item.serviceType || 'Compliance Item',
-        dueDate: item.dueDate?.toISOString().split('T')[0] || '',
-        category: item.complianceType || 'General',
-        priority: item.priority as 'critical' | 'high' | 'medium' | 'low',
-        status: item.status as 'pending' | 'in_progress' | 'completed',
-        entityName: item.entityName || 'Business Entity',
-        description: `${item.serviceType || 'Compliance'} - ${item.complianceType || 'Regular'} compliance`,
-        penaltyRisk: item.estimatedPenalty || 0,
-      }));
-
-      // If no real data, return realistic mock data
-      if (complianceItems.length === 0) {
-        const mockData = generateComplianceCalendarMockData();
-        return res.json(mockData);
-      }
-
-      res.json(complianceItems);
-    } catch (error: any) {
-      console.error('Error fetching compliance calendar:', error);
-      res.status(500).json({ error: 'Failed to fetch compliance calendar' });
-    }
-  };
-
-  // Register at both paths for backward compatibility
-  app.get('/api/client/compliance-calendar', sessionAuthMiddleware, complianceCalendarHandler);
-  app.get('/api/v1/client/compliance-calendar', sessionAuthMiddleware, complianceCalendarHandler);
-  console.log('✅ Client Compliance Calendar endpoint registered');
+  // Client Compliance Calendar endpoint is now registered in client-routes.ts with proper RBAC
 
   // Register User Management routes for Super Admin user creation and management
   registerUserManagementRoutes(app);
@@ -1314,7 +1447,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register Super Admin routes for system-wide management
   const { registerSuperAdminRoutes } = await import('./super-admin-routes');
   registerSuperAdminRoutes(app);
-  
+
+  // Register Admin User Management routes (delegated from Super Admin)
+  const { registerAdminUserRoutes } = await import('./admin-user-routes');
+  registerAdminUserRoutes(app);
+
   // Register Client Registration routes for self-service onboarding
   registerClientRegistrationRoutes(app);
   
@@ -1338,7 +1475,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register Customer Service & Support Ticket System routes
   app.use('/api/customer-service', customerServiceRoutes);
-  
+
+  // Register Client Support routes (client-facing ticket management)
+  registerClientSupportRoutes(app);
+
   // Register AI Document Preparation routes
   const { registerAiDocumentRoutes } = await import('./ai-document-routes');
   registerAiDocumentRoutes(app);
@@ -1346,6 +1486,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register Document Vault routes for secure document storage
   const { registerDocumentVaultRoutes } = await import('./document-vault-routes');
   registerDocumentVaultRoutes(app);
+
+  // Register Investor Data Room routes for secure investor document sharing
+  const { registerInvestorDataRoomRoutes } = await import('./investor-data-room-routes');
+  registerInvestorDataRoomRoutes(app);
+
+  // Register Automated Document Request System
+  const { registerDocumentRequestRoutes } = await import('./document-request-routes');
+  registerDocumentRequestRoutes(app);
+
+  // Register DigiLocker Integration routes
+  const { registerDigiLockerRoutes } = await import('./digilocker-routes');
+  registerDigiLockerRoutes(app);
 
   // Register E-Sign routes for digital document signing
   const { registerESignRoutes } = await import('./esign-routes');
@@ -1418,10 +1570,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/v1/workflow-import', workflowImportRoutes.default);
   console.log('✅ Workflow Import routes registered');
 
-  // Register Admin Config routes (if not already registered)
-  const { registerAdminConfigRoutes } = await import('./admin-config-routes');
-  registerAdminConfigRoutes(app);
-  console.log('✅ Admin Config routes registered');
+  // Register Status Management routes (Unified status facility with drill-down)
+  const statusManagementRoutes = await import('./status-management-routes');
+  app.use('/api/status-management', statusManagementRoutes.default);
+  app.use('/api/v1/status-management', statusManagementRoutes.default);
+  app.use('/api/admin/status-management', statusManagementRoutes.default);
+  console.log('✅ Status Management routes registered');
+
+  // Register Work Queue routes (Unified operations view with SLA tracking & escalation)
+  const workQueueRoutes = await import('./work-queue-routes');
+  app.use('/api/work-queue', workQueueRoutes.default);
+  app.use('/api/v1/work-queue', workQueueRoutes.default);
+  app.use('/api/ops/work-queue', workQueueRoutes.default);
+  console.log('✅ Work Queue & Escalation routes registered');
+
+  // Register Universal Service API (96+ services for all stakeholders)
+  const universalServiceApi = await import('./universal-service-api');
+  app.use('/api/universal', universalServiceApi.default);
+  app.use('/api/v2/universal', universalServiceApi.default);
+  console.log('✅ Universal Service API registered (96+ services)');
+
+  // Register Unified Dashboard API (Single source of truth for all stakeholders)
+  const unifiedDashboardApi = await import('./unified-dashboard-api');
+  app.use('/api/dashboard', unifiedDashboardApi.default);
+  app.use('/api/v2/dashboard', unifiedDashboardApi.default);
+  console.log('✅ Unified Dashboard API registered (single source of truth)');
+
+  // Register Advanced CRM Engine (Lead management, bulk ops, pipeline)
+  const advancedCrmEngine = await import('./advanced-crm-engine');
+  app.use('/api/crm', advancedCrmEngine.default);
+  app.use('/api/v2/crm', advancedCrmEngine.default);
+  console.log('✅ Advanced CRM Engine registered (leads, pipeline, bulk operations)');
+
+  // Register Configuration Management API (Services, Clients, System config)
+  const configManagementApi = await import('./configuration-management-api');
+  app.use('/api/config', configManagementApi.default);
+  app.use('/api/v2/config', configManagementApi.default);
+  console.log('✅ Configuration Management API registered (services, clients, system)');
+
+  // Register Compliance Management API (Calendar, Health, Alerts, Penalties)
+  const complianceManagementApi = await import('./compliance-management-api');
+  app.use('/api/compliance', complianceManagementApi.default);
+  app.use('/api/v2/compliance', complianceManagementApi.default);
+  console.log('✅ Compliance Management API registered (calendar, health, alerts, penalties)');
+
+  // Initialize auto-escalation engine (check every 15 minutes)
+  const { initializeEscalationEngine } = await import('./auto-escalation-engine');
+  initializeEscalationEngine(15).then(() => {
+    console.log('✅ Auto-Escalation Engine initialized');
+  }).catch(err => {
+    console.error('❌ Failed to initialize escalation engine:', err);
+  });
+
+  // Register AI Routes (Anthropic, OpenAI, Perplexity, Gemini integration)
+  const aiRoutes = await import('./ai-routes');
+  app.use('/api/ai', aiRoutes.default);
+  app.use('/api/v2/ai', aiRoutes.default);
+  console.log('✅ AI Routes registered (Compliance, Sales, Documents, Support agents)');
 
   const httpServer = createServer(app);
   return httpServer;

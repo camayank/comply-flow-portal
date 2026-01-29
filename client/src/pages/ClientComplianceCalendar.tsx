@@ -32,56 +32,13 @@ const ClientComplianceCalendar = () => {
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'list'>('month');
   const [filterCategory, setFilterCategory] = useState<string>('all');
 
-  // Fetch compliance items
-  const { data: complianceItems = [], isLoading } = useQuery<ComplianceItem[]>({
+  // Fetch compliance items from authenticated API
+  const { data: complianceItems = [], isLoading, error } = useQuery<ComplianceItem[]>({
     queryKey: ['/api/client/compliance-calendar'],
   });
 
-  // Mock data for demonstration
-  const mockComplianceData: ComplianceItem[] = [
-    {
-      id: 1,
-      title: 'GST Return Filing (GSTR-3B)',
-      dueDate: '2025-10-20',
-      category: 'GST',
-      priority: 'critical',
-      status: 'pending',
-      entityName: 'TechCorp Pvt Ltd',
-      description: 'Monthly GST return filing'
-    },
-    {
-      id: 2,
-      title: 'TDS Return Filing',
-      dueDate: '2025-10-15',
-      category: 'Income Tax',
-      priority: 'high',
-      status: 'in_progress',
-      entityName: 'TechCorp Pvt Ltd',
-      description: 'Quarterly TDS return'
-    },
-    {
-      id: 3,
-      title: 'PF & ESI Payment',
-      dueDate: '2025-10-25',
-      category: 'Payroll',
-      priority: 'high',
-      status: 'pending',
-      entityName: 'TechCorp Pvt Ltd',
-      description: 'Monthly employee contribution'
-    },
-    {
-      id: 4,
-      title: 'Board Meeting Minutes',
-      dueDate: '2025-10-30',
-      category: 'Corporate',
-      priority: 'medium',
-      status: 'pending',
-      entityName: 'TechCorp Pvt Ltd',
-      description: 'Quarterly board meeting documentation'
-    },
-  ];
-
-  const displayData = complianceItems.length > 0 ? complianceItems : mockComplianceData;
+  // Use real data only - no mock fallback
+  const displayData = complianceItems;
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -298,6 +255,27 @@ const ClientComplianceCalendar = () => {
                   </Card>
                 );
               })
+            ) : error ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <AlertTriangle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Unable to Load Calendar</h3>
+                  <p className="text-sm text-gray-600">Please try again or contact support if the issue persists.</p>
+                </CardContent>
+              </Card>
+            ) : displayData.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <CalendarIcon className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Compliance Items Yet</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Your compliance calendar will populate once you have active services.
+                  </p>
+                  <Button variant="outline" onClick={() => window.location.href = '/services'}>
+                    Browse Services
+                  </Button>
+                </CardContent>
+              </Card>
             ) : (
               <Card>
                 <CardContent className="py-12 text-center">

@@ -1,13 +1,22 @@
-import type { Express } from "express";
+import type { Express, Response } from "express";
 import { db } from './db';
 import { payments, serviceRequests, businessEntities } from '@shared/schema';
 import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
+import {
+  sessionAuthMiddleware,
+  requireMinimumRole,
+  USER_ROLES,
+  type AuthenticatedRequest
+} from './rbac-middleware';
+
+// Middleware for financial access - requires accountant or higher
+const requireFinancialAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ACCOUNTANT)] as const;
 
 // Financial Management & Revenue Analytics
 export function registerFinancialManagementRoutes(app: Express) {
 
-  // Get financial overview/dashboard
-  app.get('/api/financials/overview', async (req, res) => {
+  // Get financial overview/dashboard - requires accountant or higher
+  app.get('/api/financials/overview', ...requireFinancialAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { startDate, endDate } = req.query;
 
@@ -64,8 +73,8 @@ export function registerFinancialManagementRoutes(app: Express) {
     }
   });
 
-  // Get revenue by month (for charts)
-  app.get('/api/financials/revenue-by-month', async (req, res) => {
+  // Get revenue by month (for charts) - requires accountant or higher
+  app.get('/api/financials/revenue-by-month', ...requireFinancialAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { year = new Date().getFullYear() } = req.query;
 

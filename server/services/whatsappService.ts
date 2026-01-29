@@ -3,14 +3,23 @@
  * Handles WhatsApp messages via Twilio/WhatsApp Business API
  */
 
-import { Twilio } from 'twilio';
+import twilio from 'twilio';
 import { pool } from '../config/database';
 import { logger, notificationLogger } from '../config/logger';
 
 // Twilio WhatsApp configuration
-const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
-  ? new Twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+// Validate that account SID starts with 'AC' to avoid crashes
+const isValidTwilioConfig =
+  process.env.TWILIO_ACCOUNT_SID?.startsWith('AC') &&
+  process.env.TWILIO_AUTH_TOKEN;
+
+const twilioClient = isValidTwilioConfig
+  ? twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!)
   : null;
+
+if (!twilioClient && process.env.NODE_ENV === 'development') {
+  console.log('⚠️  Twilio WhatsApp not configured - WhatsApp notifications disabled');
+}
 
 const TWILIO_WHATSAPP_NUMBER = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886';
 

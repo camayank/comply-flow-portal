@@ -1,23 +1,33 @@
 /**
  * Role-Based Access Control (RBAC) Middleware
  * Checks user permissions based on roles
+ *
+ * PRODUCTION READY - All security checks enabled
  */
 
 import { Request, Response, NextFunction } from 'express';
 import { pool } from '../config/database';
 import { logger } from '../config/logger';
 
+// Role hierarchy levels for comparison
+const ROLE_LEVELS: Record<string, number> = {
+  'super_admin': 100,
+  'admin': 90,
+  'ops_manager': 80,
+  'ops_executive': 70,
+  'customer_service': 60,
+  'qc_executive': 55,
+  'accountant': 50,
+  'agent': 40,
+  'client': 10,
+};
+
 /**
  * Check if user has required role
- * DEV MODE: Always allow access
+ * Supports role hierarchy - higher roles can access lower role endpoints
  */
 export function requireRole(...allowedRoles: string[]) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    // 🔓 DEV MODE: Bypass role check
-    next();
-    return;
-
-    /* ORIGINAL RBAC CODE - COMMENTED FOR DEV
     try {
       if (!req.user || !req.userId) {
         res.status(401).json({
@@ -27,16 +37,34 @@ export function requireRole(...allowedRoles: string[]) {
         return;
       }
 
-      // Check if user has any of the allowed roles
-      const userRoles = req.user.roles || [];
-      const hasRole = allowedRoles.some(role => userRoles.includes(role));
+      // Get user role - support both single role and array of roles
+      const userRole = req.user.role || (req.user.roles && req.user.roles[0]);
 
-      if (!hasRole) {
-        logger.warn(`Access denied for user ${req.userId}. Required roles: ${allowedRoles.join(', ')}`);
+      if (!userRole) {
+        res.status(403).json({
+          success: false,
+          error: 'User role not found',
+        });
+        return;
+      }
+
+      // Check if user has any of the allowed roles (direct match)
+      const hasDirectRole = allowedRoles.includes(userRole);
+
+      // Check role hierarchy - higher roles can access lower role endpoints
+      const userLevel = ROLE_LEVELS[userRole] || 0;
+      const hasHierarchyAccess = allowedRoles.some(role => {
+        const requiredLevel = ROLE_LEVELS[role] || 0;
+        return userLevel >= requiredLevel;
+      });
+
+      if (!hasDirectRole && !hasHierarchyAccess) {
+        logger.warn(`Access denied for user ${req.userId} with role ${userRole}. Required roles: ${allowedRoles.join(', ')}`);
         res.status(403).json({
           success: false,
           error: 'Insufficient permissions',
           required: allowedRoles,
+          userRole: userRole,
         });
         return;
       }
@@ -49,7 +77,6 @@ export function requireRole(...allowedRoles: string[]) {
         error: 'Authorization check failed',
       });
     }
-    */
   };
 }
 

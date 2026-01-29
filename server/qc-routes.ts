@@ -1,7 +1,16 @@
 import { eq, and, desc, asc, like, inArray, isNull, sql, count, avg } from "drizzle-orm";
 import { Request, Response, Application } from "express";
 import { db } from "./db";
-import { requireAuth } from "./auth-middleware";
+import {
+  sessionAuthMiddleware,
+  requireMinimumRole,
+  USER_ROLES,
+  type AuthenticatedRequest
+} from './rbac-middleware';
+
+// Middleware chains for QC routes
+const requireQCAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.QC_EXECUTIVE)] as const;
+const requireOpsManager = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_MANAGER)] as const;
 import {
   qualityReviews,
   deliveryConfirmations,
@@ -27,7 +36,8 @@ export function registerQCRoutes(app: Application) {
   console.log('🔍 Registering QC routes...');
 
   // ========== QC DASHBOARD ==========
-  app.get('/api/qc/dashboard', requireAuth, async (req: Request, res: Response) => {
+  // QC Dashboard - requires QC Executive or higher
+  app.get('/api/qc/dashboard', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { tab = 'pending', search, priority, status, sort = 'assignedAt', order = 'desc' } = req.query;
       const currentUserId = req.user!.id;
@@ -196,7 +206,8 @@ export function registerQCRoutes(app: Application) {
   });
 
   // ========== QC METRICS ==========
-  app.get('/api/qc/metrics', async (req: Request, res: Response) => {
+  // Requires QC Executive or higher
+  app.get('/api/qc/metrics', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { timeRange = '7d', serviceFilter = 'all', reviewerFilter = 'all' } = req.query;
 
@@ -338,7 +349,8 @@ export function registerQCRoutes(app: Application) {
   });
 
   // ========== QC QUEUE MANAGEMENT ==========
-  app.get('/api/qc/queue', async (req: Request, res: Response) => {
+  // Requires QC Executive or higher
+  app.get('/api/qc/queue', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { sort = 'priority', order = 'desc', status, priority, assignee, search } = req.query;
 
@@ -415,7 +427,8 @@ export function registerQCRoutes(app: Application) {
   });
 
   // ========== QC TEAM MANAGEMENT ==========
-  app.get('/api/qc/team', async (req: Request, res: Response) => {
+  // Requires QC Executive or higher
+  app.get('/api/qc/team', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const team = await db
         .select({
@@ -443,7 +456,8 @@ export function registerQCRoutes(app: Application) {
   });
 
   // ========== QUALITY CHECKLISTS ==========
-  app.get('/api/qc/checklist/:serviceType', async (req: Request, res: Response) => {
+  // Requires QC Executive or higher
+  app.get('/api/qc/checklist/:serviceType', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { serviceType } = req.params;
 
@@ -533,9 +547,9 @@ export function registerQCRoutes(app: Application) {
   });
 
   // ========== QC REVIEW OPERATIONS ==========
-  
-  // Start QC Review
-  app.post('/api/qc/reviews/:reviewId/start', requireAuth, async (req: Request, res: Response) => {
+
+  // Start QC Review - Requires QC Executive or higher
+  app.post('/api/qc/reviews/:reviewId/start', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { reviewId } = req.params;
       const currentUserId = req.user!.id;
@@ -558,8 +572,8 @@ export function registerQCRoutes(app: Application) {
     }
   });
 
-  // Submit QC Review
-  app.post('/api/qc/reviews/:reviewId/submit', requireAuth, async (req: Request, res: Response) => {
+  // Submit QC Review - Requires QC Executive or higher
+  app.post('/api/qc/reviews/:reviewId/submit', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { reviewId } = req.params;
       const {
@@ -663,8 +677,8 @@ export function registerQCRoutes(app: Application) {
     }
   });
 
-  // Assign Review
-  app.post('/api/qc/reviews/:reviewId/assign', async (req: Request, res: Response) => {
+  // Assign Review - Requires Ops Manager (only managers can assign reviews)
+  app.post('/api/qc/reviews/:reviewId/assign', ...requireOpsManager, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { reviewId } = req.params;
       const { reviewerId } = req.body;
@@ -698,8 +712,8 @@ export function registerQCRoutes(app: Application) {
     }
   });
 
-  // Auto-assign reviews
-  app.post('/api/qc/reviews/auto-assign', async (req: Request, res: Response) => {
+  // Auto-assign reviews - Requires Ops Manager
+  app.post('/api/qc/reviews/auto-assign', ...requireOpsManager, async (req: AuthenticatedRequest, res: Response) => {
     try {
       // Get unassigned reviews
       const unassignedReviews = await db

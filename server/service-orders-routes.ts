@@ -1,10 +1,11 @@
 import type { Express } from "express";
 import { db } from './db';
-import { 
+import {
   serviceRequests,
   businessEntities
 } from '@shared/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
+import { executeStatusTransition, getAvailableTransitions, getTransitionHistory } from './status-transition-handler';
 
 export function registerServiceOrdersRoutes(app: Express) {
 
@@ -82,54 +83,76 @@ export function registerServiceOrdersRoutes(app: Express) {
     }
   });
 
-  // UPDATE service order status
+  // UPDATE service order status (using unified status transition handler)
   app.patch('/api/service-orders/:id/status', async (req, res) => {
     try {
       const orderId = parseInt(req.params.id);
-      const { from, to, notes, timestamp } = req.body;
+      const { from, to, notes, reason, timestamp } = req.body;
 
-      // Fetch current order
-      const [currentOrder] = await db
-        .select()
-        .from(serviceRequests)
-        .where(eq(serviceRequests.id, orderId));
+      // Use the unified status transition handler
+      // This automatically:
+      // 1. Validates the transition
+      // 2. Records history for transparency
+      // 3. Creates tasks if configured
+      // 4. Sends notifications if configured
+      // 5. Emits events for other systems
+      const result = await executeStatusTransition({
+        serviceRequestId: orderId,
+        toStatusCode: to,
+        userId: (req as any).user?.id || 1, // Get from auth context
+        reason: reason || notes,
+        notes,
+        triggerSource: 'api'
+      });
 
-      if (!currentOrder) {
-        return res.status(404).json({ error: 'Service order not found' });
+      if (!result.success) {
+        return res.status(400).json({
+          error: result.error,
+          from,
+          to
+        });
       }
 
-      // Update status
-      await db
-        .update(serviceRequests)
-        .set({
-          status: to,
-          updatedAt: new Date().toISOString()
-        })
-        .where(eq(serviceRequests.id, orderId));
+      console.log(`📈 Status updated via transition handler: Order ${orderId} ${result.previousStatus} → ${result.newStatus}`);
 
-      // TODO: Emit event for notification system
-      // emitEvent('service.status_changed', {
-      //   service_order_id: orderId,
-      //   from,
-      //   to,
-      //   serviceName: currentOrder.serviceType,
-      //   periodLabel: currentOrder.periodLabel,
-      //   notes,
-      //   timestamp
-      // });
-
-      console.log(`📈 Status updated: Order ${orderId} ${from} → ${to}`);
-      
-      res.json({ 
+      res.json({
         success: true,
         message: 'Status updated successfully',
         orderId,
-        from,
-        to
+        from: result.previousStatus,
+        to: result.newStatus,
+        historyId: result.historyId
       });
     } catch (error) {
       console.error('Error updating service order status:', error);
       res.status(500).json({ error: 'Failed to update status' });
+    }
+  });
+
+  // GET available transitions for a service order
+  app.get('/api/service-orders/:id/available-transitions', async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const transitions = await getAvailableTransitions(orderId);
+
+      res.json({ transitions });
+    } catch (error) {
+      console.error('Error fetching available transitions:', error);
+      res.status(500).json({ error: 'Failed to fetch available transitions' });
+    }
+  });
+
+  // GET transition history for a service order
+  app.get('/api/service-orders/:id/transition-history', async (req, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const limit = parseInt(req.query.limit as string) || 50;
+      const history = await getTransitionHistory(orderId, limit);
+
+      res.json({ history });
+    } catch (error) {
+      console.error('Error fetching transition history:', error);
+      res.status(500).json({ error: 'Failed to fetch transition history' });
     }
   });
 

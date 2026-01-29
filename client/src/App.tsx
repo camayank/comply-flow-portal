@@ -78,9 +78,19 @@ const MasterBlueprintDashboard = lazy(() => import("./pages/MasterBlueprintDashb
 const UniversalLandingPage = lazy(() => import("./pages/UniversalLandingPage"));
 const WorkflowImport = lazy(() => import("./pages/WorkflowImport"));
 const AdminServiceConfig = lazy(() => import("./pages/AdminServiceConfig"));
+const StatusManagement = lazy(() => import("./pages/StatusManagement"));
+const OperationsWorkQueue = lazy(() => import("./pages/OperationsWorkQueue"));
+const ClientServicesDashboard = lazy(() => import("./pages/ClientServicesDashboard"));
+const ServiceCatalogBrowser = lazy(() => import("./pages/ServiceCatalogBrowser"));
+const AdminServicesOverview = lazy(() => import("./pages/AdminServicesOverview"));
+const RoleBasedDashboard = lazy(() => import("./pages/RoleBasedDashboard"));
+const LeadPipeline = lazy(() => import("./pages/LeadPipeline"));
+const ConfigurationManager = lazy(() => import("./pages/ConfigurationManager"));
+const ComplianceManagementDashboard = lazy(() => import("./pages/ComplianceManagementDashboard"));
 const PreSalesManager = lazy(() => import("./pages/PreSalesManager"));
 const SalesProposalManager = lazy(() => import("./pages/SalesProposalManager"));
 const QCDashboard = lazy(() => import("./pages/QCDashboard"));
+const QCDeliveryHandoff = lazy(() => import("./pages/QCDeliveryHandoff"));
 const QualityMetricsDashboard = lazy(() => import("./pages/QualityMetricsDashboard"));
 const AccountIndex = lazy(() => import("./pages/portal-v2/AccountIndex"));
 const AccountBusinesses = lazy(() => import("./pages/portal-v2/AccountBusinesses"));
@@ -101,6 +111,7 @@ const AgentCommissionTracker = lazy(() => import("./pages/AgentCommissionTracker
 const AgentPerformance = lazy(() => import("./pages/AgentPerformance"));
 const AgentProfileSettings = lazy(() => import("./pages/AgentProfileSettings"));
 const CustomerServiceDashboard = lazy(() => import("./pages/CustomerServiceDashboard"));
+const ClientSupport = lazy(() => import("./pages/ClientSupport"));
 const SuperAdminPortal = lazy(() => import("./pages/SuperAdminPortal"));
 const RoleSelection = lazy(() => import("./pages/RoleSelection"));
 const LifecycleDashboard = lazy(() => import("./pages/LifecycleDashboard"));
@@ -150,8 +161,19 @@ const AppContent = () => {
   const [location, setLocation] = useLocation();
   const { user, isAuthenticated, isLoading } = useAuth();
 
-  // 🔓 DEV MODE: Disable all route protection
-  /* ORIGINAL ROUTE PROTECTION - COMMENTED FOR DEV
+  // Scroll to top and focus main content on route change
+  useEffect(() => {
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'instant' });
+
+    // Focus main content area
+    const mainContent = document.getElementById('main-content');
+    if (mainContent) {
+      mainContent.focus({ preventScroll: true });
+    }
+  }, [location]);
+
+  // PRODUCTION READY: Full route protection enabled
   useEffect(() => {
     if (isLoading) {
       return;
@@ -159,24 +181,34 @@ const AppContent = () => {
 
     const isPublic = isPublicRoute(location);
 
+    // Redirect unauthenticated users to login for protected routes
     if (!isAuthenticated && !isPublic) {
       sessionStorage.setItem('redirectAfterLogin', location);
       setLocation('/login');
       return;
     }
 
+    // Handle authenticated users
     if (isAuthenticated && user?.role) {
+      // Redirect away from auth pages to dashboard
       if (['/login', '/signin', '/select-role', '/role-selection'].includes(location)) {
-        setLocation(getRoleDashboardRoute(user.role));
+        const redirectUrl = sessionStorage.getItem('redirectAfterLogin');
+        if (redirectUrl && canAccessRoute(user.role, redirectUrl)) {
+          sessionStorage.removeItem('redirectAfterLogin');
+          setLocation(redirectUrl);
+        } else {
+          setLocation(getRoleDashboardRoute(user.role));
+        }
         return;
       }
 
+      // Redirect users who don't have access to the current route
       if (!isPublic && !canAccessRoute(user.role, location)) {
+        console.warn(`[RBAC] Access denied for role "${user.role}" to route "${location}"`);
         setLocation(getRoleDashboardRoute(user.role));
       }
     }
   }, [isAuthenticated, isLoading, location, setLocation, user]);
-  */
 
   return (
     <ErrorBoundary>
@@ -187,7 +219,10 @@ const AppContent = () => {
           <CommandPalette />
           <Router>
             <div className="min-h-screen flex flex-col">
-              <main className="flex-grow">
+              <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-blue-600 focus:text-white focus:px-4 focus:py-2 focus:rounded">
+                Skip to main content
+              </a>
+              <main id="main-content" className="flex-grow focus:outline-none" tabIndex={-1}>
                 <Suspense fallback={<PageLoader />}>
                   <Switch>
                 <Route path="/" component={DevHub} />
@@ -195,6 +230,8 @@ const AppContent = () => {
                 <Route path="/dev" component={DevHub} />
                 <Route path="/landing" component={UnifiedLanding} />
                 <Route path="/dashboard" component={UnifiedDashboard} />
+                <Route path="/my-dashboard" component={RoleBasedDashboard} />
+                <Route path="/role-dashboard" component={RoleBasedDashboard} />
                 <Route path="/select-role" component={RoleSelection} />
                 <Route path="/role-selection" component={RoleSelection} />
                 <Route path="/mobile-landing" component={MobileResponsiveLanding} />
@@ -205,6 +242,9 @@ const AppContent = () => {
                 <Route path="/signup" component={ClientRegistration} />
                 <Route path="/leads" component={LeadManagement} />
                 <Route path="/lead-management" component={LeadManagement} />
+                <Route path="/lead-pipeline" component={LeadPipeline} />
+                <Route path="/pipeline" component={LeadPipeline} />
+                <Route path="/crm" component={LeadPipeline} />
                 <Route path="/service-requests" component={ServiceRequestUI} />
                 <Route path="/requests" component={ServiceRequestUI} />
                 <Route path="/my-requests" component={ServiceRequestUI} />
@@ -239,6 +279,9 @@ const AppContent = () => {
                 <Route path="/service-request/create" component={ServiceRequestCreate} />
                 <Route path="/service-request/:id" component={ServiceRequestDetail} />
                 <Route path="/compliance-calendar" component={ClientComplianceCalendar} />
+                <Route path="/compliance-management" component={ComplianceManagementDashboard} />
+                <Route path="/compliance-admin" component={ComplianceManagementDashboard} />
+                <Route path="/compliance-ops" component={ComplianceManagementDashboard} />
                 <Route path="/client-profile" component={ClientProfile} />
                 <Route path="/workflow-dashboard" component={DigiComplyWorkflowDashboard} />
                 <Route path="/smart-start" component={SmartStart} />
@@ -271,12 +314,40 @@ const AppContent = () => {
                 <Route path="/master-blueprint" component={MasterBlueprintDashboard} />
                 {/* CONSOLIDATED: /universal-admin and /universal-ops merged into /admin and /operations */}
                 <Route path="/admin-config" component={AdminServiceConfig} />
+                <Route path="/status-management" component={StatusManagement} />
+                <Route path="/workflow-statuses" component={StatusManagement} />
+                <Route path="/work-queue" component={OperationsWorkQueue} />
+                <Route path="/ops/work-queue" component={OperationsWorkQueue} />
+                <Route path="/operations-queue" component={OperationsWorkQueue} />
+
+                {/* Client Service Tracking */}
+                <Route path="/my-services" component={ClientServicesDashboard} />
+                <Route path="/client/services" component={ClientServicesDashboard} />
+                <Route path="/service-tracker" component={ClientServicesDashboard} />
+
+                {/* Service Catalog Browser (96+ services) */}
+                <Route path="/service-catalog" component={ServiceCatalogBrowser} />
+                <Route path="/browse-services" component={ServiceCatalogBrowser} />
+
+                {/* Admin Services Management */}
+                <Route path="/admin/services" component={AdminServicesOverview} />
+                <Route path="/services-management" component={AdminServicesOverview} />
+                <Route path="/manage-services" component={AdminServicesOverview} />
+
+                {/* Configuration Management */}
+                <Route path="/config" component={ConfigurationManager} />
+                <Route path="/configuration" component={ConfigurationManager} />
+                <Route path="/admin/config" component={ConfigurationManager} />
+                <Route path="/settings" component={ConfigurationManager} />
+
                 <Route path="/workflow-import" component={WorkflowImport} />
                 <Route path="/pre-sales" component={PreSalesManager} />
                 <Route path="/sales-proposals" component={SalesProposalManagerRefactored} />
                 <Route path="/qc" component={QCDashboard} />
                 <Route path="/qc-dashboard" component={QCDashboard} />
                 <Route path="/quality-control" component={QCDashboard} />
+                <Route path="/qc-delivery-handoff" component={QCDeliveryHandoff} />
+                <Route path="/delivery-handoff" component={QCDeliveryHandoff} />
                 <Route path="/quality-metrics" component={QualityMetricsDashboard} />
                 <Route path="/qc-metrics" component={QualityMetricsDashboard} />
                 <Route path="/delivery/:deliveryId" component={DeliveryConfirmation} />
@@ -312,6 +383,9 @@ const AppContent = () => {
                 <Route path="/partner" component={MobileAgentPortal} />
                 <Route path="/partners" component={MobileAgentPortal} />
                 <Route path="/customer-service" component={CustomerServiceDashboard} />
+                <Route path="/support" component={ClientSupport} />
+                <Route path="/help" component={ClientSupport} />
+                <Route path="/tickets" component={ClientSupport} />
                 <Route path="/super-admin" component={SuperAdminPortal} />
                 {/* CONSOLIDATED: Single onboarding flow */}
                 <Route path="/onboarding" component={SmartStart} />

@@ -1,17 +1,25 @@
 import { Request, Response } from 'express';
 import { db } from './db';
-import { 
+import {
   operationsTeam, employeeSkills, skillsMaster, trainingPrograms, trainingEnrollments,
   performanceReviews, employeeGoals, attendanceRecords, leaveTypes, leaveBalances,
   leaveApplications, careerPaths, careerProgress, workloadMetrics, teamMetrics
 } from '../shared/schema';
 import { eq, and, or, desc, asc, sql, inArray, count, avg, sum, gte, lte } from 'drizzle-orm';
+import {
+  sessionAuthMiddleware,
+  requireMinimumRole,
+  USER_ROLES,
+  AuthenticatedRequest
+} from './rbac-middleware';
 
 // ============================================================================
 // EMPLOYEE MANAGEMENT ROUTES
 // ============================================================================
 
 export function registerHRRoutes(app: any) {
+  // Apply authentication to all HR routes
+  app.use('/api/hr', sessionAuthMiddleware);
   
   // ========== EMPLOYEE DIRECTORY ==========
   
@@ -169,14 +177,13 @@ export function registerHRRoutes(app: any) {
     try {
       const { id } = req.params;
 
-      // Soft delete - set status to 'terminated' instead of hard delete
-      const [employee] = await db.update(employees)
+      // Soft delete - set isActive to false instead of hard delete
+      const [employee] = await db.update(operationsTeam)
         .set({
-          status: 'terminated',
-          terminationDate: new Date(),
+          isActive: false,
           updatedAt: new Date(),
         })
-        .where(eq(employees.id, parseInt(id)))
+        .where(eq(operationsTeam.id, parseInt(id)))
         .returning();
 
       if (!employee) {
@@ -185,7 +192,7 @@ export function registerHRRoutes(app: any) {
 
       res.json({
         success: true,
-        message: 'Employee terminated successfully',
+        message: 'Employee deactivated successfully',
         employee,
       });
     } catch (error) {

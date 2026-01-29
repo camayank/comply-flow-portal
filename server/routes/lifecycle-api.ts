@@ -16,25 +16,41 @@
  * - Request logging
  */
 
-import { Router } from 'express';
+import { Router, Request } from 'express';
 import * as ClientService from '../services/v2/client-service';
 import * as ComplianceService from '../services/v2/compliance-service';
 import * as ServiceCatalogService from '../services/v2/service-catalog-service';
 import * as DocumentService from '../services/v2/document-management-service';
 import * as LifecycleService from '../services/v2/business-lifecycle-service';
-import { 
-  validateRequest, 
-  performanceMonitor, 
+import {
+  validateRequest,
+  performanceMonitor,
   withTimeout,
   NotFoundError,
   AppError,
   lifecycleSchemas
 } from '../robustness-middleware';
+import {
+  sessionAuthMiddleware,
+  requireRole,
+  USER_ROLES,
+  type AuthenticatedRequest
+} from '../rbac-middleware';
 
 const router = Router();
 
+// Apply authentication middleware - require CLIENT role for all lifecycle routes
+router.use(sessionAuthMiddleware as any);
+router.use(requireRole(USER_ROLES.CLIENT) as any);
+
 // Apply performance monitoring to all routes
 router.use(performanceMonitor(500)); // Warn if request takes > 500ms
+
+// Helper to get authenticated user ID (no fallbacks - auth is required)
+function getAuthenticatedUserId(req: Request): string | null {
+  const user = (req as AuthenticatedRequest).user;
+  return user?.id ? String(user.id) : null;
+}
 
 /**
  * GET /api/v2/lifecycle/dashboard
@@ -44,7 +60,10 @@ router.use(performanceMonitor(500)); // Warn if request takes > 500ms
  */
 router.get('/dashboard', validateRequest(lifecycleSchemas.userId, 'query'), async (req, res, next) => {
   try {
-    const userId = (req as any).user?.id || req.query.userId as string || 'dev-user-123';
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
     
     const client = await withTimeout(
       ClientService.getClientByUserId(userId),
@@ -160,7 +179,10 @@ router.get('/dashboard', validateRequest(lifecycleSchemas.userId, 'query'), asyn
  */
 router.get('/compliance-detail', async (req, res) => {
   try {
-    const userId = (req as any).user?.id || req.query.userId as string || 'dev-user-123';
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
     const client = await ClientService.getClientByUserId(userId);
     
     if (!client) {
@@ -233,7 +255,10 @@ router.get('/compliance-detail', async (req, res) => {
  */
 router.get('/services-detail', async (req, res) => {
   try {
-    const userId = (req as any).user?.id || req.query.userId as string || 'dev-user-123';
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
     const client = await ClientService.getClientByUserId(userId);
     
     if (!client) {
@@ -309,7 +334,10 @@ router.get('/services-detail', async (req, res) => {
  */
 router.get('/documents-detail', async (req, res) => {
   try {
-    const userId = (req as any).user?.id || req.query.userId as string || 'dev-user-123';
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
     const client = await ClientService.getClientByUserId(userId);
     
     if (!client) {
@@ -398,7 +426,10 @@ router.get('/documents-detail', async (req, res) => {
  */
 router.get('/funding-detail', async (req, res) => {
   try {
-    const userId = (req as any).user?.id || req.query.userId as string || 'dev-user-123';
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
     const client = await ClientService.getClientByUserId(userId);
     
     if (!client) {
@@ -494,7 +525,10 @@ router.get('/funding-detail', async (req, res) => {
  */
 router.get('/timeline', async (req, res) => {
   try {
-    const userId = (req as any).user?.id || req.query.userId as string || 'dev-user-123';
+    const userId = getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
     const client = await ClientService.getClientByUserId(userId);
     
     if (!client) {

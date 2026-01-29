@@ -2,11 +2,20 @@ import express from 'express';
 import { storage } from './storage';
 import { insertSalesProposalSchema, SalesProposal } from '../shared/schema';
 import { z } from 'zod';
+import {
+  sessionAuthMiddleware,
+  requireMinimumRole,
+  USER_ROLES,
+  AuthenticatedRequest
+} from './rbac-middleware';
 
 const router = express.Router();
 
+// Apply authentication to all proposal routes
+router.use('/proposals', sessionAuthMiddleware);
+
 // GET /api/proposals - Get all proposals with filtering and pagination
-router.get('/proposals', async (req, res) => {
+router.get('/proposals', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
     const { 
       search, 
@@ -51,7 +60,7 @@ router.get('/proposals', async (req, res) => {
 });
 
 // GET /api/proposals/:id - Get specific proposal
-router.get('/proposals/:id', async (req, res) => {
+router.get('/proposals/:id', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
     const proposal = await storage.getProposal(parseInt(req.params.id));
 
@@ -67,7 +76,7 @@ router.get('/proposals/:id', async (req, res) => {
 });
 
 // POST /api/proposals - Create new proposal
-router.post('/proposals', async (req, res) => {
+router.post('/proposals', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
     const validatedData = insertSalesProposalSchema.parse(req.body);
     
@@ -90,7 +99,7 @@ router.post('/proposals', async (req, res) => {
 });
 
 // PUT /api/proposals/:id - Update proposal
-router.put('/proposals/:id', async (req, res) => {
+router.put('/proposals/:id', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
     const validatedData = insertSalesProposalSchema.partial().parse(req.body);
     
@@ -110,8 +119,8 @@ router.put('/proposals/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/proposals/:id - Delete proposal
-router.delete('/proposals/:id', async (req, res) => {
+// DELETE /api/proposals/:id - Delete proposal (Admin only)
+router.delete('/proposals/:id', requireMinimumRole(USER_ROLES.ADMIN), async (req: AuthenticatedRequest, res) => {
   try {
     const deleted = await storage.deleteProposal(parseInt(req.params.id));
 
@@ -127,7 +136,7 @@ router.delete('/proposals/:id', async (req, res) => {
 });
 
 // POST /api/proposals/:id/send - Send proposal to client
-router.post('/proposals/:id/send', async (req, res) => {
+router.post('/proposals/:id/send', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
     const sentProposal = await storage.sendProposal(parseInt(req.params.id));
 
@@ -146,7 +155,7 @@ router.post('/proposals/:id/send', async (req, res) => {
 });
 
 // GET /api/proposals/stats/dashboard - Get dashboard statistics
-router.get('/proposals/stats/dashboard', async (req, res) => {
+router.get('/proposals/stats/dashboard', requireMinimumRole(USER_ROLES.OPS_EXECUTIVE), async (req: AuthenticatedRequest, res) => {
   try {
     const stats = await storage.getProposalStats();
 
@@ -158,7 +167,7 @@ router.get('/proposals/stats/dashboard', async (req, res) => {
 });
 
 // GET /api/proposals/by-lead/:leadId - Get proposals for a specific lead
-router.get('/proposals/by-lead/:leadId', async (req, res) => {
+router.get('/proposals/by-lead/:leadId', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
     const proposals = await storage.getSalesProposalsByLead(req.params.leadId);
 
@@ -169,8 +178,8 @@ router.get('/proposals/by-lead/:leadId', async (req, res) => {
   }
 });
 
-// POST /api/proposals/:id/approve - Approve proposal
-router.post('/proposals/:id/approve', async (req, res) => {
+// POST /api/proposals/:id/approve - Approve proposal (Admin only)
+router.post('/proposals/:id/approve', requireMinimumRole(USER_ROLES.ADMIN), async (req: AuthenticatedRequest, res) => {
   try {
     const { remarks } = req.body;
     
@@ -193,8 +202,8 @@ router.post('/proposals/:id/approve', async (req, res) => {
   }
 });
 
-// POST /api/proposals/:id/reject - Reject proposal
-router.post('/proposals/:id/reject', async (req, res) => {
+// POST /api/proposals/:id/reject - Reject proposal (Admin only)
+router.post('/proposals/:id/reject', requireMinimumRole(USER_ROLES.ADMIN), async (req: AuthenticatedRequest, res) => {
   try {
     const { reason } = req.body;
     
@@ -217,24 +226,187 @@ router.post('/proposals/:id/reject', async (req, res) => {
   }
 });
 
-// POST /api/proposals/:id/convert - Convert proposal to client
-router.post('/proposals/:id/convert', async (req, res) => {
+// POST /api/proposals/:id/convert - Convert proposal to client (Ops Executive and above)
+router.post('/proposals/:id/convert', requireMinimumRole(USER_ROLES.OPS_EXECUTIVE), async (req: AuthenticatedRequest, res) => {
   try {
-    const { paymentAmount } = req.body;
-    
-    const updatedProposal = await storage.updateProposal(parseInt(req.params.id), {
-      proposalStatus: 'converted',
-      paymentReceived: paymentAmount ? 'partial' : 'full',
-      paymentPending: paymentAmount ? paymentAmount.toString() : '0'
-    });
+    const proposalId = parseInt(req.params.id);
+    const {
+      paymentAmount,
+      createServiceRequest = true,
+      notes,
+      convertedBy
+    } = req.body;
 
-    if (!updatedProposal) {
+    // Get the proposal
+    const proposal = await storage.getProposal(proposalId);
+    if (!proposal) {
       return res.status(404).json({ error: 'Proposal not found' });
     }
 
-    res.json({ 
-      message: 'Proposal converted successfully', 
-      proposal: updatedProposal 
+    // Check if already converted
+    if (proposal.proposalStatus === 'converted') {
+      return res.status(400).json({ error: 'Proposal has already been converted' });
+    }
+
+    // Get associated lead if exists
+    let lead = null;
+    if (proposal.leadId) {
+      lead = await storage.getLeadByLeadId(proposal.leadId);
+    }
+
+    // Generate unique client ID (C0001 format)
+    const existingEntities = await storage.getAllBusinessEntities();
+    const clientNumber = existingEntities.length + 1;
+    const clientId = `C${clientNumber.toString().padStart(4, '0')}`;
+
+    // Generate temporary password
+    const tempPassword = `DigiComply${Math.random().toString(36).slice(-8)}`;
+
+    // Use proposal data, falling back to lead data
+    const clientEmail = proposal.email || lead?.email || `${clientId.toLowerCase()}@pending.digicomply.in`;
+    const companyName = proposal.companyName || lead?.companyName || 'New Company';
+    const contactPerson = proposal.clientName || lead?.contactPerson || 'New Client';
+    const phone = proposal.phone || lead?.phone || null;
+
+    // Create user account
+    const userData = {
+      username: clientEmail,
+      password: tempPassword, // In production, this should be hashed
+      email: clientEmail,
+      phone: phone,
+      fullName: contactPerson,
+      role: 'client' as const,
+      isActive: true,
+      emailVerified: false
+    };
+
+    const newUser = await storage.createUser(userData);
+
+    // Create business entity
+    const entityData = {
+      clientId: clientId,
+      userId: newUser.id,
+      companyName: companyName,
+      entityType: lead?.businessType || 'private_limited',
+      incorporationDate: null,
+      gstin: lead?.gstin || null,
+      pan: null,
+      cin: null,
+      registeredAddress: lead?.city || null,
+      operatingAddress: null,
+      state: lead?.state || 'Delhi',
+      pincode: null,
+      industry: lead?.industry || null,
+      annualTurnover: proposal.proposedAmount?.toString() || lead?.estimatedBudget?.toString() || null,
+      employeeCount: null,
+      website: lead?.website || null,
+      contactPerson: contactPerson,
+      contactEmail: clientEmail,
+      contactPhone: phone,
+      complianceStatus: 'pending',
+      riskLevel: 'low',
+      onboardingStatus: 'pending',
+      assignedManager: null,
+      notes: notes || `Converted from proposal #${proposalId}`,
+      isActive: true,
+      lifecycleStage: 'onboarding'
+    };
+
+    const newEntity = await storage.createBusinessEntity(entityData);
+
+    // Update proposal status
+    const updatedProposal = await storage.updateProposal(proposalId, {
+      proposalStatus: 'converted',
+      paymentReceived: paymentAmount ? 'partial' : 'full',
+      paymentPending: paymentAmount ? paymentAmount.toString() : '0',
+      conversionDate: new Date(),
+      convertedClientId: clientId
+    });
+
+    // Update lead if exists
+    if (lead) {
+      await storage.updateLead(lead.id, {
+        leadStage: 'converted',
+        status: 'converted',
+        convertedAt: new Date(),
+        conversionNotes: `Converted via proposal #${proposalId} to client ${clientId}`
+      });
+    }
+
+    // Create service request if proposal has services
+    let serviceRequest = null;
+    if (createServiceRequest && proposal.selectedServices) {
+      // Parse selected services if stored as JSON string
+      let servicesArray = proposal.selectedServices;
+      if (typeof servicesArray === 'string') {
+        try {
+          servicesArray = JSON.parse(servicesArray);
+        } catch {
+          servicesArray = [];
+        }
+      }
+
+      // Create service request for first service (or primary service)
+      if (Array.isArray(servicesArray) && servicesArray.length > 0) {
+        const primaryServiceId = servicesArray[0]?.id || servicesArray[0];
+        if (primaryServiceId) {
+          serviceRequest = await storage.createServiceRequest({
+            serviceId: typeof primaryServiceId === 'number' ? primaryServiceId : parseInt(primaryServiceId),
+            businessEntityId: newEntity.id,
+            status: 'initiated',
+            priority: 'medium',
+            progress: 0,
+            currentMilestone: 'initiated',
+            totalAmount: proposal.proposedAmount?.toString() || null,
+            notes: `Auto-created from proposal #${proposalId} conversion`,
+            assignedTeamMember: null
+          });
+        }
+      }
+    }
+
+    // Log the conversion activity
+    try {
+      await storage.createActivityLog({
+        userId: req.user?.id || newUser.id,
+        action: 'proposal_converted',
+        entityType: 'proposal',
+        entityId: proposalId,
+        details: JSON.stringify({
+          proposalId: proposalId,
+          leadId: proposal.leadId || null,
+          clientId: clientId,
+          userId: newUser.id,
+          entityId: newEntity.id,
+          serviceRequestId: serviceRequest?.id || null
+        }),
+        ipAddress: req.ip || null
+      });
+    } catch (logError) {
+      console.warn('Failed to log conversion activity:', logError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Proposal converted to client successfully',
+      data: {
+        proposal: updatedProposal,
+        user: {
+          id: newUser.id,
+          username: newUser.username,
+          email: newUser.email,
+          temporaryPassword: tempPassword // Send once for admin to share with client
+        },
+        businessEntity: {
+          id: newEntity.id,
+          clientId: clientId,
+          companyName: newEntity.companyName
+        },
+        serviceRequest: serviceRequest ? {
+          id: serviceRequest.id,
+          status: serviceRequest.status
+        } : null
+      }
     });
   } catch (error) {
     console.error('Error converting proposal:', error);

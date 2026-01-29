@@ -1,6 +1,8 @@
 /**
  * Authentication Middleware
  * Handles JWT verification and user authentication
+ *
+ * PRODUCTION READY - All security checks enabled
  */
 
 import { Request, Response, NextFunction } from 'express';
@@ -19,21 +21,9 @@ declare global {
 
 /**
  * Authenticate JWT token middleware
- * DEV MODE: Authentication bypass enabled
+ * Verifies Bearer token and attaches user to request
  */
 export function authenticateToken(req: Request, res: Response, next: NextFunction): void {
-  // 🔓 DEV MODE: Bypass authentication
-  req.user = {
-    id: 'dev-user-123',
-    email: 'dev@test.com',
-    role: 'client',
-    type: 'access'
-  };
-  req.userId = 'dev-user-123';
-  next();
-  return;
-
-  /* ORIGINAL AUTH CODE - COMMENTED FOR DEV
   try {
     // Get token from header
     const authHeader = req.headers['authorization'];
@@ -69,7 +59,7 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
 
     // Attach user to request
     req.user = decoded;
-    req.userId = decoded.userId;
+    req.userId = decoded.id || decoded.userId;
 
     next();
   } catch (error) {
@@ -79,36 +69,73 @@ export function authenticateToken(req: Request, res: Response, next: NextFunctio
       error: 'Authentication failed',
     });
   }
-  */
 }
 
 /**
  * Optional authentication middleware
- * DEV MODE: Always attach dev user
+ * Attaches user if token present, but doesn't require it
  */
 export function optionalAuth(req: Request, res: Response, next: NextFunction): void {
-  // 🔓 DEV MODE: Always attach user
-  req.user = {
-    id: 'dev-user-123',
-    email: 'dev@test.com',
-    role: 'client',
-    type: 'access'
-  };
-  req.userId = 'dev-user-123';
-  next();
+  try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token) {
+      const decoded = verifyToken(token);
+      if (decoded && decoded.type === 'access') {
+        req.user = decoded;
+        req.userId = decoded.id || decoded.userId;
+      }
+    }
+
+    next();
+  } catch (error) {
+    // Optional auth - continue even if token invalid
+    next();
+  }
 }
 
 /**
  * Verify refresh token middleware
- * DEV MODE: Always allow refresh
+ * Used for token refresh operations
  */
 export function verifyRefreshToken(req: Request, res: Response, next: NextFunction): void {
-  // 🔓 DEV MODE: Bypass refresh token verification
-  req.user = {
-    id: 'dev-user-123',
-    email: 'dev@test.com',
-    role: 'client',
-    type: 'refresh'
-  };
-  next();
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      res.status(401).json({
+        success: false,
+        error: 'Refresh token required',
+      });
+      return;
+    }
+
+    const decoded = verifyToken(refreshToken);
+
+    if (!decoded) {
+      res.status(403).json({
+        success: false,
+        error: 'Invalid or expired refresh token',
+      });
+      return;
+    }
+
+    if (decoded.type !== 'refresh') {
+      res.status(403).json({
+        success: false,
+        error: 'Invalid token type - refresh token required',
+      });
+      return;
+    }
+
+    req.user = decoded;
+    next();
+  } catch (error) {
+    logger.error('Refresh token verification error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Token verification failed',
+    });
+  }
 }

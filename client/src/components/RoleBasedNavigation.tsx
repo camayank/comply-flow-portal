@@ -1,12 +1,12 @@
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { 
-  LayoutDashboard, 
-  Briefcase, 
-  Workflow, 
-  BarChart3, 
-  Users, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Briefcase,
+  Workflow,
+  BarChart3,
+  Users,
+  Settings,
   Shield,
   TrendingUp,
   DollarSign,
@@ -23,6 +23,9 @@ import {
   ShoppingCart,
   Calendar,
   Wallet,
+  ClipboardCheck,
+  Receipt,
+  BadgeCheck,
 } from 'lucide-react';
 import { getRoleNavigation, getRoleDisplayName } from '@/utils/roleBasedRouting';
 import { useCurrentUser } from './ProtectedRoute';
@@ -50,6 +53,9 @@ const iconMap: Record<string, React.ComponentType<any>> = {
   ShoppingCart,
   Calendar,
   Wallet,
+  ClipboardCheck,
+  Receipt,
+  BadgeCheck,
 };
 
 interface RoleBasedNavigationProps {
@@ -164,6 +170,10 @@ export function RoleBasedWelcome() {
       title: 'Admin Dashboard',
       description: 'Manage services, workflows, users, and view analytics',
     },
+    ops_manager: {
+      title: 'Operations Manager Dashboard',
+      description: 'Oversee all operations, team performance, and service delivery',
+    },
     ops_executive: {
       title: 'Operations Dashboard',
       description: 'Manage active services, tasks, and quality control',
@@ -179,6 +189,14 @@ export function RoleBasedWelcome() {
     customer_service: {
       title: 'Customer Service Dashboard',
       description: 'Support clients, manage tickets, and handle service requests',
+    },
+    qc_executive: {
+      title: 'Quality Control Dashboard',
+      description: 'Review deliverables, manage quality checks, and ensure compliance',
+    },
+    accountant: {
+      title: 'Financial Dashboard',
+      description: 'Track revenue, manage invoices, and generate financial reports',
     },
     agent: {
       title: 'Agent Portal',

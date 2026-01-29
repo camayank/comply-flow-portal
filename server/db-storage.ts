@@ -74,7 +74,12 @@ export class DbLeadsStorage {
     const [lead] = await db.select().from(leads).where(eq(leads.id, id)).limit(1);
     return lead;
   }
-  
+
+  async getLeadByLeadId(leadId: string): Promise<LeadEnhanced | undefined> {
+    const [lead] = await db.select().from(leads).where(eq(leads.leadId, leadId)).limit(1);
+    return lead;
+  }
+
   async createLead(lead: InsertLeadEnhanced): Promise<LeadEnhanced> {
     const leadId = `L${Date.now()}${Math.floor(Math.random() * 1000)}`;
     const [newLead] = await db.insert(leads).values({ ...lead, leadId }).returning();

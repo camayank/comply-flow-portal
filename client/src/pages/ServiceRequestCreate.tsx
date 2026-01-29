@@ -19,6 +19,9 @@ import {
   Upload,
   CreditCard,
   CheckCircle,
+  Loader2,
+  X,
+  AlertCircle,
 } from 'lucide-react';
 
 const STEPS = [
@@ -34,11 +37,14 @@ export default function ServiceRequestCreate() {
   const user = useCurrentUser();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedServices, setSelectedServices] = useState<any[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [formData, setFormData] = useState({
     businessEntityId: '',
     priority: 'normal',
     notes: '',
     documents: [] as File[],
+    documentType: 'general', // Default document type
   });
 
   // Load selected services from localStorage
@@ -60,22 +66,110 @@ export default function ServiceRequestCreate() {
     queryKey: ['/api/client/entities'],
   });
 
+  // Upload documents to a service request
+  const uploadDocuments = async (serviceRequestId: number, files: File[]): Promise<boolean> => {
+    if (files.length === 0) return true;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      const formDataObj = new FormData();
+
+      // Add all files to FormData
+      files.forEach((file) => {
+        formDataObj.append('files', file);
+      });
+
+      // Add document type
+      formDataObj.append('doctype', formData.documentType || 'general');
+
+      // Add notes if present
+      if (formData.notes) {
+        formDataObj.append('notes', formData.notes);
+      }
+
+      const response = await fetch(`/api/files/service-requests/${serviceRequestId}/documents`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formDataObj,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload documents');
+      }
+
+      const result = await response.json();
+      setUploadProgress(100);
+
+      if (result.failed > 0) {
+        toast({
+          title: 'Some uploads failed',
+          description: `${result.uploaded} file(s) uploaded, ${result.failed} failed`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Documents Uploaded',
+          description: `${result.uploaded} file(s) uploaded successfully`,
+        });
+      }
+
+      return result.success;
+    } catch (error: any) {
+      toast({
+        title: 'Upload Error',
+        description: error.message || 'Failed to upload documents',
+        variant: 'destructive',
+      });
+      return false;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   // Create service request mutation
   const createRequestMutation = useMutation({
     mutationFn: async (data: any) => {
       // Create service request
-      const response = await apiRequest('/api/service-requests', 'POST', data);
+      const response = await apiRequest('POST', '/api/service-requests', data);
       return response;
     },
-    onSuccess: (data) => {
-      toast({
-        title: 'Service Request Created!',
-        description: 'Your service request has been submitted successfully.',
-      });
+    onSuccess: async (data: any) => {
+      const serviceRequestId = data.id;
+
+      // If there are documents to upload, upload them
+      if (formData.documents.length > 0 && serviceRequestId) {
+        const uploadSuccess = await uploadDocuments(serviceRequestId, formData.documents);
+
+        if (!uploadSuccess) {
+          toast({
+            title: 'Request Created',
+            description: 'Service request created but some documents failed to upload. You can upload them later.',
+          });
+        } else {
+          toast({
+            title: 'Service Request Created!',
+            description: 'Your service request and documents have been submitted successfully.',
+          });
+        }
+      } else {
+        toast({
+          title: 'Service Request Created!',
+          description: 'Your service request has been submitted successfully.',
+        });
+      }
+
       // Clear stored services
       localStorage.removeItem('selectedServices');
-      // Redirect to client portal
-      setLocation(`/client-portal`);
+
+      // Redirect to payment if amount > 0, otherwise to portal
+      if (data.totalAmount && data.totalAmount > 0) {
+        setLocation(`/payment-gateway/${serviceRequestId}`);
+      } else {
+        setLocation(`/client-portal`);
+      }
     },
     onError: (error: any) => {
       toast({
@@ -147,15 +241,63 @@ export default function ServiceRequestCreate() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
-      setFormData((prev) => ({
-        ...prev,
-        documents: [...prev.documents, ...newFiles],
-      }));
-      toast({
-        title: 'Files Added',
-        description: `${newFiles.length} file(s) added`,
+
+      // Validate file types
+      const allowedTypes = [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/csv',
+      ];
+
+      const validFiles: File[] = [];
+      const invalidFiles: string[] = [];
+
+      newFiles.forEach((file) => {
+        if (allowedTypes.includes(file.type) || file.name.endsWith('.pdf') || file.name.endsWith('.doc') || file.name.endsWith('.docx')) {
+          // Check file size (max 10MB)
+          if (file.size <= 10 * 1024 * 1024) {
+            validFiles.push(file);
+          } else {
+            invalidFiles.push(`${file.name} (too large - max 10MB)`);
+          }
+        } else {
+          invalidFiles.push(`${file.name} (unsupported type)`);
+        }
       });
+
+      if (invalidFiles.length > 0) {
+        toast({
+          title: 'Some files rejected',
+          description: invalidFiles.join(', '),
+          variant: 'destructive',
+        });
+      }
+
+      if (validFiles.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          documents: [...prev.documents, ...validFiles],
+        }));
+        toast({
+          title: 'Files Added',
+          description: `${validFiles.length} file(s) added`,
+        });
+      }
+
+      // Reset input
+      e.target.value = '';
     }
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      documents: prev.documents.filter((_, i) => i !== index),
+    }));
   };
 
   return (
@@ -330,43 +472,108 @@ export default function ServiceRequestCreate() {
             <CardHeader>
               <CardTitle>Upload Documents</CardTitle>
               <CardDescription>
-                Upload required documents for your service request (optional at this stage)
+                Upload required documents for your service request. Supported formats: PDF, Images (JPG, PNG), Word, Excel (max 10MB each)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="border-2 border-dashed rounded-lg p-8 text-center">
+              {/* Document Type Selector */}
+              <div className="space-y-2">
+                <Label htmlFor="documentType">Document Category</Label>
+                <Select
+                  value={formData.documentType}
+                  onValueChange={(value) => setFormData((prev) => ({ ...prev, documentType: value }))}
+                >
+                  <SelectTrigger id="documentType" data-testid="select-document-type">
+                    <SelectValue placeholder="Select document type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General Documents</SelectItem>
+                    <SelectItem value="identity">Identity Documents (PAN, Aadhaar)</SelectItem>
+                    <SelectItem value="incorporation">Incorporation Documents</SelectItem>
+                    <SelectItem value="financial">Financial Documents</SelectItem>
+                    <SelectItem value="tax">Tax Documents</SelectItem>
+                    <SelectItem value="legal">Legal Documents</SelectItem>
+                    <SelectItem value="compliance">Compliance Documents</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* File Upload Area */}
+              <div
+                className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
+                onClick={() => document.getElementById('file-upload-input')?.click()}
+              >
                 <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="font-medium mb-2">Upload Documents</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Drag and drop files here, or click to browse
+                  Click to browse or drag and drop files here
                 </p>
                 <Input
+                  id="file-upload-input"
                   type="file"
                   multiple
                   onChange={handleFileSelect}
-                  className="max-w-xs mx-auto"
+                  className="hidden"
+                  accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.csv"
                   data-testid="input-file-upload"
                 />
+                <Button variant="outline" type="button" onClick={(e) => e.stopPropagation()}>
+                  Browse Files
+                </Button>
               </div>
 
+              {/* File List */}
               {formData.documents.length > 0 && (
                 <div className="space-y-2">
-                  <Label>Uploaded Files ({formData.documents.length})</Label>
-                  <div className="space-y-2">
+                  <Label>Selected Files ({formData.documents.length})</Label>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
                     {formData.documents.map((file, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-2 border rounded">
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{file.name}</span>
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="p-2 bg-primary/10 rounded">
+                            <FileText className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{file.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {file.size < 1024 * 1024
+                                ? `${(file.size / 1024).toFixed(1)} KB`
+                                : `${(file.size / (1024 * 1024)).toFixed(2)} MB`}
+                            </p>
+                          </div>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {(file.size / 1024).toFixed(1)} KB
-                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveFile(idx)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
+
+              {/* Upload Info */}
+              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                  <div className="text-sm text-blue-800 dark:text-blue-200">
+                    <p className="font-medium mb-1">Document Guidelines:</p>
+                    <ul className="list-disc list-inside space-y-1 text-xs">
+                      <li>Maximum file size: 10MB per file</li>
+                      <li>Up to 5 files can be uploaded at once</li>
+                      <li>Ensure documents are clear and readable</li>
+                      <li>You can also upload documents later from your dashboard</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}

@@ -7,9 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import ModernHeader, { HeaderPresets } from '@/components/ModernHeader';
-import { 
-  Shield, 
-  CheckCircle, 
+import {
+  Shield,
+  CheckCircle,
   AlertTriangle,
   Building2,
   FileText,
@@ -27,13 +27,90 @@ import {
   MessageSquare,
   Sparkles,
   Target,
-  Globe
+  Globe,
+  ChevronDown,
+  ChevronUp,
+  Lock,
+  Server,
+  Database,
+  BadgeCheck,
+  Quote,
+  Video,
+  HelpCircle
 } from 'lucide-react';
+
+// FAQ Data
+const faqData = [
+  {
+    question: "What is DigiComply and how does it help my startup?",
+    answer: "DigiComply is India's most comprehensive compliance automation platform. We help startups and SMEs automate MCA, GST, and ROC filings with AI-powered deadline tracking, automatic form generation, and direct submission to government portals. Our platform has saved businesses over ₹18.7 Cr in penalties."
+  },
+  {
+    question: "How does the penalty-free guarantee work?",
+    answer: "We provide a 100% penalty-free guarantee. If you miss any deadline due to our platform's failure (not user delay), we cover the penalty amount. Our AI system sends T-7, T-3, and T-1 day reminders via WhatsApp, email, and SMS to ensure you never miss a deadline."
+  },
+  {
+    question: "What compliance services does DigiComply cover?",
+    answer: "We cover 96+ compliance services including: Company Incorporation, GST Registration & Returns, Annual ROC Filings (AOC-4, MGT-7), Director KYC (DIR-3), Income Tax Returns, TDS/TCS, Startup India Registration, Trademark Filing, FSSAI, Import-Export Code, and more."
+  },
+  {
+    question: "Is my data secure on DigiComply?",
+    answer: "Absolutely. We are ISO 27001 certified with bank-grade 256-bit AES encryption, multi-factor authentication, and compliance with GDPR/Data Protection Act. Your data is stored in SOC 2 compliant AWS data centers in Mumbai with 99.9% SLA guarantee."
+  },
+  {
+    question: "Can I manage multiple companies on one dashboard?",
+    answer: "Yes! DigiComply supports multi-entity management. CAs, CFOs, and business owners can manage unlimited companies from a single dashboard with role-based access control, consolidated compliance calendar, and unified billing."
+  },
+  {
+    question: "How do I get started with DigiComply?",
+    answer: "Getting started takes under 5 minutes: 1) Sign up with your mobile number, 2) Complete your business profile, 3) Upload existing documents, 4) We auto-detect pending compliances, 5) Start automating! You can also book a free demo with our compliance experts."
+  },
+  {
+    question: "What support is available?",
+    answer: "We offer 24/7 support through multiple channels: Live chat with certified CAs, WhatsApp support (+91 81306 45164), Email support with 4-hour SLA, dedicated account manager for Growth plans, and a comprehensive knowledge base with video tutorials."
+  },
+  {
+    question: "What's the difference between Starter and Growth plans?",
+    answer: "Starter (₹7,499/yr) includes basic GST + ROC filings with WhatsApp support. Growth (₹24,999/yr) adds Startup India registration, Director KYC, 2 tax consultation sessions, priority support, and a dedicated CA. Enterprise plans with custom SLAs are also available."
+  }
+];
+
+// Case Studies Data
+const caseStudies = [
+  {
+    company: "TechSprint Ventures",
+    founder: "Rahul Sharma",
+    role: "Founder & CEO",
+    fundingStage: "Series A - ₹8Cr",
+    quote: "DigiComply saved us from ₹5L MCA penalty when our CA missed INC-20A deadline. Their auto-alert system is a lifesaver!",
+    metrics: { penaltySaved: "₹5,00,000", timeSaved: "40 hrs/month", services: "GST + ROC + Startup India" },
+    avatar: "RS"
+  },
+  {
+    company: "GreenLeaf Foods",
+    founder: "Priya Patel",
+    role: "Co-Founder",
+    fundingStage: "Pre-Series A",
+    quote: "Managing FSSAI, GST, and ROC compliance was a nightmare. DigiComply brought everything into one dashboard. We've been penalty-free for 2 years!",
+    metrics: { penaltySaved: "₹2,50,000", timeSaved: "25 hrs/month", services: "GST + FSSAI + Annual Compliance" },
+    avatar: "PP"
+  },
+  {
+    company: "FinTech Solutions",
+    founder: "Amit Verma",
+    role: "CFO",
+    fundingStage: "Series B - ₹25Cr",
+    quote: "As a fintech, we have strict compliance requirements. DigiComply's automated workflow ensures we never miss RBI reporting deadlines. Investors love the transparency.",
+    metrics: { penaltySaved: "₹8,00,000", timeSaved: "60 hrs/month", services: "GST + ITR + Director KYC" },
+    avatar: "AV"
+  }
+];
 
 const LandingPage = () => {
   const [penaltySaved, setPenaltySaved] = useState(2182910);
   const [companiesServed, setCompaniesServed] = useState(5247);
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
 
   // Animated counters
   useEffect(() => {
@@ -711,6 +788,307 @@ const LandingPage = () => {
                   </Button>
                 </CardContent>
               </Card>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Case Studies Section */}
+      <section id="case-studies" className="py-12 sm:py-16 bg-white">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-8 sm:mb-12">
+              <div className="inline-flex items-center gap-2 bg-orange-100 text-orange-800 px-4 py-2 rounded-full text-sm font-medium mb-4">
+                <Quote className="h-4 w-4" />
+                Success Stories
+              </div>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
+                Real Results from Real Businesses
+              </h2>
+              <p className="text-base sm:text-lg text-gray-600 px-4 max-w-3xl mx-auto">
+                See how startups across India are saving time, money, and stress with DigiComply
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+              {caseStudies.map((study, index) => (
+                <Card key={index} className="border-2 hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white to-blue-50">
+                  <CardHeader>
+                    <div className="flex items-start gap-4 mb-4">
+                      <div className="w-14 h-14 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                        {study.avatar}
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">{study.founder}</CardTitle>
+                        <CardDescription className="text-sm">{study.role}</CardDescription>
+                        <Badge className="mt-1 bg-green-100 text-green-800 text-xs">{study.fundingStage}</Badge>
+                      </div>
+                    </div>
+                    <p className="font-semibold text-blue-900">{study.company}</p>
+                  </CardHeader>
+                  <CardContent>
+                    <blockquote className="text-gray-700 italic mb-4 text-sm leading-relaxed">
+                      "{study.quote}"
+                    </blockquote>
+                    <div className="border-t pt-4 space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Penalty Saved:</span>
+                        <span className="font-semibold text-green-600">{study.metrics.penaltySaved}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Time Saved:</span>
+                        <span className="font-semibold text-blue-600">{study.metrics.timeSaved}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Services:</span>
+                        <span className="font-medium text-gray-700 text-right">{study.metrics.services}</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-center mt-4">
+                      {[1,2,3,4,5].map((star) => (
+                        <Star key={star} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="text-center">
+              <Link to="/case-studies">
+                <Button variant="outline" size="lg" className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white">
+                  View All Success Stories
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Security & Trust Section */}
+      <section id="security" className="py-12 sm:py-16 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-8 sm:mb-12">
+              <div className="inline-flex items-center gap-2 bg-green-500/20 text-green-400 px-4 py-2 rounded-full text-sm font-medium mb-4">
+                <Lock className="h-4 w-4" />
+                Enterprise-Grade Security
+              </div>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4">
+                Your Data is Safe with Us
+              </h2>
+              <p className="text-base sm:text-lg text-blue-200 px-4 max-w-3xl mx-auto">
+                Bank-grade security infrastructure trusted by 5,200+ businesses including funded startups and enterprise clients
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-colors">
+                <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center mb-4">
+                  <Shield className="h-6 w-6 text-green-400" />
+                </div>
+                <h3 className="font-semibold mb-2">ISO 27001 Certified</h3>
+                <p className="text-sm text-blue-200">International standard for information security management systems</p>
+              </div>
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-colors">
+                <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mb-4">
+                  <Server className="h-6 w-6 text-blue-400" />
+                </div>
+                <h3 className="font-semibold mb-2">SOC 2 Type II</h3>
+                <p className="text-sm text-blue-200">Data hosted on AWS Mumbai with 99.9% uptime SLA guarantee</p>
+              </div>
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-colors">
+                <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center mb-4">
+                  <Lock className="h-6 w-6 text-purple-400" />
+                </div>
+                <h3 className="font-semibold mb-2">256-bit AES Encryption</h3>
+                <p className="text-sm text-blue-200">Bank-grade encryption for all data at rest and in transit</p>
+              </div>
+              <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-colors">
+                <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center mb-4">
+                  <Database className="h-6 w-6 text-orange-400" />
+                </div>
+                <h3 className="font-semibold mb-2">GDPR Compliant</h3>
+                <p className="text-sm text-blue-200">Full compliance with Data Protection Act and international standards</p>
+              </div>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-sm rounded-xl p-6 sm:p-8 border border-white/10">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div>
+                  <h3 className="text-xl font-semibold mb-4">Additional Security Measures</h3>
+                  <ul className="space-y-3">
+                    <li className="flex items-center gap-3">
+                      <BadgeCheck className="h-5 w-5 text-green-400 flex-shrink-0" />
+                      <span className="text-sm text-blue-100">Multi-factor authentication (MFA) for all accounts</span>
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <BadgeCheck className="h-5 w-5 text-green-400 flex-shrink-0" />
+                      <span className="text-sm text-blue-100">Role-based access control (RBAC) with audit logs</span>
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <BadgeCheck className="h-5 w-5 text-green-400 flex-shrink-0" />
+                      <span className="text-sm text-blue-100">Regular penetration testing and security audits</span>
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <BadgeCheck className="h-5 w-5 text-green-400 flex-shrink-0" />
+                      <span className="text-sm text-blue-100">Automated daily backups with 30-day retention</span>
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <BadgeCheck className="h-5 w-5 text-green-400 flex-shrink-0" />
+                      <span className="text-sm text-blue-100">24/7 security monitoring and incident response</span>
+                    </li>
+                  </ul>
+                </div>
+                <div className="text-center lg:text-right">
+                  <div className="inline-flex flex-wrap justify-center lg:justify-end gap-4">
+                    <div className="bg-white/10 rounded-lg p-4">
+                      <img src="https://via.placeholder.com/80x40?text=ISO+27001" alt="ISO 27001" className="h-10 object-contain opacity-80" />
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-4">
+                      <img src="https://via.placeholder.com/80x40?text=SOC+2" alt="SOC 2" className="h-10 object-contain opacity-80" />
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-4">
+                      <img src="https://via.placeholder.com/80x40?text=GDPR" alt="GDPR" className="h-10 object-contain opacity-80" />
+                    </div>
+                    <div className="bg-white/10 rounded-lg p-4">
+                      <img src="https://via.placeholder.com/80x40?text=GSTN" alt="GSTN Certified" className="h-10 object-contain opacity-80" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Video Demo Section */}
+      <section id="video-demo" className="py-12 sm:py-16 bg-gradient-to-br from-gray-50 to-blue-50">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center gap-2 bg-red-100 text-red-800 px-4 py-2 rounded-full text-sm font-medium mb-4">
+                <Video className="h-4 w-4" />
+                Platform Walkthrough
+              </div>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3">
+                See DigiComply in Action
+              </h2>
+              <p className="text-base sm:text-lg text-gray-600">
+                Watch how easy it is to automate your compliance in under 5 minutes
+              </p>
+            </div>
+
+            <Card className="overflow-hidden shadow-2xl border-0">
+              <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 relative group cursor-pointer">
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/30 to-purple-600/30 group-hover:opacity-80 transition-opacity"></div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <Button
+                    size="lg"
+                    className="bg-red-600 hover:bg-red-700 shadow-2xl hover:scale-110 transition-all duration-300 mb-4"
+                    data-testid="button-play-demo-video"
+                  >
+                    <Play className="h-8 w-8 mr-2" />
+                    Play Demo Video
+                  </Button>
+                  <span className="text-white/80 text-sm">Duration: 4 min 32 sec</span>
+                </div>
+                <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center text-white/60 text-sm">
+                  <span>Complete Platform Overview</span>
+                  <span>1080p HD</span>
+                </div>
+              </div>
+              <CardContent className="p-6 bg-white">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">Dashboard Overview</h4>
+                    <p className="text-sm text-gray-600">See your compliance health at a glance</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">Auto-Filing Demo</h4>
+                    <p className="text-sm text-gray-600">Watch GST return get filed automatically</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">Alert System</h4>
+                    <p className="text-sm text-gray-600">Never miss a deadline with smart alerts</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section id="faq" className="py-12 sm:py-16 bg-white">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-8 sm:mb-12">
+              <div className="inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-medium mb-4">
+                <HelpCircle className="h-4 w-4" />
+                Frequently Asked Questions
+              </div>
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3">
+                Got Questions? We Have Answers
+              </h2>
+              <p className="text-base sm:text-lg text-gray-600">
+                Everything you need to know about DigiComply and compliance automation
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {faqData.map((faq, index) => (
+                <Card
+                  key={index}
+                  className={`border-2 transition-all duration-300 cursor-pointer ${
+                    expandedFaq === index ? 'border-blue-500 shadow-lg' : 'border-gray-200 hover:border-blue-300'
+                  }`}
+                  onClick={() => setExpandedFaq(expandedFaq === index ? null : index)}
+                >
+                  <CardHeader className="pb-0">
+                    <div className="flex items-start justify-between gap-4">
+                      <CardTitle className="text-base sm:text-lg font-semibold text-gray-900 flex-1">
+                        {faq.question}
+                      </CardTitle>
+                      <div className={`p-2 rounded-full transition-colors ${expandedFaq === index ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                        {expandedFaq === index ? (
+                          <ChevronUp className="h-5 w-5 text-blue-600" />
+                        ) : (
+                          <ChevronDown className="h-5 w-5 text-gray-500" />
+                        )}
+                      </div>
+                    </div>
+                  </CardHeader>
+                  {expandedFaq === index && (
+                    <CardContent className="pt-4">
+                      <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
+                    </CardContent>
+                  )}
+                </Card>
+              ))}
+            </div>
+
+            <div className="mt-8 text-center">
+              <p className="text-gray-600 mb-4">Still have questions?</p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button
+                  variant="outline"
+                  className="border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white"
+                  data-testid="button-chat-support"
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Chat with Support
+                </Button>
+                <Button
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => window.open('https://wa.me/918130645164?text=Hi! I have a question about DigiComply.', '_blank')}
+                  data-testid="button-whatsapp-support"
+                >
+                  <Phone className="h-4 w-4 mr-2" />
+                  WhatsApp: +91 81306 45164
+                </Button>
+              </div>
             </div>
           </div>
         </div>

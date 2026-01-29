@@ -1,6 +1,8 @@
 /**
  * Agent Portal Routes
  *
+ * PRODUCTION READY - All routes protected with authentication and authorization
+ *
  * Complete API for agent/partner management:
  * - Agent stats and profile
  * - Lead management (CRUD)
@@ -13,7 +15,11 @@ import type { Express, Request, Response } from "express";
 import { db } from './db';
 import { leads, commissionRecords, users } from '@shared/schema';
 import { eq, and, desc, sql, gte, lte } from 'drizzle-orm';
-import { sessionAuthMiddleware, type AuthenticatedRequest } from './rbac-middleware';
+import { sessionAuthMiddleware, requireMinimumRole, requireRole, USER_ROLES, type AuthenticatedRequest } from './rbac-middleware';
+
+// Middleware combination for agent routes - requires authentication + agent role or higher
+const agentAuth = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.AGENT)] as const;
+const adminAuth = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ADMIN)] as const;
 
 export function registerAgentRoutes(app: Express) {
 
@@ -22,10 +28,15 @@ export function registerAgentRoutes(app: Express) {
   /**
    * GET /api/agent/stats
    * Get agent dashboard statistics
+   * Requires: Agent role or higher
    */
-  app.get('/api/agent/stats', async (req: Request, res: Response) => {
+  app.get('/api/agent/stats', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const agentId = (req as any).user?.id || 'dev-agent-123';
+      const agentId = req.user?.id;
+
+      if (!agentId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
 
       // Get lead statistics
       const allLeads = await db.select()
@@ -102,16 +113,24 @@ export function registerAgentRoutes(app: Express) {
   /**
    * GET /api/agent/leads
    * Get all leads for the agent
+   * Requires: Agent role or higher
    */
-  app.get('/api/agent/leads', async (req: Request, res: Response) => {
+  app.get('/api/agent/leads', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const agentId = (req as any).user?.id || 'dev-agent-123';
+      const agentId = req.user?.id;
+      const userRole = req.user?.role;
       const { stage, limit = 50, offset = 0 } = req.query;
+
+      if (!agentId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
 
       let query = db.select().from(leads);
 
-      // In production, filter by agentId
-      // query = query.where(eq(leads.agentId, agentId));
+      // Filter by agentId for agents, admins see all
+      if (userRole === 'agent') {
+        query = query.where(eq(leads.agentId, String(agentId))) as any;
+      }
 
       if (stage && stage !== 'all') {
         query = query.where(eq(leads.stage, stage as string)) as any;
@@ -136,14 +155,25 @@ export function registerAgentRoutes(app: Express) {
   /**
    * GET /api/agent/leads/recent
    * Get recent leads for dashboard
+   * Requires: Agent role or higher
    */
-  app.get('/api/agent/leads/recent', async (req: Request, res: Response) => {
+  app.get('/api/agent/leads/recent', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const agentId = (req as any).user?.id || 'dev-agent-123';
+      const agentId = req.user?.id;
+      const userRole = req.user?.role;
 
-      const recentLeads = await db.select()
-        .from(leads)
-        // .where(eq(leads.agentId, agentId))
+      if (!agentId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+
+      let query = db.select().from(leads);
+
+      // Filter by agentId for agents
+      if (userRole === 'agent') {
+        query = query.where(eq(leads.agentId, String(agentId))) as any;
+      }
+
+      const recentLeads = await query
         .orderBy(desc(leads.createdAt))
         .limit(5);
 
@@ -169,10 +199,16 @@ export function registerAgentRoutes(app: Express) {
   /**
    * POST /api/agent/leads
    * Create a new lead
+   * Requires: Agent role or higher
    */
-  app.post('/api/agent/leads', async (req: Request, res: Response) => {
+  app.post('/api/agent/leads', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const agentId = (req as any).user?.id || 'dev-agent-123';
+      const agentId = req.user?.id;
+
+      if (!agentId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+
       const {
         companyName,
         contactName,
@@ -199,7 +235,7 @@ export function registerAgentRoutes(app: Express) {
           notes,
           source,
           stage: 'new',
-          agentId,
+          agentId: String(agentId),
         })
         .returning();
 
@@ -216,11 +252,22 @@ export function registerAgentRoutes(app: Express) {
   /**
    * PATCH /api/agent/leads/:id
    * Update lead stage or details
+   * Requires: Agent role or higher + ownership check
    */
-  app.patch('/api/agent/leads/:id', async (req: Request, res: Response) => {
+  app.patch('/api/agent/leads/:id', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { id } = req.params;
+      const agentId = req.user?.id;
+      const userRole = req.user?.role;
       const updates = req.body;
+
+      // First verify ownership (unless admin)
+      if (userRole === 'agent') {
+        const [existingLead] = await db.select().from(leads).where(eq(leads.id, parseInt(id)));
+        if (!existingLead || existingLead.agentId !== String(agentId)) {
+          return res.status(403).json({ error: 'You can only update your own leads' });
+        }
+      }
 
       const [updatedLead] = await db.update(leads)
         .set({
@@ -247,8 +294,9 @@ export function registerAgentRoutes(app: Express) {
   /**
    * DELETE /api/agent/leads/:id
    * Delete a lead
+   * Requires: Admin role (agents cannot delete leads)
    */
-  app.delete('/api/agent/leads/:id', async (req: Request, res: Response) => {
+  app.delete('/api/agent/leads/:id', ...adminAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { id } = req.params;
 
@@ -267,16 +315,24 @@ export function registerAgentRoutes(app: Express) {
   /**
    * GET /api/agent/commissions
    * Get all commissions for the agent
+   * Requires: Agent role or higher
    */
-  app.get('/api/agent/commissions', async (req: Request, res: Response) => {
+  app.get('/api/agent/commissions', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const agentId = (req as any).user?.id || 1;
+      const agentId = req.user?.id;
+      const userRole = req.user?.role;
       const { status, limit = 50 } = req.query;
+
+      if (!agentId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
 
       let query = db.select().from(commissionRecords);
 
-      // In production: filter by agentId
-      // query = query.where(eq(commissionRecords.agentId, parseInt(agentId)));
+      // Filter by agentId for agents, admins see all
+      if (userRole === 'agent') {
+        query = query.where(eq(commissionRecords.agentId, parseInt(String(agentId)) || 0)) as any;
+      }
 
       if (status && status !== 'all') {
         query = query.where(eq(commissionRecords.status, status as string)) as any;
@@ -299,14 +355,25 @@ export function registerAgentRoutes(app: Express) {
   /**
    * GET /api/agent/commissions/summary
    * Get commission summary for dashboard
+   * Requires: Agent role or higher
    */
-  app.get('/api/agent/commissions/summary', async (req: Request, res: Response) => {
+  app.get('/api/agent/commissions/summary', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const agentId = (req as any).user?.id || 1;
+      const agentId = req.user?.id;
+      const userRole = req.user?.role;
 
-      const commissions = await db.select()
-        .from(commissionRecords);
-        // .where(eq(commissionRecords.agentId, parseInt(agentId)));
+      if (!agentId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+
+      let query = db.select().from(commissionRecords);
+
+      // Filter by agentId for agents
+      if (userRole === 'agent') {
+        query = query.where(eq(commissionRecords.agentId, parseInt(String(agentId)) || 0)) as any;
+      }
+
+      const commissions = await query;
 
       const now = new Date();
       const thisMonth = commissions.filter(c => {
@@ -356,14 +423,29 @@ export function registerAgentRoutes(app: Express) {
   /**
    * GET /api/agent/performance
    * Get detailed performance analytics
+   * Requires: Agent role or higher
    */
-  app.get('/api/agent/performance', async (req: Request, res: Response) => {
+  app.get('/api/agent/performance', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const agentId = (req as any).user?.id || 'dev-agent-123';
+      const agentId = req.user?.id;
+      const userRole = req.user?.role;
       const { period = '6months' } = req.query;
 
-      const allLeads = await db.select().from(leads);
-      const commissions = await db.select().from(commissionRecords);
+      if (!agentId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+
+      // Filter data by agent if not admin
+      let leadsQuery = db.select().from(leads);
+      let commissionsQuery = db.select().from(commissionRecords);
+
+      if (userRole === 'agent') {
+        leadsQuery = leadsQuery.where(eq(leads.agentId, String(agentId))) as any;
+        commissionsQuery = commissionsQuery.where(eq(commissionRecords.agentId, parseInt(String(agentId)) || 0)) as any;
+      }
+
+      const allLeads = await leadsQuery;
+      const commissions = await commissionsQuery;
 
       // Calculate monthly data for the last 6 months
       const monthlyData = [];
@@ -442,8 +524,9 @@ export function registerAgentRoutes(app: Express) {
   /**
    * GET /api/agent/leaderboard
    * Get agent leaderboard rankings
+   * Requires: Agent role or higher
    */
-  app.get('/api/agent/leaderboard', async (req: Request, res: Response) => {
+  app.get('/api/agent/leaderboard', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { period = 'this_month' } = req.query;
 
@@ -473,8 +556,9 @@ export function registerAgentRoutes(app: Express) {
   /**
    * GET /api/agent/announcements
    * Get announcements for agents
+   * Requires: Agent role or higher
    */
-  app.get('/api/agent/announcements', async (req: Request, res: Response) => {
+  app.get('/api/agent/announcements', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       // In production, this would query from an announcements table
       const announcements = [
@@ -520,47 +604,47 @@ export function registerAgentRoutes(app: Express) {
   });
 
   // ============ V1 API COMPATIBILITY ============
+  // V1 routes also protected - they redirect to main routes which have auth
 
-  // Register duplicate routes at /api/v1 for backward compatibility
-  app.get('/api/v1/agent/stats', async (req, res) => {
+  app.get('/api/v1/agent/stats', ...agentAuth, async (req: AuthenticatedRequest, res) => {
     req.url = '/api/agent/stats';
     app._router.handle(req, res, () => {});
   });
 
-  app.get('/api/v1/agent/leads', async (req, res) => {
+  app.get('/api/v1/agent/leads', ...agentAuth, async (req: AuthenticatedRequest, res) => {
     req.url = '/api/agent/leads';
     app._router.handle(req, res, () => {});
   });
 
-  app.get('/api/v1/agent/leads/recent', async (req, res) => {
+  app.get('/api/v1/agent/leads/recent', ...agentAuth, async (req: AuthenticatedRequest, res) => {
     req.url = '/api/agent/leads/recent';
     app._router.handle(req, res, () => {});
   });
 
-  app.get('/api/v1/agent/commissions', async (req, res) => {
+  app.get('/api/v1/agent/commissions', ...agentAuth, async (req: AuthenticatedRequest, res) => {
     req.url = '/api/agent/commissions';
     app._router.handle(req, res, () => {});
   });
 
-  app.get('/api/v1/agent/commissions/summary', async (req, res) => {
+  app.get('/api/v1/agent/commissions/summary', ...agentAuth, async (req: AuthenticatedRequest, res) => {
     req.url = '/api/agent/commissions/summary';
     app._router.handle(req, res, () => {});
   });
 
-  app.get('/api/v1/agent/performance', async (req, res) => {
+  app.get('/api/v1/agent/performance', ...agentAuth, async (req: AuthenticatedRequest, res) => {
     req.url = '/api/agent/performance';
     app._router.handle(req, res, () => {});
   });
 
-  app.get('/api/v1/agent/leaderboard', async (req, res) => {
+  app.get('/api/v1/agent/leaderboard', ...agentAuth, async (req: AuthenticatedRequest, res) => {
     req.url = '/api/agent/leaderboard';
     app._router.handle(req, res, () => {});
   });
 
-  app.get('/api/v1/agent/announcements', async (req, res) => {
+  app.get('/api/v1/agent/announcements', ...agentAuth, async (req: AuthenticatedRequest, res) => {
     req.url = '/api/agent/announcements';
     app._router.handle(req, res, () => {});
   });
 
-  console.log('✅ Agent Portal routes registered');
+  console.log('✅ Agent Portal routes registered (PROTECTED)');
 }

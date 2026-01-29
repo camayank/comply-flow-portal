@@ -68,6 +68,11 @@ export function createBackwardCompatibilityMiddleware(targetVersion: ApiVersion 
       return next();
     }
 
+    // Skip file management routes (already properly prefixed)
+    if (path.startsWith('/api/files/')) {
+      return next();
+    }
+
     // Only handle /api/* routes (not versioned yet)
     if (path.startsWith('/api/')) {
       // Add deprecation warning header

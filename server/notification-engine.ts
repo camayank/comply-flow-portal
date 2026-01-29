@@ -1,5 +1,5 @@
 import { db } from './db';
-import { 
+import {
   serviceRequests,
   businessEntities,
   users
@@ -7,6 +7,24 @@ import {
 import { eq, and, sql } from 'drizzle-orm';
 import cron from 'node-cron';
 import { EventEmitter } from 'events';
+import { sendWhatsApp, verifyWhatsAppConfig } from './services/whatsappService';
+import nodemailer from 'nodemailer';
+
+// Email transporter configuration
+const emailTransporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_SECURE === 'true',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  }
+});
+
+// SMS provider configuration (Twilio)
+const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
+  ? new (require('twilio'))(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+  : null;
 
 // Enterprise Notification Engine for Universal Service Provider Platform
 export class NotificationEngine {
@@ -401,21 +419,81 @@ export class NotificationEngine {
   }
 
   private async sendEmail(to: string, subject: string, body: string) {
-    // Demo implementation - replace with actual email service
-    console.log(`📧 [EMAIL] → ${to} | ${subject} | ${body.slice(0, 120)}...`);
-    return { success: true, providerId: 'demo-email-123' };
+    try {
+      // Check if email is enabled
+      if (process.env.NOTIFICATION_EMAIL_ENABLED !== 'true') {
+        console.log(`📧 [EMAIL-DISABLED] → ${to} | ${subject}`);
+        return { success: true, providerId: 'disabled', message: 'Email notifications disabled' };
+      }
+
+      // Send real email via nodemailer
+      const info = await emailTransporter.sendMail({
+        from: process.env.SMTP_FROM || '"DigiComply" <noreply@digicomply.in>',
+        to,
+        subject,
+        html: body.replace(/\n/g, '<br>')
+      });
+
+      console.log(`📧 [EMAIL-SENT] → ${to} | ${subject} | MessageId: ${info.messageId}`);
+      return { success: true, providerId: info.messageId };
+    } catch (error: any) {
+      console.error(`📧 [EMAIL-ERROR] → ${to} | ${error.message}`);
+      return { success: false, error: error.message };
+    }
   }
 
   private async sendWhatsApp(to: string, body: string) {
-    // Demo implementation - replace with WhatsApp Business API
-    console.log(`📱 [WHATSAPP] → ${to} | ${body}`);
-    return { success: true, providerId: 'demo-wa-123' };
+    try {
+      // Check if WhatsApp is enabled
+      if (process.env.NOTIFICATION_WHATSAPP_ENABLED !== 'true') {
+        console.log(`📱 [WHATSAPP-DISABLED] → ${to}`);
+        return { success: true, providerId: 'disabled', message: 'WhatsApp notifications disabled' };
+      }
+
+      // Use the WhatsApp service
+      const success = await sendWhatsApp({
+        to: to.startsWith('+') ? to : `+91${to}`,
+        message: body
+      });
+
+      if (success) {
+        console.log(`📱 [WHATSAPP-SENT] → ${to}`);
+        return { success: true, providerId: `wa-${Date.now()}` };
+      } else {
+        return { success: false, error: 'WhatsApp send failed' };
+      }
+    } catch (error: any) {
+      console.error(`📱 [WHATSAPP-ERROR] → ${to} | ${error.message}`);
+      return { success: false, error: error.message };
+    }
   }
 
   private async sendSMS(to: string, body: string) {
-    // Demo implementation - replace with SMS service
-    console.log(`💬 [SMS] → ${to} | ${body}`);
-    return { success: true, providerId: 'demo-sms-123' };
+    try {
+      // Check if SMS is enabled
+      if (process.env.NOTIFICATION_SMS_ENABLED !== 'true') {
+        console.log(`💬 [SMS-DISABLED] → ${to}`);
+        return { success: true, providerId: 'disabled', message: 'SMS notifications disabled' };
+      }
+
+      // Send real SMS via Twilio
+      if (!twilioClient) {
+        console.log(`💬 [SMS-NO-PROVIDER] → ${to}`);
+        return { success: false, error: 'SMS provider not configured' };
+      }
+
+      const message = await twilioClient.messages.create({
+        body: body.slice(0, 160), // SMS character limit
+        from: process.env.TWILIO_SMS_NUMBER,
+        to: to.startsWith('+') ? to : `+91${to}`
+      });
+
+      console.log(`💬 [SMS-SENT] → ${to} | SID: ${message.sid}`);
+      return { success: true, providerId: message.sid };
+    } catch (error: any) {
+      console.error(`💬 [SMS-ERROR] → ${to} | ${error.message}`);
+      return { success: false, error: error.message };
+    }
   }
 
   // Public methods for triggering events

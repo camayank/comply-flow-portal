@@ -4710,6 +4710,521 @@ export const stateCalculationLog = pgTable('state_calculation_log', {
 });
 
 // ============================================================================
+// UNIFIED STATUS MANAGEMENT SYSTEM
+// Configurable workflow statuses per service with admin management
+// ============================================================================
+
+// Master table defining all possible statuses per service
+export const serviceWorkflowStatuses = pgTable("service_workflow_statuses", {
+  id: serial("id").primaryKey(),
+  serviceKey: text("service_key").notNull(), // Links to services_catalog.service_key
+  statusCode: text("status_code").notNull(), // e.g., 'initiated', 'docs_pending', 'govt_submission'
+  statusName: text("status_name").notNull(), // Human-readable name: "Document Collection"
+  statusDescription: text("status_description"), // Detailed description of this status
+
+  // Status category and type
+  statusCategory: text("status_category").notNull().default("process"), // process, milestone, terminal
+  isTerminal: boolean("is_terminal").default(false), // true for final statuses (completed, cancelled)
+
+  // Ordering and display
+  displayOrder: integer("display_order").notNull().default(0), // Workflow sequence order
+  color: text("color").default("#6b7280"), // UI display color (hex)
+  icon: text("icon"), // Optional icon name
+
+  // Workflow behavior
+  autoProgress: boolean("auto_progress").default(false), // Auto-move to next status
+  autoProgressDelayHours: integer("auto_progress_delay_hours"), // Hours before auto-progress
+  requiresApproval: boolean("requires_approval").default(false), // Needs manager approval
+  requiresDocument: boolean("requires_document").default(false), // Needs document upload
+
+  // SLA and triggers
+  slaHours: integer("sla_hours"), // SLA time for this status
+  triggerTasks: boolean("trigger_tasks").default(true), // Auto-create tasks on entering this status
+  triggerNotification: boolean("trigger_notification").default(true), // Send notifications
+
+  // Assignee rules
+  defaultAssigneeRole: text("default_assignee_role"), // ops_executive, qc_reviewer, admin
+  escalateToRole: text("escalate_to_role"), // Role to escalate if SLA breached
+
+  // Client visibility
+  clientVisible: boolean("client_visible").default(true), // Show to client
+  clientStatusLabel: text("client_status_label"), // Client-friendly status name
+  clientMessage: text("client_message"), // Message to show client at this status
+
+  // Metadata
+  isActive: boolean("is_active").default(true),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Defines valid transitions between statuses
+export const statusTransitionRules = pgTable("status_transition_rules", {
+  id: serial("id").primaryKey(),
+  serviceKey: text("service_key").notNull(),
+  fromStatusCode: text("from_status_code").notNull(), // Current status
+  toStatusCode: text("to_status_code").notNull(), // Target status
+
+  // Transition conditions
+  transitionName: text("transition_name").notNull(), // e.g., "Submit for QC", "Approve"
+  transitionDescription: text("transition_description"),
+
+  // Permissions
+  allowedRoles: json("allowed_roles").$type<string[]>(), // Roles that can trigger this transition
+  requiresApproval: boolean("requires_approval").default(false),
+  approverRoles: json("approver_roles").$type<string[]>(), // Roles that can approve
+
+  // Conditions and validations
+  conditionsJson: json("conditions_json"), // Custom conditions {field: "documents.count", operator: ">=", value: 1}
+  validationMessage: text("validation_message"), // Error message if conditions not met
+
+  // Actions on transition
+  onTransitionTasks: json("on_transition_tasks"), // Tasks to create
+  onTransitionNotifications: json("on_transition_notifications"), // Notifications to send
+  onTransitionWebhook: text("on_transition_webhook"), // Webhook URL to call
+
+  // UI settings
+  buttonLabel: text("button_label"), // Label for transition button
+  buttonColor: text("button_color").default("primary"), // primary, success, warning, danger
+  confirmationRequired: boolean("confirmation_required").default(false),
+  confirmationMessage: text("confirmation_message"),
+
+  // Ordering
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Complete history of all status transitions (transparency/audit)
+export const statusTransitionHistory = pgTable("status_transition_history", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  serviceKey: text("service_key").notNull(),
+  businessEntityId: integer("business_entity_id"),
+
+  // Transition details
+  fromStatusCode: text("from_status_code"), // null for initial status
+  toStatusCode: text("to_status_code").notNull(),
+  fromStatusName: text("from_status_name"),
+  toStatusName: text("to_status_name").notNull(),
+
+  // Who and when
+  changedBy: integer("changed_by").notNull(), // User ID who made the change
+  changedByName: text("changed_by_name"), // Denormalized for easy display
+  changedByRole: text("changed_by_role"),
+  changedAt: timestamp("changed_at").defaultNow(),
+
+  // Context
+  transitionReason: text("transition_reason"), // Why this transition was made
+  notes: text("notes"), // Additional notes
+
+  // Auto-generated info
+  durationInPreviousStatus: integer("duration_in_previous_status"), // Minutes in previous status
+  isAutomatic: boolean("is_automatic").default(false), // True if system-triggered
+  triggerSource: text("trigger_source"), // 'manual', 'auto', 'api', 'webhook', 'scheduler'
+
+  // Approval tracking
+  wasApprovalRequired: boolean("was_approval_required").default(false),
+  approvedBy: integer("approved_by"),
+  approvedAt: timestamp("approved_at"),
+
+  // Associated actions
+  tasksCreated: json("tasks_created").$type<number[]>(), // Task IDs created by this transition
+  notificationsSent: json("notifications_sent").$type<number[]>(), // Notification IDs sent
+
+  // Snapshot of request state at transition time
+  requestSnapshot: json("request_snapshot"), // Important fields at time of transition
+
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Workflow step definitions (process drill-down)
+export const serviceWorkflowSteps = pgTable("service_workflow_steps", {
+  id: serial("id").primaryKey(),
+  serviceKey: text("service_key").notNull(),
+  statusCode: text("status_code").notNull(), // Links to serviceWorkflowStatuses
+
+  // Step details
+  stepOrder: integer("step_order").notNull().default(0),
+  stepName: text("step_name").notNull(),
+  stepDescription: text("step_description"),
+
+  // Step type and category
+  stepType: text("step_type").notNull().default("task"), // task, document, verification, approval, government, delivery
+
+  // Assignee
+  assigneeRole: text("assignee_role"), // Role responsible for this step
+  assigneeUserId: integer("assignee_user_id"), // Specific user (optional)
+
+  // Requirements
+  requiredDocuments: json("required_documents").$type<string[]>(), // Document types needed
+  requiredFields: json("required_fields").$type<string[]>(), // Form fields required
+  checklistItems: json("checklist_items").$type<{item: string, mandatory: boolean}[]>(),
+
+  // Time estimates
+  estimatedMinutes: integer("estimated_minutes"),
+  slaMinutes: integer("sla_minutes"),
+
+  // Dependencies
+  dependsOnSteps: json("depends_on_steps").$type<number[]>(), // Step IDs that must complete first
+  blocksSteps: json("blocks_steps").$type<number[]>(), // Step IDs blocked by this
+
+  // Instructions
+  internalInstructions: text("internal_instructions"), // For ops team
+  clientInstructions: text("client_instructions"), // For client
+
+  // Automation
+  canAutoComplete: boolean("can_auto_complete").default(false),
+  autoCompleteTrigger: text("auto_complete_trigger"), // Condition that auto-completes
+
+  // Status
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Service request step tracking (runtime instance of workflow steps)
+export const serviceRequestSteps = pgTable("service_request_steps", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  workflowStepId: integer("workflow_step_id").notNull(),
+
+  // Step instance status
+  status: text("status").notNull().default("pending"), // pending, in_progress, completed, skipped, blocked
+
+  // Assignee
+  assignedTo: integer("assigned_to"),
+  assignedAt: timestamp("assigned_at"),
+
+  // Timing
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  durationMinutes: integer("duration_minutes"),
+
+  // Completion details
+  completedBy: integer("completed_by"),
+  completionNotes: text("completion_notes"),
+
+  // Checklist progress
+  checklistProgress: json("checklist_progress"), // {itemIndex: boolean}
+
+  // Documents collected at this step
+  collectedDocuments: json("collected_documents").$type<number[]>(), // Document IDs
+
+  // Issues and blocks
+  blockedReason: text("blocked_reason"),
+  blockedAt: timestamp("blocked_at"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Insert schemas for unified status management
+export const insertServiceWorkflowStatusSchema = createInsertSchema(serviceWorkflowStatuses).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertStatusTransitionRuleSchema = createInsertSchema(statusTransitionRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertStatusTransitionHistorySchema = createInsertSchema(statusTransitionHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertServiceWorkflowStepSchema = createInsertSchema(serviceWorkflowSteps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertServiceRequestStepSchema = createInsertSchema(serviceRequestSteps).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Type exports for unified status management
+export type ServiceWorkflowStatus = typeof serviceWorkflowStatuses.$inferSelect;
+export type InsertServiceWorkflowStatus = z.infer<typeof insertServiceWorkflowStatusSchema>;
+export type StatusTransitionRule = typeof statusTransitionRules.$inferSelect;
+export type InsertStatusTransitionRule = z.infer<typeof insertStatusTransitionRuleSchema>;
+export type StatusTransitionHistory = typeof statusTransitionHistory.$inferSelect;
+export type InsertStatusTransitionHistory = z.infer<typeof insertStatusTransitionHistorySchema>;
+export type ServiceWorkflowStep = typeof serviceWorkflowSteps.$inferSelect;
+export type InsertServiceWorkflowStep = z.infer<typeof insertServiceWorkflowStepSchema>;
+export type ServiceRequestStep = typeof serviceRequestSteps.$inferSelect;
+export type InsertServiceRequestStep = z.infer<typeof insertServiceRequestStepSchema>;
+
+// ============================================================================
+// AUTO-ESCALATION & WORK QUEUE MANAGEMENT (Transparency & Control)
+// ============================================================================
+
+// Auto-Escalation Rules - Configurable per service/status
+export const escalationRules = pgTable("escalation_rules", {
+  id: serial("id").primaryKey(),
+  ruleKey: text("rule_key").unique().notNull(), // e.g., 'gst_registration_docs_pending_24h'
+  ruleName: text("rule_name").notNull(),
+
+  // Scope - what this rule applies to
+  serviceKey: text("service_key"), // null = all services
+  statusCode: text("status_code"), // null = all statuses
+  priority: text("priority"), // HIGH, MEDIUM, LOW - or null for all
+
+  // Trigger conditions
+  triggerType: text("trigger_type").notNull(), // 'time_based', 'threshold', 'event'
+  triggerHours: integer("trigger_hours"), // Hours until escalation (for time_based)
+  triggerCondition: json("trigger_condition"), // Complex conditions as JSON
+
+  // Escalation tiers (executed in order)
+  escalationTiers: json("escalation_tiers").$type<{
+    tier: number;
+    hoursAfterTrigger: number;
+    action: 'notify' | 'reassign' | 'both';
+    notifyRoles: string[];
+    notifyUserIds?: number[];
+    reassignToRole?: string;
+    reassignToUserId?: number;
+    emailTemplate?: string;
+    smsTemplate?: string;
+    createTask?: boolean;
+    taskTitle?: string;
+    severity: 'warning' | 'critical' | 'breach';
+  }[]>(),
+
+  // Actions
+  autoReassign: boolean("auto_reassign").default(false),
+  reassignToRole: text("reassign_to_role"),
+  createIncident: boolean("create_incident").default(false),
+  notifyClient: boolean("notify_client").default(false),
+  clientNotificationTemplate: text("client_notification_template"),
+
+  // Metadata
+  isActive: boolean("is_active").default(true),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Escalation Executions - Audit trail of all escalations
+export const escalationExecutions = pgTable("escalation_executions", {
+  id: serial("id").primaryKey(),
+  escalationRuleId: integer("escalation_rule_id").notNull(),
+  serviceRequestId: integer("service_request_id").notNull(),
+
+  // Current tier executed
+  tierExecuted: integer("tier_executed").notNull(),
+  severity: text("severity").notNull(), // warning, critical, breach
+
+  // What happened
+  actionsExecuted: json("actions_executed").$type<{
+    action: string;
+    target: string;
+    result: 'success' | 'failed';
+    details?: string;
+  }[]>(),
+
+  // Notifications sent
+  notificationsSent: json("notifications_sent").$type<{
+    channel: string;
+    recipient: string;
+    status: 'sent' | 'failed';
+    sentAt: string;
+  }[]>(),
+
+  // Reassignment details
+  previousAssignee: integer("previous_assignee"),
+  newAssignee: integer("new_assignee"),
+  reassignmentReason: text("reassignment_reason"),
+
+  // Timing
+  triggeredAt: timestamp("triggered_at").defaultNow(),
+  executedAt: timestamp("executed_at").defaultNow(),
+
+  // Resolution
+  acknowledged: boolean("acknowledged").default(false),
+  acknowledgedBy: integer("acknowledged_by"),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  resolved: boolean("resolved").default(false),
+  resolvedBy: integer("resolved_by"),
+  resolvedAt: timestamp("resolved_at"),
+  resolutionNotes: text("resolution_notes"),
+});
+
+// SLA Breach Records - Track all SLA breaches for reporting and remediation
+export const slaBreachRecords = pgTable("sla_breach_records", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+
+  // Breach details
+  breachType: text("breach_type").notNull(), // 'status_sla', 'overall_sla', 'document_sla', 'response_sla'
+  breachSeverity: text("breach_severity").notNull(), // 'minor', 'major', 'critical'
+
+  // SLA details
+  slaHours: integer("sla_hours").notNull(),
+  actualHours: integer("actual_hours").notNull(),
+  breachHours: integer("breach_hours").notNull(), // How much over SLA
+
+  // Status at breach
+  statusAtBreach: text("status_at_breach").notNull(),
+  assigneeAtBreach: integer("assignee_at_breach"),
+
+  // Root cause analysis
+  rootCauseCategory: text("root_cause_category"), // 'client_delay', 'govt_delay', 'ops_delay', 'system_issue', 'resource_constraint'
+  rootCauseDetails: text("root_cause_details"),
+  wasClientFault: boolean("was_client_fault").default(false),
+  wasExternalFault: boolean("was_external_fault").default(false),
+
+  // Remediation
+  remediationRequired: boolean("remediation_required").default(false),
+  remediationStatus: text("remediation_status").default("pending"), // 'pending', 'in_progress', 'completed', 'waived'
+  remediationActions: json("remediation_actions").$type<{
+    action: string;
+    assignedTo: number;
+    dueDate: string;
+    status: 'pending' | 'done';
+  }[]>(),
+
+  // Client impact
+  clientNotified: boolean("client_notified").default(false),
+  clientNotifiedAt: timestamp("client_notified_at"),
+  compensationOffered: boolean("compensation_offered").default(false),
+  compensationDetails: text("compensation_details"),
+
+  // Timestamps
+  breachedAt: timestamp("breached_at").defaultNow(),
+  reportedBy: integer("reported_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Unified Work Queue - Operations team's single source of truth
+export const workItemQueue = pgTable("work_item_queue", {
+  id: serial("id").primaryKey(),
+
+  // Work item reference
+  workItemType: text("work_item_type").notNull(), // 'service_request', 'task', 'qc_review', 'document_review', 'escalation'
+  referenceId: integer("reference_id").notNull(), // ID of the actual item
+
+  // Service context
+  serviceRequestId: integer("service_request_id"),
+  serviceKey: text("service_key"),
+  entityId: integer("entity_id"),
+  entityName: text("entity_name"),
+
+  // Current state
+  currentStatus: text("current_status").notNull(),
+  priority: text("priority").notNull().default("MEDIUM"),
+
+  // Assignment
+  assignedTo: integer("assigned_to"),
+  assignedToName: text("assigned_to_name"),
+  assignedToRole: text("assigned_to_role"),
+
+  // SLA tracking
+  slaDeadline: timestamp("sla_deadline"),
+  slaStatus: text("sla_status").default("on_track"), // 'on_track', 'at_risk', 'warning', 'breached'
+  slaHoursRemaining: integer("sla_hours_remaining"),
+
+  // Escalation status
+  escalationLevel: integer("escalation_level").default(0), // 0=none, 1=warning, 2=critical, 3=breach
+  lastEscalatedAt: timestamp("last_escalated_at"),
+
+  // Timeline
+  createdAt: timestamp("created_at").defaultNow(),
+  lastActivityAt: timestamp("last_activity_at").defaultNow(),
+  ageHours: integer("age_hours").default(0),
+
+  // Visibility
+  clientVisible: boolean("client_visible").default(false),
+  clientStatusLabel: text("client_status_label"),
+
+  // Quick access fields (denormalized for dashboard performance)
+  dueDate: timestamp("due_date"),
+  serviceTypeName: text("service_type_name"),
+  periodLabel: text("period_label"),
+});
+
+// Work Item Activity Log - Immutable audit trail (SOC 2 compliant)
+export const workItemActivityLog = pgTable("work_item_activity_log", {
+  id: serial("id").primaryKey(),
+  workItemQueueId: integer("work_item_queue_id").notNull(),
+  serviceRequestId: integer("service_request_id"),
+
+  // Activity details
+  activityType: text("activity_type").notNull(), // 'status_change', 'assignment', 'escalation', 'note', 'document', 'client_update'
+  activityDescription: text("activity_description").notNull(),
+
+  // Changes
+  previousValue: json("previous_value"),
+  newValue: json("new_value"),
+
+  // Actor
+  performedBy: integer("performed_by"),
+  performedByName: text("performed_by_name"),
+  performedByRole: text("performed_by_role"),
+
+  // System generated
+  isSystemGenerated: boolean("is_system_generated").default(false),
+  triggerSource: text("trigger_source"), // 'api', 'ui', 'automation', 'escalation', 'webhook'
+
+  // Immutable timestamp (SOC 2 requirement)
+  occurredAt: timestamp("occurred_at").defaultNow(),
+
+  // Client visibility
+  clientVisible: boolean("client_visible").default(false),
+  clientMessage: text("client_message"),
+});
+
+// Insert schemas for auto-escalation
+export const insertEscalationRuleSchema = createInsertSchema(escalationRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertEscalationExecutionSchema = createInsertSchema(escalationExecutions).omit({
+  id: true,
+  triggeredAt: true,
+  executedAt: true,
+});
+
+export const insertSlaBreachRecordSchema = createInsertSchema(slaBreachRecords).omit({
+  id: true,
+  breachedAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertWorkItemQueueSchema = createInsertSchema(workItemQueue).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWorkItemActivityLogSchema = createInsertSchema(workItemActivityLog).omit({
+  id: true,
+  occurredAt: true,
+});
+
+// Type exports
+export type EscalationRule = typeof escalationRules.$inferSelect;
+export type InsertEscalationRule = z.infer<typeof insertEscalationRuleSchema>;
+export type EscalationExecution = typeof escalationExecutions.$inferSelect;
+export type InsertEscalationExecution = z.infer<typeof insertEscalationExecutionSchema>;
+export type SlaBreachRecord = typeof slaBreachRecords.$inferSelect;
+export type InsertSlaBreachRecord = z.infer<typeof insertSlaBreachRecordSchema>;
+export type WorkItemQueue = typeof workItemQueue.$inferSelect;
+export type InsertWorkItemQueue = z.infer<typeof insertWorkItemQueueSchema>;
+export type WorkItemActivityLog = typeof workItemActivityLog.$inferSelect;
+export type InsertWorkItemActivityLog = z.infer<typeof insertWorkItemActivityLogSchema>;
+
+// ============================================================================
 // INDEXES for Performance
 // ============================================================================
 
@@ -4721,3 +5236,8 @@ export const stateCalculationLog = pgTable('state_calculation_log', {
 // CREATE INDEX idx_compliance_rules_domain ON compliance_rules(domain, is_active);
 // CREATE INDEX idx_compliance_alerts_entity_active ON compliance_alerts(entity_id, is_active, severity);
 // CREATE INDEX idx_calculation_log_entity_time ON state_calculation_log(entity_id, calculated_at DESC);
+// CREATE INDEX idx_workflow_statuses_service ON service_workflow_statuses(service_key, is_active);
+// CREATE INDEX idx_transition_rules_service ON status_transition_rules(service_key, from_status_code);
+// CREATE INDEX idx_transition_history_request ON status_transition_history(service_request_id, changed_at DESC);
+// CREATE INDEX idx_workflow_steps_service ON service_workflow_steps(service_key, status_code);
+// CREATE INDEX idx_request_steps_request ON service_request_steps(service_request_id, status);

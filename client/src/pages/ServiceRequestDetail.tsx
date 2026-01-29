@@ -50,8 +50,8 @@ const ServiceRequestDetail = () => {
   // Add comment mutation
   const addCommentMutation = useMutation({
     mutationFn: async (comment: string) => {
-      return apiRequest(`/api/service-requests/${requestId}/comments`, 'POST', {
-        comment,
+      return apiRequest('POST', `/api/client/service-requests/${requestId}/comments`, {
+        content: comment,
       });
     },
     onSuccess: () => {
