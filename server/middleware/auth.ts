@@ -112,16 +112,3 @@ export function verifyRefreshToken(req: Request, res: Response, next: NextFuncti
   };
   next();
 }
-
-    req.user = decoded;
-    req.userId = decoded.userId;
-
-    next();
-  } catch (error) {
-    logger.error('Refresh token verification error:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Token verification failed',
-    });
-  }
-}
