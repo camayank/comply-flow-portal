@@ -18,6 +18,7 @@ import {
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES, type AuthenticatedRequest } from "./rbac-middleware";
+import { validateIdParam, parseIdParam, ID_TYPES } from "./middleware/id-validator";
 import { registerProposalRoutes } from "./proposals-routes";
 import { registerDashboardAnalyticsRoutes } from "./dashboard-analytics-routes";
 import { registerExportRoutes } from "./export-routes";
@@ -95,14 +96,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/service-requests/:id", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
-      const serviceRequest = await storage.getServiceRequest(id);
-      
+      const parsed = parseIdParam(req.params.id);
+      let serviceRequest;
+
+      if (parsed.isNumeric) {
+        // Lookup by numeric ID
+        serviceRequest = await storage.getServiceRequest(parsed.numericId!);
+      } else {
+        // Lookup by readable ID (SR2600001)
+        const [result] = await db.select()
+          .from(serviceRequests)
+          .where(eq(serviceRequests.requestId, parsed.readableId!))
+          .limit(1);
+        serviceRequest = result;
+      }
+
       if (!serviceRequest) {
         return res.status(404).json({ error: "Service request not found" });
       }
-      
-      res.json(serviceRequest);
+
+      // Include both numeric and readable IDs in response
+      res.json({
+        ...serviceRequest,
+        displayId: (serviceRequest as any).requestId || `SR-${serviceRequest.id}`
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch service request" });
     }
@@ -110,9 +127,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/service-requests/:id", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const parsed = parseIdParam(req.params.id);
+      let id: number;
+
+      if (parsed.isNumeric) {
+        id = parsed.numericId!;
+      } else {
+        // Lookup numeric ID from readable ID
+        const [result] = await db.select({ id: serviceRequests.id })
+          .from(serviceRequests)
+          .where(eq(serviceRequests.requestId, parsed.readableId!))
+          .limit(1);
+        if (!result) {
+          return res.status(404).json({ error: "Service request not found" });
+        }
+        id = result.id;
+      }
+
       const updates = req.body;
-      
+
       // If updating with document hash, verify integrity
       if (updates.documentHash && updates.uploadedDocs) {
         const computedHash = createHash('sha256')
@@ -139,10 +172,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete Service Request
   app.delete("/api/service-requests/:id", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const parsed = parseIdParam(req.params.id);
+      let id: number;
+      let serviceRequest;
+
+      if (parsed.isNumeric) {
+        id = parsed.numericId!;
+        serviceRequest = await storage.getServiceRequest(id);
+      } else {
+        const [result] = await db.select()
+          .from(serviceRequests)
+          .where(eq(serviceRequests.requestId, parsed.readableId!))
+          .limit(1);
+        serviceRequest = result;
+        id = result?.id || 0;
+      }
 
       // Verify the service request exists
-      const serviceRequest = await storage.getServiceRequest(id);
       if (!serviceRequest) {
         return res.status(404).json({ error: "Service request not found" });
       }
@@ -274,20 +320,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(documentsUploads.serviceRequestId, id))
         .orderBy(desc(documentsUploads.uploadedAt));
 
+      // Add displayId to each document
+      const documentsWithDisplayId = documents.map(doc => ({
+        ...doc,
+        displayId: (doc as any).documentId || `DOC-${doc.id}`
+      }));
+
       // Categorize documents
       const categorized = {
-        required: documents.filter(d =>
+        required: documentsWithDisplayId.filter(d =>
           ['pan_card', 'aadhar_card', 'incorporation_cert', 'bank_statement'].includes(d.doctype)
         ),
-        uploaded: documents.filter(d => d.status !== 'approved'),
-        approved: documents.filter(d => d.status === 'approved'),
-        rejected: documents.filter(d => d.status === 'rejected')
+        uploaded: documentsWithDisplayId.filter(d => d.status !== 'approved'),
+        approved: documentsWithDisplayId.filter(d => d.status === 'approved'),
+        rejected: documentsWithDisplayId.filter(d => d.status === 'rejected')
       };
 
       res.json({
         serviceRequestId: id,
         totalDocuments: documents.length,
-        documents,
+        documents: documentsWithDisplayId,
         categorized,
         stats: {
           total: documents.length,
@@ -337,8 +389,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(whereClause)
       ]);
 
+      // Add displayId to each request for consistent ID display
+      const requestsWithDisplayId = requests.map(req => ({
+        ...req,
+        displayId: (req as any).requestId || `SR-${req.id}`
+      }));
+
       res.json({
-        serviceRequests: requests,
+        serviceRequests: requestsWithDisplayId,
         pagination: {
           total: count,
           page: parseInt(page as string),
@@ -1627,6 +1685,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/ai', aiRoutes.default);
   app.use('/api/v2/ai', aiRoutes.default);
   console.log('✅ AI Routes registered (Compliance, Sales, Documents, Support agents)');
+
+  // Register ID Lookup Routes (Universal ID resolution)
+  const idLookupRoutes = await import('./routes/id-lookup-routes');
+  app.use('/api/lookup', idLookupRoutes.default);
+  app.use('/api/v2/lookup', idLookupRoutes.default);
+  console.log('✅ ID Lookup Routes registered (Universal ID resolution)');
 
   const httpServer = createServer(app);
   return httpServer;

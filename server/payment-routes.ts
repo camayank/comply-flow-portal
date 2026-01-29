@@ -10,6 +10,7 @@ import {
   USER_ROLES,
   type AuthenticatedRequest
 } from './rbac-middleware';
+import { parseIdParam } from './middleware/id-validator';
 
 // Client authentication middleware
 const clientAuth = [sessionAuthMiddleware, requireRole(USER_ROLES.CLIENT)] as const;
@@ -514,21 +515,34 @@ export function registerPaymentRoutes(app: Express) {
   });
 
   // Get payment details (staff access)
+  // Supports both numeric ID and readable ID (PAY26000001)
   app.get('/api/payments/:id', ...staffAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const paymentId = parseInt(req.params.id);
+      const parsed = parseIdParam(req.params.id);
+      let payment;
 
-      const [payment] = await db
-        .select()
-        .from(payments)
-        .where(eq(payments.id, paymentId))
-        .limit(1);
+      if (parsed.isNumeric) {
+        [payment] = await db.select()
+          .from(payments)
+          .where(eq(payments.id, parsed.numericId!))
+          .limit(1);
+      } else {
+        // Lookup by readable payment ID
+        [payment] = await db.select()
+          .from(payments)
+          .where(eq(payments.paymentId, parsed.readableId!))
+          .limit(1);
+      }
 
       if (!payment) {
         return res.status(404).json({ error: 'Payment not found' });
       }
 
-      res.json(payment);
+      // Include displayId for consistent frontend display
+      res.json({
+        ...payment,
+        displayId: payment.paymentId || `PAY-${payment.id}`
+      });
     } catch (error) {
       console.error('Get payment error:', error);
       res.status(500).json({ error: 'Failed to fetch payment' });

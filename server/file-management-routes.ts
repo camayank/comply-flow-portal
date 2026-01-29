@@ -12,6 +12,7 @@ import { db } from './db';
 import { documentsUploads } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { generateDocumentId } from './services/id-generator';
+import { parseIdParam } from './middleware/id-validator';
 
 const router = Router();
 
@@ -19,14 +20,20 @@ const router = Router();
 router.get('/service-requests/:serviceRequestId/documents', async (req: Request, res: Response) => {
   try {
     const serviceRequestId = parseInt(req.params.serviceRequestId);
-    
+
     const documents = await db
       .select()
       .from(documentsUploads)
       .where(eq(documentsUploads.serviceRequestId, serviceRequestId))
       .orderBy(documentsUploads.uploadedAt);
-    
-    res.json(documents);
+
+    // Add displayId to each document
+    const documentsWithDisplayId = documents.map(doc => ({
+      ...doc,
+      displayId: (doc as any).documentId || `DOC-${doc.id}`
+    }));
+
+    res.json(documentsWithDisplayId);
   } catch (error) {
     console.error('Error fetching documents:', error);
     res.status(500).json({ error: 'Failed to fetch documents' });
@@ -131,14 +138,21 @@ router.post('/service-requests/:serviceRequestId/documents', upload.array('files
 });
 
 // Get document download URL
+// Supports both numeric ID and readable ID (DOC26000001)
 router.get('/documents/:documentId/download', async (req: Request, res: Response) => {
   try {
-    const documentId = parseInt(req.params.documentId);
+    const parsed = parseIdParam(req.params.documentId);
+    let document;
 
-    const [document] = await db
-      .select()
-      .from(documentsUploads)
-      .where(eq(documentsUploads.id, documentId));
+    if (parsed.isNumeric) {
+      [document] = await db.select()
+        .from(documentsUploads)
+        .where(eq(documentsUploads.id, parsed.numericId!));
+    } else {
+      [document] = await db.select()
+        .from(documentsUploads)
+        .where(eq(documentsUploads.documentId, parsed.readableId!));
+    }
 
     if (!document) {
       return res.status(404).json({ error: 'Document not found' });
@@ -152,6 +166,7 @@ router.get('/documents/:documentId/download', async (req: Request, res: Response
       filename: document.filename,
       mimetype: document.mimeType,
       size: document.sizeBytes,
+      displayId: (document as any).documentId || `DOC-${document.id}`,
       expiresIn: '15 minutes'
     });
   } catch (error: any) {
@@ -161,9 +176,25 @@ router.get('/documents/:documentId/download', async (req: Request, res: Response
 });
 
 // Update document status (for review/approval)
+// Supports both numeric ID and readable ID (DOC26000001)
 router.patch('/documents/:documentId/status', async (req: Request, res: Response) => {
   try {
-    const documentId = parseInt(req.params.documentId);
+    const parsed = parseIdParam(req.params.documentId);
+    let documentId: number;
+
+    if (parsed.isNumeric) {
+      documentId = parsed.numericId!;
+    } else {
+      const [doc] = await db.select({ id: documentsUploads.id })
+        .from(documentsUploads)
+        .where(eq(documentsUploads.documentId, parsed.readableId!))
+        .limit(1);
+      if (!doc) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+      documentId = doc.id;
+    }
+
     const { status, reviewNotes, reviewedBy } = req.body;
 
     if (!status) {

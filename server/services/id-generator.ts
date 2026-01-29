@@ -16,6 +16,9 @@ import { db } from '../db';
 import { idSequences, ID_TYPES, type IdType } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 
+// Re-export ID types for consumers of this module
+export { ID_TYPES, type IdType } from '@shared/schema';
+
 // ============================================================================
 // ID CONFIGURATION
 // ============================================================================

@@ -15,6 +15,7 @@ import {
   type AuthenticatedRequest
 } from './rbac-middleware';
 import { generateTicketId } from './services/id-generator';
+import { parseIdParam } from './middleware/id-validator';
 
 // Client-only access middleware
 const requireClientAccess = [sessionAuthMiddleware, requireRole(USER_ROLES.CLIENT)] as const;
@@ -65,6 +66,7 @@ export function registerClientSupportRoutes(app: Express) {
 
       const ticketsWithAge = tickets.map(ticket => ({
         ...ticket,
+        displayId: ticket.ticketNumber,
         age: calculateTicketAge(new Date(ticket.createdAt!))
       }));
 
@@ -76,23 +78,39 @@ export function registerClientSupportRoutes(app: Express) {
   });
 
   // GET /api/client/support/tickets/:id - Get single ticket with messages
+  // Supports both numeric ID and readable ID (TKT26000001)
   app.get('/api/client/support/tickets/:id', ...requireClientAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.user?.id;
-      const ticketId = parseInt(req.params.id);
+      const parsed = parseIdParam(req.params.id);
+      let ticketId: number;
+      let ticket;
 
       if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
       // Fetch ticket - ensure it belongs to the client
-      const [ticket] = await db.select()
-        .from(supportTickets)
-        .where(and(
-          eq(supportTickets.id, ticketId),
-          eq(supportTickets.clientId, userId)
-        ))
-        .limit(1);
+      if (parsed.isNumeric) {
+        ticketId = parsed.numericId!;
+        [ticket] = await db.select()
+          .from(supportTickets)
+          .where(and(
+            eq(supportTickets.id, ticketId),
+            eq(supportTickets.clientId, userId)
+          ))
+          .limit(1);
+      } else {
+        // Lookup by readable ticket number
+        [ticket] = await db.select()
+          .from(supportTickets)
+          .where(and(
+            eq(supportTickets.ticketNumber, parsed.readableId!),
+            eq(supportTickets.clientId, userId)
+          ))
+          .limit(1);
+        ticketId = ticket?.id || 0;
+      }
 
       if (!ticket) {
         return res.status(404).json({ error: 'Ticket not found' });
@@ -204,10 +222,13 @@ export function registerClientSupportRoutes(app: Express) {
   });
 
   // POST /api/client/support/tickets/:id/messages - Add message to ticket
+  // Supports both numeric ID and readable ID (TKT26000001)
   app.post('/api/client/support/tickets/:id/messages', ...requireClientAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.user?.id;
-      const ticketId = parseInt(req.params.id);
+      const parsed = parseIdParam(req.params.id);
+      let ticketId: number;
+      let ticket;
 
       if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -218,14 +239,26 @@ export function registerClientSupportRoutes(app: Express) {
         return res.status(400).json({ error: 'Message is required' });
       }
 
-      // Verify ticket belongs to client
-      const [ticket] = await db.select()
-        .from(supportTickets)
-        .where(and(
-          eq(supportTickets.id, ticketId),
-          eq(supportTickets.clientId, userId)
-        ))
-        .limit(1);
+      // Verify ticket belongs to client - support both ID formats
+      if (parsed.isNumeric) {
+        ticketId = parsed.numericId!;
+        [ticket] = await db.select()
+          .from(supportTickets)
+          .where(and(
+            eq(supportTickets.id, ticketId),
+            eq(supportTickets.clientId, userId)
+          ))
+          .limit(1);
+      } else {
+        [ticket] = await db.select()
+          .from(supportTickets)
+          .where(and(
+            eq(supportTickets.ticketNumber, parsed.readableId!),
+            eq(supportTickets.clientId, userId)
+          ))
+          .limit(1);
+        ticketId = ticket?.id || 0;
+      }
 
       if (!ticket) {
         return res.status(404).json({ error: 'Ticket not found' });
@@ -272,10 +305,13 @@ export function registerClientSupportRoutes(app: Express) {
   });
 
   // POST /api/client/support/tickets/:id/satisfaction - Submit satisfaction rating
+  // Supports both numeric ID and readable ID (TKT26000001)
   app.post('/api/client/support/tickets/:id/satisfaction', ...requireClientAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.user?.id;
-      const ticketId = parseInt(req.params.id);
+      const parsed = parseIdParam(req.params.id);
+      let ticketId: number;
+      let ticket;
 
       if (!userId) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -287,14 +323,26 @@ export function registerClientSupportRoutes(app: Express) {
         return res.status(400).json({ error: 'Rating must be between 1 and 5' });
       }
 
-      // Verify ticket belongs to client and is resolved
-      const [ticket] = await db.select()
-        .from(supportTickets)
-        .where(and(
-          eq(supportTickets.id, ticketId),
-          eq(supportTickets.clientId, userId)
-        ))
-        .limit(1);
+      // Verify ticket belongs to client and is resolved - support both ID formats
+      if (parsed.isNumeric) {
+        ticketId = parsed.numericId!;
+        [ticket] = await db.select()
+          .from(supportTickets)
+          .where(and(
+            eq(supportTickets.id, ticketId),
+            eq(supportTickets.clientId, userId)
+          ))
+          .limit(1);
+      } else {
+        [ticket] = await db.select()
+          .from(supportTickets)
+          .where(and(
+            eq(supportTickets.ticketNumber, parsed.readableId!),
+            eq(supportTickets.clientId, userId)
+          ))
+          .limit(1);
+        ticketId = ticket?.id || 0;
+      }
 
       if (!ticket) {
         return res.status(404).json({ error: 'Ticket not found' });

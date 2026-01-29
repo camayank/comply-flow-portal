@@ -1,10 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { db } from './db';
 import { requireAuth } from './auth-middleware';
-import { 
-  supportTickets, 
-  responseTemplates, 
-  ticketMessages, 
+import {
+  supportTickets,
+  responseTemplates,
+  ticketMessages,
   ticketAssignments,
   users,
   insertSupportTicketSchema,
@@ -12,22 +12,14 @@ import {
   insertTicketMessageSchema
 } from '../shared/schema';
 import { eq, desc, and, or, sql, count } from 'drizzle-orm';
+import { generateTicketId } from './services/id-generator';
+import { parseIdParam } from './middleware/id-validator';
 
 const router = Router();
 
+// Use centralized ID generator for ticket numbers
 async function generateTicketNumber(): Promise<string> {
-  const lastTicket = await db.select({ ticketNumber: supportTickets.ticketNumber })
-    .from(supportTickets)
-    .orderBy(desc(supportTickets.id))
-    .limit(1);
-  
-  if (lastTicket.length === 0) {
-    return 'T00001';
-  }
-  
-  const lastNumber = parseInt(lastTicket[0].ticketNumber.substring(1));
-  const newNumber = lastNumber + 1;
-  return `T${newNumber.toString().padStart(5, '0')}`;
+  return generateTicketId();
 }
 
 router.get('/stats', async (req: Request, res: Response) => {
@@ -94,7 +86,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
       const diffMs = now.getTime() - created.getTime();
       const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
       const diffDays = Math.floor(diffHours / 24);
-      
+
       let age;
       if (diffDays > 0) {
         age = `${diffDays} day${diffDays > 1 ? 's' : ''}`;
@@ -102,7 +94,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
         age = `${diffHours} hour${diffHours !== 1 ? 's' : ''}`;
       }
 
-      return { ...ticket, age };
+      return { ...ticket, displayId: ticket.ticketNumber, age };
     });
 
     res.json(ticketsWithAge);
@@ -112,16 +104,28 @@ router.get('/tickets', async (req: Request, res: Response) => {
   }
 });
 
+// Supports both numeric ID and readable ID (TKT26000001)
 router.get('/tickets/:id', async (req: Request, res: Response) => {
   try {
-    const ticketId = parseInt(req.params.id);
-    
-    const ticket = await db.select()
-      .from(supportTickets)
-      .where(eq(supportTickets.id, ticketId))
-      .limit(1);
+    const parsed = parseIdParam(req.params.id);
+    let ticketId: number;
+    let ticket;
 
-    if (ticket.length === 0) {
+    if (parsed.isNumeric) {
+      ticketId = parsed.numericId!;
+      [ticket] = await db.select()
+        .from(supportTickets)
+        .where(eq(supportTickets.id, ticketId))
+        .limit(1);
+    } else {
+      [ticket] = await db.select()
+        .from(supportTickets)
+        .where(eq(supportTickets.ticketNumber, parsed.readableId!))
+        .limit(1);
+      ticketId = ticket?.id || 0;
+    }
+
+    if (!ticket) {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
@@ -131,7 +135,7 @@ router.get('/tickets/:id', async (req: Request, res: Response) => {
       .orderBy(ticketMessages.createdAt);
 
     res.json({
-      ticket: ticket[0],
+      ticket: { ...ticket, displayId: ticket.ticketNumber },
       messages
     });
   } catch (error) {
@@ -171,9 +175,25 @@ router.post('/tickets', async (req: Request, res: Response) => {
   }
 });
 
+// Supports both numeric ID and readable ID (TKT26000001)
 router.patch('/tickets/:id', async (req: Request, res: Response) => {
   try {
-    const ticketId = parseInt(req.params.id);
+    const parsed = parseIdParam(req.params.id);
+    let ticketId: number;
+
+    if (parsed.isNumeric) {
+      ticketId = parsed.numericId!;
+    } else {
+      const [ticket] = await db.select({ id: supportTickets.id })
+        .from(supportTickets)
+        .where(eq(supportTickets.ticketNumber, parsed.readableId!))
+        .limit(1);
+      if (!ticket) {
+        return res.status(404).json({ message: 'Ticket not found' });
+      }
+      ticketId = ticket.id;
+    }
+
     const updates: any = { ...req.body, updatedAt: new Date() };
 
     if (updates.status === 'in_progress' && !updates.firstRespondedAt) {
@@ -195,28 +215,41 @@ router.patch('/tickets/:id', async (req: Request, res: Response) => {
       .where(eq(supportTickets.id, ticketId))
       .returning();
 
-    res.json(updatedTicket);
+    res.json({ ...updatedTicket, displayId: updatedTicket.ticketNumber });
   } catch (error) {
     console.error('Error updating ticket:', error);
     res.status(500).json({ message: 'Failed to update ticket' });
   }
 });
 
+// Supports both numeric ID and readable ID (TKT26000001)
 router.post('/tickets/:id/assign', requireAuth, async (req: Request, res: Response) => {
   try {
-    const ticketId = parseInt(req.params.id);
+    const parsed = parseIdParam(req.params.id);
+    let ticketId: number;
+    let ticket;
+
     const { assignedTo, reason } = req.body;
 
-    const ticket = await db.select()
-      .from(supportTickets)
-      .where(eq(supportTickets.id, ticketId))
-      .limit(1);
+    if (parsed.isNumeric) {
+      ticketId = parsed.numericId!;
+      [ticket] = await db.select()
+        .from(supportTickets)
+        .where(eq(supportTickets.id, ticketId))
+        .limit(1);
+    } else {
+      [ticket] = await db.select()
+        .from(supportTickets)
+        .where(eq(supportTickets.ticketNumber, parsed.readableId!))
+        .limit(1);
+      ticketId = ticket?.id || 0;
+    }
 
-    if (ticket.length === 0) {
+    if (!ticket) {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
-    const previousAssignee = ticket[0].assignedTo;
+    const previousAssignee = ticket.assignedTo;
 
     await db.insert(ticketAssignments).values({
       ticketId,
@@ -243,9 +276,24 @@ router.post('/tickets/:id/assign', requireAuth, async (req: Request, res: Respon
   }
 });
 
+// Supports both numeric ID and readable ID (TKT26000001)
 router.post('/tickets/:id/messages', requireAuth, async (req: Request, res: Response) => {
   try {
-    const ticketId = parseInt(req.params.id);
+    const parsed = parseIdParam(req.params.id);
+    let ticketId: number;
+
+    if (parsed.isNumeric) {
+      ticketId = parsed.numericId!;
+    } else {
+      const [ticket] = await db.select({ id: supportTickets.id })
+        .from(supportTickets)
+        .where(eq(supportTickets.ticketNumber, parsed.readableId!))
+        .limit(1);
+      if (!ticket) {
+        return res.status(404).json({ message: 'Ticket not found' });
+      }
+      ticketId = ticket.id;
+    }
 
     const validatedData = insertTicketMessageSchema.parse({
       ticketId,
@@ -334,9 +382,25 @@ router.patch('/templates/:id', async (req: Request, res: Response) => {
   }
 });
 
+// Supports both numeric ID and readable ID (TKT26000001)
 router.post('/tickets/:id/satisfaction', async (req: Request, res: Response) => {
   try {
-    const ticketId = parseInt(req.params.id);
+    const parsed = parseIdParam(req.params.id);
+    let ticketId: number;
+
+    if (parsed.isNumeric) {
+      ticketId = parsed.numericId!;
+    } else {
+      const [ticket] = await db.select({ id: supportTickets.id })
+        .from(supportTickets)
+        .where(eq(supportTickets.ticketNumber, parsed.readableId!))
+        .limit(1);
+      if (!ticket) {
+        return res.status(404).json({ message: 'Ticket not found' });
+      }
+      ticketId = ticket.id;
+    }
+
     const { rating, comment } = req.body;
 
     const [updatedTicket] = await db.update(supportTickets)
@@ -349,7 +413,7 @@ router.post('/tickets/:id/satisfaction', async (req: Request, res: Response) => 
       .where(eq(supportTickets.id, ticketId))
       .returning();
 
-    res.json(updatedTicket);
+    res.json({ ...updatedTicket, displayId: updatedTicket.ticketNumber });
   } catch (error) {
     console.error('Error recording satisfaction rating:', error);
     res.status(500).json({ message: 'Failed to record rating' });
