@@ -151,12 +151,12 @@ const routes: RouteInfo[] = [
   {
     path: "/client-profile",
     name: "Client Profile",
-    description: "View and edit client profile information",
+    description: "Full profile management with stats, activity & preferences",
     role: "Client - Core",
     icon: UserCircle,
     color: "bg-blue-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
   {
     path: "/compliance-calendar",
@@ -181,12 +181,12 @@ const routes: RouteInfo[] = [
   {
     path: "/service-request/create",
     name: "Create Service Request",
-    description: "Request a new service",
+    description: "Full service request wizard with catalog integration",
     role: "Client - Core",
     icon: Rocket,
     color: "bg-blue-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
   {
     path: "/referrals",
@@ -263,34 +263,34 @@ const routes: RouteInfo[] = [
   {
     path: "/10k",
     name: "Compliance Scorecard",
-    description: "10K compliance readiness scorecard",
+    description: "Full 10K scoring with funding readiness & investor view",
     role: "Compliance",
     icon: Award,
     color: "bg-amber-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
 
   // ============ DOCUMENTS & TASKS ============
   {
     path: "/documents",
     name: "Document Upload",
-    description: "Upload and manage documents",
+    description: "Full document management with vault & verification",
     role: "Documents",
     icon: FileText,
     color: "bg-purple-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
   {
     path: "/ai-documents",
     name: "AI Document Prep",
-    description: "AI-powered document preparation",
+    description: "AI-powered document generation with templates & signing",
     role: "Documents",
     icon: Bot,
     color: "bg-violet-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/esign-agreements",
@@ -371,32 +371,32 @@ const routes: RouteInfo[] = [
   {
     path: "/admin-config",
     name: "Admin Service Config",
-    description: "Configure services and workflows",
+    description: "Full service & workflow configuration with stats",
     role: "Admin",
     icon: Settings,
     color: "bg-purple-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/blueprint",
     name: "Master Blueprint",
-    description: "Platform architecture and system blueprint",
+    description: "Complete platform architecture, modules & data flow",
     role: "Admin",
     icon: Map,
     color: "bg-indigo-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/workflow-import",
     name: "Workflow Import",
-    description: "Import and manage workflow templates",
+    description: "Full workflow import/export with template library",
     role: "Admin",
     icon: Import,
     color: "bg-purple-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
   {
     path: "/super-admin",
@@ -564,22 +564,22 @@ const routes: RouteInfo[] = [
   {
     path: "/landing",
     name: "Landing Page",
-    description: "Main landing page",
+    description: "Full landing with stats, testimonials & pricing",
     role: "Landing",
     icon: Home,
     color: "bg-blue-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
   {
     path: "/mobile-landing",
     name: "Mobile Landing",
-    description: "Mobile-responsive landing page",
+    description: "Mobile-optimized landing with all features",
     role: "Landing",
     icon: Smartphone,
     color: "bg-blue-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
   // CONSOLIDATED: /onboarding merged into /smart-start
   {
@@ -629,12 +629,12 @@ const routes: RouteInfo[] = [
   {
     path: "/services",
     name: "Service Catalog (Public)",
-    description: "Browse available services (public view)",
+    description: "Full service catalog with categories, details & quoting",
     role: "Utility",
     icon: Store,
     color: "bg-cyan-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
   {
     path: "/design-system",

@@ -1389,6 +1389,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/v1/retainership', retainershipRoutes.default);
   console.log('✅ Retainership/Subscription routes registered');
 
+  // Register Compliance Scorecard routes for 10K page
+  const complianceScorecardRoutes = await import('./compliance-scorecard-routes');
+  app.use('/api/compliance-scorecard', complianceScorecardRoutes.default);
+  app.use('/api/v1/compliance-scorecard', complianceScorecardRoutes.default);
+  console.log('✅ Compliance Scorecard (10K) routes registered');
+
+  // Register Client Profile routes
+  const clientProfileRoutes = await import('./client-profile-routes');
+  app.use('/api/client-profile', clientProfileRoutes.default);
+  app.use('/api/v1/client-profile', clientProfileRoutes.default);
+  console.log('✅ Client Profile routes registered');
+
+  // Register Blueprint routes for Master Blueprint page
+  const blueprintRoutes = await import('./blueprint-routes');
+  app.use('/api/blueprint', blueprintRoutes.default);
+  app.use('/api/v1/blueprint', blueprintRoutes.default);
+  console.log('✅ Blueprint/Architecture routes registered');
+
+  // Register Public routes (landing, catalog, pricing)
+  const publicRoutes = await import('./public-routes');
+  app.use('/api/public', publicRoutes.default);
+  console.log('✅ Public routes (landing, catalog) registered');
+
+  // Register Workflow Import routes
+  const workflowImportRoutes = await import('./workflow-import-routes');
+  app.use('/api/workflow-import', workflowImportRoutes.default);
+  app.use('/api/v1/workflow-import', workflowImportRoutes.default);
+  console.log('✅ Workflow Import routes registered');
+
+  // Register Admin Config routes (if not already registered)
+  const { registerAdminConfigRoutes } = await import('./admin-config-routes');
+  registerAdminConfigRoutes(app);
+  console.log('✅ Admin Config routes registered');
+
   const httpServer = createServer(app);
   return httpServer;
 }
