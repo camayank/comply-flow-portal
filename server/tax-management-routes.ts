@@ -1,11 +1,11 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { db } from './db';
 
 // Tax Management for Startups - GST, TDS, ITR
 export function registerTaxManagementRoutes(app: Express) {
 
-  // Get tax compliance dashboard for a client
-  app.get('/api/tax/dashboard/:clientId', async (req, res) => {
+  // Tax dashboard handler
+  const taxDashboardHandler = async (req: Request, res: Response) => {
     try {
       const { clientId } = req.params;
 
@@ -55,10 +55,10 @@ export function registerTaxManagementRoutes(app: Express) {
       console.error('Get tax dashboard error:', error);
       res.status(500).json({ error: 'Failed to fetch tax dashboard' });
     }
-  });
+  };
 
-  // Get GST filing history
-  app.get('/api/tax/gst/history/:clientId', async (req, res) => {
+  // GST history handler
+  const gstHistoryHandler = async (req: Request, res: Response) => {
     try {
       const history = [
         {
@@ -107,10 +107,10 @@ export function registerTaxManagementRoutes(app: Express) {
       console.error('Get GST history error:', error);
       res.status(500).json({ error: 'Failed to fetch GST history' });
     }
-  });
+  };
 
-  // Calculate GST liability
-  app.post('/api/tax/gst/calculate', async (req, res) => {
+  // GST calculate handler
+  const gstCalculateHandler = async (req: Request, res: Response) => {
     try {
       const { sales, purchases, igst, cgst, sgst } = req.body;
 
@@ -134,10 +134,10 @@ export function registerTaxManagementRoutes(app: Express) {
       console.error('Calculate GST error:', error);
       res.status(500).json({ error: 'Failed to calculate GST' });
     }
-  });
+  };
 
-  // Get TDS filing history
-  app.get('/api/tax/tds/history/:clientId', async (req, res) => {
+  // TDS history handler
+  const tdsHistoryHandler = async (req: Request, res: Response) => {
     try {
       const history = [
         {
@@ -179,24 +179,23 @@ export function registerTaxManagementRoutes(app: Express) {
       console.error('Get TDS history error:', error);
       res.status(500).json({ error: 'Failed to fetch TDS history' });
     }
-  });
+  };
 
-  // Calculate TDS
-  app.post('/api/tax/tds/calculate', async (req, res) => {
+  // TDS calculate handler
+  const tdsCalculateHandler = async (req: Request, res: Response) => {
     try {
       const { amount, section, panAvailable } = req.body;
 
-      // TDS rates for common sections
       const rates: Record<string, { withPan: number; withoutPan: number }> = {
-        '194C': { withPan: 1, withoutPan: 20 }, // Contractors
-        '194H': { withPan: 5, withoutPan: 20 }, // Commission
-        '194I': { withPan: 10, withoutPan: 20 }, // Rent
-        '194J': { withPan: 10, withoutPan: 20 }, // Professional fees
-        '192': { withPan: 0, withoutPan: 0 }, // Salary (slab based)
+        '194C': { withPan: 1, withoutPan: 20 },
+        '194H': { withPan: 5, withoutPan: 20 },
+        '194I': { withPan: 10, withoutPan: 20 },
+        '194J': { withPan: 10, withoutPan: 20 },
+        '192': { withPan: 0, withoutPan: 0 },
       };
 
       const rate = panAvailable ? rates[section]?.withPan : rates[section]?.withoutPan;
-      const tdsAmount = (amount * rate) / 100;
+      const tdsAmount = (amount * (rate || 0)) / 100;
       const netPayable = amount - tdsAmount;
 
       res.json({
@@ -211,10 +210,10 @@ export function registerTaxManagementRoutes(app: Express) {
       console.error('Calculate TDS error:', error);
       res.status(500).json({ error: 'Failed to calculate TDS' });
     }
-  });
+  };
 
-  // Get ITR filing status
-  app.get('/api/tax/itr/status/:clientId', async (req, res) => {
+  // ITR status handler
+  const itrStatusHandler = async (req: Request, res: Response) => {
     try {
       const status = {
         assessmentYear: "2024-25",
@@ -248,13 +247,11 @@ export function registerTaxManagementRoutes(app: Express) {
       console.error('Get ITR status error:', error);
       res.status(500).json({ error: 'Failed to fetch ITR status' });
     }
-  });
+  };
 
-  // Get tax calendar/deadlines
-  app.get('/api/tax/calendar', async (req, res) => {
+  // Tax calendar handler
+  const taxCalendarHandler = async (req: Request, res: Response) => {
     try {
-      const { month, year } = req.query;
-      
       const calendar = [
         {
           date: "2024-10-11",
@@ -293,10 +290,10 @@ export function registerTaxManagementRoutes(app: Express) {
       console.error('Get tax calendar error:', error);
       res.status(500).json({ error: 'Failed to fetch tax calendar' });
     }
-  });
+  };
 
-  // Get tax insights and recommendations
-  app.get('/api/tax/insights/:clientId', async (req, res) => {
+  // Tax insights handler
+  const taxInsightsHandler = async (req: Request, res: Response) => {
     try {
       const insights = {
         savingsOpportunities: [
@@ -344,7 +341,32 @@ export function registerTaxManagementRoutes(app: Express) {
       console.error('Get tax insights error:', error);
       res.status(500).json({ error: 'Failed to fetch tax insights' });
     }
-  });
+  };
+
+  // Register routes at both /api and /api/v1 paths for backward compatibility
+  app.get('/api/tax/dashboard/:clientId', taxDashboardHandler);
+  app.get('/api/v1/tax/dashboard/:clientId', taxDashboardHandler);
+
+  app.get('/api/tax/gst/history/:clientId', gstHistoryHandler);
+  app.get('/api/v1/tax/gst/history/:clientId', gstHistoryHandler);
+
+  app.post('/api/tax/gst/calculate', gstCalculateHandler);
+  app.post('/api/v1/tax/gst/calculate', gstCalculateHandler);
+
+  app.get('/api/tax/tds/history/:clientId', tdsHistoryHandler);
+  app.get('/api/v1/tax/tds/history/:clientId', tdsHistoryHandler);
+
+  app.post('/api/tax/tds/calculate', tdsCalculateHandler);
+  app.post('/api/v1/tax/tds/calculate', tdsCalculateHandler);
+
+  app.get('/api/tax/itr/status/:clientId', itrStatusHandler);
+  app.get('/api/v1/tax/itr/status/:clientId', itrStatusHandler);
+
+  app.get('/api/tax/calendar', taxCalendarHandler);
+  app.get('/api/v1/tax/calendar', taxCalendarHandler);
+
+  app.get('/api/tax/insights/:clientId', taxInsightsHandler);
+  app.get('/api/v1/tax/insights/:clientId', taxInsightsHandler);
 
   console.log('✅ Tax Management routes registered');
 }

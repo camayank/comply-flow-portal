@@ -1,90 +1,137 @@
 import React, { useState } from 'react';
 import { useLocation } from 'wouter';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { FileText, PenTool, Shield, Download, Eye, CheckCircle } from 'lucide-react';
+import { FileText, PenTool, Shield, Download, Eye, CheckCircle, Loader2, AlertTriangle } from 'lucide-react';
+import { apiRequest, queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
+
+interface ESignDocument {
+  id: string;
+  title: string;
+  description: string;
+  status: 'draft' | 'ready' | 'signed' | 'expired';
+  pages: number;
+  required: boolean;
+  category: string;
+  signedAt?: string;
+  signedBy?: string;
+}
 
 const ESignAgreements = () => {
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [signedDocuments, setSignedDocuments] = useState<string[]>([]);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
-  const documents = [
-    {
-      id: 'moa',
-      title: 'Memorandum of Association (MOA)',
-      description: 'Defines the company\'s constitution and scope of activities',
-      status: 'ready',
-      pages: 12,
-      required: true
+  // Fetch documents from API
+  const { data: documents = [], isLoading, error } = useQuery<ESignDocument[]>({
+    queryKey: ['/api/esign/documents'],
+    queryFn: async () => {
+      const response = await fetch('/api/esign/documents', {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
+      return response.json();
     },
-    {
-      id: 'aoa',
-      title: 'Articles of Association (AOA)',
-      description: 'Internal management and governance rules',
-      status: 'ready',
-      pages: 8,
-      required: true
+  });
+
+  // Sign document mutation
+  const signDocumentMutation = useMutation({
+    mutationFn: async (documentId: string) => {
+      const response = await fetch(`/api/esign/documents/${documentId}/sign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          signatureData: 'digital-consent',
+          agreedToTerms: true,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to sign document');
+      }
+      return response.json();
     },
-    {
-      id: 'inc32',
-      title: 'INC-32 (SPICe Part B)',
-      description: 'Application for Name Reservation',
-      status: 'ready',
-      pages: 4,
-      required: true
+    onSuccess: (data, documentId) => {
+      setSignedDocuments(prev => [...prev, documentId]);
+      queryClient.invalidateQueries({ queryKey: ['/api/esign/documents'] });
+      toast({
+        title: "Document Signed",
+        description: "Document has been digitally signed successfully.",
+      });
     },
-    {
-      id: 'dir2',
-      title: 'DIR-2 (Director KYC)',
-      description: 'Director identification and KYC verification',
-      status: 'ready',
-      pages: 6,
-      required: true
+    onError: (error) => {
+      toast({
+        title: "Signing Failed",
+        description: "Failed to sign the document. Please try again.",
+        variant: "destructive",
+      });
     },
-    {
-      id: 'inc9',
-      title: 'INC-9 (Declaration by Professionals)',
-      description: 'Professional declaration and verification',
-      status: 'ready',
-      pages: 2,
-      required: true
-    }
-  ];
+  });
 
   const handleDocumentSign = (docId: string) => {
-    setSignedDocuments(prev => 
-      prev.includes(docId) 
-        ? prev.filter(id => id !== docId)
-        : [...prev, docId]
-    );
+    if (signedDocuments.includes(docId)) {
+      // Toggle off locally (backend would need separate unsign endpoint)
+      setSignedDocuments(prev => prev.filter(id => id !== docId));
+    } else {
+      signDocumentMutation.mutate(docId);
+    }
   };
 
   const handleContinue = () => {
     const requiredDocs = documents.filter(doc => doc.required).map(doc => doc.id);
     const allRequiredSigned = requiredDocs.every(docId => signedDocuments.includes(docId));
-    
+
     if (allRequiredSigned && agreedToTerms) {
       localStorage.setItem('signedDocuments', JSON.stringify(signedDocuments));
       setLocation('/payment-gateway');
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'signed':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'ready':
-        return <PenTool className="h-4 w-4 text-blue-500" />;
-      default:
-        return <FileText className="h-4 w-4 text-gray-400" />;
+  const getStatusIcon = (status: string, isSigned: boolean) => {
+    if (isSigned || status === 'signed') {
+      return <CheckCircle className="h-4 w-4 text-green-500" />;
     }
+    if (status === 'ready') {
+      return <PenTool className="h-4 w-4 text-blue-500" />;
+    }
+    return <FileText className="h-4 w-4 text-gray-400" />;
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading documents...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Unable to Load Documents</h3>
+            <p className="text-gray-600 mb-4">Please try again or contact support.</p>
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const requiredDocs = documents.filter(doc => doc.required);
-  const signedRequiredCount = requiredDocs.filter(doc => signedDocuments.includes(doc.id)).length;
+  const signedRequiredCount = requiredDocs.filter(doc => signedDocuments.includes(doc.id) || doc.status === 'signed').length;
   const allRequiredSigned = signedRequiredCount === requiredDocs.length;
 
   return (
@@ -127,9 +174,9 @@ const ESignAgreements = () => {
                   <span>Total documents: {signedDocuments.length}/{documents.length}</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
+                  <div
                     className="bg-blue-600 rounded-full h-2 transition-all duration-300"
-                    style={{ width: `${(signedRequiredCount / requiredDocs.length) * 100}%` }}
+                    style={{ width: `${requiredDocs.length ? (signedRequiredCount / requiredDocs.length) * 100 : 0}%` }}
                   ></div>
                 </div>
               </div>
@@ -139,10 +186,10 @@ const ESignAgreements = () => {
           {/* Document List */}
           <div className="space-y-4 mb-8">
             {documents.map((document) => {
-              const isSigned = signedDocuments.includes(document.id);
-              
+              const isSigned = signedDocuments.includes(document.id) || document.status === 'signed';
+
               return (
-                <Card 
+                <Card
                   key={document.id}
                   className={`transition-all duration-200 ${
                     isSigned ? 'bg-green-50 border-green-200' : 'hover:shadow-md'
@@ -151,7 +198,7 @@ const ESignAgreements = () => {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        {getStatusIcon(isSigned ? 'signed' : document.status)}
+                        {getStatusIcon(document.status, isSigned)}
                         <div>
                           <CardTitle className="text-lg flex items-center gap-2">
                             {document.title}
@@ -163,7 +210,7 @@ const ESignAgreements = () => {
                           <p className="text-sm text-gray-500 mt-1">{document.pages} pages</p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-2">
                         <Button variant="outline" size="sm">
                           <Eye className="h-4 w-4 mr-1" />
@@ -178,8 +225,13 @@ const ESignAgreements = () => {
                           variant={isSigned ? "default" : "outline"}
                           size="sm"
                           className={isSigned ? "bg-green-600 hover:bg-green-700" : ""}
+                          disabled={signDocumentMutation.isPending}
                         >
-                          <PenTool className="h-4 w-4 mr-1" />
+                          {signDocumentMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          ) : (
+                            <PenTool className="h-4 w-4 mr-1" />
+                          )}
                           {isSigned ? 'Signed' : 'Sign'}
                         </Button>
                       </div>
@@ -226,8 +278,8 @@ const ESignAgreements = () => {
                 <div>
                   <h4 className="font-medium text-blue-900 mb-2">Secure Digital Signing</h4>
                   <p className="text-sm text-blue-800">
-                    All documents are digitally signed using 256-bit SSL encryption. 
-                    Your signatures are legally binding and comply with IT Act 2000. 
+                    All documents are digitally signed using 256-bit SSL encryption.
+                    Your signatures are legally binding and comply with IT Act 2000.
                     Documents are stored securely and are accessible anytime from your dashboard.
                   </p>
                 </div>
@@ -237,7 +289,7 @@ const ESignAgreements = () => {
 
           {/* Continue Button */}
           <div className="text-center">
-            <Button 
+            <Button
               onClick={handleContinue}
               disabled={!allRequiredSigned || !agreedToTerms}
               size="lg"

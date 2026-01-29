@@ -1313,6 +1313,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register AI Document Preparation routes
   const { registerAiDocumentRoutes } = await import('./ai-document-routes');
   registerAiDocumentRoutes(app);
+
+  // Register Document Vault routes for secure document storage
+  const { registerDocumentVaultRoutes } = await import('./document-vault-routes');
+  registerDocumentVaultRoutes(app);
+
+  // Register E-Sign routes for digital document signing
+  const { registerESignRoutes } = await import('./esign-routes');
+  registerESignRoutes(app);
   
   // Register Service-Document Integration routes
   const { registerServiceDocumentIntegration } = await import('./service-document-integration');

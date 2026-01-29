@@ -221,5 +221,37 @@ export function registerWorkflowAutomationRoutes(app: Express) {
     }
   });
 
+  // Register duplicate routes at /api/v1 paths for backward compatibility
+  app.get('/api/v1/workflows/automation', async (req, res) => {
+    const automations = [
+      { id: 1, name: "Welcome Email on Registration", trigger: "client_registered", enabled: true },
+      { id: 2, name: "Payment Reminder - 24hrs before due", trigger: "payment_due_soon", enabled: true },
+      { id: 3, name: "Service Milestone Completed", trigger: "milestone_completed", enabled: true },
+      { id: 4, name: "Document Upload Reminder", trigger: "document_pending", enabled: true },
+      { id: 5, name: "Compliance Due Alert - 7 Days", trigger: "compliance_due_soon", enabled: true },
+      { id: 6, name: "Referral Credit - Successful Onboarding", trigger: "referral_completed", enabled: true },
+    ];
+    res.json(automations);
+  });
+
+  app.get('/api/v1/workflows/history', async (req, res) => {
+    const history = [
+      { id: 1, workflow: "Welcome Email on Registration", trigger: "client_registered", status: "success", executedAt: new Date() },
+      { id: 2, workflow: "Payment Reminder", trigger: "payment_due_soon", status: "success", executedAt: new Date(Date.now() - 3600000) },
+    ];
+    res.json(history);
+  });
+
+  app.post('/api/v1/workflows/automation', async (req, res) => {
+    const { name, trigger, actions, enabled } = req.body;
+    res.json({ message: 'Automation created', automation: { id: Math.floor(Math.random() * 10000), name, trigger, actions, enabled } });
+  });
+
+  app.patch('/api/v1/workflows/automation/:id', async (req, res) => {
+    const { id } = req.params;
+    const { enabled } = req.body;
+    res.json({ message: 'Automation updated', id: parseInt(id), enabled });
+  });
+
   console.log('✅ Workflow Automation routes registered');
 }
