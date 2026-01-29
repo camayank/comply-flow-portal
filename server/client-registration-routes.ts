@@ -3,6 +3,7 @@ import { db } from './db';
 import { users, businessEntities } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
+import { generateClientId } from './services/id-generator';
 
 export function registerClientRegistrationRoutes(app: Express) {
 
@@ -60,9 +61,8 @@ export function registerClientRegistrationRoutes(app: Express) {
         })
         .returning();
 
-      // Generate client ID (C0001 format)
-      const clientCount = await db.select().from(businessEntities);
-      const clientId = `C${String(clientCount.length + 1).padStart(4, '0')}`;
+      // Generate client ID using centralized ID generator
+      const clientId = await generateClientId();
 
       // Create business entity
       const [newEntity] = await db

@@ -184,7 +184,16 @@ app.use((req, res, next) => {
     await serviceSeeder.seedAllServices();
     await seedComplianceData();
   }
-  
+
+  // Run ID sequences migration
+  try {
+    const { runMigration: runIdSequencesMigration } = await import('./migrations/add-id-sequences');
+    await runIdSequencesMigration();
+    console.log('✅ ID sequences initialized');
+  } catch (error) {
+    console.warn('⚠️ ID sequences migration skipped (may already exist):', (error as Error).message);
+  }
+
   console.log('✅ Service management systems initialized');
   
   // Initialize task reminder processor

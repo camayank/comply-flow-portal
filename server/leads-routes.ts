@@ -13,6 +13,7 @@ import {
   USER_ROLES,
   AuthenticatedRequest
 } from './rbac-middleware';
+import { generateClientId, generateLeadId } from './services/id-generator';
 
 const router = express.Router();
 
@@ -219,10 +220,8 @@ router.post('/leads/:id/convert', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE
       return res.status(400).json({ error: 'Lead has already been converted' });
     }
 
-    // 2. Generate unique client ID (C0001 format)
-    const existingEntities = await storage.getAllBusinessEntities();
-    const clientNumber = existingEntities.length + 1;
-    const clientId = `C${clientNumber.toString().padStart(4, '0')}`;
+    // 2. Generate unique client ID using centralized ID generator
+    const clientId = await generateClientId();
 
     // 3. Generate temporary password (should be changed on first login)
     const tempPassword = `DigiComply${Math.random().toString(36).slice(-8)}`;

@@ -18,6 +18,7 @@ import type {
   Service, InsertService,
   User, InsertUser
 } from '../shared/schema';
+import { generateLeadId, generateServiceRequestId, generatePaymentId, generateInvoiceId } from './services/id-generator';
 
 // Database-backed storage for critical entities (Leads & Proposals)
 // This ensures data persists across server restarts
@@ -81,7 +82,8 @@ export class DbLeadsStorage {
   }
 
   async createLead(lead: InsertLeadEnhanced): Promise<LeadEnhanced> {
-    const leadId = `L${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    // Generate lead ID using centralized ID generator
+    const leadId = await generateLeadId();
     const [newLead] = await db.insert(leads).values({ ...lead, leadId }).returning();
     return newLead;
   }

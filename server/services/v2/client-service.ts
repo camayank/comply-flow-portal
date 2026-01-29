@@ -31,15 +31,20 @@ export interface Client {
 /**
  * Get client by user ID
  * Primary method for fetching client data after authentication
+ * Uses business_entities table which is the primary entity store
  */
 export async function getClientByUserId(userId: string): Promise<Client | null> {
   const result = await pool.query(
-    `SELECT 
-      id, user_id, business_name, business_type, gstin, pan,
-      email, phone, address, city, state, pincode, industry,
-      incorporation_date, status, created_at, updated_at
-    FROM clients
-    WHERE user_id = $1 AND status = 'active'`,
+    `SELECT
+      be.id, be.owner_id as user_id, be.name as business_name,
+      be.entity_type as business_type, be.gstin, be.pan,
+      u.email, u.phone, be.address, be.city, be.state,
+      be.industry_type as industry, be.registration_date as incorporation_date,
+      be.client_status as status, be.is_active,
+      be.created_at, be.updated_at
+    FROM business_entities be
+    JOIN users u ON be.owner_id = u.id
+    WHERE be.owner_id = $1 AND be.is_active = true`,
     [userId]
   );
 
@@ -50,7 +55,7 @@ export async function getClientByUserId(userId: string): Promise<Client | null> 
   const row = result.rows[0];
   return {
     id: row.id,
-    userId: row.user_id,
+    userId: String(row.user_id),
     businessName: row.business_name,
     businessType: row.business_type,
     gstin: row.gstin,
@@ -60,10 +65,10 @@ export async function getClientByUserId(userId: string): Promise<Client | null> 
     address: row.address,
     city: row.city,
     state: row.state,
-    pincode: row.pincode,
+    pincode: null,
     industry: row.industry,
     incorporationDate: row.incorporation_date,
-    status: row.status,
+    status: row.status || 'active',
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };

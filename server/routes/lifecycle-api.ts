@@ -58,7 +58,7 @@ function getAuthenticatedUserId(req: Request): string | null {
  * TOP-LEVEL: Executive dashboard view
  * Shows compliance health, lifecycle stage, funding readiness
  */
-router.get('/dashboard', validateRequest(lifecycleSchemas.userId, 'query'), async (req, res, next) => {
+router.get('/dashboard', async (req, res, next) => {
   try {
     const userId = getAuthenticatedUserId(req);
     if (!userId) {

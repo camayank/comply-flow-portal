@@ -5225,6 +5225,103 @@ export type WorkItemActivityLog = typeof workItemActivityLog.$inferSelect;
 export type InsertWorkItemActivityLog = z.infer<typeof insertWorkItemActivityLogSchema>;
 
 // ============================================================================
+// ID SEQUENCE MANAGEMENT
+// ============================================================================
+
+/**
+ * ID Sequences Table
+ * Centralized ID generation with atomic counters for all entity types
+ * Ensures unique, sequential IDs across the platform
+ */
+export const idSequences = pgTable("id_sequences", {
+  id: serial("id").primaryKey(),
+  entityType: text("entity_type").notNull(), // CLIENT, ENTITY, SERVICE_REQUEST, etc.
+  year: text("year").notNull(), // 4-digit year or 'ALL' for non-yearly IDs
+  month: text("month"), // Optional 2-digit month for monthly sequences
+  currentSequence: integer("current_sequence").notNull().default(0),
+  prefix: text("prefix").notNull(), // C, E, SR, WI, etc.
+  lastGeneratedId: text("last_generated_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Unique constraint on entity_type + year + month combination
+// Note: Add in migration: CREATE UNIQUE INDEX idx_id_sequences_unique ON id_sequences(entity_type, year, COALESCE(month, ''));
+
+export const insertIdSequenceSchema = createInsertSchema(idSequences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type IdSequence = typeof idSequences.$inferSelect;
+export type InsertIdSequence = z.infer<typeof insertIdSequenceSchema>;
+
+// ============================================================================
+// ID TYPE CONSTANTS
+// ============================================================================
+
+export const ID_TYPES = {
+  // Core Entities
+  CLIENT: 'CLIENT',
+  ENTITY: 'ENTITY',
+  CONTACT: 'CONTACT',
+  USER: 'USER',
+  STAFF: 'STAFF',
+  AGENT: 'AGENT',
+  TEAM: 'TEAM',
+
+  // Service & Work
+  SERVICE_REQUEST: 'SERVICE_REQUEST',
+  WORK_ITEM: 'WORK_ITEM',
+  TASK: 'TASK',
+  SUB_TASK: 'SUB_TASK',
+  WORKFLOW_INSTANCE: 'WORKFLOW_INSTANCE',
+
+  // Financial
+  INVOICE: 'INVOICE',
+  PAYMENT: 'PAYMENT',
+  RECEIPT: 'RECEIPT',
+  CREDIT_NOTE: 'CREDIT_NOTE',
+  DEBIT_NOTE: 'DEBIT_NOTE',
+  COMMISSION: 'COMMISSION',
+  WALLET_TXN: 'WALLET_TXN',
+  PAYOUT: 'PAYOUT',
+
+  // Documents
+  DOCUMENT: 'DOCUMENT',
+  DOC_REQUEST: 'DOC_REQUEST',
+  SIGNATURE: 'SIGNATURE',
+  CERTIFICATE: 'CERTIFICATE',
+
+  // Compliance
+  COMPLIANCE_ITEM: 'COMPLIANCE_ITEM',
+  DEADLINE: 'DEADLINE',
+  PENALTY: 'PENALTY',
+  FILING: 'FILING',
+
+  // Sales & CRM
+  LEAD: 'LEAD',
+  OPPORTUNITY: 'OPPORTUNITY',
+  PROPOSAL: 'PROPOSAL',
+  CONTRACT: 'CONTRACT',
+  QUOTE: 'QUOTE',
+
+  // Support
+  TICKET: 'TICKET',
+  ESCALATION: 'ESCALATION',
+  FEEDBACK: 'FEEDBACK',
+  MESSAGE: 'MESSAGE',
+
+  // Quality
+  QC_REVIEW: 'QC_REVIEW',
+  DELIVERY: 'DELIVERY',
+  REJECTION: 'REJECTION',
+} as const;
+
+export type IdType = typeof ID_TYPES[keyof typeof ID_TYPES];
+
+// ============================================================================
 // INDEXES for Performance
 // ============================================================================
 

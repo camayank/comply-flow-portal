@@ -73,6 +73,46 @@ export function createBackwardCompatibilityMiddleware(targetVersion: ApiVersion 
       return next();
     }
 
+    // Skip auth routes (not versioned)
+    if (path.startsWith('/api/auth/')) {
+      return next();
+    }
+
+    // Skip v2 routes (already versioned)
+    if (path.startsWith('/api/v2/')) {
+      return next();
+    }
+
+    // Skip ops routes (operations API)
+    if (path.startsWith('/api/ops/')) {
+      return next();
+    }
+
+    // Skip admin routes
+    if (path.startsWith('/api/admin/')) {
+      return next();
+    }
+
+    // Skip client registration routes
+    if (path.startsWith('/api/client/register')) {
+      return next();
+    }
+
+    // Skip payment routes
+    if (path.startsWith('/api/payments/')) {
+      return next();
+    }
+
+    // Skip service request routes (main CRUD)
+    if (path.startsWith('/api/service-requests')) {
+      return next();
+    }
+
+    // Skip services routes (public catalog)
+    if (path === '/api/services' || path.startsWith('/api/services/')) {
+      return next();
+    }
+
     // Only handle /api/* routes (not versioned yet)
     if (path.startsWith('/api/')) {
       // Add deprecation warning header
