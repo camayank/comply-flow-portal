@@ -1371,6 +1371,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { registerIntegrationRoutes } = await import('./integration-routes');
   registerIntegrationRoutes(app);
 
+  // Register Executive Analytics routes for Dashboard & BI
+  const executiveAnalyticsRoutes = await import('./executive-analytics-routes');
+  app.use('/api/executive', executiveAnalyticsRoutes.default);
+  app.use('/api/v1/executive', executiveAnalyticsRoutes.default);
+  console.log('✅ Executive Analytics routes registered');
+
+  // Register Recommendations routes for Smart Suggestions
+  const recommendationsRoutes = await import('./recommendations-routes');
+  app.use('/api/recommendations', recommendationsRoutes.default);
+  app.use('/api/v1/recommendations', recommendationsRoutes.default);
+  console.log('✅ Recommendations/Suggestions routes registered');
+
+  // Register Retainership routes for subscription management
+  const retainershipRoutes = await import('./retainership-routes');
+  app.use('/api/retainership', retainershipRoutes.default);
+  app.use('/api/v1/retainership', retainershipRoutes.default);
+  console.log('✅ Retainership/Subscription routes registered');
+
   const httpServer = createServer(app);
   return httpServer;
 }

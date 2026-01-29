@@ -498,34 +498,34 @@ const routes: RouteInfo[] = [
   {
     path: "/executive-dashboard",
     name: "Executive Dashboard",
-    description: "High-level business metrics & KPIs",
+    description: "Full executive stats with revenue trends & forecasting",
     role: "Executive",
     icon: BarChart3,
     color: "bg-slate-700",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/business-intelligence",
     name: "Business Intelligence",
-    description: "Analytics, reporting, forecasting",
+    description: "Complete BI dashboard with funnel, performance & forecasting",
     role: "Executive",
     icon: TrendingUp,
     color: "bg-slate-700",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
 
   // ============ SUPPORT & FINANCE ============
   {
     path: "/customer-service",
     name: "Customer Service",
-    description: "Support ticket management & client communication",
+    description: "Full ticket management with SLA, canned responses & satisfaction",
     role: "Support",
     icon: Headphones,
     color: "bg-teal-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
   {
     path: "/financial-management",
@@ -554,12 +554,12 @@ const routes: RouteInfo[] = [
   {
     path: "/dashboard",
     name: "Unified Dashboard",
-    description: "Main unified dashboard view",
+    description: "Role-based dashboard with widgets & quick actions",
     role: "Landing",
     icon: LayoutDashboard,
     color: "bg-blue-600",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   {
     path: "/landing",
@@ -596,33 +596,33 @@ const routes: RouteInfo[] = [
   {
     path: "/founder",
     name: "Founder Lite",
-    description: "Simplified founder dashboard",
+    description: "Simplified dashboard with health score & quick actions",
     role: "Client - Core",
     icon: Crown,
     color: "bg-amber-500",
     status: 'active',
-    depth: 'partial'
+    depth: 'full'
   },
   // CONSOLIDATED: /mobile-dashboard merged into /portal-v2 (responsive)
   {
     path: "/retainership",
     name: "Retainership Plans",
-    description: "View and manage retainer subscriptions",
+    description: "Full subscription management with plans, billing & usage",
     role: "Client - Core",
     icon: Package,
     color: "bg-emerald-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
   {
     path: "/suggestions",
     name: "Smart Suggestions",
-    description: "AI-powered service recommendations",
+    description: "AI recommendations for services, compliance & growth",
     role: "Client - Core",
     icon: Sparkles,
     color: "bg-violet-500",
     status: 'active',
-    depth: 'basic'
+    depth: 'full'
   },
 
   // ============ UTILITY PAGES ============
