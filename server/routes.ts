@@ -1692,6 +1692,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/v2/lookup', idLookupRoutes.default);
   console.log('✅ ID Lookup Routes registered (Universal ID resolution)');
 
+  // Register Webhook Routes (Enterprise outbound webhooks)
+  const webhookRoutes = await import('./routes/webhook-routes');
+  app.use('/api/webhooks', webhookRoutes.default);
+  app.use('/api/v2/webhooks', webhookRoutes.default);
+  console.log('✅ Webhook Routes registered (Enterprise outbound webhooks)');
+
+  // Register API Key Management Routes (External integration keys)
+  const apiKeyRoutes = await import('./routes/api-key-routes');
+  app.use('/api/api-keys', apiKeyRoutes.default);
+  app.use('/api/v2/api-keys', apiKeyRoutes.default);
+  console.log('✅ API Key Routes registered (External integration keys)');
+
+  // Register Notification Preferences Routes (User notification settings)
+  const notificationPreferencesRoutes = await import('./routes/notification-preferences-routes');
+  app.use('/api/notification-preferences', notificationPreferencesRoutes.default);
+  app.use('/api/v2/notification-preferences', notificationPreferencesRoutes.default);
+  console.log('✅ Notification Preferences Routes registered (User notification settings)');
+
+  // Register Tenant Routes (Multi-tenancy management)
+  const tenantRoutes = await import('./routes/tenant-routes');
+  app.use('/api/tenants', tenantRoutes.default);
+  app.use('/api/v2/tenants', tenantRoutes.default);
+  console.log('✅ Tenant Routes registered (Multi-tenancy management)');
+
+  // Register Advanced RBAC Routes (Permission management)
+  const advancedRbacRoutes = await import('./routes/advanced-rbac-routes');
+  app.use('/api/rbac', advancedRbacRoutes.default);
+  app.use('/api/v2/rbac', advancedRbacRoutes.default);
+  console.log('✅ Advanced RBAC Routes registered (Permission management)');
+
   const httpServer = createServer(app);
   return httpServer;
 }
