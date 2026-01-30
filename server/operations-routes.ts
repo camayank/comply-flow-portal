@@ -178,7 +178,7 @@ export function registerOperationsRoutes(app: Express) {
         .from(serviceRequests)
         .leftJoin(businessEntities, eq(serviceRequests.businessEntityId, businessEntities.id))
         .leftJoin(services, eq(serviceRequests.serviceId, services.id))
-        .where(sql`${serviceRequests.status} in ('qc_approved', 'ready_for_delivery', 'packaging', 'sending', 'delivered', 'confirmed')`)
+        .where(sql`${serviceRequests.status} in ('qc_approved', 'ready_for_delivery', 'delivered', 'awaiting_client_confirmation', 'completed')`)
         .orderBy(desc(serviceRequests.updatedAt));
 
       // Get QC reviews for these service requests
@@ -204,6 +204,7 @@ export function registerOperationsRoutes(app: Express) {
       }
 
       // Get stats
+      // Stats using valid state machine statuses
       const stats = {
         readyForDelivery: await db
           .select({ count: sql`count(*)` })
@@ -212,15 +213,15 @@ export function registerOperationsRoutes(app: Express) {
         inProgress: await db
           .select({ count: sql`count(*)` })
           .from(serviceRequests)
-          .where(sql`${serviceRequests.status} in ('packaging', 'sending')`),
-        delivered: await db
-          .select({ count: sql`count(*)` })
-          .from(serviceRequests)
           .where(eq(serviceRequests.status, 'delivered')),
-        confirmed: await db
+        awaitingConfirmation: await db
           .select({ count: sql`count(*)` })
           .from(serviceRequests)
-          .where(eq(serviceRequests.status, 'confirmed'))
+          .where(eq(serviceRequests.status, 'awaiting_client_confirmation')),
+        completed: await db
+          .select({ count: sql`count(*)` })
+          .from(serviceRequests)
+          .where(eq(serviceRequests.status, 'completed'))
       };
 
       // Calculate delivery metrics
@@ -288,9 +289,9 @@ export function registerOperationsRoutes(app: Express) {
         items: enrichedItems,
         stats: {
           readyForDelivery: Number(stats.readyForDelivery[0]?.count || 0),
-          inProgress: Number(stats.inProgress[0]?.count || 0),
-          delivered: Number(stats.delivered[0]?.count || 0),
-          confirmed: Number(stats.confirmed[0]?.count || 0),
+          delivered: Number(stats.inProgress[0]?.count || 0),
+          awaitingConfirmation: Number(stats.awaitingConfirmation[0]?.count || 0),
+          completed: Number(stats.completed[0]?.count || 0),
           avgDeliveryTime: Math.round(avgDeliveryTime * 10) / 10,
           deliverySuccessRate: Math.round(deliverySuccessRate * 10) / 10
         }
@@ -303,10 +304,11 @@ export function registerOperationsRoutes(app: Express) {
 
   // Initiate delivery for a service request
   // Requires: ops_executive or higher
+  // USES STATE MACHINE: ready_for_delivery → delivered
   app.post('/api/ops/delivery-handoff/:handoffId/initiate', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { handoffId } = req.params;
-      const { deliveryMethod, deliveryNotes, includeDocuments, customMessage, initiatedBy } = req.body;
+      const { deliveryMethod, deliveryNotes, includeDocuments, customMessage } = req.body;
       const serviceRequestId = parseInt(handoffId);
 
       // Get service request details
@@ -319,19 +321,38 @@ export function registerOperationsRoutes(app: Express) {
         return res.status(404).json({ error: 'Service request not found' });
       }
 
+      // Use state machine for transition: ready_for_delivery → delivered
+      const { transitionServiceRequestStatus } = await import('./services/core-operations-service');
+      const transitionResult = await transitionServiceRequestStatus(serviceRequestId, 'delivered', {
+        performedBy: {
+          id: req.user?.id || 0,
+          username: req.user?.username || 'unknown',
+          role: req.user?.role || 'unknown'
+        },
+        reason: 'Delivery initiated',
+        notes: deliveryNotes
+      });
+
+      if (!transitionResult.success) {
+        return res.status(400).json({
+          error: 'Cannot initiate delivery',
+          message: transitionResult.message,
+          currentStatus: serviceRequest.status
+        });
+      }
+
       // Generate a unique delivery token for secure confirmation
       const deliveryToken = `DT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      // Update service request status
-      const [updatedRequest] = await db
-        .update(serviceRequests)
-        .set({
-          status: 'sending',
-          updatedAt: new Date(),
-          notes: deliveryNotes ? `${serviceRequest.notes || ''}\n[Delivery] ${deliveryNotes}` : serviceRequest.notes
-        })
-        .where(eq(serviceRequests.id, serviceRequestId))
-        .returning();
+      // Update notes if provided
+      if (deliveryNotes) {
+        await db
+          .update(serviceRequests)
+          .set({
+            notes: `${serviceRequest.notes || ''}\n[Delivery] ${deliveryNotes}`
+          })
+          .where(eq(serviceRequests.id, serviceRequestId));
+      }
 
       // Create delivery confirmation record
       const [deliveryRecord] = await db
@@ -342,7 +363,7 @@ export function registerOperationsRoutes(app: Express) {
           deliveryStatus: 'initiated',
           status: 'pending',
           deliveryToken: deliveryToken,
-          initiatedBy: initiatedBy || 'ops_team',
+          initiatedBy: req.user?.username || 'ops_team',
           notes: deliveryNotes || null,
           documents: includeDocuments ? JSON.stringify(includeDocuments) : null,
           customMessage: customMessage || null,
@@ -358,7 +379,8 @@ export function registerOperationsRoutes(app: Express) {
         deliveryId: deliveryRecord.id,
         deliveryToken: deliveryToken,
         deliveryMethod,
-        serviceRequestStatus: updatedRequest.status,
+        serviceRequestStatus: 'delivered',
+        previousStatus: transitionResult.previousStatus,
         timestamp: new Date().toISOString()
       });
     } catch (error) {
@@ -368,6 +390,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Confirm delivery receipt (client-facing)
+  // USES STATE MACHINE: delivered → completed
   app.post('/api/delivery/:token/confirm', async (req: Request, res: Response) => {
     try {
       const { token } = req.params;
@@ -402,14 +425,17 @@ export function registerOperationsRoutes(app: Express) {
         .where(eq(deliveryConfirmations.id, delivery.id))
         .returning();
 
-      // Update service request status to confirmed
-      await db
-        .update(serviceRequests)
-        .set({
-          status: 'confirmed',
-          updatedAt: new Date()
-        })
-        .where(eq(serviceRequests.id, delivery.serviceRequestId));
+      // Use state machine for transition: delivered → completed
+      const { transitionServiceRequestStatus } = await import('./services/core-operations-service');
+      await transitionServiceRequestStatus(delivery.serviceRequestId, 'completed', {
+        performedBy: {
+          id: 0, // Client action (no authenticated user)
+          username: confirmedBy || 'client',
+          role: 'client'
+        },
+        reason: 'Delivery confirmed by client',
+        notes: feedback
+      });
 
       res.json({
         success: true,

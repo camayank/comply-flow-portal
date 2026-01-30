@@ -2,6 +2,12 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import {
+  SERVICE_REQUEST_STATUSES,
+  DELIVERY_STATUSES,
+  STATUS_LABELS as SHARED_STATUS_LABELS,
+  STATUS_COLORS as SHARED_STATUS_COLORS
+} from '@/constants';
+import {
   Card,
   CardContent,
   CardDescription,
@@ -72,7 +78,7 @@ interface HandoffItem {
   qualityScore: number;
   reviewNotes: string;
   priority: string;
-  status: 'ready_for_delivery' | 'packaging' | 'sending' | 'delivered' | 'confirmed';
+  status: 'ready_for_delivery' | 'delivered' | 'awaiting_client_confirmation' | 'completed';
   deliverables: Array<{
     id: string;
     name: string;
@@ -95,20 +101,18 @@ interface HandoffStats {
   deliverySuccessRate: number;
 }
 
-const STATUS_COLORS = {
+const STATUS_COLORS: Record<string, string> = {
   ready_for_delivery: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-  packaging: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-  sending: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
   delivered: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-  confirmed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+  awaiting_client_confirmation: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  completed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
 };
 
-const STATUS_LABELS = {
+const STATUS_LABELS: Record<string, string> = {
   ready_for_delivery: 'Ready for Delivery',
-  packaging: 'Packaging',
-  sending: 'Sending',
   delivered: 'Delivered',
-  confirmed: 'Confirmed'
+  awaiting_client_confirmation: 'Awaiting Confirmation',
+  completed: 'Completed'
 };
 
 const PRIORITY_COLORS = {
@@ -278,8 +282,8 @@ export default function QCDeliveryHandoff() {
       item.serviceName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPriority = priorityFilter === 'all' || item.priority === priorityFilter;
     const matchesTab = selectedTab === 'ready' ? item.status === 'ready_for_delivery' :
-      selectedTab === 'in_progress' ? ['packaging', 'sending'].includes(item.status) :
-      ['delivered', 'confirmed'].includes(item.status);
+      selectedTab === 'in_progress' ? ['delivered', 'awaiting_client_confirmation'].includes(item.status) :
+      item.status === 'completed';
     return matchesSearch && matchesPriority && matchesTab;
   }) || [];
 

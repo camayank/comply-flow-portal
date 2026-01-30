@@ -12,3 +12,6 @@ export * from './use-toast';
 export * from './usePlatformSync';
 export * from './useLifecycle';
 export * from './useCompliance';
+export * from './useOperations';
+export * from './useCustomerSuccess';
+export * from './useAudit';

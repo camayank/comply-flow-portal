@@ -14,9 +14,18 @@
  * - Transparent status for all stakeholders
  */
 
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/useAuth";
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
+import {
+  useWorkQueue,
+  useAtRiskItems,
+  useBreachedItems,
+  useWorkQueueStats,
+  useTriggerEscalationCheck,
+  useActivityLog,
+} from "@/hooks/useOperations";
+import { SLA_STATUSES } from "@/constants";
 import {
   Card,
   CardContent,
@@ -258,10 +267,8 @@ function StatsCard({
 
 // Activity Log Component
 function ActivityLog({ serviceRequestId }: { serviceRequestId: number }) {
-  const { data: activities, isLoading } = useQuery({
-    queryKey: [`/api/work-queue/activity/${serviceRequestId}`],
-    enabled: !!serviceRequestId,
-  });
+  const { data: activitiesData, isLoading } = useActivityLog(serviceRequestId);
+  const activities = activitiesData?.activities || activitiesData || [];
 
   if (isLoading) {
     return <div className="text-center py-4">Loading activity...</div>;
@@ -363,44 +370,32 @@ export default function OperationsWorkQueue() {
   const [activeTab, setActiveTab] = useState("all");
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
   const [filters, setFilters] = useState({
-    slaStatus: "",
+    slaStatus: "" as '' | 'on_track' | 'at_risk' | 'warning' | 'breached',
     priority: "",
     assignee: "",
   });
 
-  // Fetch work queue
-  const { data: workQueueData, isLoading, refetch } = useQuery<{
-    items: WorkItem[];
-    stats: WorkQueueStats;
-  }>({
-    queryKey: ["/api/work-queue", filters],
-  });
+  // Fetch work queue using new hooks
+  const { data: workQueueData, isLoading, refetch } = useWorkQueue(
+    filters.slaStatus || filters.priority
+      ? {
+          slaStatus: filters.slaStatus || undefined,
+          priority: filters.priority || undefined,
+        }
+      : undefined
+  );
 
   // Fetch at-risk items
-  const { data: atRiskData } = useQuery({
-    queryKey: ["/api/work-queue/at-risk"],
-  });
+  const { data: atRiskData } = useAtRiskItems();
 
   // Fetch breached items
-  const { data: breachedData } = useQuery({
-    queryKey: ["/api/work-queue/breached"],
-  });
+  const { data: breachedData } = useBreachedItems();
 
-  // Fetch unassigned items
-  const { data: unassignedData } = useQuery({
-    queryKey: ["/api/work-queue/unassigned"],
-  });
+  // Fetch unassigned items - use work queue with no assignedTo filter
+  const unassignedData = { items: workQueueData?.items?.filter((item: WorkItem) => !item.assignedTo) || [] };
 
-  // Manual process trigger
-  const processMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/work-queue/engine/process", { method: "POST" });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/work-queue"] });
-    },
-  });
+  // Manual process trigger using new hook
+  const triggerCheck = useTriggerEscalationCheck();
 
   const stats = workQueueData?.stats;
   const items = workQueueData?.items || [];
@@ -441,8 +436,8 @@ export default function OperationsWorkQueue() {
             Refresh
           </Button>
           <Button
-            onClick={() => processMutation.mutate()}
-            disabled={processMutation.isPending}
+            onClick={() => triggerCheck.mutate()}
+            disabled={triggerCheck.isPending}
           >
             <Zap className="h-4 w-4 mr-2" />
             Process Now

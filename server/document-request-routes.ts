@@ -719,5 +719,220 @@ export function registerDocumentRequestRoutes(app: Express) {
     }
   });
 
+  // ============================================================
+  // DOCUMENT VERIFICATION - STATE MACHINE INTEGRATION
+  // ============================================================
+
+  /**
+   * Get document verification status for a service request
+   * Returns complete status of all required and uploaded documents
+   */
+  app.get('/api/service-requests/:serviceRequestId/documents/verification-status', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { serviceRequestId } = req.params;
+      const { checkDocumentsVerified, getRequiredDocuments } = await import('./services/document-verification-service');
+
+      const verificationResult = await checkDocumentsVerified(parseInt(serviceRequestId));
+      const requiredDocs = await getRequiredDocuments(parseInt(serviceRequestId));
+
+      res.json({
+        serviceRequestId: parseInt(serviceRequestId),
+        ...verificationResult,
+        requiredDocuments: requiredDocs,
+        canAdvanceToVerified: verificationResult.isComplete && !verificationResult.pendingVerification.length && !verificationResult.rejectedDocuments.length,
+        summary: {
+          status: verificationResult.isVerified ? 'all_verified' :
+                  verificationResult.isComplete ? 'pending_verification' : 'documents_missing',
+          message: verificationResult.isVerified ? 'All documents verified' :
+                   verificationResult.isComplete ? `${verificationResult.pendingVerification.length} document(s) pending verification` :
+                   `${verificationResult.missingDocuments.length} document(s) missing`
+        }
+      });
+    } catch (error: any) {
+      console.error('Error checking verification status:', error);
+      res.status(500).json({ error: 'Failed to check verification status' });
+    }
+  });
+
+  /**
+   * Verify a single document
+   * Updates document status and optionally auto-advances service request
+   */
+  app.post('/api/documents/:documentId/verify', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { documentId } = req.params;
+      const { status, notes, rejectionReason, autoAdvance = true } = req.body;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      if (!['verified', 'approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status. Must be verified, approved, or rejected' });
+      }
+
+      const { verifyDocument, autoAdvanceAfterDocumentVerification } = await import('./services/document-verification-service');
+
+      // Verify the document
+      const result = await verifyDocument(
+        parseInt(documentId),
+        userId,
+        status,
+        notes,
+        rejectionReason
+      );
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.message });
+      }
+
+      // Get document to find service request
+      const [doc] = await db.select()
+        .from(documentsUploads)
+        .where(eq(documentsUploads.id, parseInt(documentId)))
+        .limit(1);
+
+      let advanceResult = null;
+
+      // Auto-advance if enabled and document was verified/approved
+      if (autoAdvance && doc?.serviceRequestId && status !== 'rejected') {
+        advanceResult = await autoAdvanceAfterDocumentVerification(
+          doc.serviceRequestId,
+          {
+            id: req.user?.id || 0,
+            username: req.user?.username || 'unknown',
+            role: req.user?.role || 'unknown'
+          }
+        );
+      }
+
+      res.json({
+        success: true,
+        message: result.message,
+        documentId: parseInt(documentId),
+        status,
+        autoAdvance: advanceResult
+      });
+    } catch (error: any) {
+      console.error('Error verifying document:', error);
+      res.status(500).json({ error: 'Failed to verify document' });
+    }
+  });
+
+  /**
+   * Bulk verify all documents for a service request
+   * Useful for approving all documents at once
+   */
+  app.post('/api/service-requests/:serviceRequestId/documents/bulk-verify', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { serviceRequestId } = req.params;
+      const { status = 'verified', autoAdvance = true } = req.body;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      if (!['verified', 'approved'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status. Must be verified or approved' });
+      }
+
+      const {
+        bulkVerifyDocuments,
+        autoAdvanceAfterDocumentVerification,
+        checkDocumentsVerified
+      } = await import('./services/document-verification-service');
+
+      // Bulk verify
+      const result = await bulkVerifyDocuments(
+        parseInt(serviceRequestId),
+        userId,
+        status
+      );
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.message });
+      }
+
+      let advanceResult = null;
+
+      // Auto-advance if enabled
+      if (autoAdvance) {
+        advanceResult = await autoAdvanceAfterDocumentVerification(
+          parseInt(serviceRequestId),
+          {
+            id: req.user?.id || 0,
+            username: req.user?.username || 'unknown',
+            role: req.user?.role || 'unknown'
+          }
+        );
+      }
+
+      // Get final verification status
+      const verificationStatus = await checkDocumentsVerified(parseInt(serviceRequestId));
+
+      res.json({
+        success: true,
+        message: `All documents ${status}`,
+        serviceRequestId: parseInt(serviceRequestId),
+        verificationStatus,
+        autoAdvance: advanceResult
+      });
+    } catch (error: any) {
+      console.error('Error bulk verifying documents:', error);
+      res.status(500).json({ error: 'Failed to bulk verify documents' });
+    }
+  });
+
+  /**
+   * Get required documents list for a service request
+   * Useful for showing clients what documents they need to upload
+   */
+  app.get('/api/service-requests/:serviceRequestId/required-documents', sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { serviceRequestId } = req.params;
+      const { getRequiredDocuments, checkDocumentsUploaded, REQUIRED_DOCUMENTS_BY_SERVICE } = await import('./services/document-verification-service');
+
+      const requiredDocs = await getRequiredDocuments(parseInt(serviceRequestId));
+      const uploadStatus = await checkDocumentsUploaded(parseInt(serviceRequestId));
+
+      // Map to user-friendly format
+      const documentList = requiredDocs.map(docType => {
+        const uploaded = uploadStatus.details.find(d => d.documentType === docType);
+        const template = documentTemplates.find(t => t.id === docType);
+
+        return {
+          documentType: docType,
+          displayName: template?.name || docType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          description: template?.description || 'Required document',
+          acceptedFormats: template?.acceptedFormats || ['pdf', 'jpg', 'png'],
+          maxSizeMB: template?.maxSizeMB || 10,
+          status: uploaded?.status || 'pending',
+          isUploaded: !!uploaded && uploaded.status !== 'pending',
+          isVerified: uploaded?.status === 'verified' || uploaded?.status === 'approved',
+          uploadedAt: uploaded?.uploadedAt,
+          verifiedAt: uploaded?.verifiedAt
+        };
+      });
+
+      res.json({
+        serviceRequestId: parseInt(serviceRequestId),
+        requiredDocuments: documentList,
+        summary: {
+          total: requiredDocs.length,
+          uploaded: uploadStatus.totalUploaded,
+          verified: uploadStatus.totalVerified,
+          missing: uploadStatus.missingDocuments.length,
+          isComplete: uploadStatus.isComplete,
+          isVerified: uploadStatus.isVerified
+        }
+      });
+    } catch (error: any) {
+      console.error('Error fetching required documents:', error);
+      res.status(500).json({ error: 'Failed to fetch required documents' });
+    }
+  });
+
   console.log('✅ Document Request routes registered');
 }

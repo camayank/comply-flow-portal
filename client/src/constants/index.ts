@@ -18,7 +18,211 @@ export const USER_ROLES = {
   SUPER_ADMIN: 'SUPER_ADMIN',
 } as const;
 
-// Service statuses
+// =============================================================================
+// SERVICE REQUEST STATUSES - Matches Backend State Machine
+// server/services/service-request-state-machine.ts
+// =============================================================================
+
+export const SERVICE_REQUEST_STATUSES = {
+  // Initial States
+  DRAFT: 'draft',
+  INITIATED: 'initiated',
+  PENDING_PAYMENT: 'pending_payment',
+
+  // Active Processing States
+  PAYMENT_RECEIVED: 'payment_received',
+  DOCUMENTS_PENDING: 'documents_pending',
+  DOCUMENTS_UPLOADED: 'documents_uploaded',
+  DOCUMENTS_VERIFIED: 'documents_verified',
+  IN_PROGRESS: 'in_progress',
+  PROCESSING: 'processing',
+
+  // Review States
+  PENDING_REVIEW: 'pending_review',
+  UNDER_REVIEW: 'under_review',
+  QC_REVIEW: 'qc_review',
+  QC_APPROVED: 'qc_approved',
+  QC_REJECTED: 'qc_rejected',
+
+  // Delivery States
+  READY_FOR_DELIVERY: 'ready_for_delivery',
+  DELIVERED: 'delivered',
+  AWAITING_CLIENT_CONFIRMATION: 'awaiting_client_confirmation',
+
+  // Terminal States
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+  ON_HOLD: 'on_hold',
+  REJECTED: 'rejected',
+
+  // Escalation States
+  ESCALATED: 'escalated',
+  SLA_BREACHED: 'sla_breached',
+} as const;
+
+export type ServiceRequestStatus = typeof SERVICE_REQUEST_STATUSES[keyof typeof SERVICE_REQUEST_STATUSES];
+
+// Status display labels
+export const SERVICE_REQUEST_STATUS_LABELS: Record<ServiceRequestStatus, string> = {
+  [SERVICE_REQUEST_STATUSES.DRAFT]: 'Draft',
+  [SERVICE_REQUEST_STATUSES.INITIATED]: 'Initiated',
+  [SERVICE_REQUEST_STATUSES.PENDING_PAYMENT]: 'Pending Payment',
+  [SERVICE_REQUEST_STATUSES.PAYMENT_RECEIVED]: 'Payment Received',
+  [SERVICE_REQUEST_STATUSES.DOCUMENTS_PENDING]: 'Documents Pending',
+  [SERVICE_REQUEST_STATUSES.DOCUMENTS_UPLOADED]: 'Documents Uploaded',
+  [SERVICE_REQUEST_STATUSES.DOCUMENTS_VERIFIED]: 'Documents Verified',
+  [SERVICE_REQUEST_STATUSES.IN_PROGRESS]: 'In Progress',
+  [SERVICE_REQUEST_STATUSES.PROCESSING]: 'Processing',
+  [SERVICE_REQUEST_STATUSES.PENDING_REVIEW]: 'Pending Review',
+  [SERVICE_REQUEST_STATUSES.UNDER_REVIEW]: 'Under Review',
+  [SERVICE_REQUEST_STATUSES.QC_REVIEW]: 'QC Review',
+  [SERVICE_REQUEST_STATUSES.QC_APPROVED]: 'QC Approved',
+  [SERVICE_REQUEST_STATUSES.QC_REJECTED]: 'QC Rejected',
+  [SERVICE_REQUEST_STATUSES.READY_FOR_DELIVERY]: 'Ready for Delivery',
+  [SERVICE_REQUEST_STATUSES.DELIVERED]: 'Delivered',
+  [SERVICE_REQUEST_STATUSES.AWAITING_CLIENT_CONFIRMATION]: 'Awaiting Confirmation',
+  [SERVICE_REQUEST_STATUSES.COMPLETED]: 'Completed',
+  [SERVICE_REQUEST_STATUSES.CANCELLED]: 'Cancelled',
+  [SERVICE_REQUEST_STATUSES.ON_HOLD]: 'On Hold',
+  [SERVICE_REQUEST_STATUSES.REJECTED]: 'Rejected',
+  [SERVICE_REQUEST_STATUSES.ESCALATED]: 'Escalated',
+  [SERVICE_REQUEST_STATUSES.SLA_BREACHED]: 'SLA Breached',
+};
+
+// Status colors for UI badges
+export const SERVICE_REQUEST_STATUS_COLORS: Record<ServiceRequestStatus, string> = {
+  [SERVICE_REQUEST_STATUSES.DRAFT]: 'bg-gray-100 text-gray-800',
+  [SERVICE_REQUEST_STATUSES.INITIATED]: 'bg-blue-100 text-blue-800',
+  [SERVICE_REQUEST_STATUSES.PENDING_PAYMENT]: 'bg-yellow-100 text-yellow-800',
+  [SERVICE_REQUEST_STATUSES.PAYMENT_RECEIVED]: 'bg-green-100 text-green-800',
+  [SERVICE_REQUEST_STATUSES.DOCUMENTS_PENDING]: 'bg-orange-100 text-orange-800',
+  [SERVICE_REQUEST_STATUSES.DOCUMENTS_UPLOADED]: 'bg-blue-100 text-blue-800',
+  [SERVICE_REQUEST_STATUSES.DOCUMENTS_VERIFIED]: 'bg-green-100 text-green-800',
+  [SERVICE_REQUEST_STATUSES.IN_PROGRESS]: 'bg-blue-100 text-blue-800',
+  [SERVICE_REQUEST_STATUSES.PROCESSING]: 'bg-indigo-100 text-indigo-800',
+  [SERVICE_REQUEST_STATUSES.PENDING_REVIEW]: 'bg-purple-100 text-purple-800',
+  [SERVICE_REQUEST_STATUSES.UNDER_REVIEW]: 'bg-purple-100 text-purple-800',
+  [SERVICE_REQUEST_STATUSES.QC_REVIEW]: 'bg-violet-100 text-violet-800',
+  [SERVICE_REQUEST_STATUSES.QC_APPROVED]: 'bg-emerald-100 text-emerald-800',
+  [SERVICE_REQUEST_STATUSES.QC_REJECTED]: 'bg-red-100 text-red-800',
+  [SERVICE_REQUEST_STATUSES.READY_FOR_DELIVERY]: 'bg-cyan-100 text-cyan-800',
+  [SERVICE_REQUEST_STATUSES.DELIVERED]: 'bg-teal-100 text-teal-800',
+  [SERVICE_REQUEST_STATUSES.AWAITING_CLIENT_CONFIRMATION]: 'bg-amber-100 text-amber-800',
+  [SERVICE_REQUEST_STATUSES.COMPLETED]: 'bg-green-100 text-green-800',
+  [SERVICE_REQUEST_STATUSES.CANCELLED]: 'bg-red-100 text-red-800',
+  [SERVICE_REQUEST_STATUSES.ON_HOLD]: 'bg-gray-100 text-gray-800',
+  [SERVICE_REQUEST_STATUSES.REJECTED]: 'bg-red-100 text-red-800',
+  [SERVICE_REQUEST_STATUSES.ESCALATED]: 'bg-orange-100 text-orange-800',
+  [SERVICE_REQUEST_STATUSES.SLA_BREACHED]: 'bg-red-100 text-red-800',
+};
+
+// Status groups for filtering
+export const SERVICE_REQUEST_STATUS_GROUPS = {
+  INITIAL: [SERVICE_REQUEST_STATUSES.DRAFT, SERVICE_REQUEST_STATUSES.INITIATED, SERVICE_REQUEST_STATUSES.PENDING_PAYMENT],
+  ACTIVE: [SERVICE_REQUEST_STATUSES.PAYMENT_RECEIVED, SERVICE_REQUEST_STATUSES.DOCUMENTS_PENDING, SERVICE_REQUEST_STATUSES.DOCUMENTS_UPLOADED, SERVICE_REQUEST_STATUSES.DOCUMENTS_VERIFIED, SERVICE_REQUEST_STATUSES.IN_PROGRESS, SERVICE_REQUEST_STATUSES.PROCESSING],
+  REVIEW: [SERVICE_REQUEST_STATUSES.PENDING_REVIEW, SERVICE_REQUEST_STATUSES.UNDER_REVIEW, SERVICE_REQUEST_STATUSES.QC_REVIEW, SERVICE_REQUEST_STATUSES.QC_APPROVED, SERVICE_REQUEST_STATUSES.QC_REJECTED],
+  DELIVERY: [SERVICE_REQUEST_STATUSES.READY_FOR_DELIVERY, SERVICE_REQUEST_STATUSES.DELIVERED, SERVICE_REQUEST_STATUSES.AWAITING_CLIENT_CONFIRMATION],
+  TERMINAL: [SERVICE_REQUEST_STATUSES.COMPLETED, SERVICE_REQUEST_STATUSES.CANCELLED, SERVICE_REQUEST_STATUSES.REJECTED],
+  SPECIAL: [SERVICE_REQUEST_STATUSES.ON_HOLD, SERVICE_REQUEST_STATUSES.ESCALATED, SERVICE_REQUEST_STATUSES.SLA_BREACHED],
+} as const;
+
+// =============================================================================
+// QC REVIEW STATUSES
+// =============================================================================
+
+export const QC_REVIEW_STATUSES = {
+  PENDING: 'pending',
+  ASSIGNED: 'assigned',
+  IN_PROGRESS: 'in_progress',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  REWORK_REQUIRED: 'rework_required',
+} as const;
+
+export type QCReviewStatus = typeof QC_REVIEW_STATUSES[keyof typeof QC_REVIEW_STATUSES];
+
+export const QC_REVIEW_STATUS_LABELS: Record<QCReviewStatus, string> = {
+  [QC_REVIEW_STATUSES.PENDING]: 'Pending',
+  [QC_REVIEW_STATUSES.ASSIGNED]: 'Assigned',
+  [QC_REVIEW_STATUSES.IN_PROGRESS]: 'In Progress',
+  [QC_REVIEW_STATUSES.APPROVED]: 'Approved',
+  [QC_REVIEW_STATUSES.REJECTED]: 'Rejected',
+  [QC_REVIEW_STATUSES.REWORK_REQUIRED]: 'Rework Required',
+};
+
+export const QC_REVIEW_STATUS_COLORS: Record<QCReviewStatus, string> = {
+  [QC_REVIEW_STATUSES.PENDING]: 'bg-yellow-100 text-yellow-800',
+  [QC_REVIEW_STATUSES.ASSIGNED]: 'bg-blue-100 text-blue-800',
+  [QC_REVIEW_STATUSES.IN_PROGRESS]: 'bg-indigo-100 text-indigo-800',
+  [QC_REVIEW_STATUSES.APPROVED]: 'bg-green-100 text-green-800',
+  [QC_REVIEW_STATUSES.REJECTED]: 'bg-red-100 text-red-800',
+  [QC_REVIEW_STATUSES.REWORK_REQUIRED]: 'bg-orange-100 text-orange-800',
+};
+
+// =============================================================================
+// DOCUMENT VERIFICATION STATUSES
+// =============================================================================
+
+export const DOCUMENT_VERIFICATION_STATUSES = {
+  PENDING: 'pending',
+  UPLOADED: 'uploaded',
+  VERIFIED: 'verified',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  EXPIRED: 'expired',
+} as const;
+
+export type DocumentVerificationStatus = typeof DOCUMENT_VERIFICATION_STATUSES[keyof typeof DOCUMENT_VERIFICATION_STATUSES];
+
+export const DOCUMENT_VERIFICATION_STATUS_LABELS: Record<DocumentVerificationStatus, string> = {
+  [DOCUMENT_VERIFICATION_STATUSES.PENDING]: 'Pending',
+  [DOCUMENT_VERIFICATION_STATUSES.UPLOADED]: 'Uploaded',
+  [DOCUMENT_VERIFICATION_STATUSES.VERIFIED]: 'Verified',
+  [DOCUMENT_VERIFICATION_STATUSES.APPROVED]: 'Approved',
+  [DOCUMENT_VERIFICATION_STATUSES.REJECTED]: 'Rejected',
+  [DOCUMENT_VERIFICATION_STATUSES.EXPIRED]: 'Expired',
+};
+
+// =============================================================================
+// SLA & ESCALATION STATUSES
+// =============================================================================
+
+export const SLA_STATUSES = {
+  ON_TRACK: 'on_track',
+  AT_RISK: 'at_risk',
+  WARNING: 'warning',
+  BREACHED: 'breached',
+} as const;
+
+export type SLAStatus = typeof SLA_STATUSES[keyof typeof SLA_STATUSES];
+
+export const SLA_STATUS_LABELS: Record<SLAStatus, string> = {
+  [SLA_STATUSES.ON_TRACK]: 'On Track',
+  [SLA_STATUSES.AT_RISK]: 'At Risk',
+  [SLA_STATUSES.WARNING]: 'Warning',
+  [SLA_STATUSES.BREACHED]: 'Breached',
+};
+
+export const SLA_STATUS_COLORS: Record<SLAStatus, string> = {
+  [SLA_STATUSES.ON_TRACK]: 'bg-green-100 text-green-800',
+  [SLA_STATUSES.AT_RISK]: 'bg-yellow-100 text-yellow-800',
+  [SLA_STATUSES.WARNING]: 'bg-orange-100 text-orange-800',
+  [SLA_STATUSES.BREACHED]: 'bg-red-100 text-red-800',
+};
+
+export const ESCALATION_SEVERITIES = {
+  WARNING: 'warning',
+  CRITICAL: 'critical',
+  BREACH: 'breach',
+} as const;
+
+export type EscalationSeverity = typeof ESCALATION_SEVERITIES[keyof typeof ESCALATION_SEVERITIES];
+
+// =============================================================================
+// LEGACY SERVICE STATUSES (for backwards compatibility)
+// =============================================================================
+
+// Service statuses (legacy - use SERVICE_REQUEST_STATUSES for new code)
 export const SERVICE_STATUSES = {
   PENDING: 'PENDING',
   IN_PROGRESS: 'IN_PROGRESS',
@@ -29,10 +233,11 @@ export const SERVICE_STATUSES = {
 
 // Task statuses
 export const TASK_STATUSES = {
-  TODO: 'TODO',
-  IN_PROGRESS: 'IN_PROGRESS',
-  REVIEW: 'REVIEW',
-  COMPLETED: 'COMPLETED',
+  TODO: 'todo',
+  IN_PROGRESS: 'in_progress',
+  REVIEW: 'review',
+  COMPLETED: 'completed',
+  REWORK_REQUIRED: 'rework_required',
 } as const;
 
 // Priority levels

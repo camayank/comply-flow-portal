@@ -71,26 +71,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/service-requests", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const validatedData = insertServiceRequestSchema.parse(req.body);
-      
+
       // Calculate total amount from services
-      const services = await Promise.all(
+      const servicesList = await Promise.all(
         (Array.isArray(validatedData.serviceId) ? validatedData.serviceId : [validatedData.serviceId])
           .map(id => storage.getService(id))
       );
-      
-      const totalAmount = services.reduce((sum, service) => {
+
+      const totalAmount = servicesList.reduce((sum, service) => {
         return sum + (service?.price || 0);
       }, 0);
 
+      // Create the service request
       const serviceRequest = await storage.createServiceRequest({
         ...validatedData,
         totalAmount,
         status: "initiated"
       });
 
+      // Set SLA deadline based on service definition
+      if (serviceRequest && serviceRequest.id) {
+        const { setSLADeadline } = await import('./services/core-operations-service');
+        const serviceId = Array.isArray(validatedData.serviceId)
+          ? validatedData.serviceId[0]
+          : validatedData.serviceId;
+        await setSLADeadline(serviceRequest.id, serviceId);
+
+        // Fetch updated service request with SLA
+        const updatedRequest = await storage.getServiceRequest(serviceRequest.id);
+        return res.status(201).json(updatedRequest);
+      }
+
       res.status(201).json(serviceRequest);
-    } catch (error) {
-      res.status(400).json({ error: "Invalid request data" });
+    } catch (error: any) {
+      console.error('Error creating service request:', error);
+      res.status(400).json({ error: "Invalid request data", message: error.message });
     }
   });
 
@@ -129,19 +144,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const parsed = parseIdParam(req.params.id);
       let id: number;
+      let currentRequest;
 
       if (parsed.isNumeric) {
         id = parsed.numericId!;
+        currentRequest = await storage.getServiceRequest(id);
       } else {
         // Lookup numeric ID from readable ID
-        const [result] = await db.select({ id: serviceRequests.id })
+        const [result] = await db.select()
           .from(serviceRequests)
           .where(eq(serviceRequests.requestId, parsed.readableId!))
           .limit(1);
         if (!result) {
           return res.status(404).json({ error: "Service request not found" });
         }
+        currentRequest = result;
         id = result.id;
+      }
+
+      if (!currentRequest) {
+        return res.status(404).json({ error: "Service request not found" });
       }
 
       const updates = req.body;
@@ -151,21 +173,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const computedHash = createHash('sha256')
           .update(JSON.stringify(updates.uploadedDocs))
           .digest('hex');
-        
+
         if (computedHash !== updates.documentHash) {
           return res.status(400).json({ error: "Document hash verification failed" });
         }
       }
-      
-      const updatedRequest = await storage.updateServiceRequest(id, updates);
-      
-      if (!updatedRequest) {
-        return res.status(404).json({ error: "Service request not found" });
+
+      // CRITICAL: If status is being changed, enforce state machine validation
+      if (updates.status && updates.status !== currentRequest.status) {
+        const { transitionServiceRequestStatus } = await import('./services/core-operations-service');
+
+        const transitionResult = await transitionServiceRequestStatus(id, updates.status, {
+          performedBy: {
+            id: req.user?.id || 0,
+            username: req.user?.username || 'unknown',
+            role: req.user?.role || 'unknown'
+          },
+          reason: updates.statusChangeReason || 'Updated via API',
+          notes: updates.internalNotes
+        });
+
+        if (!transitionResult.success) {
+          return res.status(400).json({
+            error: "Status transition not allowed",
+            message: transitionResult.message,
+            currentStatus: currentRequest.status,
+            requestedStatus: updates.status
+          });
+        }
+
+        // Remove status from updates since it was handled by the state machine
+        delete updates.status;
       }
-      
-      res.json(updatedRequest);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to update service request" });
+
+      // Update other fields (non-status)
+      if (Object.keys(updates).length > 0) {
+        const updatedRequest = await storage.updateServiceRequest(id, updates);
+
+        if (!updatedRequest) {
+          return res.status(404).json({ error: "Service request not found" });
+        }
+
+        res.json(updatedRequest);
+      } else {
+        // Status-only update was handled above, return fresh data
+        const freshRequest = await storage.getServiceRequest(id);
+        res.json(freshRequest);
+      }
+    } catch (error: any) {
+      console.error('Error updating service request:', error);
+      res.status(500).json({ error: "Failed to update service request", message: error.message });
     }
   });
 
@@ -299,6 +356,253 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching service request timeline:', error);
       res.status(500).json({ error: "Failed to fetch service request timeline" });
+    }
+  });
+
+  // ==========================================================================
+  // SERVICE REQUEST STATUS TRANSITIONS - STATE MACHINE VALIDATED
+  // ==========================================================================
+
+  // POST /api/service-requests/:id/transition - Validated status transition
+  app.post("/api/service-requests/:id/transition", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const parsed = parseIdParam(req.params.id);
+      const { toStatus, reason, notes, force = false } = req.body;
+
+      if (!toStatus) {
+        return res.status(400).json({ error: "toStatus is required" });
+      }
+
+      let id: number;
+      let serviceRequest;
+
+      if (parsed.isNumeric) {
+        id = parsed.numericId!;
+        serviceRequest = await storage.getServiceRequest(id);
+      } else {
+        const [result] = await db.select()
+          .from(serviceRequests)
+          .where(eq(serviceRequests.requestId, parsed.readableId!))
+          .limit(1);
+        serviceRequest = result;
+        id = result?.id || 0;
+      }
+
+      if (!serviceRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      // Import state machine
+      const { transitionStatus, isValidTransition, getValidNextStatuses, getProgressPercentage } = await import('./services/service-request-state-machine');
+
+      const fromStatus = serviceRequest.status;
+
+      // Check if admin is forcing an invalid transition
+      const isAdmin = ['admin', 'super_admin'].includes(req.user?.role || '');
+      if (force && !isAdmin) {
+        return res.status(403).json({ error: "Only admins can force invalid transitions" });
+      }
+
+      // Validate transition (unless forced by admin)
+      if (!force && !isValidTransition(fromStatus, toStatus)) {
+        return res.status(400).json({
+          error: "Invalid status transition",
+          currentStatus: fromStatus,
+          requestedStatus: toStatus,
+          validNextStatuses: getValidNextStatuses(fromStatus),
+          message: `Cannot transition from '${fromStatus}' to '${toStatus}'. Valid transitions: ${getValidNextStatuses(fromStatus).join(', ')}`
+        });
+      }
+
+      // Perform the transition
+      const result = await transitionStatus(id, toStatus, {
+        performedBy: {
+          id: req.user?.id || 0,
+          username: req.user?.username || 'unknown',
+          role: req.user?.role || 'unknown'
+        },
+        reason,
+        notes,
+        force
+      });
+
+      if (!result.success) {
+        return res.status(400).json({
+          error: "Transition failed",
+          message: result.message,
+          details: result
+        });
+      }
+
+      // Get updated progress
+      const newProgress = getProgressPercentage(toStatus);
+
+      // Log the transition
+      try {
+        await storage.createActivityLog({
+          userId: req.user?.id || 0,
+          action: 'service_request_status_changed',
+          entityType: 'service_request',
+          entityId: id,
+          details: JSON.stringify({
+            fromStatus,
+            toStatus,
+            reason,
+            forced: force,
+            transitionId: result.transitionId
+          }),
+          ipAddress: req.ip || null
+        });
+      } catch (logError) {
+        console.warn('Failed to log status transition:', logError);
+      }
+
+      res.json({
+        success: true,
+        serviceRequestId: id,
+        previousStatus: fromStatus,
+        newStatus: toStatus,
+        progress: newProgress >= 0 ? newProgress : undefined,
+        transitionId: result.transitionId,
+        message: result.message,
+        timestamp: result.timestamp
+      });
+    } catch (error: any) {
+      console.error('Error transitioning service request status:', error);
+      res.status(500).json({ error: "Failed to transition status", message: error.message });
+    }
+  });
+
+  // GET /api/service-requests/:id/valid-transitions - Get valid next statuses
+  app.get("/api/service-requests/:id/valid-transitions", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const parsed = parseIdParam(req.params.id);
+      let serviceRequest;
+
+      if (parsed.isNumeric) {
+        serviceRequest = await storage.getServiceRequest(parsed.numericId!);
+      } else {
+        const [result] = await db.select()
+          .from(serviceRequests)
+          .where(eq(serviceRequests.requestId, parsed.readableId!))
+          .limit(1);
+        serviceRequest = result;
+      }
+
+      if (!serviceRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      const { getValidNextStatuses, getProgressPercentage, getRemainingSteps } = await import('./services/service-request-state-machine');
+
+      const currentStatus = serviceRequest.status;
+      const validTransitions = getValidNextStatuses(currentStatus);
+
+      res.json({
+        serviceRequestId: serviceRequest.id,
+        currentStatus,
+        currentProgress: getProgressPercentage(currentStatus),
+        remainingSteps: getRemainingSteps(currentStatus),
+        validNextStatuses: validTransitions.map(status => ({
+          status,
+          progress: getProgressPercentage(status),
+          remainingSteps: getRemainingSteps(status)
+        }))
+      });
+    } catch (error) {
+      console.error('Error getting valid transitions:', error);
+      res.status(500).json({ error: "Failed to get valid transitions" });
+    }
+  });
+
+  // GET /api/service-requests/workflow-diagram - Get workflow state diagram
+  app.get("/api/service-requests/workflow-diagram", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { getWorkflowDiagram, SERVICE_REQUEST_STATUSES } = await import('./services/service-request-state-machine');
+
+      res.json({
+        statuses: Object.values(SERVICE_REQUEST_STATUSES),
+        diagram: getWorkflowDiagram()
+      });
+    } catch (error) {
+      console.error('Error getting workflow diagram:', error);
+      res.status(500).json({ error: "Failed to get workflow diagram" });
+    }
+  });
+
+  // POST /api/service-requests/:id/reject - Reject service request with feedback
+  app.post("/api/service-requests/:id/reject", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const parsed = parseIdParam(req.params.id);
+      const { reason, feedback, allowResubmission = true } = req.body;
+
+      if (!reason) {
+        return res.status(400).json({ error: "Rejection reason is required" });
+      }
+
+      let id: number;
+      let serviceRequest;
+
+      if (parsed.isNumeric) {
+        id = parsed.numericId!;
+        serviceRequest = await storage.getServiceRequest(id);
+      } else {
+        const [result] = await db.select()
+          .from(serviceRequests)
+          .where(eq(serviceRequests.requestId, parsed.readableId!))
+          .limit(1);
+        serviceRequest = result;
+        id = result?.id || 0;
+      }
+
+      if (!serviceRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      // Cannot reject completed requests
+      if (serviceRequest.status === 'completed') {
+        return res.status(400).json({ error: "Cannot reject a completed service request" });
+      }
+
+      const updatedRequest = await storage.updateServiceRequest(id, {
+        status: 'rejected',
+        rejectedAt: new Date(),
+        rejectedBy: req.user?.id,
+        rejectionReason: reason,
+        rejectionFeedback: feedback,
+        canResubmit: allowResubmission,
+        updatedAt: new Date()
+      });
+
+      // Log rejection
+      try {
+        await storage.createActivityLog({
+          userId: req.user?.id || 0,
+          action: 'service_request_rejected',
+          entityType: 'service_request',
+          entityId: id,
+          details: JSON.stringify({
+            reason,
+            feedback,
+            allowResubmission,
+            rejectedBy: req.user?.username
+          }),
+          ipAddress: req.ip || null
+        });
+      } catch (logError) {
+        console.warn('Failed to log rejection:', logError);
+      }
+
+      res.json({
+        success: true,
+        message: allowResubmission
+          ? 'Service request returned for corrections'
+          : 'Service request rejected',
+        serviceRequest: updatedRequest
+      });
+    } catch (error: any) {
+      console.error('Error rejecting service request:', error);
+      res.status(500).json({ error: "Failed to reject service request", message: error.message });
     }
   });
 
@@ -1642,6 +1946,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/ops/work-queue', workQueueRoutes.default);
   console.log('✅ Work Queue & Escalation routes registered');
 
+  // Register Escalation routes (Auto-escalation engine API)
+  const { registerEscalationRoutes } = await import('./escalation-routes');
+  registerEscalationRoutes(app);
+  console.log('✅ Escalation Management routes registered');
+
   // Register Universal Service API (96+ services for all stakeholders)
   const universalServiceApi = await import('./universal-service-api');
   app.use('/api/universal', universalServiceApi.default);
@@ -1721,6 +2030,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/rbac', advancedRbacRoutes.default);
   app.use('/api/v2/rbac', advancedRbacRoutes.default);
   console.log('✅ Advanced RBAC Routes registered (Permission management)');
+
+  // Register Audit & Compliance Routes (Immutable Audit Log, Data Deletion, Access Reviews)
+  const auditRoutes = await import('./routes/audit-routes');
+  app.use('/api/audit', auditRoutes.default);
+  app.use('/api/v2/audit', auditRoutes.default);
+  console.log('✅ Audit & Compliance Routes registered (Audit Log, Data Deletion, Access Reviews, Security Incidents)');
+
+  // Register Customer Success Routes (Playbooks, Renewals, Health Scores)
+  const customerSuccessRoutes = await import('./routes/customer-success-routes');
+  app.use('/api/customer-success', customerSuccessRoutes.default);
+  app.use('/api/v2/customer-success', customerSuccessRoutes.default);
+  console.log('✅ Customer Success Routes registered (Playbooks, Renewals, Health Scores)');
 
   const httpServer = createServer(app);
   return httpServer;
