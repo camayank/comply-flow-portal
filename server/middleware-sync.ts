@@ -56,7 +56,7 @@ export class MiddlewareSyncEngine {
         }
       });
 
-      ws.on('close', () => {
+      ws.on('close', async () => {
         this.clients.delete(sessionId);
         const interval = this.syncIntervals.get(sessionId);
         if (interval) {
@@ -201,7 +201,7 @@ export class MiddlewareSyncEngine {
     }
   }
 
-  private startClientSync(sessionId: string) {
+  private async startClientSync(sessionId: string) {
     const { jobManager } = await import('./job-lifecycle-manager.js');
 
     const syncIntervalHandle = jobManager.registerInterval(
@@ -310,7 +310,7 @@ export class MiddlewareSyncEngine {
     }
   }
 
-  private startSyncProcesses() {
+  private async startSyncProcesses() {
     const { jobManager } = await import('./job-lifecycle-manager.js');
 
     // Quality audit sync every 5 minutes

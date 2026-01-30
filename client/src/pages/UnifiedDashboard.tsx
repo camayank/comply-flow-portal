@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import AgentDashboard from './AgentDashboard';
-import MobileClientPortal from './MobileClientPortal';
+import MobileClientPortal from './MobileClientPortalRefactored';
 import MobileAdminPanel from './MobileAdminPanel';
 import MobileOperationsPanel from './MobileOperationsPanel';
 import CustomerServiceDashboard from './CustomerServiceDashboard';
