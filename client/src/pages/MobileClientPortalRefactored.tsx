@@ -237,7 +237,7 @@ export default function MobileClientPortal() {
         >
           {entitiesQuery.render((entities) => (
             <div className="grid gap-4">
-              {entities.map((entity) => (
+              {(Array.isArray(entities) ? entities : []).map((entity) => (
                 <Card key={entity.id}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
