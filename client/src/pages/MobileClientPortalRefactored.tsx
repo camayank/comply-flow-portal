@@ -152,7 +152,7 @@ export default function MobileClientPortal() {
                   <div>
                     <p className="text-sm text-muted-foreground">Active Services</p>
                     <p className="text-2xl font-bold">
-                      {servicesQuery.data?.filter(s => s.status !== 'completed').length || 0}
+                      {(Array.isArray(servicesQuery.data) ? servicesQuery.data : []).filter(s => s.status !== 'completed').length || 0}
                     </p>
                   </div>
                   <FileText className="h-8 w-8 text-purple-600" />
@@ -166,7 +166,7 @@ export default function MobileClientPortal() {
                   <div>
                     <p className="text-sm text-muted-foreground">Pending Docs</p>
                     <p className="text-2xl font-bold">
-                      {servicesQuery.data?.filter(s => s.status === 'initiated').length || 0}
+                      {(Array.isArray(servicesQuery.data) ? servicesQuery.data : []).filter(s => s.status === 'initiated').length || 0}
                     </p>
                   </div>
                   <Upload className="h-8 w-8 text-orange-600" />
@@ -180,7 +180,7 @@ export default function MobileClientPortal() {
                   <div>
                     <p className="text-sm text-muted-foreground">Completed</p>
                     <p className="text-2xl font-bold">
-                      {servicesQuery.data?.filter(s => s.status === 'completed').length || 0}
+                      {(Array.isArray(servicesQuery.data) ? servicesQuery.data : []).filter(s => s.status === 'completed').length || 0}
                     </p>
                   </div>
                   <CheckCircle className="h-8 w-8 text-green-600" />
