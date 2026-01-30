@@ -97,6 +97,9 @@ const AccountBusinesses = lazy(() => import("./pages/portal-v2/AccountBusinesses
 const AccountBilling = lazy(() => import("./pages/portal-v2/AccountBilling"));
 const AccountDocuments = lazy(() => import("./pages/portal-v2/AccountDocuments"));
 const AccountSecurity = lazy(() => import("./pages/portal-v2/AccountSecurity"));
+const AccountNotifications = lazy(() => import("./pages/portal-v2/AccountNotifications"));
+const WebhookManagement = lazy(() => import("./pages/admin/WebhookManagement"));
+const APIKeyManagement = lazy(() => import("./pages/admin/APIKeyManagement"));
 const DeliveryConfirmation = lazy(() => import("./pages/DeliveryConfirmation"));
 const HRDashboard = lazy(() => import("./pages/HRDashboard"));
 const ClientMasterDashboard = lazy(() => import("./pages/ClientMasterDashboard"));
@@ -303,6 +306,13 @@ const AppContent = () => {
                 <Route path="/portal-v2/account/billing" component={AccountBilling} />
                 <Route path="/portal-v2/account/documents" component={AccountDocuments} />
                 <Route path="/portal-v2/account/security" component={AccountSecurity} />
+                <Route path="/portal-v2/account/notifications" component={AccountNotifications} />
+
+                {/* Enterprise Admin Routes */}
+                <Route path="/admin/webhooks" component={WebhookManagement} />
+                <Route path="/admin/api-keys" component={APIKeyManagement} />
+                <Route path="/developer/api-keys" component={APIKeyManagement} />
+
                 <Route path="/portal" component={MobileClientPortalRefactored} />
                 <Route path="/client-portal" component={MobileClientPortalRefactored} />
                 <Route path="/operations" component={MobileOperationsPanelRefactored} />

@@ -1,7 +1,11 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pkg from 'pg';
 const { Pool } = pkg;
-import * as schema from "@shared/schema";
+import * as baseSchema from "@shared/schema";
+import * as enterpriseSchema from "../shared/enterprise-schema";
+
+// Merge base and enterprise schemas
+const schema = { ...baseSchema, ...enterpriseSchema };
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -11,3 +15,6 @@ if (!process.env.DATABASE_URL) {
 
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle({ client: pool, schema });
+
+// Re-export all schema tables for convenience
+export { baseSchema, enterpriseSchema };
