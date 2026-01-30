@@ -325,6 +325,9 @@ const AppContent = () => {
                 <Route path="/admin/webhooks" component={WebhookManagement} />
                 <Route path="/admin/api-keys" component={APIKeyManagement} />
                 <Route path="/developer/api-keys" component={APIKeyManagement} />
+                <Route path="/admin/clients" component={ClientMasterDashboard} />
+                <Route path="/admin/users" component={MobileAdminPanelRefactored} />
+                <Route path="/admin/workflow-import" component={WorkflowImport} />
 
                 {/* Customer Success Routes */}
                 <Route path="/customer-success/playbooks" component={PlaybookManagement} />
@@ -377,6 +380,7 @@ const AppContent = () => {
                 <Route path="/client-portal/documents" component={DocumentVault} />
                 <Route path="/operations" component={MobileOperationsPanelRefactored} />
                 <Route path="/ops" component={MobileOperationsPanelRefactored} />
+                <Route path="/universal-ops" component={MobileOperationsPanelRefactored} />
                 {/* CONSOLIDATED: /operations-manager merged into /operations */}
                 <Route path="/admin" component={MobileAdminPanelRefactored} />
                 <Route path="/admin-control" component={MobileAdminPanelRefactored} />
@@ -388,6 +392,7 @@ const AppContent = () => {
                 <Route path="/workflow-statuses" component={StatusManagement} />
                 <Route path="/work-queue" component={OperationsWorkQueue} />
                 <Route path="/ops/work-queue" component={OperationsWorkQueue} />
+                <Route path="/operations/work-queue" component={OperationsWorkQueue} />
                 <Route path="/operations-queue" component={OperationsWorkQueue} />
 
                 {/* Client Service Tracking */}
@@ -415,6 +420,7 @@ const AppContent = () => {
                 <Route path="/pre-sales" component={PreSalesManager} />
                 <Route path="/sales-proposals" component={SalesProposalManagerRefactored} />
                 <Route path="/qc" component={QCDashboard} />
+                <Route path="/qc/queue" component={QCDashboard} />
                 <Route path="/qc-dashboard" component={QCDashboard} />
                 <Route path="/quality-control" component={QCDashboard} />
                 <Route path="/qc-delivery-handoff" component={QCDeliveryHandoff} />
@@ -445,6 +451,7 @@ const AppContent = () => {
                 <Route path="/agent" component={MobileAgentPortal} />
                 <Route path="/agent/dashboard" component={AgentDashboard} />
                 <Route path="/agent/leads" component={AgentLeadManagement} />
+                <Route path="/agent/clients" component={AgentLeadManagement} />
                 <Route path="/agent/commissions" component={AgentCommissionTracker} />
                 <Route path="/agent/performance" component={AgentPerformance} />
                 <Route path="/agent/profile" component={AgentProfileSettings} />
@@ -481,6 +488,12 @@ const AppContent = () => {
                 <Route path="/retainership" component={RetainershipPlans} />
                 <Route path="/suggestions" component={SmartSuggestionsEngine} />
                 <Route path="/vault" component={DocumentVault} />
+
+                {/* Legal/Policy Pages - placeholder routes */}
+                <Route path="/privacy-policy" component={LandingPage} />
+                <Route path="/terms-of-service" component={LandingPage} />
+                <Route path="/refund-policy" component={LandingPage} />
+
                 <Route component={NotFound} />
               </Switch>
               </Suspense>
