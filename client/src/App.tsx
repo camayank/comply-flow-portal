@@ -372,6 +372,9 @@ const AppContent = () => {
 
                 <Route path="/portal" component={MobileClientPortalRefactored} />
                 <Route path="/client-portal" component={MobileClientPortalRefactored} />
+                <Route path="/client-portal/entities" component={MobileClientPortalRefactored} />
+                <Route path="/client-portal/services" component={ServiceRequestUI} />
+                <Route path="/client-portal/documents" component={DocumentVault} />
                 <Route path="/operations" component={MobileOperationsPanelRefactored} />
                 <Route path="/ops" component={MobileOperationsPanelRefactored} />
                 {/* CONSOLIDATED: /operations-manager merged into /operations */}
