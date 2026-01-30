@@ -197,29 +197,21 @@ export default function MobileClientPortal() {
               <Plus className="h-5 w-5" />
               <span className="text-xs">Add Entity</span>
             </Button>
-            <Link href="/services">
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2 w-full">
-                <ShoppingBag className="h-5 w-5" />
-                <span className="text-xs">Browse Services</span>
-              </Button>
+            <Link href="/services" className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-auto py-4 flex-col gap-2 w-full">
+              <ShoppingBag className="h-5 w-5" />
+              <span className="text-xs">Browse Services</span>
             </Link>
-            <Link href="/compliance-calendar">
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2 w-full">
-                <Calendar className="h-5 w-5" />
-                <span className="text-xs">Compliance Calendar</span>
-              </Button>
+            <Link href="/compliance-calendar" className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-auto py-4 flex-col gap-2 w-full">
+              <Calendar className="h-5 w-5" />
+              <span className="text-xs">Compliance Calendar</span>
             </Link>
-            <Link href="/wallet">
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2 w-full">
-                <Wallet className="h-5 w-5" />
-                <span className="text-xs">Wallet</span>
-              </Button>
+            <Link href="/wallet" className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-auto py-4 flex-col gap-2 w-full">
+              <Wallet className="h-5 w-5" />
+              <span className="text-xs">Wallet</span>
             </Link>
-            <Link href="/referral-dashboard">
-              <Button variant="outline" className="h-auto py-4 flex-col gap-2 w-full">
-                <Gift className="h-5 w-5" />
-                <span className="text-xs">Referrals</span>
-              </Button>
+            <Link href="/referral-dashboard" className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-auto py-4 flex-col gap-2 w-full">
+              <Gift className="h-5 w-5" />
+              <span className="text-xs">Referrals</span>
             </Link>
           </div>
         </PageSection>
@@ -280,7 +272,7 @@ export default function MobileClientPortal() {
         >
           {servicesQuery.render((services) => (
             <div className="space-y-3">
-              {services.slice(0, 5).map((service) => (
+              {(Array.isArray(services) ? services : []).slice(0, 5).map((service) => (
                 <Card key={service.id}>
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between mb-3">
