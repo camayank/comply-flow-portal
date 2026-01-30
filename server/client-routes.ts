@@ -591,5 +591,561 @@ export function registerClientRoutes(app: Express) {
     }
   });
 
+  // ============ COMPLIANCE ALERT PREFERENCES ============
+
+  /**
+   * GET /api/client/compliance-alerts/preferences
+   * Get client's compliance alert notification preferences
+   * Requires: Client role
+   */
+  app.get('/api/client/compliance-alerts/preferences', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      // Get user's entity
+      const userEntityId = await getUserEntityId(userId);
+
+      // Mock preferences - In production, fetch from database
+      const preferences = {
+        entityId: userEntityId,
+        userId,
+
+        // General notification settings
+        notificationsEnabled: true,
+
+        // Channel preferences
+        channels: {
+          email: {
+            enabled: true,
+            primaryEmail: req.user?.email || 'user@example.com',
+            secondaryEmail: null,
+            digestMode: 'immediate', // immediate, daily_digest, weekly_digest
+          },
+          sms: {
+            enabled: true,
+            phoneNumber: '+91-98765-43210',
+            onlyCritical: true, // Only send SMS for critical alerts
+          },
+          whatsapp: {
+            enabled: true,
+            phoneNumber: '+91-98765-43210',
+            includeDocuments: true,
+          },
+          inApp: {
+            enabled: true,
+            showBadge: true,
+            playSound: false,
+          },
+          push: {
+            enabled: false,
+            deviceTokens: [],
+          },
+        },
+
+        // Compliance type preferences
+        complianceTypes: {
+          gst: {
+            enabled: true,
+            reminderDays: [30, 15, 7, 3, 1], // Days before deadline
+            includeGSTR1: true,
+            includeGSTR3B: true,
+            includeAnnualReturn: true,
+          },
+          income_tax: {
+            enabled: true,
+            reminderDays: [60, 30, 15, 7, 3],
+            includeTDS: true,
+            includeAdvanceTax: true,
+            includeITR: true,
+          },
+          roc: {
+            enabled: true,
+            reminderDays: [30, 15, 7],
+            includeAOC4: true,
+            includeMGT7: true,
+            includeDIR3KYC: true,
+          },
+          pf_esi: {
+            enabled: true,
+            reminderDays: [7, 3, 1],
+            includeMonthlyFiling: true,
+            includeAnnualReturn: true,
+          },
+          other: {
+            enabled: true,
+            reminderDays: [15, 7, 3],
+          },
+        },
+
+        // Alert severity preferences
+        severityPreferences: {
+          critical: {
+            enabled: true,
+            channels: ['email', 'sms', 'whatsapp', 'inApp'],
+            sendImmediately: true,
+          },
+          warning: {
+            enabled: true,
+            channels: ['email', 'whatsapp', 'inApp'],
+            sendImmediately: false,
+          },
+          info: {
+            enabled: true,
+            channels: ['email', 'inApp'],
+            sendImmediately: false,
+          },
+        },
+
+        // Alert type preferences
+        alertTypes: {
+          upcoming_deadline: {
+            enabled: true,
+            description: 'Upcoming compliance deadlines',
+          },
+          overdue: {
+            enabled: true,
+            description: 'Overdue compliance items',
+          },
+          penalty_risk: {
+            enabled: true,
+            description: 'Potential penalty notifications',
+          },
+          document_expiry: {
+            enabled: true,
+            description: 'Document expiration warnings',
+          },
+          license_renewal: {
+            enabled: true,
+            description: 'License renewal reminders',
+          },
+          regulatory_updates: {
+            enabled: true,
+            description: 'New regulatory changes affecting your business',
+          },
+          service_status: {
+            enabled: true,
+            description: 'Status updates on active services',
+          },
+        },
+
+        // Quiet hours
+        quietHours: {
+          enabled: false,
+          startTime: '22:00',
+          endTime: '07:00',
+          timezone: 'Asia/Kolkata',
+          exceptCritical: true, // Still send critical alerts during quiet hours
+        },
+
+        // Escalation preferences
+        escalation: {
+          enabled: true,
+          escalateAfterHours: 24, // Escalate if not acknowledged within 24 hours
+          escalateTo: null, // Additional email for escalation
+        },
+
+        lastUpdated: new Date(),
+      };
+
+      res.json(preferences);
+    } catch (error) {
+      console.error('Error fetching alert preferences:', error);
+      res.status(500).json({ error: 'Failed to fetch preferences' });
+    }
+  });
+
+  /**
+   * PUT /api/client/compliance-alerts/preferences
+   * Update client's compliance alert notification preferences
+   * Requires: Client role
+   */
+  app.put('/api/client/compliance-alerts/preferences', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { channels, complianceTypes, severityPreferences, alertTypes, quietHours, escalation, notificationsEnabled } = req.body;
+
+      // Validate required structure
+      if (typeof notificationsEnabled !== 'boolean') {
+        return res.status(400).json({ error: 'notificationsEnabled must be a boolean' });
+      }
+
+      // Mock update - In production, save to database
+      const updatedPreferences = {
+        userId,
+        notificationsEnabled,
+        channels: channels || {},
+        complianceTypes: complianceTypes || {},
+        severityPreferences: severityPreferences || {},
+        alertTypes: alertTypes || {},
+        quietHours: quietHours || {},
+        escalation: escalation || {},
+        lastUpdated: new Date(),
+      };
+
+      res.json({
+        message: 'Preferences updated successfully',
+        preferences: updatedPreferences,
+      });
+    } catch (error) {
+      console.error('Error updating alert preferences:', error);
+      res.status(500).json({ error: 'Failed to update preferences' });
+    }
+  });
+
+  /**
+   * PATCH /api/client/compliance-alerts/preferences/channel/:channel
+   * Update a specific channel's preferences
+   * Requires: Client role
+   */
+  app.patch('/api/client/compliance-alerts/preferences/channel/:channel', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const { channel } = req.params;
+      const updates = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const validChannels = ['email', 'sms', 'whatsapp', 'inApp', 'push'];
+      if (!validChannels.includes(channel)) {
+        return res.status(400).json({ error: `Invalid channel. Must be one of: ${validChannels.join(', ')}` });
+      }
+
+      // Mock update - In production, update specific channel in database
+      res.json({
+        message: `${channel} preferences updated successfully`,
+        channel,
+        settings: updates,
+      });
+    } catch (error) {
+      console.error('Error updating channel preferences:', error);
+      res.status(500).json({ error: 'Failed to update channel preferences' });
+    }
+  });
+
+  /**
+   * GET /api/client/compliance-alerts
+   * Get active compliance alerts for the client
+   * Requires: Client role
+   */
+  app.get('/api/client/compliance-alerts', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { severity, type, acknowledged, limit = 50 } = req.query;
+
+      // Get user's entity
+      const userEntityId = await getUserEntityId(userId);
+      if (!userEntityId) {
+        return res.json({ alerts: [], total: 0 });
+      }
+
+      // Mock alerts - In production, query from complianceAlerts table
+      const alerts = [
+        {
+          id: 1,
+          entityId: userEntityId,
+          alertType: 'upcoming_deadline',
+          severity: 'critical',
+          title: 'GST Return Due in 3 Days',
+          message: 'GSTR-3B for January 2026 is due on 20th February. Please ensure timely filing to avoid penalties.',
+          actionRequired: 'File GSTR-3B before deadline',
+          complianceType: 'gst',
+          deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+          isActive: true,
+          isAcknowledged: false,
+          triggeredAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+          metadata: {
+            filingPeriod: 'January 2026',
+            returnType: 'GSTR-3B',
+            estimatedPenalty: 5000,
+          },
+        },
+        {
+          id: 2,
+          entityId: userEntityId,
+          alertType: 'upcoming_deadline',
+          severity: 'warning',
+          title: 'TDS Return Due in 15 Days',
+          message: 'Quarterly TDS return for Q3 FY 2025-26 is due on 31st January 2026.',
+          actionRequired: 'File TDS return',
+          complianceType: 'income_tax',
+          deadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+          isActive: true,
+          isAcknowledged: false,
+          triggeredAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+          metadata: {
+            quarter: 'Q3 FY 2025-26',
+            returnType: '26Q',
+          },
+        },
+        {
+          id: 3,
+          entityId: userEntityId,
+          alertType: 'document_expiry',
+          severity: 'info',
+          title: 'GST Certificate Renewal',
+          message: 'Your GST registration certificate will expire in 30 days. Renewal process should be initiated.',
+          actionRequired: 'Initiate GST certificate renewal',
+          complianceType: 'gst',
+          deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          isActive: true,
+          isAcknowledged: true,
+          acknowledgedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+          triggeredAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+          metadata: {
+            documentType: 'GST Certificate',
+            expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          },
+        },
+        {
+          id: 4,
+          entityId: userEntityId,
+          alertType: 'regulatory_updates',
+          severity: 'info',
+          title: 'New GST Compliance Update',
+          message: 'CBIC has issued new guidelines for e-invoicing threshold. Review changes that may affect your business.',
+          actionRequired: 'Review new guidelines',
+          complianceType: 'gst',
+          deadline: null,
+          isActive: true,
+          isAcknowledged: false,
+          triggeredAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+          metadata: {
+            circularNumber: 'CBIC/2026/01/15',
+            effectiveDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          },
+        },
+        {
+          id: 5,
+          entityId: userEntityId,
+          alertType: 'service_status',
+          severity: 'info',
+          title: 'Service Request Update',
+          message: 'Your Annual ROC Filing (SR-001) has moved to "Documents Pending" status.',
+          actionRequired: 'Upload required documents',
+          complianceType: 'roc',
+          deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          isActive: true,
+          isAcknowledged: false,
+          triggeredAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+          metadata: {
+            serviceRequestId: 'SR-001',
+            previousStatus: 'Payment Received',
+            newStatus: 'Documents Pending',
+          },
+        },
+      ];
+
+      // Apply filters
+      let filteredAlerts = alerts;
+
+      if (severity && severity !== 'all') {
+        filteredAlerts = filteredAlerts.filter(a => a.severity === severity);
+      }
+      if (type && type !== 'all') {
+        filteredAlerts = filteredAlerts.filter(a => a.alertType === type);
+      }
+      if (acknowledged !== undefined) {
+        const isAck = acknowledged === 'true';
+        filteredAlerts = filteredAlerts.filter(a => a.isAcknowledged === isAck);
+      }
+
+      // Sort by severity and date
+      const severityOrder = { critical: 0, warning: 1, info: 2 };
+      filteredAlerts.sort((a, b) => {
+        const sevDiff = severityOrder[a.severity as keyof typeof severityOrder] - severityOrder[b.severity as keyof typeof severityOrder];
+        if (sevDiff !== 0) return sevDiff;
+        return new Date(b.triggeredAt).getTime() - new Date(a.triggeredAt).getTime();
+      });
+
+      res.json({
+        alerts: filteredAlerts.slice(0, parseInt(limit as string)),
+        total: filteredAlerts.length,
+        summary: {
+          total: alerts.length,
+          critical: alerts.filter(a => a.severity === 'critical' && !a.isAcknowledged).length,
+          warning: alerts.filter(a => a.severity === 'warning' && !a.isAcknowledged).length,
+          info: alerts.filter(a => a.severity === 'info' && !a.isAcknowledged).length,
+          acknowledged: alerts.filter(a => a.isAcknowledged).length,
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching compliance alerts:', error);
+      res.status(500).json({ error: 'Failed to fetch alerts' });
+    }
+  });
+
+  /**
+   * PATCH /api/client/compliance-alerts/:id/acknowledge
+   * Acknowledge a compliance alert
+   * Requires: Client role
+   */
+  app.patch('/api/client/compliance-alerts/:id/acknowledge', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const { id } = req.params;
+      const { notes } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      // Mock acknowledge - In production, update complianceAlerts table
+      res.json({
+        message: 'Alert acknowledged successfully',
+        alertId: parseInt(id),
+        acknowledgedAt: new Date(),
+        acknowledgedBy: userId,
+        notes,
+      });
+    } catch (error) {
+      console.error('Error acknowledging alert:', error);
+      res.status(500).json({ error: 'Failed to acknowledge alert' });
+    }
+  });
+
+  /**
+   * POST /api/client/compliance-alerts/test
+   * Send a test notification to verify alert channels
+   * Requires: Client role
+   */
+  app.post('/api/client/compliance-alerts/test', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      const { channel } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const validChannels = ['email', 'sms', 'whatsapp'];
+      if (!validChannels.includes(channel)) {
+        return res.status(400).json({ error: `Invalid channel. Must be one of: ${validChannels.join(', ')}` });
+      }
+
+      // Mock test notification - In production, actually send test notification
+      res.json({
+        message: `Test notification sent to ${channel}`,
+        channel,
+        sentAt: new Date(),
+        status: 'sent',
+        note: `A test notification has been sent to your registered ${channel}. Please check and confirm receipt.`,
+      });
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      res.status(500).json({ error: 'Failed to send test notification' });
+    }
+  });
+
+  /**
+   * GET /api/client/compliance-alerts/upcoming-deadlines
+   * Get summary of upcoming compliance deadlines for dashboard widget
+   * Requires: Client role
+   */
+  app.get('/api/client/compliance-alerts/upcoming-deadlines', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { days = 30 } = req.query;
+
+      // Mock upcoming deadlines - In production, query from compliance tracking
+      const upcomingDeadlines = [
+        {
+          id: 1,
+          complianceType: 'gst',
+          complianceName: 'GSTR-3B',
+          period: 'January 2026',
+          deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+          daysRemaining: 3,
+          status: 'pending',
+          priority: 'critical',
+          estimatedPenalty: 5000,
+          relatedServiceRequest: null,
+        },
+        {
+          id: 2,
+          complianceType: 'income_tax',
+          complianceName: 'TDS Return (26Q)',
+          period: 'Q3 FY 2025-26',
+          deadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
+          daysRemaining: 15,
+          status: 'pending',
+          priority: 'high',
+          estimatedPenalty: 10000,
+          relatedServiceRequest: null,
+        },
+        {
+          id: 3,
+          complianceType: 'gst',
+          complianceName: 'GSTR-1',
+          period: 'January 2026',
+          deadline: new Date(Date.now() + 11 * 24 * 60 * 60 * 1000),
+          daysRemaining: 11,
+          status: 'pending',
+          priority: 'high',
+          estimatedPenalty: 5000,
+          relatedServiceRequest: null,
+        },
+        {
+          id: 4,
+          complianceType: 'roc',
+          complianceName: 'AOC-4 (Financial Statements)',
+          period: 'FY 2024-25',
+          deadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
+          daysRemaining: 45,
+          status: 'in_progress',
+          priority: 'medium',
+          estimatedPenalty: 100000,
+          relatedServiceRequest: 'SR-001',
+        },
+        {
+          id: 5,
+          complianceType: 'roc',
+          complianceName: 'DIR-3 KYC',
+          period: 'Annual',
+          deadline: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+          daysRemaining: 60,
+          status: 'pending',
+          priority: 'low',
+          estimatedPenalty: 5000,
+          relatedServiceRequest: null,
+        },
+      ];
+
+      // Filter by days
+      const maxDays = parseInt(days as string);
+      const filtered = upcomingDeadlines.filter(d => d.daysRemaining <= maxDays);
+
+      res.json({
+        deadlines: filtered,
+        summary: {
+          total: filtered.length,
+          critical: filtered.filter(d => d.daysRemaining <= 7).length,
+          thisWeek: filtered.filter(d => d.daysRemaining <= 7).length,
+          thisMonth: filtered.filter(d => d.daysRemaining <= 30).length,
+          totalEstimatedPenalty: filtered.reduce((sum, d) => sum + (d.estimatedPenalty || 0), 0),
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching upcoming deadlines:', error);
+      res.status(500).json({ error: 'Failed to fetch upcoming deadlines' });
+    }
+  });
+
   console.log('✅ Client routes registered');
 }

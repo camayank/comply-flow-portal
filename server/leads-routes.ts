@@ -198,6 +198,464 @@ router.get('/executives', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async
   }
 });
 
+// =====================================================
+// LEAD ASSIGNMENT & APPROVAL WORKFLOW - CRITICAL APIS
+// =====================================================
+
+// PUT /api/leads/:id/assign - Assign lead to sales executive
+router.put('/leads/:id/assign', requireMinimumRole(USER_ROLES.SALES_MANAGER), async (req: AuthenticatedRequest, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+    const { assignedTo, assignedToName, priority, notes } = req.body;
+
+    if (!assignedTo) {
+      return res.status(400).json({ error: 'assignedTo is required' });
+    }
+
+    const lead = await storage.getLead(leadId);
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    // Update lead with assignment
+    const updatedLead = await storage.updateLead(leadId, {
+      assignedTo,
+      assignedToName: assignedToName || null,
+      priority: priority || lead.priority,
+      lastActivityDate: new Date(),
+      lastActivityType: 'assigned'
+    });
+
+    // Log the assignment activity
+    try {
+      await storage.createActivityLog({
+        userId: req.user?.id || 0,
+        action: 'lead_assigned',
+        entityType: 'lead',
+        entityId: leadId,
+        details: JSON.stringify({
+          leadId: lead.leadId,
+          assignedTo,
+          assignedToName,
+          assignedBy: req.user?.username,
+          notes
+        }),
+        ipAddress: req.ip || null
+      });
+    } catch (logError) {
+      console.warn('Failed to log assignment activity:', logError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Lead assigned successfully',
+      lead: updatedLead
+    });
+  } catch (error) {
+    console.error('Error assigning lead:', error);
+    res.status(500).json({ error: 'Failed to assign lead' });
+  }
+});
+
+// POST /api/leads/bulk-assign - Bulk assign leads to sales executives
+router.post('/leads/bulk-assign', requireMinimumRole(USER_ROLES.SALES_MANAGER), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { leadIds, assignedTo, assignedToName, distributionType = 'manual' } = req.body;
+
+    if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
+      return res.status(400).json({ error: 'leadIds array is required' });
+    }
+
+    if (distributionType === 'manual' && !assignedTo) {
+      return res.status(400).json({ error: 'assignedTo is required for manual distribution' });
+    }
+
+    const results: { success: any[]; failed: any[] } = { success: [], failed: [] };
+
+    // Get executives for round-robin distribution if needed
+    let executives: any[] = [];
+    if (distributionType === 'round_robin' || distributionType === 'load_balanced') {
+      executives = await storage.getPreSalesExecutives();
+      if (executives.length === 0) {
+        return res.status(400).json({ error: 'No sales executives available for distribution' });
+      }
+    }
+
+    for (let i = 0; i < leadIds.length; i++) {
+      const leadId = leadIds[i];
+      try {
+        let targetAssignee = assignedTo;
+        let targetAssigneeName = assignedToName;
+
+        // Distribute leads based on strategy
+        if (distributionType === 'round_robin') {
+          const execIndex = i % executives.length;
+          targetAssignee = executives[execIndex].id;
+          targetAssigneeName = executives[execIndex].fullName;
+        } else if (distributionType === 'load_balanced') {
+          // Simple load balancing - assign to exec with least leads
+          const execWithLeastLeads = executives.reduce((min, exec) =>
+            (exec.activeLeadCount || 0) < (min.activeLeadCount || 0) ? exec : min
+          , executives[0]);
+          targetAssignee = execWithLeastLeads.id;
+          targetAssigneeName = execWithLeastLeads.fullName;
+          // Increment virtual count for next iteration
+          execWithLeastLeads.activeLeadCount = (execWithLeastLeads.activeLeadCount || 0) + 1;
+        }
+
+        const updatedLead = await storage.updateLead(leadId, {
+          assignedTo: targetAssignee,
+          assignedToName: targetAssigneeName,
+          lastActivityDate: new Date(),
+          lastActivityType: 'assigned'
+        });
+
+        if (updatedLead) {
+          results.success.push({ leadId, assignedTo: targetAssignee, assignedToName: targetAssigneeName });
+        } else {
+          results.failed.push({ leadId, error: 'Lead not found' });
+        }
+      } catch (err: any) {
+        results.failed.push({ leadId, error: err.message });
+      }
+    }
+
+    // Log bulk assignment
+    try {
+      await storage.createActivityLog({
+        userId: req.user?.id || 0,
+        action: 'leads_bulk_assigned',
+        entityType: 'lead',
+        entityId: 0,
+        details: JSON.stringify({
+          totalLeads: leadIds.length,
+          successCount: results.success.length,
+          failedCount: results.failed.length,
+          distributionType,
+          assignedBy: req.user?.username
+        }),
+        ipAddress: req.ip || null
+      });
+    } catch (logError) {
+      console.warn('Failed to log bulk assignment:', logError);
+    }
+
+    res.json({
+      success: true,
+      message: `Assigned ${results.success.length} of ${leadIds.length} leads`,
+      results
+    });
+  } catch (error) {
+    console.error('Error bulk assigning leads:', error);
+    res.status(500).json({ error: 'Failed to bulk assign leads' });
+  }
+});
+
+// PATCH /api/leads/:id/approve - Approve lead (Sales Manager)
+router.patch('/leads/:id/approve', requireMinimumRole(USER_ROLES.SALES_MANAGER), async (req: AuthenticatedRequest, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+    const { qualityScore, notes, assignToExecutive } = req.body;
+
+    const lead = await storage.getLead(leadId);
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    // Cannot approve already converted or rejected leads
+    if (lead.leadStage === 'converted' || lead.status === 'rejected') {
+      return res.status(400).json({ error: `Cannot approve a lead that is ${lead.status || lead.leadStage}` });
+    }
+
+    const updateData: any = {
+      status: 'approved',
+      qualityScore: qualityScore || 80,
+      approvedAt: new Date(),
+      approvedBy: req.user?.id,
+      approvalNotes: notes,
+      lastActivityDate: new Date(),
+      lastActivityType: 'approved'
+    };
+
+    // Optionally assign to executive upon approval
+    if (assignToExecutive) {
+      updateData.assignedTo = assignToExecutive.id;
+      updateData.assignedToName = assignToExecutive.name;
+    }
+
+    // Move to qualified stage
+    if (lead.leadStage === 'new' || lead.leadStage === 'contacted') {
+      updateData.leadStage = 'qualified';
+    }
+
+    const updatedLead = await storage.updateLead(leadId, updateData);
+
+    // Log approval
+    try {
+      await storage.createActivityLog({
+        userId: req.user?.id || 0,
+        action: 'lead_approved',
+        entityType: 'lead',
+        entityId: leadId,
+        details: JSON.stringify({
+          leadId: lead.leadId,
+          qualityScore: updateData.qualityScore,
+          approvedBy: req.user?.username,
+          notes
+        }),
+        ipAddress: req.ip || null
+      });
+    } catch (logError) {
+      console.warn('Failed to log approval activity:', logError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Lead approved successfully',
+      lead: updatedLead
+    });
+  } catch (error) {
+    console.error('Error approving lead:', error);
+    res.status(500).json({ error: 'Failed to approve lead' });
+  }
+});
+
+// PATCH /api/leads/:id/reject - Reject lead (Sales Manager)
+router.patch('/leads/:id/reject', requireMinimumRole(USER_ROLES.SALES_MANAGER), async (req: AuthenticatedRequest, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+    const { reason, feedback, allowResubmission = false } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({ error: 'Rejection reason is required' });
+    }
+
+    const lead = await storage.getLead(leadId);
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    // Cannot reject already converted leads
+    if (lead.leadStage === 'converted') {
+      return res.status(400).json({ error: 'Cannot reject a converted lead' });
+    }
+
+    const updatedLead = await storage.updateLead(leadId, {
+      status: 'rejected',
+      leadStage: allowResubmission ? 'new' : 'lost',
+      rejectedAt: new Date(),
+      rejectedBy: req.user?.id,
+      rejectionReason: reason,
+      rejectionFeedback: feedback,
+      lastActivityDate: new Date(),
+      lastActivityType: 'rejected'
+    });
+
+    // Log rejection
+    try {
+      await storage.createActivityLog({
+        userId: req.user?.id || 0,
+        action: 'lead_rejected',
+        entityType: 'lead',
+        entityId: leadId,
+        details: JSON.stringify({
+          leadId: lead.leadId,
+          reason,
+          feedback,
+          allowResubmission,
+          rejectedBy: req.user?.username
+        }),
+        ipAddress: req.ip || null
+      });
+    } catch (logError) {
+      console.warn('Failed to log rejection activity:', logError);
+    }
+
+    res.json({
+      success: true,
+      message: allowResubmission
+        ? 'Lead returned for more information'
+        : 'Lead rejected',
+      lead: updatedLead
+    });
+  } catch (error) {
+    console.error('Error rejecting lead:', error);
+    res.status(500).json({ error: 'Failed to reject lead' });
+  }
+});
+
+// POST /api/leads/:id/request-info - Request more information on lead
+router.post('/leads/:id/request-info', requireMinimumRole(USER_ROLES.SALES_MANAGER), async (req: AuthenticatedRequest, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+    const { requiredFields, message, deadline } = req.body;
+
+    if (!requiredFields || !Array.isArray(requiredFields) || requiredFields.length === 0) {
+      return res.status(400).json({ error: 'requiredFields array is required' });
+    }
+
+    const lead = await storage.getLead(leadId);
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    const updatedLead = await storage.updateLead(leadId, {
+      status: 'info_requested',
+      infoRequestedAt: new Date(),
+      infoRequestedBy: req.user?.id,
+      infoRequestedFields: JSON.stringify(requiredFields),
+      infoRequestMessage: message,
+      infoRequestDeadline: deadline ? new Date(deadline) : null,
+      lastActivityDate: new Date(),
+      lastActivityType: 'info_requested'
+    });
+
+    // Log info request
+    try {
+      await storage.createActivityLog({
+        userId: req.user?.id || 0,
+        action: 'lead_info_requested',
+        entityType: 'lead',
+        entityId: leadId,
+        details: JSON.stringify({
+          leadId: lead.leadId,
+          requiredFields,
+          message,
+          deadline,
+          requestedBy: req.user?.username
+        }),
+        ipAddress: req.ip || null
+      });
+    } catch (logError) {
+      console.warn('Failed to log info request activity:', logError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Information requested from lead submitter',
+      lead: updatedLead
+    });
+  } catch (error) {
+    console.error('Error requesting lead info:', error);
+    res.status(500).json({ error: 'Failed to request lead information' });
+  }
+});
+
+// GET /api/leads/pending-approval - Get leads pending manager approval
+router.get('/leads/pending-approval', requireMinimumRole(USER_ROLES.SALES_MANAGER), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { page = '1', limit = '20' } = req.query;
+    const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
+
+    // Get leads that need approval (new leads without approval status)
+    const result = await storage.getAllLeads({
+      stage: 'new',
+      limit: parseInt(limit as string),
+      offset
+    });
+
+    // Filter to only pending approval (no approvedAt and no rejectedAt)
+    const pendingLeads = result.leads.filter((lead: any) =>
+      !lead.approvedAt && !lead.rejectedAt && lead.status !== 'rejected'
+    );
+
+    res.json({
+      leads: pendingLeads,
+      pagination: {
+        total: pendingLeads.length,
+        page: parseInt(page as string),
+        limit: parseInt(limit as string),
+        totalPages: Math.ceil(pendingLeads.length / parseInt(limit as string))
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching pending leads:', error);
+    res.status(500).json({ error: 'Failed to fetch pending leads' });
+  }
+});
+
+// POST /api/leads/:id/score - Calculate lead quality score
+router.post('/leads/:id/score', requireMinimumRole(USER_ROLES.SALES_EXECUTIVE), async (req: AuthenticatedRequest, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+    const lead = await storage.getLead(leadId);
+
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    // Calculate lead quality score based on multiple factors
+    let score = 0;
+    const factors: { factor: string; score: number; maxScore: number }[] = [];
+
+    // 1. Company information completeness (max 20)
+    if (lead.companyName) { score += 5; factors.push({ factor: 'Company Name', score: 5, maxScore: 5 }); }
+    if (lead.industry) { score += 5; factors.push({ factor: 'Industry', score: 5, maxScore: 5 }); }
+    if (lead.businessType) { score += 5; factors.push({ factor: 'Business Type', score: 5, maxScore: 5 }); }
+    if (lead.website) { score += 5; factors.push({ factor: 'Website', score: 5, maxScore: 5 }); }
+
+    // 2. Contact information (max 20)
+    if (lead.email) { score += 10; factors.push({ factor: 'Email', score: 10, maxScore: 10 }); }
+    if (lead.phone) { score += 5; factors.push({ factor: 'Phone', score: 5, maxScore: 5 }); }
+    if (lead.contactPerson) { score += 5; factors.push({ factor: 'Contact Person', score: 5, maxScore: 5 }); }
+
+    // 3. Budget qualification (max 20)
+    const budget = lead.estimatedBudget || 0;
+    if (budget >= 100000) { score += 20; factors.push({ factor: 'Budget (₹1L+)', score: 20, maxScore: 20 }); }
+    else if (budget >= 50000) { score += 15; factors.push({ factor: 'Budget (₹50K+)', score: 15, maxScore: 20 }); }
+    else if (budget >= 25000) { score += 10; factors.push({ factor: 'Budget (₹25K+)', score: 10, maxScore: 20 }); }
+    else if (budget > 0) { score += 5; factors.push({ factor: 'Budget (Specified)', score: 5, maxScore: 20 }); }
+
+    // 4. Lead source quality (max 20)
+    const highQualitySources = ['referral', 'partner', 'existing_client'];
+    const mediumQualitySources = ['website', 'linkedin', 'google'];
+    if (highQualitySources.includes(lead.source || '')) {
+      score += 20; factors.push({ factor: 'High-Quality Source', score: 20, maxScore: 20 });
+    } else if (mediumQualitySources.includes(lead.source || '')) {
+      score += 12; factors.push({ factor: 'Medium-Quality Source', score: 12, maxScore: 20 });
+    } else if (lead.source) {
+      score += 5; factors.push({ factor: 'Source Specified', score: 5, maxScore: 20 });
+    }
+
+    // 5. Service interest (max 20)
+    if (lead.interestedServices && Array.isArray(lead.interestedServices) && lead.interestedServices.length > 0) {
+      const serviceScore = Math.min(lead.interestedServices.length * 5, 20);
+      score += serviceScore;
+      factors.push({ factor: 'Service Interest', score: serviceScore, maxScore: 20 });
+    }
+
+    // Determine qualification level
+    let qualificationLevel: 'hot' | 'warm' | 'cold' | 'unqualified';
+    if (score >= 80) qualificationLevel = 'hot';
+    else if (score >= 60) qualificationLevel = 'warm';
+    else if (score >= 40) qualificationLevel = 'cold';
+    else qualificationLevel = 'unqualified';
+
+    // Update lead with score
+    await storage.updateLead(leadId, {
+      qualityScore: score,
+      qualificationLevel,
+      lastScoredAt: new Date()
+    });
+
+    res.json({
+      leadId: lead.leadId,
+      score,
+      maxScore: 100,
+      qualificationLevel,
+      factors,
+      recommendation: score >= 60
+        ? 'This lead is qualified and should be pursued actively'
+        : score >= 40
+        ? 'This lead needs more qualification before pursuing'
+        : 'This lead may not be a good fit - consider requesting more information'
+    });
+  } catch (error) {
+    console.error('Error scoring lead:', error);
+    res.status(500).json({ error: 'Failed to score lead' });
+  }
+});
+
 // POST /api/leads/:id/convert - Convert lead to client (CRITICAL ENDPOINT)
 router.post('/leads/:id/convert', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {

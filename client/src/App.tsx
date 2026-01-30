@@ -134,6 +134,19 @@ const MobileOperationsPanelRefactored = lazy(() => import("./pages/MobileOperati
 const MobileAdminPanelRefactored = lazy(() => import("./pages/MobileAdminPanelRefactored"));
 const SalesProposalManagerRefactored = lazy(() => import("./pages/SalesProposalManagerRefactored"));
 const DevHub = lazy(() => import("./pages/DevHub"));
+const PlaybookManagement = lazy(() => import("./pages/customer-success/PlaybookManagement"));
+const RenewalPipeline = lazy(() => import("./pages/customer-success/RenewalPipeline"));
+const SalesDashboard = lazy(() => import("./pages/sales/SalesDashboard"));
+const AuditLogViewer = lazy(() => import("./pages/compliance/AuditLogViewer"));
+const DataDeletionRequests = lazy(() => import("./pages/compliance/DataDeletionRequests"));
+const AccessReviews = lazy(() => import("./pages/admin/AccessReviews"));
+const SecurityIncidents = lazy(() => import("./pages/security/SecurityIncidents"));
+const EscalationDashboard = lazy(() => import("./pages/operations/EscalationDashboard"));
+const NotificationCenter = lazy(() => import("./pages/notifications/NotificationCenter"));
+const MessageCenter = lazy(() => import("./pages/messaging/MessageCenter"));
+const CommissionDisputes = lazy(() => import("./pages/agent/CommissionDisputes"));
+const AgentKYC = lazy(() => import("./pages/agent/AgentKYC"));
+const ComplianceAlertPreferences = lazy(() => import("./pages/client/ComplianceAlertPreferences"));
 
 const publicRoutePrefixes = [
   '/',
@@ -313,6 +326,50 @@ const AppContent = () => {
                 <Route path="/admin/api-keys" component={APIKeyManagement} />
                 <Route path="/developer/api-keys" component={APIKeyManagement} />
 
+                {/* Customer Success Routes */}
+                <Route path="/customer-success/playbooks" component={PlaybookManagement} />
+                <Route path="/playbooks" component={PlaybookManagement} />
+                <Route path="/customer-success/renewals" component={RenewalPipeline} />
+                <Route path="/renewals" component={RenewalPipeline} />
+                <Route path="/renewal-pipeline" component={RenewalPipeline} />
+
+                {/* Sales Dashboard Routes */}
+                <Route path="/sales" component={SalesDashboard} />
+                <Route path="/sales/dashboard" component={SalesDashboard} />
+                <Route path="/sales/pipeline" component={SalesDashboard} />
+                <Route path="/sales/team" component={SalesDashboard} />
+                <Route path="/sales/forecasts" component={SalesDashboard} />
+                <Route path="/sales/targets" component={SalesDashboard} />
+
+                {/* Audit & Compliance Routes */}
+                <Route path="/compliance/audit-log" component={AuditLogViewer} />
+                <Route path="/audit-log" component={AuditLogViewer} />
+                <Route path="/compliance/data-requests" component={DataDeletionRequests} />
+                <Route path="/data-requests" component={DataDeletionRequests} />
+                <Route path="/admin/access-reviews" component={AccessReviews} />
+                <Route path="/access-reviews" component={AccessReviews} />
+
+                {/* Security Incidents Routes */}
+                <Route path="/security/incidents" component={SecurityIncidents} />
+                <Route path="/incidents" component={SecurityIncidents} />
+                <Route path="/security-incidents" component={SecurityIncidents} />
+
+                {/* Escalation Management Routes (Ops Manager) */}
+                <Route path="/escalations" component={EscalationDashboard} />
+                <Route path="/ops/escalations" component={EscalationDashboard} />
+                <Route path="/escalation-dashboard" component={EscalationDashboard} />
+
+                {/* Notification Center (All Roles) */}
+                <Route path="/notifications" component={NotificationCenter} />
+                <Route path="/notification-center" component={NotificationCenter} />
+                <Route path="/alerts" component={NotificationCenter} />
+
+                {/* Messaging Center (Client-Ops Communication) */}
+                <Route path="/messages" component={MessageCenter} />
+                <Route path="/messaging" component={MessageCenter} />
+                <Route path="/conversations" component={MessageCenter} />
+                <Route path="/inbox" component={MessageCenter} />
+
                 <Route path="/portal" component={MobileClientPortalRefactored} />
                 <Route path="/client-portal" component={MobileClientPortalRefactored} />
                 <Route path="/operations" component={MobileOperationsPanelRefactored} />
@@ -333,6 +390,7 @@ const AppContent = () => {
                 {/* Client Service Tracking */}
                 <Route path="/my-services" component={ClientServicesDashboard} />
                 <Route path="/client/services" component={ClientServicesDashboard} />
+                <Route path="/client/alert-preferences" component={ComplianceAlertPreferences} />
                 <Route path="/service-tracker" component={ClientServicesDashboard} />
 
                 {/* Service Catalog Browser (96+ services) */}
@@ -387,6 +445,10 @@ const AppContent = () => {
                 <Route path="/agent/commissions" component={AgentCommissionTracker} />
                 <Route path="/agent/performance" component={AgentPerformance} />
                 <Route path="/agent/profile" component={AgentProfileSettings} />
+                <Route path="/agent/disputes" component={CommissionDisputes} />
+                <Route path="/agent/kyc" component={AgentKYC} />
+                <Route path="/agent/commission-disputes" component={CommissionDisputes} />
+                <Route path="/commission-disputes" component={CommissionDisputes} />
                 {/* CONSOLIDATED: All agent portal routes point to main agent */}
                 <Route path="/agents" component={MobileAgentPortal} />
                 <Route path="/agent-portal" component={MobileAgentPortal} />

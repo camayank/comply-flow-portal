@@ -3,6 +3,8 @@ import { Request, Response, NextFunction } from 'express';
 export const USER_ROLES = {
   SUPER_ADMIN: 'super_admin',
   ADMIN: 'admin',
+  SALES_MANAGER: 'sales_manager',
+  SALES_EXECUTIVE: 'sales_executive',
   OPS_MANAGER: 'ops_manager',
   OPS_EXECUTIVE: 'ops_executive',
   CUSTOMER_SERVICE: 'customer_service',
@@ -16,7 +18,7 @@ export const USER_ROLES = {
 export const ADMIN_ROLES = ['super_admin', 'admin'] as const;
 
 // Roles that Admin can manage (delegated)
-export const DELEGATED_ROLES = ['ops_manager', 'ops_executive', 'customer_service', 'qc_executive', 'accountant', 'agent', 'client'] as const;
+export const DELEGATED_ROLES = ['sales_manager', 'sales_executive', 'ops_manager', 'ops_executive', 'customer_service', 'qc_executive', 'accountant', 'agent', 'client'] as const;
 
 /**
  * Role Hierarchy for Authorization
@@ -34,7 +36,9 @@ export const DELEGATED_ROLES = ['ops_manager', 'ops_executive', 'customer_servic
 export const ROLE_HIERARCHY = {
   [USER_ROLES.SUPER_ADMIN]: 100,      // Full system access - ONLY manages admins, system config
   [USER_ROLES.ADMIN]: 90,             // Administrative access - manages all non-admin users
+  [USER_ROLES.SALES_MANAGER]: 85,     // Sales team manager - leads, proposals, team oversight
   [USER_ROLES.OPS_MANAGER]: 80,       // Operations manager
+  [USER_ROLES.SALES_EXECUTIVE]: 75,   // Sales team - lead management, proposals
   [USER_ROLES.OPS_EXECUTIVE]: 70,     // Operations team
   [USER_ROLES.CUSTOMER_SERVICE]: 60,  // Customer support
   [USER_ROLES.QC_EXECUTIVE]: 55,      // Quality control
@@ -113,6 +117,27 @@ export const PERMISSIONS = {
   INTEGRATIONS: {
     VIEW: 'integrations:view',
     MANAGE: 'integrations:manage',   // Super Admin only
+  },
+  SALES: {
+    VIEW_LEADS: 'sales:leads:view',
+    CREATE_LEADS: 'sales:leads:create',
+    UPDATE_LEADS: 'sales:leads:update',
+    DELETE_LEADS: 'sales:leads:delete',
+    ASSIGN_LEADS: 'sales:leads:assign',
+    CONVERT_LEADS: 'sales:leads:convert',
+    VIEW_PROPOSALS: 'sales:proposals:view',
+    CREATE_PROPOSALS: 'sales:proposals:create',
+    UPDATE_PROPOSALS: 'sales:proposals:update',
+    DELETE_PROPOSALS: 'sales:proposals:delete',
+    VIEW_PIPELINE: 'sales:pipeline:view',
+    MANAGE_PIPELINE: 'sales:pipeline:manage',
+    VIEW_TEAM: 'sales:team:view',
+    MANAGE_TEAM: 'sales:team:manage',
+    VIEW_TARGETS: 'sales:targets:view',
+    MANAGE_TARGETS: 'sales:targets:manage',
+    VIEW_FORECASTS: 'sales:forecasts:view',
+    VIEW_COMMISSIONS: 'sales:commissions:view',
+    MANAGE_COMMISSIONS: 'sales:commissions:manage',
   },
 } as const;
 
@@ -217,6 +242,37 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     PERMISSIONS.AUDIT.VIEW,
     // Integrations view only
     PERMISSIONS.INTEGRATIONS.VIEW,
+  ],
+
+  // SALES MANAGER - Sales team oversight, pipeline management, forecasting
+  [USER_ROLES.SALES_MANAGER]: [
+    PERMISSIONS.USER_MANAGEMENT.READ,
+    PERMISSIONS.CLIENT_MANAGEMENT.READ,
+    PERMISSIONS.CLIENT_MANAGEMENT.CREATE,
+    PERMISSIONS.CLIENT_MANAGEMENT.UPDATE,
+    PERMISSIONS.SERVICE_MANAGEMENT.READ,
+    ...Object.values(PERMISSIONS.SALES),
+    PERMISSIONS.ANALYTICS.VIEW,
+    PERMISSIONS.ANALYTICS.EXPORT,
+    PERMISSIONS.FINANCIAL.VIEW,
+  ],
+
+  // SALES EXECUTIVE - Lead management, proposal creation
+  [USER_ROLES.SALES_EXECUTIVE]: [
+    PERMISSIONS.CLIENT_MANAGEMENT.READ,
+    PERMISSIONS.CLIENT_MANAGEMENT.CREATE,
+    PERMISSIONS.SERVICE_MANAGEMENT.READ,
+    PERMISSIONS.SALES.VIEW_LEADS,
+    PERMISSIONS.SALES.CREATE_LEADS,
+    PERMISSIONS.SALES.UPDATE_LEADS,
+    PERMISSIONS.SALES.CONVERT_LEADS,
+    PERMISSIONS.SALES.VIEW_PROPOSALS,
+    PERMISSIONS.SALES.CREATE_PROPOSALS,
+    PERMISSIONS.SALES.UPDATE_PROPOSALS,
+    PERMISSIONS.SALES.VIEW_PIPELINE,
+    PERMISSIONS.SALES.VIEW_TARGETS,
+    PERMISSIONS.SALES.VIEW_COMMISSIONS,
+    PERMISSIONS.ANALYTICS.VIEW,
   ],
 
   // OPS MANAGER - Team management, service assignment, QC oversight

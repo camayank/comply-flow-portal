@@ -6,6 +6,8 @@
 export const USER_ROLES = {
   SUPER_ADMIN: 'super_admin',
   ADMIN: 'admin',
+  SALES_MANAGER: 'sales_manager',
+  SALES_EXECUTIVE: 'sales_executive',
   OPS_MANAGER: 'ops_manager',
   OPS_EXECUTIVE: 'ops_executive',
   OPS_EXEC: 'ops_exec',
@@ -21,7 +23,9 @@ export const USER_ROLES = {
 export const ROLE_LEVELS: Record<string, number> = {
   'super_admin': 100,
   'admin': 90,
+  'sales_manager': 85,
   'ops_manager': 80,
+  'sales_executive': 75,
   'ops_executive': 70,
   'ops_exec': 70,
   'ops_lead': 70,
@@ -47,6 +51,12 @@ export function getRoleDashboardRoute(role: string): string {
 
     case USER_ROLES.ADMIN:
       return '/admin';
+
+    case USER_ROLES.SALES_MANAGER:
+      return '/sales';
+
+    case USER_ROLES.SALES_EXECUTIVE:
+      return '/sales';
 
     case USER_ROLES.OPS_MANAGER:
     case USER_ROLES.OPS_EXECUTIVE:
@@ -309,6 +319,73 @@ export function getAllowedRoutes(role: string): string[] {
         ...commonRoutes,
       ];
 
+    case USER_ROLES.SALES_MANAGER:
+      // Sales Manager - Full sales pipeline, team management, forecasting
+      return [
+        '/',
+        '/sales',
+        '/sales/dashboard',
+        '/sales/pipeline',
+        '/sales/team',
+        '/sales/forecasts',
+        '/sales/targets',
+        '/sales/reports',
+        '/leads',
+        '/lead-management',
+        '/lead-pipeline',
+        '/pipeline',
+        '/crm',
+        '/proposals',
+        '/proposal-management',
+        '/pre-sales',
+        '/sales-proposals',
+        '/client-master',
+        '/clients',
+        '/client-management',
+        '/services',
+        '/service-catalog',
+        '/browse-services',
+        '/analytics',
+        '/executive-dashboard',
+        '/financial-management', // Read-only for commission/revenue
+        '/tasks',
+        '/task-management',
+        '/my-tasks',
+        '/referrals',
+        '/referral-dashboard',
+        ...commonRoutes,
+      ];
+
+    case USER_ROLES.SALES_EXECUTIVE:
+      // Sales Executive - Lead management, proposals, personal targets
+      return [
+        '/',
+        '/sales',
+        '/sales/dashboard',
+        '/sales/pipeline',
+        '/sales/my-leads',
+        '/sales/my-targets',
+        '/leads',
+        '/lead-management',
+        '/lead-pipeline',
+        '/pipeline',
+        '/crm',
+        '/proposals',
+        '/proposal-management',
+        '/pre-sales',
+        '/sales-proposals',
+        '/client-master',
+        '/clients',
+        '/services',
+        '/service-catalog',
+        '/browse-services',
+        '/tasks',
+        '/task-management',
+        '/my-tasks',
+        '/referrals',
+        ...commonRoutes,
+      ];
+
     case USER_ROLES.OPS_MANAGER:
       // Ops Manager has additional team management and analytics access
       return [
@@ -561,7 +638,30 @@ export function getRoleNavigation(role: string) {
         { label: 'Financial Management', path: '/financial-management', icon: 'DollarSign' },
         { label: 'AI Products', path: '/autocomply', icon: 'Bot' },
       ];
-    
+
+    case USER_ROLES.SALES_MANAGER:
+      return [
+        { label: 'Dashboard', path: '/sales', icon: 'LayoutDashboard' },
+        { label: 'Pipeline', path: '/sales', section: 'pipeline', icon: 'TrendingUp' },
+        { label: 'Leads', path: '/leads', icon: 'UserPlus' },
+        { label: 'Proposals', path: '/proposals', icon: 'FileText' },
+        { label: 'Team', path: '/sales', section: 'team', icon: 'Users' },
+        { label: 'Targets', path: '/sales', section: 'targets', icon: 'Target' },
+        { label: 'Forecasts', path: '/sales', section: 'forecasts', icon: 'BarChart3' },
+        { label: 'Analytics', path: '/analytics', icon: 'PieChart' },
+      ];
+
+    case USER_ROLES.SALES_EXECUTIVE:
+      return [
+        { label: 'Dashboard', path: '/sales', icon: 'LayoutDashboard' },
+        { label: 'My Pipeline', path: '/sales', section: 'my-pipeline', icon: 'TrendingUp' },
+        { label: 'My Leads', path: '/leads', icon: 'UserPlus' },
+        { label: 'Proposals', path: '/proposals', icon: 'FileText' },
+        { label: 'My Targets', path: '/sales', section: 'my-targets', icon: 'Target' },
+        { label: 'Clients', path: '/client-master', icon: 'Building2' },
+        { label: 'Services', path: '/service-catalog', icon: 'ShoppingCart' },
+      ];
+
     case USER_ROLES.OPS_MANAGER:
       return [
         { label: 'Dashboard', path: '/operations', icon: 'LayoutDashboard' },
@@ -652,6 +752,10 @@ export function getRoleDisplayName(role: string): string {
       return 'Super Administrator';
     case USER_ROLES.ADMIN:
       return 'Administrator';
+    case USER_ROLES.SALES_MANAGER:
+      return 'Sales Manager';
+    case USER_ROLES.SALES_EXECUTIVE:
+      return 'Sales Executive';
     case USER_ROLES.OPS_MANAGER:
       return 'Operations Manager';
     case USER_ROLES.OPS_EXECUTIVE:
@@ -711,6 +815,14 @@ export function isQCRole(role: string): boolean {
 export function isFinanceRole(role: string): boolean {
   const normalizedRole = role.toLowerCase();
   return [USER_ROLES.ACCOUNTANT, USER_ROLES.ADMIN, USER_ROLES.SUPER_ADMIN].includes(normalizedRole as UserRole);
+}
+
+/**
+ * Check if role is sales staff
+ */
+export function isSalesRole(role: string): boolean {
+  const normalizedRole = role.toLowerCase();
+  return [USER_ROLES.SALES_MANAGER, USER_ROLES.SALES_EXECUTIVE].includes(normalizedRole as UserRole);
 }
 
 /**
