@@ -37,6 +37,7 @@ import clientV2Routes from "./routes/client-v2-robust"; // Robust US-style imple
 import lifecycleApiRoutes from "./routes/lifecycle-api"; // Lifecycle management with drill-down
 import { complianceStateRoutes } from "./compliance-state-routes"; // Compliance state & score management
 import { registerClientSupportRoutes } from "./client-support-routes"; // Client support ticket routes
+import { registerBulkImportRoutes } from "./bulk-import-routes"; // Bulk data import routes
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const requireAdminAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ADMIN)] as const;
@@ -1840,6 +1841,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Client Support routes (client-facing ticket management)
   registerClientSupportRoutes(app);
+
+  // Register Bulk Import routes for data import across all modules
+  registerBulkImportRoutes(app);
 
   // Register AI Document Preparation routes
   const { registerAiDocumentRoutes } = await import('./ai-document-routes');

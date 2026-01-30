@@ -124,6 +124,7 @@ const DocumentsDetail = lazy(() => import("./pages/DocumentsDetail"));
 const FundingDetail = lazy(() => import("./pages/FundingDetail"));
 const Timeline = lazy(() => import("./pages/Timeline"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const BulkUploadCenter = lazy(() => import("./pages/BulkUploadCenter"));
 const DigiComplyWorkflowDashboard = lazy(() => import("./components/DigiComplyWorkflowDashboard"));
 const OperationsManager = lazy(() => import("./components/OperationsManager"));
 const Footer = lazy(() => import("./components/Footer"));
@@ -417,6 +418,13 @@ const AppContent = () => {
                 <Route path="/settings" component={ConfigurationManager} />
 
                 <Route path="/workflow-import" component={WorkflowImport} />
+
+                {/* Bulk Upload Routes */}
+                <Route path="/bulk-upload" component={BulkUploadCenter} />
+                <Route path="/bulk-import" component={BulkUploadCenter} />
+                <Route path="/data-import" component={BulkUploadCenter} />
+                <Route path="/admin/bulk-upload" component={BulkUploadCenter} />
+
                 <Route path="/pre-sales" component={PreSalesManager} />
                 <Route path="/sales-proposals" component={SalesProposalManagerRefactored} />
                 <Route path="/qc" component={QCDashboard} />

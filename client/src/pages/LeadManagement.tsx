@@ -10,7 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Mail, Phone, Plus, Search, Star, UserPlus } from 'lucide-react';
+import { CheckCircle2, Mail, Phone, Plus, Search, Star, UserPlus, Upload } from 'lucide-react';
+import { BulkUploadDialogEnhanced, ColumnDefinition, BulkUploadResult } from '@/components/BulkUploadDialogEnhanced';
 import { getStatusColor } from '@/lib/design-system-utils';
 import { SkeletonCard, SkeletonDashboard } from '@/components/ui/skeleton-loader';
 import { EmptySearchResults } from '@/components/ui/empty-state';
@@ -77,10 +78,48 @@ interface CreateLeadFormProps {
   onSubmit: (data: CreateLeadInput) => void;
 }
 
+// Bulk upload column definitions
+const leadBulkColumns: ColumnDefinition[] = [
+  { key: 'companyName', label: 'Company Name', type: 'text', required: true, placeholder: 'Acme Corp' },
+  { key: 'contactPerson', label: 'Contact Person', type: 'text', required: true, placeholder: 'John Doe' },
+  { key: 'email', label: 'Email', type: 'email', required: true, placeholder: 'john@acme.com' },
+  { key: 'phone', label: 'Phone', type: 'phone', required: true, placeholder: '+919876543210' },
+  {
+    key: 'leadSource', label: 'Lead Source', type: 'select',
+    options: [
+      { value: 'website', label: 'Website' },
+      { value: 'referral', label: 'Referral' },
+      { value: 'cold_call', label: 'Cold Call' },
+      { value: 'social_media', label: 'Social Media' },
+      { value: 'event', label: 'Event' },
+      { value: 'partner', label: 'Partner' },
+      { value: 'google_ads', label: 'Google Ads' },
+      { value: 'other', label: 'Other' },
+    ]
+  },
+  { key: 'requirementSummary', label: 'Requirements', type: 'text', placeholder: 'GST registration required' },
+  { key: 'estimatedValue', label: 'Est. Value (₹)', type: 'number', placeholder: '50000' },
+  {
+    key: 'stage', label: 'Stage', type: 'select',
+    options: [
+      { value: 'new', label: 'New' },
+      { value: 'hot_lead', label: 'Hot' },
+      { value: 'warm_lead', label: 'Warm' },
+      { value: 'cold_lead', label: 'Cold' },
+    ]
+  },
+];
+
+const leadBulkSampleData = [
+  { companyName: 'Tech Solutions Pvt Ltd', contactPerson: 'Rahul Sharma', email: 'rahul@techsolutions.com', phone: '+919876543210', leadSource: 'website', requirementSummary: 'GST registration needed', estimatedValue: 15000, stage: 'new' },
+  { companyName: 'Green Foods', contactPerson: 'Priya Patel', email: 'priya@greenfoods.in', phone: '+919123456789', leadSource: 'referral', requirementSummary: 'Company incorporation', estimatedValue: 35000, stage: 'hot_lead' },
+];
+
 export default function LeadManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStage, setFilterStage] = useState<LeadFilterStage>('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -108,6 +147,23 @@ export default function LeadManagement() {
       });
     },
   });
+
+  // Bulk upload handler
+  const handleBulkUpload = async (data: Record<string, any>[]): Promise<BulkUploadResult> => {
+    try {
+      const response = await apiRequest<BulkUploadResult>('POST', '/api/crm/leads/bulk', { items: data });
+      queryClient.invalidateQueries({ queryKey: ['/api/leads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/leads/stats'] });
+      return response;
+    } catch (error: any) {
+      return {
+        success: 0,
+        failed: data.length,
+        errors: [error.message || 'Bulk upload failed'],
+        insertedIds: [],
+      };
+    }
+  };
 
   const updateLeadMutation = useMutation({
     mutationFn: ({ id, ...data }: UpdateLeadInput) => apiRequest<Lead>('PATCH', `/api/leads/${id}`, data),
@@ -165,22 +221,41 @@ export default function LeadManagement() {
             <p className="text-muted-foreground">Track and convert your leads</p>
           </div>
           
-          <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-create-lead">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Lead
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Create New Lead</DialogTitle>
-                <DialogDescription>Enter lead information to start tracking</DialogDescription>
-              </DialogHeader>
-              <CreateLeadForm onSubmit={createLeadMutation.mutate} />
-            </DialogContent>
-          </Dialog>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowBulkUpload(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Bulk Import
+            </Button>
+            <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-create-lead">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Lead
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create New Lead</DialogTitle>
+                  <DialogDescription>Enter lead information to start tracking</DialogDescription>
+                </DialogHeader>
+                <CreateLeadForm onSubmit={createLeadMutation.mutate} />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
+
+        {/* Bulk Upload Dialog */}
+        <BulkUploadDialogEnhanced
+          open={showBulkUpload}
+          onOpenChange={setShowBulkUpload}
+          title="Bulk Import Leads"
+          description="Import multiple leads from Excel or CSV file"
+          columns={leadBulkColumns}
+          entityName="Leads"
+          onUpload={handleBulkUpload}
+          sampleData={leadBulkSampleData}
+          allowManualEntry={true}
+        />
 
         {leadStats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

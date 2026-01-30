@@ -34,8 +34,11 @@ import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  Upload
 } from 'lucide-react';
+import { BulkUploadDialogEnhanced, ColumnDefinition, BulkUploadResult } from '@/components/BulkUploadDialogEnhanced';
+import { apiRequest } from '@/lib/queryClient';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { SkeletonList, SkeletonCard } from '@/components/ui/skeleton-loader';
@@ -91,6 +94,57 @@ interface ClientCommunication {
   outcome: string;
 }
 
+// Bulk upload column definitions for clients
+const clientBulkColumns: ColumnDefinition[] = [
+  { key: 'name', label: 'Client Name', type: 'text', required: true, placeholder: 'ABC Enterprises' },
+  {
+    key: 'entityType', label: 'Entity Type', type: 'select', required: true,
+    options: [
+      { value: 'sole_proprietorship', label: 'Sole Proprietorship' },
+      { value: 'partnership', label: 'Partnership' },
+      { value: 'llp', label: 'LLP' },
+      { value: 'private_limited', label: 'Private Limited' },
+      { value: 'public_limited', label: 'Public Limited' },
+      { value: 'opc', label: 'One Person Company' },
+    ]
+  },
+  { key: 'email', label: 'Email', type: 'email', required: true, placeholder: 'contact@abc.com' },
+  { key: 'phone', label: 'Phone', type: 'phone', required: true, placeholder: '+919876543210' },
+  { key: 'city', label: 'City', type: 'text', required: true, placeholder: 'Mumbai' },
+  {
+    key: 'state', label: 'State', type: 'select', required: true,
+    options: [
+      { value: 'MH', label: 'Maharashtra' },
+      { value: 'DL', label: 'Delhi' },
+      { value: 'KA', label: 'Karnataka' },
+      { value: 'TN', label: 'Tamil Nadu' },
+      { value: 'GJ', label: 'Gujarat' },
+      { value: 'OTHER', label: 'Other' },
+    ]
+  },
+  {
+    key: 'industry', label: 'Industry', type: 'select',
+    options: [
+      { value: 'technology', label: 'Technology' },
+      { value: 'manufacturing', label: 'Manufacturing' },
+      { value: 'retail', label: 'Retail' },
+      { value: 'services', label: 'Services' },
+      { value: 'other', label: 'Other' },
+    ]
+  },
+  { key: 'pan', label: 'PAN', type: 'text', placeholder: 'ABCDE1234F',
+    validation: (val) => !val || /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(val) || 'Invalid PAN format'
+  },
+  { key: 'gstin', label: 'GSTIN', type: 'text', placeholder: '27ABCDE1234F1Z5',
+    validation: (val) => !val || /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9A-Z]{3}$/.test(val) || 'Invalid GSTIN format'
+  },
+  { key: 'relationshipManager', label: 'Relationship Manager', type: 'text', placeholder: 'RM Name' },
+];
+
+const clientBulkSampleData = [
+  { name: 'ABC Enterprises', entityType: 'private_limited', email: 'info@abc.com', phone: '+919876543210', city: 'Mumbai', state: 'MH', industry: 'technology', pan: 'ABCDE1234F', gstin: '27ABCDE1234F1Z5', relationshipManager: 'John Doe' },
+];
+
 const ClientMasterDashboard = () => {
   const [activeTab, setActiveTab] = useState('directory');
   const [searchTerm, setSearchTerm] = useState('');
@@ -98,8 +152,26 @@ const ClientMasterDashboard = () => {
   const [selectedClient, setSelectedClient] = useState<ClientEntity | null>(null);
   const [viewProfileDialog, setViewProfileDialog] = useState(false);
   const [addClientDialog, setAddClientDialog] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Bulk upload handler
+  const handleBulkUpload = async (data: Record<string, any>[]): Promise<BulkUploadResult> => {
+    try {
+      const response = await apiRequest<BulkUploadResult>('POST', '/api/clients/bulk', { items: data });
+      queryClient.invalidateQueries({ queryKey: ['/api/client-master/clients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/client-master/stats'] });
+      return response;
+    } catch (error: any) {
+      return {
+        success: 0,
+        failed: data.length,
+        errors: [error.message || 'Bulk upload failed'],
+        insertedIds: [],
+      };
+    }
+  };
 
   // Fetch all clients
   const { data: clients = [], isLoading: clientsLoading } = useQuery({
@@ -168,17 +240,39 @@ const ClientMasterDashboard = () => {
                 <p className="text-sm text-gray-500 dark:text-gray-400">Comprehensive client relationship management</p>
               </div>
             </div>
-            <Button 
-              onClick={() => setAddClientDialog(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-              data-testid="button-add-client"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Client
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowBulkUpload(true)}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Bulk Import
+              </Button>
+              <Button
+                onClick={() => setAddClientDialog(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                data-testid="button-add-client"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Client
+              </Button>
+            </div>
           </div>
         </div>
       </header>
+
+      {/* Bulk Upload Dialog */}
+      <BulkUploadDialogEnhanced
+        open={showBulkUpload}
+        onOpenChange={setShowBulkUpload}
+        title="Bulk Import Clients"
+        description="Import multiple clients from Excel or CSV file"
+        columns={clientBulkColumns}
+        entityName="Clients"
+        onUpload={handleBulkUpload}
+        sampleData={clientBulkSampleData}
+        allowManualEntry={true}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
