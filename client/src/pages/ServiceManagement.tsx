@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  Settings, Plus, Package, Wrench, BarChart3, Copy, Edit3, Trash2, 
+import {
+  Settings, Plus, Package, Wrench, BarChart3, Copy, Edit3, Trash2,
   Clock, DollarSign, Users, TrendingUp, CheckCircle, AlertCircle,
   Filter, Search, Tag, Download, Upload, Activity
 } from 'lucide-react';
+import { BulkUploadDialogEnhanced, ColumnDefinition, BulkUploadResult } from '@/components/BulkUploadDialogEnhanced';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -88,12 +89,41 @@ interface ServiceAnalytics {
   }>;
 }
 
+// Bulk upload column definitions for services
+const serviceBulkColumns: ColumnDefinition[] = [
+  { key: 'serviceCode', label: 'Service Code', type: 'text', required: true, placeholder: 'SVC001' },
+  { key: 'name', label: 'Service Name', type: 'text', required: true, placeholder: 'GST Registration' },
+  { key: 'description', label: 'Description', type: 'text', placeholder: 'Service description' },
+  { key: 'category', label: 'Category', type: 'select', required: true, options: [
+    { value: 'incorporation', label: 'Incorporation' },
+    { value: 'compliance', label: 'Compliance' },
+    { value: 'tax', label: 'Tax' },
+    { value: 'legal', label: 'Legal' },
+    { value: 'accounting', label: 'Accounting' },
+  ]},
+  { key: 'serviceType', label: 'Service Type', type: 'select', required: true, options: [
+    { value: 'standard', label: 'Standard' },
+    { value: 'premium', label: 'Premium' },
+    { value: 'enterprise', label: 'Enterprise' },
+    { value: 'custom', label: 'Custom' },
+  ]},
+  { key: 'basePrice', label: 'Base Price (₹)', type: 'number', required: true, placeholder: '5000' },
+  { key: 'slaHours', label: 'SLA Hours', type: 'number', placeholder: '48' },
+  { key: 'complexityLevel', label: 'Complexity', type: 'select', options: [
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' },
+    { value: 'expert', label: 'Expert' },
+  ]},
+];
+
 export default function ServiceManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedComplexity, setSelectedComplexity] = useState('');
   const [selectedServiceType, setSelectedServiceType] = useState('');
   const [activeTab, setActiveTab] = useState('services');
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -210,6 +240,25 @@ export default function ServiceManagement() {
       case 'enterprise': return 'bg-purple-100 text-purple-800';
       case 'custom': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const handleBulkUpload = async (data: Record<string, any>[]): Promise<BulkUploadResult> => {
+    try {
+      const response = await fetch('/api/services/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ services: data }),
+        credentials: 'include',
+      });
+      const result = await response.json();
+      if (response.ok) {
+        queryClient.invalidateQueries({ queryKey: ['service-definitions'] });
+        return { success: result.created || data.length, failed: result.failed || 0, errors: result.errors || [] };
+      }
+      return { success: 0, failed: data.length, errors: [result.message || 'Bulk upload failed'] };
+    } catch (error: any) {
+      return { success: 0, failed: data.length, errors: [error.message || 'Network error'] };
     }
   };
 
@@ -385,7 +434,7 @@ export default function ServiceManagement() {
                         <span className="text-sm text-gray-600 dark:text-gray-400">
                           {servicesData.total} services found
                         </span>
-                        <Button variant="outline" size="sm" data-testid="button-create-bulk">
+                        <Button variant="outline" size="sm" onClick={() => setBulkUploadOpen(true)} data-testid="button-create-bulk">
                           <Upload className="h-4 w-4 mr-2" />
                           Bulk Import
                         </Button>
@@ -770,6 +819,20 @@ export default function ServiceManagement() {
           </Tabs>
         </div>
       </div>
+
+      {/* Bulk Upload Dialog */}
+      <BulkUploadDialogEnhanced
+        open={bulkUploadOpen}
+        onOpenChange={setBulkUploadOpen}
+        title="Bulk Import Services"
+        description="Upload multiple service definitions at once using Excel or CSV file"
+        columns={serviceBulkColumns}
+        onUpload={handleBulkUpload}
+        sampleData={[
+          { serviceCode: 'GST-REG', name: 'GST Registration', description: 'New GST registration service', category: 'tax', serviceType: 'standard', basePrice: 2999, slaHours: 48, complexityLevel: 'low' },
+          { serviceCode: 'PVT-INC', name: 'Private Limited Incorporation', description: 'Company registration with MCA', category: 'incorporation', serviceType: 'premium', basePrice: 9999, slaHours: 168, complexityLevel: 'medium' },
+        ]}
+      />
     </div>
   );
 }

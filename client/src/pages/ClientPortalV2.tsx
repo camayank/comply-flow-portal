@@ -11,6 +11,23 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Home, Settings, Calendar, FileText, Bell, HelpCircle, TrendingUp, Clock, CheckCircle } from 'lucide-react';
 
+interface UpcomingDeadline {
+  title: string;
+  date: string;
+  daysLeft: number;
+  priority: 'high' | 'medium' | 'low';
+  category?: string;
+}
+
+interface QuickStats {
+  tasksCompleted: number;
+  tasksCompletedChange?: string;
+  pendingActions: number;
+  pendingActionsLabel?: string;
+  daysSafe: number;
+  daysSafeLabel?: string;
+}
+
 interface ClientStatusData {
   complianceState: 'GREEN' | 'AMBER' | 'RED';
   daysSafe: number;
@@ -36,6 +53,8 @@ interface ClientStatusData {
     timestamp: string;
     icon?: string;
   }>;
+  upcomingDeadlines?: UpcomingDeadline[];
+  quickStats?: QuickStats;
 }
 
 export default function ClientPortalV2() {
@@ -71,24 +90,44 @@ export default function ClientPortalV2() {
     },
   ];
 
-  const upcomingDeadlines = [
-    { title: 'GST Filing - January 2026', date: 'Feb 5, 2026', daysLeft: 12, priority: 'high' },
-    { title: 'TDS Return - Q3 FY 2025-26', date: 'Feb 15, 2026', daysLeft: 22, priority: 'medium' },
-    { title: 'Professional Tax - Q4', date: 'Mar 31, 2026', daysLeft: 66, priority: 'low' },
-  ];
-
-  const quickStats = [
-    { label: 'Tasks Completed', value: '23', change: '+5 this month', icon: CheckCircle, color: 'text-green-600' },
-    { label: 'Pending Actions', value: '2', change: 'Due soon', icon: Clock, color: 'text-amber-600' },
-    { label: 'Days Safe', value: '12', change: 'Until next deadline', icon: TrendingUp, color: 'text-blue-600' },
-  ];
+  // Build quick stats from API data
+  const getQuickStats = (data: ClientStatusData) => {
+    const stats = data.quickStats || { tasksCompleted: 0, pendingActions: 0, daysSafe: data.daysSafe };
+    return [
+      {
+        label: 'Tasks Completed',
+        value: String(stats.tasksCompleted),
+        change: stats.tasksCompletedChange || '',
+        icon: CheckCircle,
+        color: 'text-green-600'
+      },
+      {
+        label: 'Pending Actions',
+        value: String(stats.pendingActions),
+        change: stats.pendingActionsLabel || (stats.pendingActions > 0 ? 'Due soon' : 'All clear'),
+        icon: Clock,
+        color: 'text-amber-600'
+      },
+      {
+        label: 'Days Safe',
+        value: String(stats.daysSafe),
+        change: stats.daysSafeLabel || 'Until next deadline',
+        icon: TrendingUp,
+        color: 'text-blue-600'
+      },
+    ];
+  };
 
   return (
     <DashboardLayout
       title="Your Business"
       navigation={navigation}
     >
-      {statusQuery.render((data) => (
+      {statusQuery.render((data) => {
+        const quickStats = getQuickStats(data);
+        const upcomingDeadlines = data.upcomingDeadlines || [];
+
+        return (
         <div className="max-w-3xl mx-auto space-y-6 px-4 py-6">
           {/* Quick Stats Row */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -128,32 +167,40 @@ export default function ClientPortalV2() {
             defaultOpen={true}
             count={upcomingDeadlines.length}
           >
-            <div className="space-y-3">
-              {upcomingDeadlines.map((deadline, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <Calendar className="h-5 w-5 text-gray-400" />
-                    <div>
-                      <p className="font-medium text-gray-900">{deadline.title}</p>
-                      <p className="text-sm text-gray-600">{deadline.date}</p>
+            {upcomingDeadlines.length > 0 ? (
+              <div className="space-y-3">
+                {upcomingDeadlines.map((deadline, index) => (
+                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <Calendar className="h-5 w-5 text-gray-400" />
+                      <div>
+                        <p className="font-medium text-gray-900">{deadline.title}</p>
+                        <p className="text-sm text-gray-600">{deadline.date}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-gray-600">{deadline.daysLeft} days</span>
+                      <Badge
+                        variant="default"
+                        className={
+                          deadline.priority === 'high' ? 'bg-red-100 text-red-700 hover:bg-red-100' :
+                          deadline.priority === 'medium' ? 'bg-amber-100 text-amber-700 hover:bg-amber-100' :
+                          'bg-gray-100 text-gray-700 hover:bg-gray-100'
+                        }
+                      >
+                        {deadline.priority}
+                      </Badge>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-gray-600">{deadline.daysLeft} days</span>
-                    <Badge 
-                      variant="default" 
-                      className={
-                        deadline.priority === 'high' ? 'bg-red-100 text-red-700 hover:bg-red-100' :
-                        deadline.priority === 'medium' ? 'bg-amber-100 text-amber-700 hover:bg-amber-100' :
-                        'bg-gray-100 text-gray-700 hover:bg-gray-100'
-                      }
-                    >
-                      {deadline.priority}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-gray-500">
+                <Calendar className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                <p>No upcoming deadlines</p>
+                <p className="text-sm">Your compliance calendar will populate as you add services</p>
+              </div>
+            )}
           </CollapsibleSection>
 
           {/* TERTIARY: Collapsed by default */}
@@ -238,7 +285,8 @@ export default function ClientPortalV2() {
             </div>
           </CollapsibleSection>
         </div>
-      ))}
+        );
+      })}
 
       {/* Action Detail Modal */}
       {statusQuery.data?.nextAction && (

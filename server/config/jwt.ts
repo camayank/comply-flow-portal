@@ -6,7 +6,14 @@
 import jwt from 'jsonwebtoken';
 import { logger } from './logger';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_jwt_key_change_this_in_production';
+// CRITICAL: JWT_SECRET must be set in environment - no default allowed
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('CRITICAL: JWT_SECRET environment variable is required. Set a secure random string of at least 32 characters.');
+}
+if (JWT_SECRET.length < 32) {
+  throw new Error('CRITICAL: JWT_SECRET must be at least 32 characters long for security.');
+}
 const JWT_ACCESS_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';
 const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
 const JWT_ISSUER = process.env.JWT_ISSUER || 'comply-flow-portal';

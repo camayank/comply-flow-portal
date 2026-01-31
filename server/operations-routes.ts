@@ -9,6 +9,20 @@ import {
   type AuthenticatedRequest
 } from './rbac-middleware';
 
+// Pagination helper
+interface PaginationParams {
+  page: number;
+  limit: number;
+  offset: number;
+}
+
+function parsePagination(query: any, defaultLimit = 20, maxLimit = 100): PaginationParams {
+  const page = Math.max(1, parseInt(query.page as string) || 1);
+  const limit = Math.min(maxLimit, Math.max(1, parseInt(query.limit as string) || defaultLimit));
+  const offset = (page - 1) * limit;
+  return { page, limit, offset };
+}
+
 // Middleware chains for operations routes
 const requireOpsAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE)] as const;
 const requireOpsManager = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_MANAGER)] as const;
@@ -17,10 +31,26 @@ export function registerOperationsRoutes(app: Express) {
 
   // ========== SERVICE ORDERS (using service_requests) ==========
   // Requires: ops_executive or higher
+  // Supports pagination: ?page=1&limit=20
   app.get('/api/ops/service-orders', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { status } = req.query;
-      
+      const { page, limit, offset } = parsePagination(req.query);
+
+      // Build where conditions
+      const conditions = [];
+      if (status) {
+        conditions.push(eq(serviceRequests.status, status as string));
+      }
+
+      // Get total count
+      const totalResult = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(serviceRequests)
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+      const total = totalResult[0]?.count || 0;
+
+      // Get paginated results
       let query = db
         .select({
           id: serviceRequests.id,
@@ -36,15 +66,26 @@ export function registerOperationsRoutes(app: Express) {
           updatedAt: serviceRequests.updatedAt
         })
         .from(serviceRequests)
-        .orderBy(desc(serviceRequests.createdAt));
+        .orderBy(desc(serviceRequests.createdAt))
+        .limit(limit)
+        .offset(offset);
 
-      // Apply status filter if provided
-      if (status) {
-        query = query.where(eq(serviceRequests.status, status as string));
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions));
       }
 
       const orders = await query;
-      res.json(orders);
+
+      res.json({
+        data: orders,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasMore: offset + orders.length < total
+        }
+      });
     } catch (error) {
       console.error('Error fetching service orders:', error);
       res.status(500).json({ error: 'Failed to fetch service orders' });

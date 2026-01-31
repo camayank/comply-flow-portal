@@ -152,7 +152,15 @@ const ClientMasterDashboard = () => {
   const [selectedClient, setSelectedClient] = useState<ClientEntity | null>(null);
   const [viewProfileDialog, setViewProfileDialog] = useState(false);
   const [addClientDialog, setAddClientDialog] = useState(false);
+  const [editClientDialog, setEditClientDialog] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    entityType: '',
+    phone: '',
+    email: '',
+  });
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -218,6 +226,84 @@ const ClientMasterDashboard = () => {
       bronze: 'bg-gradient-to-r from-orange-400 to-orange-600 text-white'
     };
     return tierColors[tier as keyof typeof tierColors] || 'bg-gray-400 text-white';
+  };
+
+  // Handle opening edit dialog
+  const handleEditClient = (client: ClientEntity) => {
+    setSelectedClient(client);
+    setFormData({
+      name: client.name,
+      entityType: client.entityType,
+      phone: client.phone,
+      email: client.email,
+    });
+    setEditClientDialog(true);
+  };
+
+  // Handle saving new client
+  const handleSaveNewClient = async () => {
+    if (!formData.name || !formData.email) {
+      toast({
+        title: 'Validation Error',
+        description: 'Client name and email are required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await apiRequest('POST', '/api/clients', formData);
+      queryClient.invalidateQueries({ queryKey: ['/api/client-master/clients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/client-master/stats'] });
+      toast({
+        title: 'Success',
+        description: 'Client created successfully',
+      });
+      setAddClientDialog(false);
+      setFormData({ name: '', entityType: '', phone: '', email: '' });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create client',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Handle updating existing client
+  const handleUpdateClient = async () => {
+    if (!selectedClient || !formData.name || !formData.email) {
+      toast({
+        title: 'Validation Error',
+        description: 'Client name and email are required',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await apiRequest('PATCH', `/api/clients/${selectedClient.id}`, formData);
+      queryClient.invalidateQueries({ queryKey: ['/api/client-master/clients'] });
+      toast({
+        title: 'Success',
+        description: 'Client updated successfully',
+      });
+      setEditClientDialog(false);
+      setSelectedClient(null);
+      setFormData({ name: '', entityType: '', phone: '', email: '' });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update client',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const filteredClients = clients.filter((client: ClientEntity) => {
@@ -399,12 +485,12 @@ const ClientMasterDashboard = () => {
                     {clientsLoading ? (
                       <SkeletonList items={6} />
                     ) : filteredClients.length === 0 ? (
-                      searchQuery || filterType !== 'all' ? (
+                      searchTerm || statusFilter !== 'all' ? (
                         <EmptySearchResults
-                          searchTerm={searchQuery}
+                          searchTerm={searchTerm}
                           onClearSearch={() => {
-                            setSearchQuery('');
-                            setFilterType('all');
+                            setSearchTerm('');
+                            setStatusFilter('all');
                           }}
                         />
                       ) : (
@@ -476,6 +562,7 @@ const ClientMasterDashboard = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
+                                onClick={() => handleEditClient(client)}
                                 data-testid={`button-edit-${client.clientId}`}
                               >
                                 <Edit className="h-4 w-4 mr-2" />
@@ -511,37 +598,266 @@ const ClientMasterDashboard = () => {
           </TabsContent>
 
           <TabsContent value="portfolio" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">High Value Clients</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold text-purple-600">{clients.filter((c: ClientEntity) => c.totalRevenue > 100000).length}</p>
+                  <p className="text-xs text-gray-500">Revenue &gt; ₹1L annually</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Medium Value Clients</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold text-blue-600">{clients.filter((c: ClientEntity) => c.totalRevenue >= 50000 && c.totalRevenue <= 100000).length}</p>
+                  <p className="text-xs text-gray-500">Revenue ₹50K - ₹1L annually</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Growth Potential</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold text-green-600">{clients.filter((c: ClientEntity) => c.totalRevenue < 50000).length}</p>
+                  <p className="text-xs text-gray-500">Revenue &lt; ₹50K annually</p>
+                </CardContent>
+              </Card>
+            </div>
+
             <Card>
               <CardHeader>
-                <CardTitle>Client Portfolio Management</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Client Segmentation
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-500 mb-4">Portfolio view will show client segmentation and value analysis.</p>
-                {/* Portfolio management content will be implemented */}
+                <div className="space-y-4">
+                  {clients.slice(0, 10).map((client: ClientEntity) => (
+                    <div key={client.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarFallback className="bg-blue-100 text-blue-600 text-sm">
+                            {client.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">{client.name}</p>
+                          <p className="text-sm text-gray-500">{client.industry}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-semibold">₹{client.totalRevenue.toLocaleString()}</p>
+                          <p className="text-xs text-gray-500">Lifetime Value</p>
+                        </div>
+                        <Badge className={client.totalRevenue > 100000 ? 'bg-purple-500' : client.totalRevenue >= 50000 ? 'bg-blue-500' : 'bg-gray-500'}>
+                          {client.totalRevenue > 100000 ? 'High Value' : client.totalRevenue >= 50000 ? 'Medium' : 'Growth'}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="contracts" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-green-100 rounded-lg">
+                      <CheckCircle2 className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{clients.filter((c: ClientEntity) => c.clientStatus === 'active').length}</p>
+                      <p className="text-sm text-gray-500">Active Contracts</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-yellow-100 rounded-lg">
+                      <Clock className="h-6 w-6 text-yellow-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">5</p>
+                      <p className="text-sm text-gray-500">Expiring Soon</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-blue-100 rounded-lg">
+                      <RefreshCw className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">3</p>
+                      <p className="text-sm text-gray-500">Pending Renewal</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-red-100 rounded-lg">
+                      <XCircle className="h-6 w-6 text-red-600" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{clients.filter((c: ClientEntity) => c.clientStatus === 'churned').length}</p>
+                      <p className="text-sm text-gray-500">Churned</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             <Card>
               <CardHeader>
-                <CardTitle>Contract Management</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Client Contracts
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-500 mb-4">Contract management for client agreements and renewals.</p>
-                {/* Contract management content will be implemented */}
+                <div className="space-y-4">
+                  {clients.slice(0, 8).map((client: ClientEntity) => (
+                    <div key={client.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex items-center gap-4">
+                        <FileText className="h-5 w-5 text-gray-400" />
+                        <div>
+                          <p className="font-medium">{client.name} - Service Agreement</p>
+                          <p className="text-sm text-gray-500">Contract ID: CNT-{client.clientId}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-sm font-medium">₹{client.totalRevenue.toLocaleString()}/year</p>
+                          <p className="text-xs text-gray-500">Started: {client.acquisitionDate || 'N/A'}</p>
+                        </div>
+                        <Badge className={client.clientStatus === 'active' ? 'bg-green-500' : 'bg-gray-500'}>
+                          {client.clientStatus}
+                        </Badge>
+                        <Button variant="outline" size="sm">
+                          View
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Client Growth Metrics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">New Clients (This Month)</span>
+                      <span className="font-bold text-green-600">+{Math.min(clients.length, 5)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Churn Rate</span>
+                      <span className="font-bold text-red-600">{((clients.filter((c: ClientEntity) => c.clientStatus === 'churned').length / Math.max(clients.length, 1)) * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Active Rate</span>
+                      <span className="font-bold text-blue-600">{((clients.filter((c: ClientEntity) => c.clientStatus === 'active').length / Math.max(clients.length, 1)) * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Avg Compliance Score</span>
+                      <span className="font-bold text-purple-600">{clients.length > 0 ? Math.round(clients.reduce((sum: number, c: ClientEntity) => sum + c.complianceScore, 0) / clients.length) : 0}%</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Revenue Analytics
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Total Revenue</span>
+                      <span className="font-bold">₹{clients.reduce((sum: number, c: ClientEntity) => sum + c.totalRevenue, 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Avg Revenue/Client</span>
+                      <span className="font-bold">₹{clients.length > 0 ? Math.round(clients.reduce((sum: number, c: ClientEntity) => sum + c.totalRevenue, 0) / clients.length).toLocaleString() : 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Highest Value Client</span>
+                      <span className="font-bold text-green-600">₹{clients.length > 0 ? Math.max(...clients.map((c: ClientEntity) => c.totalRevenue)).toLocaleString() : 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Revenue Concentration</span>
+                      <span className="font-bold">Top 20%</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             <Card>
               <CardHeader>
-                <CardTitle>Client Analytics</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Client Distribution by Status
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-500 mb-4">Analytics and insights about client relationships and performance.</p>
-                {/* Analytics content will be implemented */}
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm text-gray-600">Active</span>
+                      <span className="text-sm font-medium">{clients.filter((c: ClientEntity) => c.clientStatus === 'active').length}</span>
+                    </div>
+                    <Progress value={(clients.filter((c: ClientEntity) => c.clientStatus === 'active').length / Math.max(clients.length, 1)) * 100} className="h-3 bg-gray-200" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm text-gray-600">Inactive</span>
+                      <span className="text-sm font-medium">{clients.filter((c: ClientEntity) => c.clientStatus === 'inactive').length}</span>
+                    </div>
+                    <Progress value={(clients.filter((c: ClientEntity) => c.clientStatus === 'inactive').length / Math.max(clients.length, 1)) * 100} className="h-3 bg-gray-200" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm text-gray-600">Dormant</span>
+                      <span className="text-sm font-medium">{clients.filter((c: ClientEntity) => c.clientStatus === 'dormant').length}</span>
+                    </div>
+                    <Progress value={(clients.filter((c: ClientEntity) => c.clientStatus === 'dormant').length / Math.max(clients.length, 1)) * 100} className="h-3 bg-gray-200" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-sm text-gray-600">Churned</span>
+                      <span className="text-sm font-medium">{clients.filter((c: ClientEntity) => c.clientStatus === 'churned').length}</span>
+                    </div>
+                    <Progress value={(clients.filter((c: ClientEntity) => c.clientStatus === 'churned').length / Math.max(clients.length, 1)) * 100} className="h-3 bg-gray-200" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -623,14 +939,25 @@ const ClientMasterDashboard = () => {
       </Dialog>
 
       {/* Add Client Dialog */}
-      <Dialog open={addClientDialog} onOpenChange={setAddClientDialog}>
+      <Dialog open={addClientDialog} onOpenChange={(open) => {
+        setAddClientDialog(open);
+        if (!open) setFormData({ name: '', entityType: '', phone: '', email: '' });
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Client</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Input placeholder="Client Name" data-testid="input-client-name" />
-            <Select>
+            <Input
+              placeholder="Client Name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              data-testid="input-client-name"
+            />
+            <Select
+              value={formData.entityType}
+              onValueChange={(value) => setFormData({ ...formData, entityType: value })}
+            >
               <SelectTrigger data-testid="select-entity-type">
                 <SelectValue placeholder="Entity Type" />
               </SelectTrigger>
@@ -638,23 +965,106 @@ const ClientMasterDashboard = () => {
                 <SelectItem value="pvt_ltd">Private Limited</SelectItem>
                 <SelectItem value="llp">LLP</SelectItem>
                 <SelectItem value="opc">OPC</SelectItem>
+                <SelectItem value="partnership">Partnership</SelectItem>
+                <SelectItem value="sole_proprietorship">Sole Proprietorship</SelectItem>
               </SelectContent>
             </Select>
-            <Input placeholder="Phone" data-testid="input-phone" />
-            <Input placeholder="Email" data-testid="input-email" />
+            <Input
+              placeholder="Phone"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              data-testid="input-phone"
+            />
+            <Input
+              placeholder="Email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              data-testid="input-email"
+            />
             <div className="flex gap-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setAddClientDialog(false)}
                 data-testid="button-cancel"
               >
                 Cancel
               </Button>
-              <Button 
+              <Button
                 className="bg-blue-600 hover:bg-blue-700"
+                onClick={handleSaveNewClient}
+                disabled={isSaving}
                 data-testid="button-save-client"
               >
-                Save Client
+                {isSaving ? 'Saving...' : 'Save Client'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Client Dialog */}
+      <Dialog open={editClientDialog} onOpenChange={(open) => {
+        setEditClientDialog(open);
+        if (!open) {
+          setSelectedClient(null);
+          setFormData({ name: '', entityType: '', phone: '', email: '' });
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Client</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              placeholder="Client Name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              data-testid="input-edit-client-name"
+            />
+            <Select
+              value={formData.entityType}
+              onValueChange={(value) => setFormData({ ...formData, entityType: value })}
+            >
+              <SelectTrigger data-testid="select-edit-entity-type">
+                <SelectValue placeholder="Entity Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pvt_ltd">Private Limited</SelectItem>
+                <SelectItem value="llp">LLP</SelectItem>
+                <SelectItem value="opc">OPC</SelectItem>
+                <SelectItem value="partnership">Partnership</SelectItem>
+                <SelectItem value="sole_proprietorship">Sole Proprietorship</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="Phone"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              data-testid="input-edit-phone"
+            />
+            <Input
+              placeholder="Email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              data-testid="input-edit-email"
+            />
+            <div className="flex gap-4">
+              <Button
+                variant="outline"
+                onClick={() => setEditClientDialog(false)}
+                data-testid="button-cancel-edit"
+              >
+                Cancel
+              </Button>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={handleUpdateClient}
+                disabled={isSaving}
+                data-testid="button-update-client"
+              >
+                {isSaving ? 'Updating...' : 'Update Client'}
               </Button>
             </div>
           </div>

@@ -71,15 +71,13 @@ export function registerSecurityMiddleware(app: Express) {
       req.path.startsWith('/ready') ||
       req.path.startsWith('/live') ||
       req.path.includes('/webhook') ||
-      // Auth endpoints that don't require session
-      req.path === '/api/auth/client/send-otp' ||
-      req.path === '/api/auth/client/verify-otp' ||
+      // Auth endpoints that don't require session (read-only or initial auth)
       req.path === '/api/auth/staff/login' ||
       req.path === '/api/auth/verify-session' || // Session verification is idempotent
-      // Client registration flows
-      req.path === '/api/client/register' ||
-      req.path === '/api/client/verify-email' ||
-      req.path === '/api/client/resend-otp'
+      // SECURITY: verify-otp is state-changing, MUST require CSRF protection
+      // Client registration - initial registration only
+      req.path === '/api/client/register'
+      // REMOVED: send-otp, verify-otp, verify-email, resend-otp now require CSRF
     ) {
       return next();
     }

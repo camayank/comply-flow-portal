@@ -346,3 +346,87 @@ export async function createAction(action: Omit<ComplianceAction, 'id'>): Promis
 
   return actionId;
 }
+
+/**
+ * Get upcoming deadlines for a client
+ * Returns sorted list of compliance deadlines
+ */
+export interface UpcomingDeadline {
+  title: string;
+  date: string;
+  daysLeft: number;
+  priority: 'high' | 'medium' | 'low';
+  category?: string;
+}
+
+export async function getUpcomingDeadlines(clientId: number, limit: number = 5): Promise<UpcomingDeadline[]> {
+  const result = await pool.query(
+    `SELECT
+      title,
+      due_date,
+      priority,
+      document_type
+    FROM compliance_actions
+    WHERE client_id = $1
+      AND status IN ('pending', 'in_progress')
+      AND due_date >= CURRENT_DATE
+    ORDER BY due_date ASC
+    LIMIT $2`,
+    [clientId, limit]
+  );
+
+  return result.rows.map(row => {
+    const dueDate = new Date(row.due_date);
+    const today = new Date();
+    const daysLeft = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    return {
+      title: row.title,
+      date: dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      daysLeft,
+      priority: row.priority || (daysLeft <= 7 ? 'high' : daysLeft <= 30 ? 'medium' : 'low'),
+      category: row.document_type
+    };
+  });
+}
+
+/**
+ * Get quick stats for client dashboard
+ * Returns task completion and status metrics
+ */
+export interface QuickStats {
+  tasksCompleted: number;
+  tasksCompletedChange?: string;
+  pendingActions: number;
+  pendingActionsLabel?: string;
+  daysSafe: number;
+  daysSafeLabel?: string;
+}
+
+export async function getQuickStats(clientId: number): Promise<QuickStats> {
+  const result = await pool.query(
+    `SELECT
+      COUNT(*) FILTER (WHERE status = 'completed') as tasks_completed,
+      COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= CURRENT_DATE - INTERVAL '30 days') as tasks_this_month,
+      COUNT(*) FILTER (WHERE status IN ('pending', 'in_progress')) as pending_actions,
+      MIN(due_date) FILTER (WHERE status IN ('pending', 'in_progress') AND due_date >= CURRENT_DATE) as next_deadline
+    FROM compliance_actions
+    WHERE client_id = $1`,
+    [clientId]
+  );
+
+  const stats = result.rows[0];
+  const nextDeadline = stats.next_deadline ? new Date(stats.next_deadline) : null;
+  const daysSafe = nextDeadline
+    ? Math.max(0, Math.ceil((nextDeadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 30;
+
+  return {
+    tasksCompleted: parseInt(stats.tasks_completed) || 0,
+    tasksCompletedChange: stats.tasks_this_month > 0 ? `+${stats.tasks_this_month} this month` : undefined,
+    pendingActions: parseInt(stats.pending_actions) || 0,
+    pendingActionsLabel: parseInt(stats.pending_actions) > 0 ? 'Due soon' : 'All clear',
+    daysSafe,
+    daysSafeLabel: 'Until next deadline'
+  };
+}

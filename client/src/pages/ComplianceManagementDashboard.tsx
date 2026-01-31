@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { BulkUploadDialogEnhanced, ColumnDefinition, BulkUploadResult } from '@/components/BulkUploadDialogEnhanced';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ import {
   CheckCircle2,
   Filter,
   Download,
+  Upload,
   Bell,
   ChevronLeft,
   ChevronRight,
@@ -40,6 +42,28 @@ import {
   BarChart3,
   Activity,
 } from 'lucide-react';
+
+// Bulk upload column definitions for compliance items
+const complianceBulkColumns: ColumnDefinition[] = [
+  { key: 'entityName', label: 'Entity Name', type: 'text', required: true, placeholder: 'ABC Pvt Ltd' },
+  { key: 'complianceType', label: 'Compliance Type', type: 'select', required: true, options: [
+    { value: 'GST', label: 'GST' },
+    { value: 'Income Tax', label: 'Income Tax' },
+    { value: 'MCA', label: 'MCA' },
+    { value: 'Payroll', label: 'Payroll' },
+    { value: 'Licenses', label: 'Licenses' },
+    { value: 'Other', label: 'Other' },
+  ]},
+  { key: 'serviceName', label: 'Service Name', type: 'text', placeholder: 'GST Return Filing' },
+  { key: 'dueDate', label: 'Due Date', type: 'date', required: true },
+  { key: 'status', label: 'Status', type: 'select', options: [
+    { value: 'pending', label: 'Pending' },
+    { value: 'in_progress', label: 'In Progress' },
+    { value: 'completed', label: 'Completed' },
+  ]},
+  { key: 'penaltyAmount', label: 'Penalty Amount (₹)', type: 'number', placeholder: '1000' },
+  { key: 'notes', label: 'Notes', type: 'text', placeholder: 'Additional notes' },
+];
 
 interface ComplianceItem {
   id: number;
@@ -101,6 +125,7 @@ const ComplianceManagementDashboard = () => {
   const [selectedItem, setSelectedItem] = useState<ComplianceItem | null>(null);
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [showExtensionDialog, setShowExtensionDialog] = useState(false);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
 
   const currentMonth = currentDate.getMonth() + 1;
   const currentYear = currentDate.getFullYear();
@@ -221,6 +246,25 @@ const ComplianceManagementDashboard = () => {
 
   const categories = ['all', 'GST', 'Income Tax', 'MCA', 'Payroll', 'Licenses', 'Other'];
 
+  const handleBulkUpload = async (data: Record<string, any>[]): Promise<BulkUploadResult> => {
+    try {
+      const response = await fetch('/api/compliance/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: data }),
+        credentials: 'include',
+      });
+      const result = await response.json();
+      if (response.ok) {
+        queryClient.invalidateQueries({ queryKey: ['/api/compliance'] });
+        return { success: result.created || data.length, failed: result.failed || 0, errors: result.errors || [] };
+      }
+      return { success: 0, failed: data.length, errors: [result.message || 'Bulk upload failed'] };
+    } catch (error: any) {
+      return { success: 0, failed: data.length, errors: [error.message || 'Network error'] };
+    }
+  };
+
   const summary = calendarData?.summary || {
     total: 0,
     overdue: 0,
@@ -256,6 +300,10 @@ const ComplianceManagementDashboard = () => {
               <p className="text-sm text-gray-600 mt-1">Complete compliance lifecycle management with calendar, alerts, and health tracking</p>
             </div>
             <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setBulkUploadOpen(true)} data-testid="button-bulk-import-compliance">
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </Button>
               <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/compliance'] })}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
@@ -1029,6 +1077,20 @@ const ComplianceManagementDashboard = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Upload Dialog */}
+      <BulkUploadDialogEnhanced
+        open={bulkUploadOpen}
+        onOpenChange={setBulkUploadOpen}
+        title="Bulk Import Compliance Items"
+        description="Upload multiple compliance items at once using Excel or CSV file"
+        columns={complianceBulkColumns}
+        onUpload={handleBulkUpload}
+        sampleData={[
+          { entityName: 'ABC Pvt Ltd', complianceType: 'GST', serviceName: 'GSTR-3B Filing', dueDate: '2025-02-20', status: 'pending', penaltyAmount: 500, notes: 'Monthly return' },
+          { entityName: 'XYZ Corp', complianceType: 'Income Tax', serviceName: 'TDS Return', dueDate: '2025-02-15', status: 'in_progress', penaltyAmount: 1000, notes: 'Q4 return' },
+        ]}
+      />
     </div>
   );
 };

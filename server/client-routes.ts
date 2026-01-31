@@ -22,21 +22,16 @@ const clientAuth = [sessionAuthMiddleware, requireRole(USER_ROLES.CLIENT)] as co
 // Helper to get user's business entity ID
 async function getUserEntityId(userId: number): Promise<number | null> {
   try {
-    // First check if user has a direct entity assignment
+    // Get entity where ownerId matches the authenticated user
     const [entity] = await db
       .select()
       .from(businessEntities)
-      .where(eq(businessEntities.primaryContactId, userId));
+      .where(and(
+        eq(businessEntities.ownerId, userId),
+        eq(businessEntities.isActive, true)
+      ));
 
-    if (entity) return entity.id;
-
-    // Fallback: check if user ID is stored as clientId in entities
-    const [entityByClientId] = await db
-      .select()
-      .from(businessEntities)
-      .where(eq(businessEntities.clientId, `U${userId}`));
-
-    return entityByClientId?.id || null;
+    return entity?.id || null;
   } catch (error) {
     console.error('Error getting user entity ID:', error);
     return null;
@@ -54,15 +49,13 @@ export function registerClientRoutes(app: Express) {
       }
 
       // Get only entities owned by this user
+      // Uses ownerId column which stores the user ID that owns this entity
       const entities = await db
         .select()
         .from(businessEntities)
         .where(and(
           eq(businessEntities.isActive, true),
-          or(
-            eq(businessEntities.primaryContactId, userId),
-            eq(businessEntities.clientId, `U${userId}`)
-          )
+          eq(businessEntities.ownerId, userId)
         ))
         .orderBy(desc(businessEntities.createdAt));
 

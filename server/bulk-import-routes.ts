@@ -42,6 +42,7 @@ export function registerBulkImportRoutes(app: Express) {
   /**
    * Bulk Import Leads
    * POST /api/crm/leads/bulk
+   * TRANSACTION: All-or-nothing import with validation phase
    */
   app.post("/api/crm/leads/bulk", ...requireSalesAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -55,6 +56,49 @@ export function registerBulkImportRoutes(app: Express) {
         return res.status(400).json({ error: "Maximum 1000 items per batch" });
       }
 
+      const tenantId = req.user?.tenantId || 1;
+      const userId = req.user?.id || 1;
+
+      // PHASE 1: Validate all items BEFORE starting transaction
+      const validationErrors: string[] = [];
+      const validItems: typeof items = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const rowNum = i + 1;
+
+        // Validate required fields
+        if (!item.companyName || !item.contactPerson || !item.email || !item.phone) {
+          validationErrors.push(`Row ${rowNum}: Missing required fields (companyName, contactPerson, email, phone)`);
+          continue;
+        }
+
+        // Validate email
+        if (!validateEmail(item.email)) {
+          validationErrors.push(`Row ${rowNum}: Invalid email format`);
+          continue;
+        }
+
+        // Validate phone
+        if (!validatePhone(item.phone)) {
+          validationErrors.push(`Row ${rowNum}: Invalid phone format`);
+          continue;
+        }
+
+        validItems.push({ ...item, rowNum });
+      }
+
+      // If any validation errors, reject entire batch
+      if (validationErrors.length > 0) {
+        return res.status(400).json({
+          error: "Validation failed - no records imported",
+          validationErrors,
+          validCount: validItems.length,
+          invalidCount: validationErrors.length,
+        });
+      }
+
+      // PHASE 2: Insert all valid items in a transaction
       const result: BulkImportResult = {
         success: 0,
         failed: 0,
@@ -62,37 +106,9 @@ export function registerBulkImportRoutes(app: Express) {
         insertedIds: [],
       };
 
-      const tenantId = req.user?.tenantId || 1;
-      const userId = req.user?.id || 1;
-
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const rowNum = i + 1;
-
-        try {
-          // Validate required fields
-          if (!item.companyName || !item.contactPerson || !item.email || !item.phone) {
-            result.errors.push(`Row ${rowNum}: Missing required fields (companyName, contactPerson, email, phone)`);
-            result.failed++;
-            continue;
-          }
-
-          // Validate email
-          if (!validateEmail(item.email)) {
-            result.errors.push(`Row ${rowNum}: Invalid email format`);
-            result.failed++;
-            continue;
-          }
-
-          // Validate phone
-          if (!validatePhone(item.phone)) {
-            result.errors.push(`Row ${rowNum}: Invalid phone format`);
-            result.failed++;
-            continue;
-          }
-
-          // Insert lead
-          const [inserted] = await db.insert(leads).values({
+      await db.transaction(async (tx) => {
+        for (const item of validItems) {
+          const [inserted] = await tx.insert(leads).values({
             tenantId,
             companyName: item.companyName,
             contactPerson: item.contactPerson,
@@ -110,22 +126,21 @@ export function registerBulkImportRoutes(app: Express) {
 
           result.success++;
           result.insertedIds.push(inserted.id);
-        } catch (err: any) {
-          result.errors.push(`Row ${rowNum}: ${err.message || 'Insert failed'}`);
-          result.failed++;
         }
-      }
+      });
 
       res.json(result);
     } catch (error: any) {
       console.error("Bulk lead import error:", error);
-      res.status(500).json({ error: error.message || "Bulk import failed" });
+      // Transaction automatically rolled back on error
+      res.status(500).json({ error: error.message || "Bulk import failed - all changes rolled back" });
     }
   });
 
   /**
    * Bulk Import Clients
    * POST /api/clients/bulk
+   * TRANSACTION: All-or-nothing import with validation phase
    */
   app.post("/api/clients/bulk", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -135,6 +150,58 @@ export function registerBulkImportRoutes(app: Express) {
         return res.status(400).json({ error: "Items array is required" });
       }
 
+      if (items.length > 1000) {
+        return res.status(400).json({ error: "Maximum 1000 items per batch" });
+      }
+
+      const tenantId = req.user?.tenantId || 1;
+
+      // PHASE 1: Validate all items BEFORE starting transaction
+      const validationErrors: string[] = [];
+      const validItems: typeof items = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const rowNum = i + 1;
+
+        // Validate required fields
+        if (!item.name || !item.entityType || !item.email || !item.phone || !item.city || !item.state) {
+          validationErrors.push(`Row ${rowNum}: Missing required fields (name, entityType, email, phone, city, state)`);
+          continue;
+        }
+
+        // Validate email
+        if (!validateEmail(item.email)) {
+          validationErrors.push(`Row ${rowNum}: Invalid email format`);
+          continue;
+        }
+
+        // Validate PAN if provided
+        if (item.pan && !validatePAN(item.pan.toUpperCase())) {
+          validationErrors.push(`Row ${rowNum}: Invalid PAN format`);
+          continue;
+        }
+
+        // Validate GSTIN if provided
+        if (item.gstin && !validateGSTIN(item.gstin.toUpperCase())) {
+          validationErrors.push(`Row ${rowNum}: Invalid GSTIN format`);
+          continue;
+        }
+
+        validItems.push({ ...item, rowNum });
+      }
+
+      // If any validation errors, reject entire batch
+      if (validationErrors.length > 0) {
+        return res.status(400).json({
+          error: "Validation failed - no records imported",
+          validationErrors,
+          validCount: validItems.length,
+          invalidCount: validationErrors.length,
+        });
+      }
+
+      // PHASE 2: Insert all valid items in a transaction
       const result: BulkImportResult = {
         success: 0,
         failed: 0,
@@ -142,46 +209,11 @@ export function registerBulkImportRoutes(app: Express) {
         insertedIds: [],
       };
 
-      const tenantId = req.user?.tenantId || 1;
-
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const rowNum = i + 1;
-
-        try {
-          // Validate required fields
-          if (!item.name || !item.entityType || !item.email || !item.phone || !item.city || !item.state) {
-            result.errors.push(`Row ${rowNum}: Missing required fields`);
-            result.failed++;
-            continue;
-          }
-
-          // Validate email
-          if (!validateEmail(item.email)) {
-            result.errors.push(`Row ${rowNum}: Invalid email format`);
-            result.failed++;
-            continue;
-          }
-
-          // Validate PAN if provided
-          if (item.pan && !validatePAN(item.pan.toUpperCase())) {
-            result.errors.push(`Row ${rowNum}: Invalid PAN format`);
-            result.failed++;
-            continue;
-          }
-
-          // Validate GSTIN if provided
-          if (item.gstin && !validateGSTIN(item.gstin.toUpperCase())) {
-            result.errors.push(`Row ${rowNum}: Invalid GSTIN format`);
-            result.failed++;
-            continue;
-          }
-
-          // Generate client ID
+      await db.transaction(async (tx) => {
+        for (const item of validItems) {
           const clientId = `CLT-${nanoid(8).toUpperCase()}`;
 
-          // Insert client (using businessEntities table as client master)
-          const [inserted] = await db.insert(businessEntities).values({
+          const [inserted] = await tx.insert(businessEntities).values({
             tenantId,
             clientId,
             name: item.name,
@@ -202,22 +234,20 @@ export function registerBulkImportRoutes(app: Express) {
 
           result.success++;
           result.insertedIds.push(inserted.id);
-        } catch (err: any) {
-          result.errors.push(`Row ${rowNum}: ${err.message || 'Insert failed'}`);
-          result.failed++;
         }
-      }
+      });
 
       res.json(result);
     } catch (error: any) {
       console.error("Bulk client import error:", error);
-      res.status(500).json({ error: error.message || "Bulk import failed" });
+      res.status(500).json({ error: error.message || "Bulk import failed - all changes rolled back" });
     }
   });
 
   /**
    * Bulk Import Business Entities
    * POST /api/entities/bulk
+   * TRANSACTION: All-or-nothing import with validation phase
    */
   app.post("/api/entities/bulk", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -227,6 +257,53 @@ export function registerBulkImportRoutes(app: Express) {
         return res.status(400).json({ error: "Items array is required" });
       }
 
+      if (items.length > 1000) {
+        return res.status(400).json({ error: "Maximum 1000 items per batch" });
+      }
+
+      const tenantId = req.user?.tenantId || 1;
+      const clientId = req.body.clientId || req.user?.clientId;
+
+      // PHASE 1: Validate all items BEFORE starting transaction
+      const validationErrors: string[] = [];
+      const validItems: typeof items = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const rowNum = i + 1;
+
+        // Validate required fields
+        if (!item.name || !item.entityType || !item.pan || !item.state) {
+          validationErrors.push(`Row ${rowNum}: Missing required fields (name, entityType, pan, state)`);
+          continue;
+        }
+
+        // Validate PAN
+        if (!validatePAN(item.pan.toUpperCase())) {
+          validationErrors.push(`Row ${rowNum}: Invalid PAN format (expected: ABCDE1234F)`);
+          continue;
+        }
+
+        // Validate GSTIN if provided
+        if (item.gstin && !validateGSTIN(item.gstin.toUpperCase())) {
+          validationErrors.push(`Row ${rowNum}: Invalid GSTIN format`);
+          continue;
+        }
+
+        validItems.push({ ...item, rowNum });
+      }
+
+      // If any validation errors, reject entire batch
+      if (validationErrors.length > 0) {
+        return res.status(400).json({
+          error: "Validation failed - no records imported",
+          validationErrors,
+          validCount: validItems.length,
+          invalidCount: validationErrors.length,
+        });
+      }
+
+      // PHASE 2: Insert all valid items in a transaction
       const result: BulkImportResult = {
         success: 0,
         failed: 0,
@@ -234,37 +311,9 @@ export function registerBulkImportRoutes(app: Express) {
         insertedIds: [],
       };
 
-      const tenantId = req.user?.tenantId || 1;
-      const clientId = req.body.clientId || req.user?.clientId;
-
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const rowNum = i + 1;
-
-        try {
-          // Validate required fields
-          if (!item.name || !item.entityType || !item.pan || !item.state) {
-            result.errors.push(`Row ${rowNum}: Missing required fields (name, entityType, pan, state)`);
-            result.failed++;
-            continue;
-          }
-
-          // Validate PAN
-          if (!validatePAN(item.pan.toUpperCase())) {
-            result.errors.push(`Row ${rowNum}: Invalid PAN format (expected: ABCDE1234F)`);
-            result.failed++;
-            continue;
-          }
-
-          // Validate GSTIN if provided
-          if (item.gstin && !validateGSTIN(item.gstin.toUpperCase())) {
-            result.errors.push(`Row ${rowNum}: Invalid GSTIN format`);
-            result.failed++;
-            continue;
-          }
-
-          // Insert entity
-          const [inserted] = await db.insert(businessEntities).values({
+      await db.transaction(async (tx) => {
+        for (const item of validItems) {
+          const [inserted] = await tx.insert(businessEntities).values({
             tenantId,
             clientId: clientId || null,
             name: item.name,
@@ -283,16 +332,13 @@ export function registerBulkImportRoutes(app: Express) {
 
           result.success++;
           result.insertedIds.push(inserted.id);
-        } catch (err: any) {
-          result.errors.push(`Row ${rowNum}: ${err.message || 'Insert failed'}`);
-          result.failed++;
         }
-      }
+      });
 
       res.json(result);
     } catch (error: any) {
       console.error("Bulk entity import error:", error);
-      res.status(500).json({ error: error.message || "Bulk import failed" });
+      res.status(500).json({ error: error.message || "Bulk import failed - all changes rolled back" });
     }
   });
 
@@ -373,6 +419,7 @@ export function registerBulkImportRoutes(app: Express) {
   /**
    * Bulk Import Tasks
    * POST /api/tasks/bulk
+   * TRANSACTION: All-or-nothing import with validation phase
    */
   app.post("/api/tasks/bulk", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -382,12 +429,9 @@ export function registerBulkImportRoutes(app: Express) {
         return res.status(400).json({ error: "Items array is required" });
       }
 
-      const result: BulkImportResult = {
-        success: 0,
-        failed: 0,
-        errors: [],
-        insertedIds: [],
-      };
+      if (items.length > 1000) {
+        return res.status(400).json({ error: "Maximum 1000 items per batch" });
+      }
 
       const tenantId = req.user?.tenantId || 1;
       const createdBy = req.user?.id || 1;
@@ -395,20 +439,53 @@ export function registerBulkImportRoutes(app: Express) {
       // Import tasks table if available
       const { tasks } = await import('@shared/schema');
 
+      // PHASE 1: Validate all items BEFORE starting transaction
+      const validationErrors: string[] = [];
+      const validItems: typeof items = [];
+
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         const rowNum = i + 1;
 
-        try {
-          // Validate required fields
-          if (!item.title || !item.priority || !item.category) {
-            result.errors.push(`Row ${rowNum}: Missing required fields (title, priority, category)`);
-            result.failed++;
+        // Validate required fields
+        if (!item.title || !item.priority || !item.category) {
+          validationErrors.push(`Row ${rowNum}: Missing required fields (title, priority, category)`);
+          continue;
+        }
+
+        // Validate due date if provided
+        if (item.dueDate) {
+          const dueDate = new Date(item.dueDate);
+          if (isNaN(dueDate.getTime())) {
+            validationErrors.push(`Row ${rowNum}: Invalid date format for dueDate`);
             continue;
           }
+        }
 
-          // Insert task
-          const [inserted] = await db.insert(tasks).values({
+        validItems.push({ ...item, rowNum });
+      }
+
+      // If any validation errors, reject entire batch
+      if (validationErrors.length > 0) {
+        return res.status(400).json({
+          error: "Validation failed - no records imported",
+          validationErrors,
+          validCount: validItems.length,
+          invalidCount: validationErrors.length,
+        });
+      }
+
+      // PHASE 2: Insert all valid items in a transaction
+      const result: BulkImportResult = {
+        success: 0,
+        failed: 0,
+        errors: [],
+        insertedIds: [],
+      };
+
+      await db.transaction(async (tx) => {
+        for (const item of validItems) {
+          const [inserted] = await tx.insert(tasks).values({
             tenantId,
             title: item.title,
             description: item.description || '',
@@ -417,29 +494,27 @@ export function registerBulkImportRoutes(app: Express) {
             status: 'pending',
             dueDate: item.dueDate ? new Date(item.dueDate) : null,
             createdBy,
-            assignedTo: null, // Would need user lookup by email
+            assignedTo: null,
             createdAt: new Date(),
             updatedAt: new Date(),
           }).returning({ id: tasks.id });
 
           result.success++;
           result.insertedIds.push(inserted.id);
-        } catch (err: any) {
-          result.errors.push(`Row ${rowNum}: ${err.message || 'Insert failed'}`);
-          result.failed++;
         }
-      }
+      });
 
       res.json(result);
     } catch (error: any) {
       console.error("Bulk task import error:", error);
-      res.status(500).json({ error: error.message || "Bulk import failed" });
+      res.status(500).json({ error: error.message || "Bulk import failed - all changes rolled back" });
     }
   });
 
   /**
    * Bulk Import Compliance Items
    * POST /api/compliance/bulk
+   * TRANSACTION: All-or-nothing import with validation phase
    */
   app.post("/api/compliance/bulk", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -449,6 +524,50 @@ export function registerBulkImportRoutes(app: Express) {
         return res.status(400).json({ error: "Items array is required" });
       }
 
+      if (items.length > 1000) {
+        return res.status(400).json({ error: "Maximum 1000 items per batch" });
+      }
+
+      const tenantId = req.user?.tenantId || 1;
+
+      // Import compliance table if available
+      const { complianceItems } = await import('@shared/schema');
+
+      // PHASE 1: Validate all items BEFORE starting transaction
+      const validationErrors: string[] = [];
+      const validItems: { item: typeof items[0]; dueDate: Date; rowNum: number }[] = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const rowNum = i + 1;
+
+        // Validate required fields
+        if (!item.entityName || !item.complianceType || !item.dueDate || !item.status) {
+          validationErrors.push(`Row ${rowNum}: Missing required fields (entityName, complianceType, dueDate, status)`);
+          continue;
+        }
+
+        // Validate date
+        const dueDate = new Date(item.dueDate);
+        if (isNaN(dueDate.getTime())) {
+          validationErrors.push(`Row ${rowNum}: Invalid date format for dueDate`);
+          continue;
+        }
+
+        validItems.push({ item, dueDate, rowNum });
+      }
+
+      // If any validation errors, reject entire batch
+      if (validationErrors.length > 0) {
+        return res.status(400).json({
+          error: "Validation failed - no records imported",
+          validationErrors,
+          validCount: validItems.length,
+          invalidCount: validationErrors.length,
+        });
+      }
+
+      // PHASE 2: Insert all valid items in a transaction
       const result: BulkImportResult = {
         success: 0,
         failed: 0,
@@ -456,33 +575,9 @@ export function registerBulkImportRoutes(app: Express) {
         insertedIds: [],
       };
 
-      const tenantId = req.user?.tenantId || 1;
-
-      // Import compliance table if available
-      const { complianceItems } = await import('@shared/schema');
-
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const rowNum = i + 1;
-
-        try {
-          // Validate required fields
-          if (!item.entityName || !item.complianceType || !item.dueDate || !item.status) {
-            result.errors.push(`Row ${rowNum}: Missing required fields (entityName, complianceType, dueDate, status)`);
-            result.failed++;
-            continue;
-          }
-
-          // Validate date
-          const dueDate = new Date(item.dueDate);
-          if (isNaN(dueDate.getTime())) {
-            result.errors.push(`Row ${rowNum}: Invalid date format`);
-            result.failed++;
-            continue;
-          }
-
-          // Insert compliance item
-          const [inserted] = await db.insert(complianceItems).values({
+      await db.transaction(async (tx) => {
+        for (const { item, dueDate } of validItems) {
+          const [inserted] = await tx.insert(complianceItems).values({
             tenantId,
             entityName: item.entityName,
             complianceType: item.complianceType,
@@ -496,16 +591,13 @@ export function registerBulkImportRoutes(app: Express) {
 
           result.success++;
           result.insertedIds.push(inserted.id);
-        } catch (err: any) {
-          result.errors.push(`Row ${rowNum}: ${err.message || 'Insert failed'}`);
-          result.failed++;
         }
-      }
+      });
 
       res.json(result);
     } catch (error: any) {
       console.error("Bulk compliance import error:", error);
-      res.status(500).json({ error: error.message || "Bulk import failed" });
+      res.status(500).json({ error: error.message || "Bulk import failed - all changes rolled back" });
     }
   });
 

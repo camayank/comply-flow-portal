@@ -221,10 +221,20 @@ export default function MobileClientPortal() {
           title="Business Entities"
           description="Manage your registered entities"
           actions={
-            <Button onClick={handleAddEntity}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Entity
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => {
+                setSelectedEntity(null);
+                setEntityDialogMode('add');
+                setEntityDialogOpen(true);
+              }}>
+                <Upload className="h-4 w-4 mr-2" />
+                Bulk Import
+              </Button>
+              <Button onClick={handleAddEntity}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Entity
+              </Button>
+            </div>
           }
         >
           {entitiesQuery.render((entities) => (

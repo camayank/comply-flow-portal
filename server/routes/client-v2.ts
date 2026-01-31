@@ -56,68 +56,12 @@ router.get('/status', async (req, res) => {
       const client = await ClientService.getClientByUserId(userId);
 
       if (!client) {
-        // Fallback to comprehensive mock data for dev mode
-        return res.json({
-          complianceState: 'AMBER',
-          daysSafe: 12,
-          nextDeadline: 'February 5, 2026',
-          penaltyExposure: 5000,
-          nextAction: {
-            id: 'action-gst-jan-2026',
-            title: 'Upload January 2026 GST documents',
-            timeEstimate: '5 minutes',
-            whyMatters: {
-              benefits: [
-                'Complete your GST filing before deadline',
-                'Avoid ₹5,000 late filing penalty',
-                'Maintain good compliance record',
-                'Enable ITC claims for next month'
-              ],
-              socialProof: '3,241 businesses completed this action this month'
-            },
-            actionType: 'upload' as const,
-            instructions: [
-              'Gather all sales invoices for January 2026',
-              'Prepare purchase invoices and input credit documents',
-              'Ensure all documents are in PDF format (max 10MB each)',
-              'Click the upload button below to attach files',
-              'Review and submit for processing'
-            ],
-            documentType: 'GST Return Documents',
-            dueDate: '2026-02-05'
-          },
-          recentActivities: [
-            {
-              id: 'activity-1',
-              type: 'document_uploaded' as const,
-              description: 'December 2025 GST returns filed successfully',
-              timestamp: new Date(Date.now() - 432000000).toISOString(), // 5 days ago
-            },
-            {
-              id: 'activity-2',
-              type: 'payment_completed' as const,
-              description: 'GST payment of ₹45,000 completed',
-              timestamp: new Date(Date.now() - 518400000).toISOString(), // 6 days ago
-            },
-            {
-              id: 'activity-3',
-              type: 'document_approved' as const,
-              description: 'TDS return for Q3 FY 2025-26 approved',
-              timestamp: new Date(Date.now() - 864000000).toISOString(), // 10 days ago
-            },
-            {
-              id: 'activity-4',
-              type: 'filing_initiated' as const,
-              description: 'Professional tax filing initiated',
-              timestamp: new Date(Date.now() - 1209600000).toISOString(), // 14 days ago
-            },
-            {
-              id: 'activity-5',
-              type: 'document_uploaded' as const,
-              description: 'Bank statement for December uploaded',
-              timestamp: new Date(Date.now() - 1296000000).toISOString(), // 15 days ago
-            }
-          ]
+        // SECURITY: Return proper error instead of fake data
+        // User should see onboarding flow or error, not misleading mock data
+        return res.status(404).json({
+          error: 'Client profile not found',
+          message: 'Please complete your client registration to access the dashboard.',
+          code: 'CLIENT_NOT_FOUND'
         });
       }
 
@@ -184,6 +128,12 @@ router.get('/status', async (req, res) => {
         timestamp: activity.timestamp.toISOString()
       }));
 
+      // Get upcoming deadlines from database
+      const upcomingDeadlines = await ComplianceService.getUpcomingDeadlines(clientId, 5);
+
+      // Get quick stats from database
+      const quickStats = await ComplianceService.getQuickStats(clientId);
+
       // Return real database data
       return res.json({
         complianceState: complianceState?.overallState || 'GREEN',
@@ -191,73 +141,19 @@ router.get('/status', async (req, res) => {
         nextDeadline,
         penaltyExposure: complianceState?.totalPenaltyExposure || 0,
         nextAction: formattedNextAction,
-        recentActivities: formattedActivities
+        recentActivities: formattedActivities,
+        upcomingDeadlines: upcomingDeadlines || [],
+        quickStats: quickStats || { tasksCompleted: 0, pendingActions: 0, daysSafe: 0 }
       });
 
     } catch (dbError: any) {
       console.error('Database error:', dbError);
-      // Return comprehensive mock data on DB error
-      return res.json({
-        complianceState: 'AMBER',
-        daysSafe: 12,
-        nextDeadline: 'February 5, 2026',
-        penaltyExposure: 5000,
-        nextAction: {
-          id: 'action-gst-jan-2026',
-          title: 'Upload January 2026 GST documents',
-          timeEstimate: '5 minutes',
-          whyMatters: {
-            benefits: [
-              'Complete your GST filing before deadline',
-              'Avoid ₹5,000 late filing penalty',
-              'Maintain good compliance record',
-              'Enable ITC claims for next month'
-            ],
-            socialProof: '3,241 businesses completed this action this month'
-          },
-          actionType: 'upload' as const,
-          instructions: [
-            'Gather all sales invoices for January 2026',
-            'Prepare purchase invoices and input credit documents',
-            'Ensure all documents are in PDF format (max 10MB each)',
-            'Click the upload button below to attach files',
-            'Review and submit for processing'
-          ],
-          documentType: 'GST Return Documents',
-          dueDate: '2026-02-05'
-        },
-        recentActivities: [
-          {
-            id: 'activity-1',
-            type: 'document_uploaded' as const,
-            description: 'December 2025 GST returns filed successfully',
-            timestamp: new Date(Date.now() - 432000000).toISOString(),
-          },
-          {
-            id: 'activity-2',
-            type: 'payment_completed' as const,
-            description: 'GST payment of ₹45,000 completed',
-            timestamp: new Date(Date.now() - 518400000).toISOString(),
-          },
-          {
-            id: 'activity-3',
-            type: 'document_approved' as const,
-            description: 'TDS return for Q3 FY 2025-26 approved',
-            timestamp: new Date(Date.now() - 864000000).toISOString(),
-          },
-          {
-            id: 'activity-4',
-            type: 'filing_initiated' as const,
-            description: 'Professional tax filing initiated',
-            timestamp: new Date(Date.now() - 1209600000).toISOString(),
-          },
-          {
-            id: 'activity-5',
-            type: 'document_uploaded' as const,
-            description: 'Bank statement for December uploaded',
-            timestamp: new Date(Date.now() - 1296000000).toISOString(),
-          }
-        ]
+      // SECURITY: Return proper error response instead of fake data
+      // Users should see service unavailable, not misleading mock data
+      return res.status(503).json({
+        error: 'Service temporarily unavailable',
+        message: 'Unable to fetch compliance data. Please try again later.',
+        code: 'DATABASE_ERROR'
       });
     }
   } catch (error: any) {

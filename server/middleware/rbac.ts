@@ -59,12 +59,12 @@ export function requireRole(...allowedRoles: string[]) {
       });
 
       if (!hasDirectRole && !hasHierarchyAccess) {
+        // Log details server-side but don't expose to client
         logger.warn(`Access denied for user ${req.userId} with role ${userRole}. Required roles: ${allowedRoles.join(', ')}`);
+        // SECURITY: Don't leak user's actual role in response - attackers can use this to probe
         res.status(403).json({
           success: false,
-          error: 'Insufficient permissions',
-          required: allowedRoles,
-          userRole: userRole,
+          error: 'Insufficient permissions for this action',
         });
         return;
       }

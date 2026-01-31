@@ -87,15 +87,11 @@ export async function extractTenant(
       }
     }
 
-    // 5. Check query parameter
-    if (!tenant) {
-      const queryTenantId = req.query.tenantId as string;
-      if (queryTenantId) {
-        tenant = await tenantService.getTenant(queryTenantId);
-      }
-    }
+    // 5. Query parameter tenant selection - REMOVED FOR SECURITY
+    // Query parameters are user-controlled and could allow cross-tenant access
+    // Tenant should only come from authenticated session
 
-    // 6. Check user session
+    // 5. Check user session (moved from 6)
     if (!tenant) {
       const user = (req as any).user;
       if (user?.tenantId) {

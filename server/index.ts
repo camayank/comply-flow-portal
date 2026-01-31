@@ -27,12 +27,32 @@ const app = express();
 // Register security headers first
 registerSecurityMiddleware(app);
 
-// CORS middleware
+// CORS middleware - restricted even in development for security
+const corsOrigins = process.env.NODE_ENV === 'production'
+  ? process.env.ALLOWED_ORIGINS?.split(',') || []
+  : [
+      'http://localhost:5000',
+      'http://localhost:5173',
+      'http://127.0.0.1:5000',
+      'http://127.0.0.1:5173',
+    ];
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? process.env.ALLOWED_ORIGINS?.split(',') || [] 
-    : true,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    if (corsOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Log blocked CORS requests for monitoring
+    logger.warn(`CORS blocked request from origin: ${origin}`);
+    return callback(new Error('Not allowed by CORS'), false);
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-Tenant-ID'],
 }));
 app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));

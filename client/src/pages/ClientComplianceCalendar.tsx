@@ -292,29 +292,87 @@ const ClientComplianceCalendar = () => {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <Button variant="ghost" size="sm">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
+                  >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <CardTitle>
                     {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                   </CardTitle>
-                  <Button variant="ghost" size="sm">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
+                  >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-7 gap-2 text-center mb-2">
+                <div className="grid grid-cols-7 gap-1 text-center mb-2">
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                    <div key={day} className="text-sm font-semibold text-gray-600">
+                    <div key={day} className="text-sm font-semibold text-gray-600 py-2">
                       {day}
                     </div>
                   ))}
                 </div>
-                <div className="text-center py-12 text-gray-600">
-                  <CalendarIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p>Calendar view coming soon</p>
-                  <p className="text-sm">Use List View to see all compliance items</p>
+                <div className="grid grid-cols-7 gap-1">
+                  {(() => {
+                    const year = currentDate.getFullYear();
+                    const month = currentDate.getMonth();
+                    const firstDay = new Date(year, month, 1).getDay();
+                    const daysInMonth = new Date(year, month + 1, 0).getDate();
+                    const today = new Date();
+
+                    const cells = [];
+
+                    // Empty cells before first day
+                    for (let i = 0; i < firstDay; i++) {
+                      cells.push(<div key={`empty-${i}`} className="min-h-[80px] p-1" />);
+                    }
+
+                    // Days of month
+                    for (let day = 1; day <= daysInMonth; day++) {
+                      const cellDate = new Date(year, month, day);
+                      const isToday = cellDate.toDateString() === today.toDateString();
+                      const dayItems = displayData.filter((item) => {
+                        const itemDate = new Date(item.dueDate);
+                        return itemDate.toDateString() === cellDate.toDateString();
+                      });
+
+                      cells.push(
+                        <div
+                          key={day}
+                          className={`min-h-[80px] p-1 border rounded-lg ${
+                            isToday ? 'bg-blue-50 border-blue-300' : 'border-gray-100 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className={`text-sm font-medium mb-1 ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
+                            {day}
+                          </div>
+                          <div className="space-y-1">
+                            {dayItems.slice(0, 2).map((item) => (
+                              <div
+                                key={item.id}
+                                className={`text-xs p-1 rounded truncate ${getPriorityColor(item.priority)} cursor-pointer`}
+                                title={item.title}
+                              >
+                                {item.title.length > 15 ? `${item.title.substring(0, 15)}...` : item.title}
+                              </div>
+                            ))}
+                            {dayItems.length > 2 && (
+                              <div className="text-xs text-gray-500 pl-1">+{dayItems.length - 2} more</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return cells;
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -325,20 +383,89 @@ const ClientComplianceCalendar = () => {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <Button variant="ghost" size="sm">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCurrentDate(new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000))}
+                  >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <CardTitle>Week View</CardTitle>
-                  <Button variant="ghost" size="sm">
+                  <CardTitle>
+                    {(() => {
+                      const startOfWeek = new Date(currentDate);
+                      startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+                      const endOfWeek = new Date(startOfWeek);
+                      endOfWeek.setDate(startOfWeek.getDate() + 6);
+                      return `${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+                    })()}
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCurrentDate(new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000))}
+                  >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12 text-gray-600">
-                  <CalendarIcon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p>Week view coming soon</p>
-                  <p className="text-sm">Use List View to see all compliance items</p>
+                <div className="grid grid-cols-7 gap-2">
+                  {(() => {
+                    const startOfWeek = new Date(currentDate);
+                    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+                    const today = new Date();
+
+                    return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, index) => {
+                      const dayDate = new Date(startOfWeek);
+                      dayDate.setDate(startOfWeek.getDate() + index);
+                      const isToday = dayDate.toDateString() === today.toDateString();
+                      const dayItems = displayData.filter((item) => {
+                        const itemDate = new Date(item.dueDate);
+                        return itemDate.toDateString() === dayDate.toDateString();
+                      });
+
+                      return (
+                        <div
+                          key={dayName}
+                          className={`min-h-[200px] p-2 border rounded-lg ${
+                            isToday ? 'bg-blue-50 border-blue-300' : 'border-gray-200'
+                          }`}
+                        >
+                          <div className="text-center mb-2">
+                            <div className="text-sm font-semibold text-gray-600">{dayName}</div>
+                            <div className={`text-lg font-bold ${isToday ? 'text-blue-600' : 'text-gray-900'}`}>
+                              {dayDate.getDate()}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            {dayItems.map((item) => {
+                              const daysUntil = getDaysUntilDue(item.dueDate);
+                              const urgency = getUrgencyBadge(daysUntil);
+                              return (
+                                <div
+                                  key={item.id}
+                                  className="p-2 bg-white border rounded shadow-sm hover:shadow transition-shadow cursor-pointer"
+                                >
+                                  <div className="flex items-start gap-2">
+                                    {getStatusIcon(item.status)}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-gray-900 truncate">{item.title}</p>
+                                      <div className="flex items-center gap-1 mt-1">
+                                        <Badge className={`${urgency.color} text-white text-xs`}>{urgency.text}</Badge>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {dayItems.length === 0 && (
+                              <div className="text-center py-4 text-gray-400 text-xs">No items</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </CardContent>
             </Card>

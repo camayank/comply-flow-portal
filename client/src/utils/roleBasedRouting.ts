@@ -3,6 +3,64 @@
  * WordPress-style role-based dashboard routing
  */
 
+import {
+  LayoutDashboard,
+  Users,
+  FileText,
+  Briefcase,
+  Workflow,
+  BarChart3,
+  Settings,
+  Shield,
+  TrendingUp,
+  DollarSign,
+  Bot,
+  UserPlus,
+  Target,
+  PieChart,
+  ListTodo,
+  ShieldCheck,
+  FolderOpen,
+  CheckSquare,
+  Building2,
+  ShoppingCart,
+  Headphones,
+  Calendar,
+  Wallet,
+  Share2,
+  Home,
+  type LucideIcon
+} from 'lucide-react';
+
+// Icon mapping from string names to Lucide components
+export const iconMap: Record<string, LucideIcon> = {
+  'LayoutDashboard': LayoutDashboard,
+  'Users': Users,
+  'FileText': FileText,
+  'Briefcase': Briefcase,
+  'Workflow': Workflow,
+  'BarChart3': BarChart3,
+  'Settings': Settings,
+  'Shield': Shield,
+  'TrendingUp': TrendingUp,
+  'DollarSign': DollarSign,
+  'Bot': Bot,
+  'UserPlus': UserPlus,
+  'Target': Target,
+  'PieChart': PieChart,
+  'ListTodo': ListTodo,
+  'ShieldCheck': ShieldCheck,
+  'FolderOpen': FolderOpen,
+  'CheckSquare': CheckSquare,
+  'Building2': Building2,
+  'ShoppingCart': ShoppingCart,
+  'Headphones': Headphones,
+  'Calendar': Calendar,
+  'Wallet': Wallet,
+  'Share2': Share2,
+  'Home': Home,
+};
+
 export const USER_ROLES = {
   SUPER_ADMIN: 'super_admin',
   ADMIN: 'admin',
@@ -837,4 +895,23 @@ export function getRoleLevel(role: string): number {
  */
 export function hasEqualOrHigherRole(userRole: string, requiredRole: string): boolean {
   return getRoleLevel(userRole) >= getRoleLevel(requiredRole);
+}
+
+/**
+ * Get role navigation with actual icon components
+ * Converts string icon names to Lucide React components
+ */
+export function getRoleNavigationWithIcons(role: string) {
+  const navigation = getRoleNavigation(role);
+  return navigation.map(item => ({
+    ...item,
+    icon: iconMap[item.icon] || LayoutDashboard
+  }));
+}
+
+/**
+ * Get a single icon component from string name
+ */
+export function getIconComponent(iconName: string): LucideIcon {
+  return iconMap[iconName] || LayoutDashboard;
 }

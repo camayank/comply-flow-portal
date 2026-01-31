@@ -48,10 +48,7 @@ const ESignAgreements = lazy(() => import("./pages/ESignAgreements"));
 const PaymentGateway = lazy(() => import("./pages/PaymentGateway"));
 const ComplianceTracker = lazy(() => import("./pages/ComplianceTracker"));
 const Confirmation = lazy(() => import("./pages/Confirmation"));
-const AdminPanel = lazy(() => import("./pages/AdminPanel"));
-// DEPRECATED: Using refactored versions instead
-// const MobileOperationsPanel = lazy(() => import("./pages/MobileOperationsPanel"));
-// const MobileAdminPanel = lazy(() => import("./pages/MobileAdminPanel"));
+// DEPRECATED: AdminPanel, MobileOperationsPanel, MobileAdminPanel - Using refactored versions instead
 const SyncDashboard = lazy(() => import("./pages/SyncDashboard"));
 const PlatformShowcase = lazy(() => import("./pages/PlatformShowcase"));
 const ComplianceTrackerDashboard = lazy(() => import("./pages/ComplianceTrackerDashboard"));
@@ -68,13 +65,11 @@ const ServiceRequestCreate = lazy(() => import("./pages/ServiceRequestCreate"));
 const ServiceRequestDetail = lazy(() => import("./pages/ServiceRequestDetail"));
 const ClientComplianceCalendar = lazy(() => import("./pages/ClientComplianceCalendar"));
 const ClientProfile = lazy(() => import("./pages/ClientProfile"));
-const OperationsPanel = lazy(() => import("./pages/OperationsPanel"));
-// DEPRECATED: Consolidated into MobileAgentPortal
-// const AgentPortal = lazy(() => import("./pages/AgentPortal"));
+// DEPRECATED: OperationsPanel - Using MobileOperationsPanelRefactored instead
+// DEPRECATED: AgentPortal - Consolidated into MobileAgentPortal
 const MobileAgentPortal = lazy(() => import("./pages/MobileAgentPortal"));
 const MasterBlueprintDashboard = lazy(() => import("./pages/MasterBlueprintDashboard"));
-// CONSOLIDATED: UniversalAdminPanel merged into MobileAdminPanelRefactored
-// CONSOLIDATED: UniversalOperationsPanel merged into MobileOperationsPanelRefactored
+// DEPRECATED: UniversalAdminPanel, UniversalOperationsPanel - Merged into refactored panels
 const UniversalLandingPage = lazy(() => import("./pages/UniversalLandingPage"));
 const WorkflowImport = lazy(() => import("./pages/WorkflowImport"));
 const AdminServiceConfig = lazy(() => import("./pages/AdminServiceConfig"));

@@ -260,9 +260,9 @@ const ESignAgreements = () => {
                   </label>
                   <p className="text-xs text-muted-foreground">
                     By checking this box, you agree to our{' '}
-                    <a href="#" className="text-blue-600 hover:underline">Terms of Service</a>{' '}
+                    <a href="/terms-of-service" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Terms of Service</a>{' '}
                     and{' '}
-                    <a href="#" className="text-blue-600 hover:underline">Privacy Policy</a>.
+                    <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Privacy Policy</a>.
                     You also confirm that all information provided is accurate and complete.
                   </p>
                 </div>

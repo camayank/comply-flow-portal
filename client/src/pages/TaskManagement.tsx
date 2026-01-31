@@ -3,7 +3,9 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Filter, CheckCircle2, Clock, AlertCircle, User, Calendar, Search } from 'lucide-react';
+import { Plus, Filter, CheckCircle2, Clock, AlertCircle, User, Calendar, Search, Upload, LayoutDashboard, ListTodo, FileText, Users, Settings, BarChart3 } from 'lucide-react';
+import { BulkUploadDialogEnhanced, ColumnDefinition, BulkUploadResult } from '@/components/BulkUploadDialogEnhanced';
+import { DashboardLayout } from '@/components/layouts/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -53,12 +55,34 @@ interface Task {
   lastReminderSent: string | null;
 }
 
+// Bulk upload column definitions for tasks
+const taskBulkColumns: ColumnDefinition[] = [
+  { key: 'title', label: 'Title', type: 'text', required: true, placeholder: 'Task title' },
+  { key: 'description', label: 'Description', type: 'text', placeholder: 'Task description' },
+  { key: 'priority', label: 'Priority', type: 'select', required: true, options: [
+    { value: 'low', label: 'Low' },
+    { value: 'normal', label: 'Normal' },
+    { value: 'high', label: 'High' },
+    { value: 'urgent', label: 'Urgent' },
+  ]},
+  { key: 'category', label: 'Category', type: 'select', required: true, options: [
+    { value: 'service', label: 'Service' },
+    { value: 'compliance', label: 'Compliance' },
+    { value: 'finance', label: 'Finance' },
+    { value: 'support', label: 'Support' },
+    { value: 'other', label: 'Other' },
+  ]},
+  { key: 'dueDate', label: 'Due Date', type: 'date' },
+  { key: 'assigneeEmail', label: 'Assignee Email', type: 'email', placeholder: 'assignee@example.com' },
+];
+
 export default function TaskManagement() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -131,6 +155,25 @@ export default function TaskManagement() {
 
   const onSubmit = (data: TaskFormData) => {
     createTaskMutation.mutate(data);
+  };
+
+  const handleBulkUpload = async (data: Record<string, any>[]): Promise<BulkUploadResult> => {
+    try {
+      const response = await fetch('/api/tasks/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tasks: data }),
+        credentials: 'include',
+      });
+      const result = await response.json();
+      if (response.ok) {
+        queryClient.invalidateQueries({ queryKey: ['/api/tasks'] });
+        return { success: result.created || data.length, failed: result.failed || 0, errors: result.errors || [] };
+      }
+      return { success: 0, failed: data.length, errors: [result.message || 'Bulk upload failed'] };
+    } catch (error: any) {
+      return { success: 0, failed: data.length, errors: [error.message || 'Network error'] };
+    }
   };
 
   // Filter tasks
@@ -251,8 +294,24 @@ export default function TaskManagement() {
     </Card>
   );
 
+  // Navigation for task management dashboard
+  const navigation = [
+    { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { label: 'Tasks', href: '/tasks', icon: ListTodo, badge: filteredTasks.filter(t => t.status === 'pending').length },
+    { label: 'Services', href: '/services', icon: FileText },
+    { label: 'Clients', href: '/clients', icon: Users },
+    { label: 'Reports', href: '/executive-dashboard', icon: BarChart3 },
+    { label: 'Settings', href: '/admin/settings', icon: Settings },
+  ];
+
   return (
-    <div className="container mx-auto py-6 px-4 max-w-7xl">
+    <DashboardLayout
+      navigation={navigation}
+      title="Task Management"
+      user={{ name: 'Operations User', email: 'ops@digicomply.in' }}
+      notificationCount={filteredTasks.filter(t => t.priority === 'urgent').length}
+    >
+    <div className="py-6 px-4 md:px-6 lg:px-8">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
@@ -260,7 +319,12 @@ export default function TaskManagement() {
           <p className="text-muted-foreground mt-1">Track and manage all your tasks in one place</p>
         </div>
         
-        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setBulkUploadOpen(true)} data-testid="button-bulk-upload-tasks">
+            <Upload className="w-4 h-4 mr-2" />
+            Bulk Import
+          </Button>
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>
             <Button data-testid="button-create-task">
               <Plus className="w-4 h-4 mr-2" />
@@ -424,7 +488,22 @@ export default function TaskManagement() {
             </Form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
+
+      {/* Bulk Upload Dialog */}
+      <BulkUploadDialogEnhanced
+        open={bulkUploadOpen}
+        onOpenChange={setBulkUploadOpen}
+        title="Bulk Import Tasks"
+        description="Upload multiple tasks at once using Excel or CSV file"
+        columns={taskBulkColumns}
+        onUpload={handleBulkUpload}
+        sampleData={[
+          { title: 'Complete GST filing', description: 'Monthly GST return filing', priority: 'high', category: 'compliance', dueDate: '2025-02-15', assigneeEmail: 'ops@company.com' },
+          { title: 'Client follow-up', description: 'Follow up on pending documents', priority: 'normal', category: 'service', dueDate: '2025-02-10', assigneeEmail: 'sales@company.com' },
+        ]}
+      />
 
       {/* Filters */}
       <Card className="mb-6">
@@ -583,5 +662,6 @@ export default function TaskManagement() {
         </TabsContent>
       </Tabs>
     </div>
+    </DashboardLayout>
   );
 }

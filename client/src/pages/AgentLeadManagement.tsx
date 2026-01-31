@@ -37,8 +37,10 @@ import {
   Eye,
   Edit,
   ArrowLeft,
-  FileText
+  FileText,
+  Upload
 } from 'lucide-react';
+import { BulkUploadDialogEnhanced, ColumnDefinition, BulkUploadResult } from '@/components/BulkUploadDialogEnhanced';
 import { Link, useLocation } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
@@ -67,6 +69,25 @@ const LEAD_SOURCES = [
   'Other'
 ];
 
+// Bulk upload column definitions for leads
+const leadBulkColumns: ColumnDefinition[] = [
+  { key: 'contactName', label: 'Contact Name', type: 'text', required: true, placeholder: 'John Doe' },
+  { key: 'companyName', label: 'Company Name', type: 'text', placeholder: 'ABC Corp' },
+  { key: 'email', label: 'Email', type: 'email', placeholder: 'john@example.com' },
+  { key: 'phone', label: 'Phone', type: 'phone', required: true, placeholder: '+91 9876543210' },
+  { key: 'serviceInterested', label: 'Service Interested', type: 'text', required: true, placeholder: 'GST Registration' },
+  { key: 'leadSource', label: 'Lead Source', type: 'select', options: LEAD_SOURCES.map(s => ({ value: s, label: s })) },
+  { key: 'leadStage', label: 'Lead Stage', type: 'select', options: [
+    { value: 'new', label: 'New' },
+    { value: 'hot_lead', label: 'Hot Lead' },
+    { value: 'warm_lead', label: 'Warm Lead' },
+    { value: 'cold_lead', label: 'Cold Lead' },
+  ]},
+  { key: 'city', label: 'City', type: 'text', placeholder: 'Mumbai' },
+  { key: 'state', label: 'State', type: 'text', placeholder: 'Maharashtra' },
+  { key: 'notes', label: 'Notes', type: 'text', placeholder: 'Additional notes' },
+];
+
 export default function AgentLeadManagement() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -74,6 +95,7 @@ export default function AgentLeadManagement() {
   const [stageFilter, setStageFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
 
   const [newLead, setNewLead] = useState({
     companyName: '',
@@ -165,6 +187,26 @@ export default function AgentLeadManagement() {
     createLeadMutation.mutate(newLead);
   };
 
+  const handleBulkUpload = async (data: Record<string, any>[]): Promise<BulkUploadResult> => {
+    try {
+      const response = await fetch('/api/agent/leads/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leads: data.map(lead => ({ ...lead, stage: lead.leadStage || 'new' })) }),
+        credentials: 'include',
+      });
+      const result = await response.json();
+      if (response.ok) {
+        queryClient.invalidateQueries({ queryKey: ['/api/agent/leads'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/agent/stats'] });
+        return { success: result.created || data.length, failed: result.failed || 0, errors: result.errors || [] };
+      }
+      return { success: 0, failed: data.length, errors: [result.message || 'Bulk upload failed'] };
+    } catch (error: any) {
+      return { success: 0, failed: data.length, errors: [error.message || 'Network error'] };
+    }
+  };
+
   const getStageColor = (stage: string) => {
     switch (stage) {
       case LEAD_STAGES.HOT_LEAD:
@@ -219,6 +261,11 @@ export default function AgentLeadManagement() {
               Track and convert your leads
             </p>
           </div>
+          <div className="flex gap-2">
+          <Button variant="outline" size="lg" onClick={() => setBulkUploadOpen(true)} data-testid="button-bulk-upload-leads">
+            <Upload className="h-5 w-5 mr-2" />
+            Bulk Import
+          </Button>
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button size="lg" data-testid="button-add-lead">
@@ -389,6 +436,7 @@ export default function AgentLeadManagement() {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
       </div>
 
@@ -566,6 +614,20 @@ export default function AgentLeadManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Bulk Upload Dialog */}
+      <BulkUploadDialogEnhanced
+        open={bulkUploadOpen}
+        onOpenChange={setBulkUploadOpen}
+        title="Bulk Import Leads"
+        description="Upload multiple leads at once using Excel or CSV file"
+        columns={leadBulkColumns}
+        onUpload={handleBulkUpload}
+        sampleData={[
+          { contactName: 'John Doe', companyName: 'ABC Corp', email: 'john@abc.com', phone: '+91 9876543210', serviceInterested: 'GST Registration', leadSource: 'Website', leadStage: 'hot_lead', city: 'Mumbai', state: 'Maharashtra', notes: 'Interested in premium plan' },
+          { contactName: 'Jane Smith', companyName: 'XYZ Ltd', email: 'jane@xyz.com', phone: '+91 8765432109', serviceInterested: 'Company Incorporation', leadSource: 'Referral', leadStage: 'warm_lead', city: 'Delhi', state: 'Delhi', notes: 'Referred by existing client' },
+        ]}
+      />
     </div>
   );
 }

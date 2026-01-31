@@ -20,56 +20,53 @@ router.use(apiLimiter);
 /**
  * GET /api/v1/client/dashboard
  * Get client dashboard overview
+ * OPTIMIZED: Single query with subqueries instead of N+1 pattern
  */
 router.get('/dashboard', requireRole('client'), asyncHandler(async (req: Request, res: Response) => {
   const userId = req.userId;
 
-  // Get client info
-  const clientResult = await pool.query(
-    'SELECT * FROM clients WHERE user_id = $1',
+  // Combined query - get client info with all stats in one database call
+  const dashboardResult = await pool.query(
+    `WITH client_data AS (
+      SELECT id, business_name, email, phone, status
+      FROM clients
+      WHERE user_id = $1
+      LIMIT 1
+    )
+    SELECT
+      c.*,
+      (SELECT COUNT(*) FROM client_services cs WHERE cs.client_id = c.id AND cs.status = 'active') as active_services,
+      (SELECT COUNT(*) FROM client_documents cd WHERE cd.client_id = c.id AND cd.status = 'pending') as pending_documents,
+      (SELECT json_agg(inv ORDER BY inv.issue_date DESC)
+       FROM (SELECT * FROM invoices WHERE client_id = c.id ORDER BY issue_date DESC LIMIT 5) inv
+      ) as recent_invoices
+    FROM client_data c`,
     [userId]
   );
 
-  if (clientResult.rows.length === 0) {
+  if (dashboardResult.rows.length === 0) {
     throw new NotFoundError('Client profile');
   }
 
-  const client = clientResult.rows[0];
-
-  // Get active services count
-  const servicesResult = await pool.query(
-    'SELECT COUNT(*) as count FROM client_services WHERE client_id = $1 AND status = $2',
-    [client.id, 'active']
-  );
-
-  // Get pending documents count
-  const docsResult = await pool.query(
-    'SELECT COUNT(*) as count FROM client_documents WHERE client_id = $1 AND status = $2',
-    [client.id, 'pending']
-  );
-
-  // Get recent invoices
-  const invoicesResult = await pool.query(
-    `SELECT * FROM invoices WHERE client_id = $1 ORDER BY issue_date DESC LIMIT 5`,
-    [client.id]
-  );
+  const data = dashboardResult.rows[0];
+  const recentInvoices = data.recent_invoices || [];
 
   res.json({
     success: true,
     data: {
       client: {
-        id: client.id,
-        companyName: client.company_name,
-        email: client.email,
-        phone: client.phone,
-        status: client.status,
+        id: data.id,
+        companyName: data.business_name,
+        email: data.email,
+        phone: data.phone,
+        status: data.status,
       },
       stats: {
-        activeServices: parseInt(servicesResult.rows[0].count),
-        pendingDocuments: parseInt(docsResult.rows[0].count),
-        recentInvoices: invoicesResult.rows.length,
+        activeServices: parseInt(data.active_services) || 0,
+        pendingDocuments: parseInt(data.pending_documents) || 0,
+        recentInvoices: recentInvoices.length,
       },
-      recentInvoices: invoicesResult.rows,
+      recentInvoices: recentInvoices,
     },
   });
 }));

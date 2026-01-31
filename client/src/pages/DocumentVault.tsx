@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  FileText, 
-  Download, 
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  FileText,
+  Download,
   Search,
   Filter,
   Calendar,
@@ -27,7 +28,9 @@ import {
   FileSpreadsheet,
   FileImage,
   Lock,
-  Unlock
+  Unlock,
+  Copy,
+  X
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -57,6 +60,9 @@ const DocumentVault = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'type' | 'size'>('date');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const [previewDoc, setPreviewDoc] = useState<DocumentWithMetrics | null>(null);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [shareDoc, setShareDoc] = useState<DocumentWithMetrics | null>(null);
 
   // Fetch documents
   const { data: documents = [], isLoading } = useQuery<DocumentWithMetrics[]>({
@@ -97,6 +103,30 @@ const DocumentVault = () => {
       });
     },
   });
+
+  // Preview document handler
+  const handlePreview = (doc: DocumentWithMetrics) => {
+    setPreviewDoc(doc);
+  };
+
+  // Share document handler
+  const handleShare = (doc: DocumentWithMetrics) => {
+    setShareDoc(doc);
+    setShowShareDialog(true);
+  };
+
+  // Copy share link to clipboard
+  const copyShareLink = () => {
+    if (shareDoc) {
+      const shareUrl = `${window.location.origin}/document-vault/share/${shareDoc.id}`;
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        toast({
+          title: "Link Copied",
+          description: "Share link has been copied to clipboard.",
+        });
+      });
+    }
+  };
 
   const getFileIcon = (mimeType: string | null) => {
     if (!mimeType) return <File className="h-5 w-5" />;
@@ -408,7 +438,7 @@ const DocumentVault = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {/* Preview logic */}}
+                            onClick={() => handlePreview(doc)}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -423,7 +453,7 @@ const DocumentVault = () => {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {/* Share logic */}}
+                            onClick={() => handleShare(doc)}
                           >
                             <Share2 className="h-4 w-4" />
                           </Button>
@@ -476,7 +506,7 @@ const DocumentVault = () => {
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => {/* Preview logic */}}
+                              onClick={() => handlePreview(doc)}
                             >
                               <Eye className="h-3 w-3" />
                             </Button>
@@ -585,6 +615,162 @@ const DocumentVault = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Document Preview Modal */}
+      <Dialog open={!!previewDoc} onOpenChange={(open) => !open && setPreviewDoc(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {previewDoc && getFileIcon(previewDoc.mimeType)}
+              {previewDoc?.fileName}
+            </DialogTitle>
+            <DialogDescription>
+              {previewDoc?.documentType} • {previewDoc && formatFileSize(previewDoc.fileSize)}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {previewDoc && (
+              <div className="space-y-4">
+                <div className="border rounded-lg p-6 bg-gray-50 min-h-[400px] flex items-center justify-center">
+                  {previewDoc.mimeType?.includes('pdf') ? (
+                    <div className="text-center">
+                      <FileText className="h-16 w-16 text-red-500 mx-auto mb-4" />
+                      <p className="text-gray-600 mb-4">PDF Document Preview</p>
+                      <Button
+                        onClick={() => downloadDocumentMutation.mutate(previewDoc.id)}
+                        disabled={downloadDocumentMutation.isPending}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download to View
+                      </Button>
+                    </div>
+                  ) : previewDoc.mimeType?.startsWith('image/') ? (
+                    <div className="text-center">
+                      <FileImage className="h-16 w-16 text-blue-500 mx-auto mb-4" />
+                      <p className="text-gray-600 mb-4">Image Preview</p>
+                      <Button
+                        onClick={() => downloadDocumentMutation.mutate(previewDoc.id)}
+                        disabled={downloadDocumentMutation.isPending}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download to View
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="text-center">
+                      <File className="h-16 w-16 text-gray-500 mx-auto mb-4" />
+                      <p className="text-gray-600 mb-4">Document Preview</p>
+                      <Button
+                        onClick={() => downloadDocumentMutation.mutate(previewDoc.id)}
+                        disabled={downloadDocumentMutation.isPending}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download to View
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-500">Document Type</p>
+                    <p className="font-medium">{previewDoc.documentType}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Uploaded</p>
+                    <p className="font-medium">{new Date(previewDoc.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">File Size</p>
+                    <p className="font-medium">{formatFileSize(previewDoc.fileSize)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Downloads</p>
+                    <p className="font-medium">{previewDoc.downloadCount || 0}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewDoc(null)}>
+              Close
+            </Button>
+            <Button
+              onClick={() => previewDoc && downloadDocumentMutation.mutate(previewDoc.id)}
+              disabled={downloadDocumentMutation.isPending}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share Document Dialog */}
+      <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Share Document</DialogTitle>
+            <DialogDescription>
+              Share "{shareDoc?.fileName}" with others
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Share Link</label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  readOnly
+                  value={shareDoc ? `${window.location.origin}/document-vault/share/${shareDoc.id}` : ''}
+                  className="flex-1"
+                />
+                <Button onClick={copyShareLink}>
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Anyone with this link can view the document
+              </p>
+            </div>
+
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Quick Share</p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (shareDoc) {
+                      const url = encodeURIComponent(`${window.location.origin}/document-vault/share/${shareDoc.id}`);
+                      window.open(`mailto:?subject=Document: ${shareDoc.fileName}&body=View document: ${url}`, '_blank');
+                    }
+                  }}
+                >
+                  Email
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (shareDoc) {
+                      const url = encodeURIComponent(`${window.location.origin}/document-vault/share/${shareDoc.id}`);
+                      window.open(`https://wa.me/?text=Document: ${shareDoc.fileName} ${url}`, '_blank');
+                    }
+                  }}
+                >
+                  WhatsApp
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowShareDialog(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
