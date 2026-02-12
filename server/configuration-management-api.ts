@@ -25,6 +25,9 @@ import {
 } from '@shared/schema';
 import { eq, and, or, like, desc, asc, sql, count, isNull } from 'drizzle-orm';
 import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES } from './rbac-middleware';
+import bcrypt from 'bcrypt';
+import { syncComplianceTracking } from './compliance-tracking-sync';
+import { generateTempPassword } from './security-utils';
 
 const router = Router();
 
@@ -366,7 +369,7 @@ router.get('/clients', sessionAuthMiddleware, async (req: Request, res: Response
       const searchTerm = `%${search}%`;
       conditions.push(
         or(
-          like(businessEntities.businessName, searchTerm),
+          like(businessEntities.name, searchTerm),
           like(businessEntities.clientId, searchTerm),
           like(businessEntities.contactEmail, searchTerm),
           like(businessEntities.contactPhone, searchTerm)
@@ -505,6 +508,7 @@ router.get('/clients/:id', sessionAuthMiddleware, async (req: Request, res: Resp
 router.post('/clients', sessionAuthMiddleware, async (req: Request, res: Response) => {
   try {
     const data = req.body;
+    const requesterId = (req as any).user?.id;
 
     // Generate client ID
     const lastClient = await db.select({ clientId: businessEntities.clientId })
@@ -535,10 +539,49 @@ router.post('/clients', sessionAuthMiddleware, async (req: Request, res: Respons
       });
     }
 
+    let ownerId = data.ownerId as number | undefined;
+    if (!ownerId && data.contactEmail) {
+      const [existingUser] = await db.select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, data.contactEmail))
+        .limit(1);
+
+      if (existingUser) {
+        ownerId = existingUser.id;
+      } else {
+        const tempPassword = generateTempPassword();
+        const hashedPassword = await bcrypt.hash(tempPassword, 12);
+        const usernameBase = data.contactEmail.split('@')[0];
+        const username = `${usernameBase}_${Date.now().toString(36)}`;
+
+        const [newUser] = await db.insert(users)
+          .values({
+            username,
+            email: data.contactEmail,
+            phone: data.contactPhone || null,
+            fullName: data.contactName || data.businessName || 'Client',
+            password: hashedPassword,
+            role: 'client',
+            isActive: true,
+          })
+          .returning();
+        ownerId = newUser.id;
+      }
+    }
+
+    if (!ownerId && requesterId) {
+      ownerId = requesterId;
+    }
+
+    if (!ownerId) {
+      return res.status(400).json({ error: 'Unable to determine client owner. Provide contactEmail or ownerId.' });
+    }
+
     const [newClient] = await db.insert(businessEntities)
       .values({
+        ownerId,
         clientId: newClientId,
-        businessName: data.businessName,
+        name: data.businessName || data.name,
         contactEmail: data.contactEmail,
         contactPhone: data.contactPhone,
         entityType: data.entityType || 'pvt_ltd',
@@ -550,11 +593,22 @@ router.post('/clients', sessionAuthMiddleware, async (req: Request, res: Respons
         cin: data.cin,
         leadSource: data.leadSource,
         referredBy: data.referredBy,
-        status: data.status || 'active',
+        clientStatus: data.status || 'active',
         onboardingStage: data.onboardingStage || 'basic_info',
-        metadata: data.metadata || {}
+        metadata: data.metadata || {},
+        annualTurnover: data.annualTurnover ?? null,
+        employeeCount: data.employeeCount ?? null,
+        registrationDate: data.registrationDate ? new Date(data.registrationDate) : null,
+        industryType: data.industryType || data.industry || null,
+        isActive: data.status ? data.status === 'active' : true,
       })
       .returning();
+
+    await db.update(users)
+      .set({ businessEntityId: newClient.id })
+      .where(eq(users.id, ownerId));
+
+    await syncComplianceTracking({ entityIds: [newClient.id] });
 
     res.status(201).json({
       success: true,
@@ -579,7 +633,7 @@ router.put('/clients/:id', sessionAuthMiddleware, async (req: Request, res: Resp
 
     const [updated] = await db.update(businessEntities)
       .set({
-        businessName: data.businessName,
+        name: data.businessName || data.name,
         contactEmail: data.contactEmail,
         contactPhone: data.contactPhone,
         entityType: data.entityType,
@@ -589,9 +643,14 @@ router.put('/clients/:id', sessionAuthMiddleware, async (req: Request, res: Resp
         pan: data.pan,
         gstin: data.gstin,
         cin: data.cin,
-        status: data.status,
+        clientStatus: data.status || data.clientStatus,
         onboardingStage: data.onboardingStage,
         metadata: data.metadata,
+        annualTurnover: data.annualTurnover ?? undefined,
+        employeeCount: data.employeeCount ?? undefined,
+        registrationDate: data.registrationDate ? new Date(data.registrationDate) : undefined,
+        industryType: data.industryType || data.industry || undefined,
+        isActive: typeof data.status === 'string' ? data.status === 'active' : undefined,
         updatedAt: new Date()
       })
       .where(eq(businessEntities.id, clientId))

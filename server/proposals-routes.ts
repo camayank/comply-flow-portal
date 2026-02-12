@@ -8,6 +8,7 @@ import {
   USER_ROLES,
   AuthenticatedRequest
 } from './rbac-middleware';
+import { generateTempPassword } from './security-utils';
 
 const router = express.Router();
 
@@ -259,8 +260,8 @@ router.post('/proposals/:id/convert', requireMinimumRole(USER_ROLES.OPS_EXECUTIV
     const clientNumber = existingEntities.length + 1;
     const clientId = `C${clientNumber.toString().padStart(4, '0')}`;
 
-    // Generate temporary password
-    const tempPassword = `DigiComply${Math.random().toString(36).slice(-8)}`;
+    // Generate cryptographically secure temporary password
+    const tempPassword = generateTempPassword();
 
     // Use proposal data, falling back to lead data
     const clientEmail = proposal.email || lead?.email || `${clientId.toLowerCase()}@pending.digicomply.in`;

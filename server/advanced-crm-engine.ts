@@ -28,8 +28,11 @@ import {
   insertLeadSchema
 } from '@shared/schema';
 import { eq, and, or, gte, lte, like, desc, asc, sql, count, isNull, isNotNull } from 'drizzle-orm';
+import { generateTempPassword } from './security-utils';
 import { sessionAuthMiddleware } from './rbac-middleware';
 import { parse } from 'csv-parse/sync';
+import bcrypt from 'bcrypt';
+import { syncComplianceTracking } from './compliance-tracking-sync';
 
 const router = Router();
 
@@ -1020,6 +1023,41 @@ router.post('/leads/:id/mark-converted-external', sessionAuthMiddleware, async (
 
     // Optionally create client record
     if (clientDetails && clientDetails.createClient) {
+      let ownerId = clientDetails.ownerId as number | undefined;
+
+      if (!ownerId && existingLead.contactEmail) {
+        const [existingUser] = await db.select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, existingLead.contactEmail))
+          .limit(1);
+
+        if (existingUser) {
+          ownerId = existingUser.id;
+        } else {
+          const tempPassword = generateTempPassword();
+          const hashedPassword = await bcrypt.hash(tempPassword, 12);
+          const usernameBase = existingLead.contactEmail.split('@')[0];
+          const username = `${usernameBase}_${Date.now().toString(36)}`;
+
+          const [newUser] = await db.insert(users)
+            .values({
+              username,
+              email: existingLead.contactEmail,
+              phone: existingLead.contactPhone || null,
+              fullName: existingLead.clientName || 'Client',
+              password: hashedPassword,
+              role: 'client',
+              isActive: true,
+            })
+            .returning();
+          ownerId = newUser.id;
+        }
+      }
+
+      if (!ownerId) {
+        throw new Error('Unable to create client without ownerId or contactEmail');
+      }
+
       // Create business entity for converted lead
       const lastEntity = await db.select({ clientId: businessEntities.clientId })
         .from(businessEntities)
@@ -1031,23 +1069,31 @@ router.post('/leads/:id/mark-converted-external', sessionAuthMiddleware, async (
         : 0;
       const newClientId = `C${String(lastClientNum + 1).padStart(4, '0')}`;
 
-      await db.insert(businessEntities)
+      const [newEntity] = await db.insert(businessEntities)
         .values({
+          ownerId,
           clientId: newClientId,
-          businessName: existingLead.clientName,
+          name: existingLead.clientName,
           contactEmail: existingLead.contactEmail,
           contactPhone: existingLead.contactPhone,
           entityType: existingLead.entityType || 'pvt_ltd',
           state: existingLead.state,
           leadSource: existingLead.leadSource,
-          status: 'active',
+          clientStatus: 'active',
           onboardingStage: 'completed',
           metadata: {
             convertedFromLead: existingLead.leadId,
             conversionDate: new Date().toISOString(),
             ...clientDetails
           }
-        });
+        })
+        .returning();
+
+      await db.update(users)
+        .set({ businessEntityId: newEntity.id })
+        .where(eq(users.id, ownerId));
+
+      await syncComplianceTracking({ entityIds: [newEntity.id] });
     }
 
     res.json({

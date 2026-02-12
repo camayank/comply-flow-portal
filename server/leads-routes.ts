@@ -14,6 +14,7 @@ import {
   AuthenticatedRequest
 } from './rbac-middleware';
 import { generateClientId, generateLeadId } from './services/id-generator';
+import { generateTempPassword } from './security-utils';
 
 const router = express.Router();
 
@@ -681,8 +682,8 @@ router.post('/leads/:id/convert', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE
     // 2. Generate unique client ID using centralized ID generator
     const clientId = await generateClientId();
 
-    // 3. Generate temporary password (should be changed on first login)
-    const tempPassword = `DigiComply${Math.random().toString(36).slice(-8)}`;
+    // 3. Generate cryptographically secure temporary password (should be changed on first login)
+    const tempPassword = generateTempPassword();
 
     // 4. Create user account
     const userData = {
@@ -749,7 +750,8 @@ router.post('/leads/:id/convert', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE
         progress: 0,
         currentMilestone: 'initiated',
         notes: `Auto-created from lead conversion`,
-        assignedTeamMember: null
+        assignedTeamMember: null,
+        assignedAgentId: lead.agentId ? Number(lead.agentId) : null
       });
     }
 

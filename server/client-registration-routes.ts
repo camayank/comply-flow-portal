@@ -4,6 +4,8 @@ import { users, businessEntities } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import { generateClientId } from './services/id-generator';
+import { syncComplianceTracking } from './compliance-tracking-sync';
+import { generateTempPassword } from './security-utils';
 
 export function registerClientRegistrationRoutes(app: Express) {
 
@@ -18,13 +20,18 @@ export function registerClientRegistrationRoutes(app: Express) {
         cin,
         industryType,
         registrationDate,
+        annualTurnover,
+        employeeCount,
         fullName,
         email,
         phone,
         alternatePhone,
+        contactEmail,
+        contactPhone,
         address,
         city,
         state,
+        pincode,
       } = req.body;
 
       // Validate required fields
@@ -43,15 +50,15 @@ export function registerClientRegistrationRoutes(app: Express) {
         return res.status(409).json({ error: 'Email already registered' });
       }
 
-      // Generate temporary password (will be sent via email)
-      const tempPassword = Math.random().toString(36).slice(-8);
-      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+      // Generate cryptographically secure temporary password (will be sent via email)
+      const tempPassword = generateTempPassword();
+      const hashedPassword = await bcrypt.hash(tempPassword, 12);
 
       // Create user account
       const [newUser] = await db
         .insert(users)
         .values({
-          username: email.split('@')[0] + Math.random().toString(36).slice(-4),
+          username: email.split('@')[0] + '_' + Date.now().toString(36),
           email,
           password: hashedPassword,
           phone,
@@ -71,32 +78,43 @@ export function registerClientRegistrationRoutes(app: Express) {
           ownerId: newUser.id,
           clientId,
           name: businessName,
+          contactEmail: contactEmail || email,
+          contactPhone: contactPhone || phone,
           entityType,
           pan: pan || null,
           gstin: gstin || null,
           cin: cin || null,
           industryType: industryType || null,
           registrationDate: registrationDate ? new Date(registrationDate) : null,
+          annualTurnover: annualTurnover ?? null,
+          employeeCount: employeeCount ?? null,
           alternatePhone: alternatePhone || null,
           address: address || null,
           city: city || null,
           state: state || null,
+          pincode: pincode || null,
           leadSource: 'self_registration',
           clientStatus: 'active',
           isActive: true,
         })
         .returning();
 
+      await db.update(users)
+        .set({ businessEntityId: newEntity.id })
+        .where(eq(users.id, newUser.id));
+
+      await syncComplianceTracking({ entityIds: [newEntity.id] });
+
       // TODO: Send welcome email with temporary password
       // Password is sent via email service (not logged for security)
 
+      // SECURITY: Never send passwords in API responses
+      // Password is sent via secure email channel only
       res.status(201).json({
         success: true,
         clientId,
         userId: newUser.id,
         message: 'Registration successful. Check your email for login credentials.',
-        // In production, remove tempPassword from response
-        tempPassword: process.env.NODE_ENV === 'development' ? tempPassword : undefined,
       });
     } catch (error: any) {
       console.error('Client registration error:', error);

@@ -5,6 +5,20 @@
 
 require('dotenv').config();
 
+// Validate required environment variables in production
+const validateEnv = () => {
+  const env = process.env.NODE_ENV || 'development';
+  if (env === 'production') {
+    const required = ['DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
+    const missing = required.filter(key => !process.env[key]);
+    if (missing.length > 0 && !process.env.DATABASE_URL) {
+      throw new Error(`Missing required database environment variables: ${missing.join(', ')}`);
+    }
+  }
+};
+
+validateEnv();
+
 const config = {
   // Development environment
   development: {
@@ -14,7 +28,8 @@ const config = {
       port: process.env.DB_PORT || 5432,
       database: process.env.DB_NAME || 'complyflow_dev',
       user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres'
+      // SECURITY: No default password - must be set in environment
+      password: process.env.DB_PASSWORD || ''
     },
     pool: {
       min: 2,
@@ -37,7 +52,8 @@ const config = {
       port: process.env.DB_PORT || 5432,
       database: process.env.DB_NAME_TEST || 'complyflow_test',
       user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres'
+      // SECURITY: No default password - must be set in environment
+      password: process.env.DB_PASSWORD || ''
     },
     pool: {
       min: 1,
