@@ -51,6 +51,19 @@ export async function sendWhatsApp(options: WhatsAppOptions): Promise<boolean> {
       }
     }
 
+    // Mock WhatsApp in development (check FIRST before provider check)
+    if (process.env.MOCK_WHATSAPP === 'true') {
+      notificationLogger.info('📱 [MOCK] WhatsApp message:', {
+        to: options.to,
+        message: messageContent.substring(0, 100) + (messageContent.length > 100 ? '...' : ''),
+        template: options.template,
+      });
+      console.log(`📱 [MOCK WhatsApp] To: ${options.to}`);
+      console.log(`   Message: ${messageContent}`);
+      await logWhatsApp(options.to, messageContent, 'sent');
+      return true;
+    }
+
     // Ensure phone number has whatsapp: prefix
     const toNumber = options.to.startsWith('whatsapp:') ? options.to : `whatsapp:${options.to}`;
 
@@ -71,7 +84,9 @@ export async function sendWhatsApp(options: WhatsAppOptions): Promise<boolean> {
       return true;
     }
 
-    throw new Error('No WhatsApp provider configured');
+    // No provider configured - log warning and return false instead of throwing
+    notificationLogger.warn('WhatsApp provider not configured. Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN, or enable MOCK_WHATSAPP=true for development.');
+    return false;
   } catch (error) {
     notificationLogger.error('WhatsApp send failed:', error);
 
