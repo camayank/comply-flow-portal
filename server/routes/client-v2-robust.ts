@@ -10,28 +10,25 @@
  * SECURITY: All routes require authentication and validate user ownership
  */
 
-import { Router, Request, Response, NextFunction } from 'express';
-import { pool } from '../db';
+import { Router, Request, Response } from 'express';
+import { db } from '../db';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
+import { and, desc, eq, inArray, or, count } from 'drizzle-orm';
+import {
+  activityLogs,
+  complianceRequiredDocuments,
+  complianceRules,
+  complianceTracking,
+  documentsUploads,
+  documentVault
+} from '@shared/schema';
 
 // Use NEW V2 service layer with proper database architecture
 import * as ClientService from '../services/v2/client-service';
 import * as ComplianceService from '../services/v2/compliance-service';
 import * as ServiceCatalogService from '../services/v2/service-catalog-service';
-
-// Legacy services for document management (will migrate later)
-import {
-  calculateComplianceState,
-  getNextPrioritizedAction,
-  getRecentActivities,
-  logActivity,
-} from '../services/compliance-engine';
-import {
-  storeDocument,
-  getClientDocuments,
-} from '../services/document-service';
 
 import {
   sessionAuthMiddleware,
@@ -39,6 +36,7 @@ import {
   USER_ROLES,
   type AuthenticatedRequest
 } from '../rbac-middleware';
+import { ensureRequiredDocumentsForRuleIds } from '../compliance-evidence';
 
 const router = Router();
 
@@ -79,6 +77,14 @@ const upload = multer({
     cb(new Error('Only documents, spreadsheets, and images are allowed'));
   },
 });
+
+const parseTrackingId = (rawId: string) => {
+  if (!rawId) return null;
+  const match = rawId.match(/(\d+)/);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 /**
  * GET /api/v2/client/status
@@ -192,7 +198,7 @@ router.get('/status', async (req: Request, res: Response) => {
  * Secureframe-style document handling with integrity checks
  * SECURITY: Uses authenticated user ID only - validates ownership of action
  */
-router.post('/actions/complete', upload.array('documents', 10), async (req: Request, res: Response) => {
+router.post('/actions/complete', upload.array('files', 10), async (req: Request, res: Response) => {
   try {
     // SECURITY: Get userId ONLY from authenticated session
     const userId = getAuthenticatedUserId(req);
@@ -206,70 +212,92 @@ router.post('/actions/complete', upload.array('documents', 10), async (req: Requ
     }
 
     const files = req.files as Express.Multer.File[];
+    const trackingId = parseTrackingId(String(actionId));
+    if (!trackingId) {
+      return res.status(400).json({ error: 'Invalid action ID' });
+    }
 
-    // Get client for authenticated user
-    const clientResult = await pool.query(
-      'SELECT id FROM clients WHERE user_id = $1',
-      [userId]
-    );
-
-    if (clientResult.rows.length === 0) {
+    const client = await ClientService.getClientByUserId(userId);
+    if (!client) {
       return res.status(404).json({ error: 'Client profile not found' });
     }
 
-    const clientId = clientResult.rows[0].id;
+    const [trackingItem] = await db
+      .select({
+        id: complianceTracking.id,
+        businessEntityId: complianceTracking.businessEntityId,
+        complianceRuleId: complianceTracking.complianceRuleId,
+        serviceType: complianceTracking.serviceType,
+        serviceId: complianceTracking.serviceId,
+        ruleCode: complianceRules.ruleCode,
+        formNumber: complianceRules.formNumber,
+        complianceName: complianceRules.complianceName,
+      })
+      .from(complianceTracking)
+      .leftJoin(complianceRules, eq(complianceTracking.complianceRuleId, complianceRules.id))
+      .where(
+        and(
+          eq(complianceTracking.id, trackingId),
+          eq(complianceTracking.businessEntityId, client.id)
+        )
+      )
+      .limit(1);
 
-    // Get action details - verify it belongs to this client
-    const actionResult = await pool.query(
-      'SELECT * FROM compliance_actions WHERE id = $1 AND client_id = $2',
-      [actionId, clientId]
-    );
-
-    if (actionResult.rows.length === 0) {
+    if (!trackingItem) {
       return res.status(404).json({ error: 'Action not found or access denied' });
     }
 
-    const action = actionResult.rows[0];
-
     // Store documents if files uploaded
     if (files && files.length > 0) {
-      for (const file of files) {
-        await storeDocument({
-          clientId,
-          actionId: action.id,
-          documentType: action.document_type,
-          fileName: file.originalname,
-          filePath: file.path,
-          fileSizeBytes: file.size,
+      const docType = String(
+        trackingItem.formNumber ||
+        trackingItem.ruleCode ||
+        trackingItem.serviceType ||
+        trackingItem.serviceId ||
+        'compliance_document'
+      );
+
+      await db.insert(documentsUploads).values(
+        files.map(file => ({
+          entityId: client.id,
+          doctype: docType,
+          filename: file.originalname,
+          path: file.path,
+          sizeBytes: file.size,
           mimeType: file.mimetype,
-          uploadedBy: userId,
-        });
-      }
+          uploader: 'client',
+          status: 'pending_review',
+        }))
+      );
     }
 
-    // Update action status
-    await pool.query(
-      `UPDATE compliance_actions
-       SET status = 'completed', completed_at = CURRENT_TIMESTAMP, completed_by = $1
-       WHERE id = $2`,
-      [userId, actionId]
-    );
+    await db
+      .update(complianceTracking)
+      .set({
+        status: 'in_progress',
+        updatedAt: new Date(),
+      })
+      .where(eq(complianceTracking.id, trackingId));
 
-    // Log activity (Stripe-style audit trail)
-    await logActivity(
-      clientId,
-      'action_completed',
-      `Completed: ${action.title}`,
-      userId,
-      { actionId, actionTitle: action.title }
-    );
-
-    // Recalculate compliance state
-    await calculateComplianceState(clientId);
+    const parsedUserId = Number(userId);
+    await db.insert(activityLogs).values({
+      userId: Number.isFinite(parsedUserId) ? parsedUserId : null,
+      businessEntityId: client.id,
+      action: files && files.length > 0 ? 'document_upload' : 'action_submitted',
+      entityType: 'compliance_tracking',
+      entityId: trackingId,
+      details: `Client submitted ${trackingItem.complianceName || trackingItem.serviceType || 'compliance action'} for review`,
+      metadata: {
+        complianceRuleId: trackingItem.complianceRuleId,
+        filesUploaded: files?.length || 0,
+      },
+      createdAt: new Date(),
+    });
 
     return res.json({
       success: true,
-      message: 'Action completed successfully',
+      status: 'in_progress',
+      message: 'Submission received and sent for review.',
       filesUploaded: files?.length || 0,
     });
   } catch (error) {
@@ -298,22 +326,37 @@ router.get('/actions/history', async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 50;
 
     // Get client for authenticated user
-    const clientResult = await pool.query(
-      'SELECT id FROM clients WHERE user_id = $1',
-      [userId]
-    );
-
-    if (clientResult.rows.length === 0) {
+    const client = await ClientService.getClientByUserId(userId);
+    if (!client) {
       return res.json({ activities: [], count: 0 });
     }
 
-    const clientId = clientResult.rows[0].id;
-
-    // Get activities using service
-    const activities = await getRecentActivities(clientId, limit);
+    const activities = await db
+      .select({
+        id: activityLogs.id,
+        action: activityLogs.action,
+        details: activityLogs.details,
+        createdAt: activityLogs.createdAt,
+        metadata: activityLogs.metadata,
+      })
+      .from(activityLogs)
+      .where(
+        and(
+          eq(activityLogs.businessEntityId, client.id),
+          eq(activityLogs.entityType, 'compliance_tracking')
+        )
+      )
+      .orderBy(desc(activityLogs.createdAt))
+      .limit(limit);
 
     return res.json({
-      activities,
+      activities: activities.map(item => ({
+        id: item.id,
+        type: item.action,
+        description: item.details || item.action,
+        timestamp: item.createdAt?.toISOString(),
+        metadata: item.metadata,
+      })),
       count: activities.length,
     });
   } catch (error) {
@@ -338,48 +381,106 @@ router.get('/actions/pending', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const clientResult = await pool.query(
-      'SELECT id FROM clients WHERE user_id = $1',
-      [userId]
-    );
-
-    if (clientResult.rows.length === 0) {
+    const client = await ClientService.getClientByUserId(userId);
+    if (!client) {
       return res.json({ actions: [], count: 0 });
     }
 
-    const clientId = clientResult.rows[0].id;
+    const actions = await db
+      .select({
+        id: complianceTracking.id,
+        dueDate: complianceTracking.dueDate,
+        status: complianceTracking.status,
+        priority: complianceTracking.priority,
+        estimatedPenalty: complianceTracking.estimatedPenalty,
+        complianceType: complianceTracking.complianceType,
+        serviceType: complianceTracking.serviceType,
+        complianceRuleId: complianceTracking.complianceRuleId,
+        ruleCode: complianceRules.ruleCode,
+        complianceName: complianceRules.complianceName,
+        description: complianceRules.description,
+        formNumber: complianceRules.formNumber,
+      })
+      .from(complianceTracking)
+      .leftJoin(complianceRules, eq(complianceTracking.complianceRuleId, complianceRules.id))
+      .where(
+        and(
+          eq(complianceTracking.businessEntityId, client.id),
+          or(
+            eq(complianceTracking.status, 'pending'),
+            eq(complianceTracking.status, 'overdue'),
+            eq(complianceTracking.status, 'in_progress')
+          )
+        )
+      )
+      .orderBy(desc(complianceTracking.dueDate));
 
-    const actionsResult = await pool.query(
-      `SELECT 
-        id, title, action_type, document_type, due_date, priority,
-        penalty_amount, estimated_time_minutes, benefits, instructions
-      FROM compliance_actions
-      WHERE client_id = $1 AND status != 'completed'
-      ORDER BY 
-        CASE priority 
-          WHEN 'critical' THEN 1
-          WHEN 'high' THEN 2
-          WHEN 'medium' THEN 3
-          WHEN 'low' THEN 4
-        END,
-        due_date ASC`,
-      [clientId]
+    const priorityOrder: Record<string, number> = {
+      critical: 0,
+      high: 1,
+      medium: 2,
+      low: 3,
+    };
+
+    actions.sort((a, b) => {
+      const pa = priorityOrder[(a.priority || 'medium').toLowerCase()] ?? 2;
+      const pb = priorityOrder[(b.priority || 'medium').toLowerCase()] ?? 2;
+      if (pa !== pb) return pa - pb;
+      const ad = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+      const bd = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+      return ad - bd;
+    });
+
+    const ruleIds = actions
+      .map(action => action.complianceRuleId)
+      .filter((id): id is number => typeof id === 'number');
+
+    if (ruleIds.length > 0) {
+      await ensureRequiredDocumentsForRuleIds(ruleIds);
+    }
+
+    const docCounts = ruleIds.length > 0
+      ? await db
+          .select({
+            complianceRuleId: complianceRequiredDocuments.complianceRuleId,
+            count: count(),
+          })
+          .from(complianceRequiredDocuments)
+          .where(inArray(complianceRequiredDocuments.complianceRuleId, ruleIds))
+          .groupBy(complianceRequiredDocuments.complianceRuleId)
+      : [];
+
+    const docCountMap = new Map<number, number>(
+      docCounts.map(row => [row.complianceRuleId, Number(row.count || 0)])
     );
 
+    const estimateMinutes = (priority?: string | null) => {
+      const normalized = (priority || '').toLowerCase();
+      if (normalized === 'critical' || normalized === 'high') return 45;
+      if (normalized === 'low') return 15;
+      return 25;
+    };
+
     return res.json({
-      actions: actionsResult.rows.map(action => ({
-        id: action.id,
-        title: action.title,
-        actionType: action.action_type,
-        documentType: action.document_type,
-        dueDate: action.due_date,
-        priority: action.priority,
-        penaltyAmount: action.penalty_amount,
-        estimatedTimeMinutes: action.estimated_time_minutes,
-        benefits: action.benefits || [],
-        instructions: action.instructions || [],
-      })),
-      count: actionsResult.rows.length,
+      actions: actions.map(action => {
+        const requiresDocuments = action.complianceRuleId
+          ? (docCountMap.get(action.complianceRuleId) || 0) > 0
+          : false;
+
+        return {
+          id: action.id,
+          title: action.complianceName || action.serviceType || action.complianceType || 'Compliance Action',
+          actionType: requiresDocuments ? 'upload' : 'review',
+          documentType: action.formNumber || action.complianceType || undefined,
+          dueDate: action.dueDate,
+          priority: action.priority || 'medium',
+          penaltyAmount: action.estimatedPenalty || 0,
+          estimatedTimeMinutes: estimateMinutes(action.priority),
+          benefits: action.description ? [action.description] : [],
+          instructions: action.description ? [action.description] : [],
+        };
+      }),
+      count: actions.length,
     });
   } catch (error) {
     console.error('Error getting pending actions:', error);
@@ -403,33 +504,85 @@ router.get('/documents', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const clientResult = await pool.query(
-      'SELECT id FROM clients WHERE user_id = $1',
-      [userId]
-    );
-
-    if (clientResult.rows.length === 0) {
+    const client = await ClientService.getClientByUserId(userId);
+    if (!client) {
       return res.json({ documents: [], count: 0 });
     }
 
-    const clientId = clientResult.rows[0].id;
+    const vaultDocs = await db
+      .select({
+        id: documentVault.id,
+        documentType: documentVault.documentType,
+        fileName: documentVault.fileName,
+        fileSize: documentVault.fileSize,
+        mimeType: documentVault.mimeType,
+        approvalStatus: documentVault.approvalStatus,
+        approvedAt: documentVault.approvedAt,
+        approvedBy: documentVault.approvedBy,
+        rejectionReason: documentVault.rejectionReason,
+        expiryDate: documentVault.expiryDate,
+        uploadedBy: documentVault.userId,
+        uploadedAt: documentVault.createdAt,
+      })
+      .from(documentVault)
+      .where(eq(documentVault.businessEntityId, client.id));
 
-    const documents = await getClientDocuments(clientId);
+    const uploadDocs = await db
+      .select({
+        id: documentsUploads.id,
+        documentType: documentsUploads.doctype,
+        fileName: documentsUploads.filename,
+        fileSize: documentsUploads.sizeBytes,
+        mimeType: documentsUploads.mimeType,
+        status: documentsUploads.status,
+        reviewedAt: documentsUploads.reviewedAt,
+        reviewedBy: documentsUploads.reviewedBy,
+        rejectionReason: documentsUploads.rejectionReason,
+        uploadedBy: documentsUploads.uploader,
+        uploadedAt: documentsUploads.uploadedAt,
+      })
+      .from(documentsUploads)
+      .where(eq(documentsUploads.entityId, client.id));
+
+    const documents = [
+      ...vaultDocs.map(doc => ({
+        id: doc.id,
+        source: 'vault',
+        documentType: doc.documentType,
+        fileName: doc.fileName,
+        fileSize: doc.fileSize,
+        mimeType: doc.mimeType,
+        verificationStatus: doc.approvalStatus,
+        verifiedAt: doc.approvedAt,
+        verifiedBy: doc.approvedBy,
+        rejectionReason: doc.rejectionReason,
+        expiryDate: doc.expiryDate,
+        uploadedBy: doc.uploadedBy,
+        uploadedAt: doc.uploadedAt,
+      })),
+      ...uploadDocs.map(doc => ({
+        id: doc.id,
+        source: 'upload',
+        documentType: doc.documentType,
+        fileName: doc.fileName,
+        fileSize: doc.fileSize,
+        mimeType: doc.mimeType,
+        verificationStatus: doc.status,
+        verifiedAt: doc.reviewedAt,
+        verifiedBy: doc.reviewedBy,
+        rejectionReason: doc.rejectionReason,
+        expiryDate: null,
+        uploadedBy: doc.uploadedBy,
+        uploadedAt: doc.uploadedAt,
+      })),
+    ].sort((a, b) => {
+      const at = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
+      const bt = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
+      return bt - at;
+    });
 
     return res.json({
-      documents: documents.map(doc => ({
-        id: doc.id,
-        documentType: doc.document_type,
-        fileName: doc.file_name,
-        fileSize: doc.file_size_bytes,
-        mimeType: doc.mime_type,
-        verificationStatus: doc.verification_status,
-        verifiedAt: doc.verified_at,
-        verifiedBy: doc.verified_by,
-        expiryDate: doc.expiry_date,
-        uploadedBy: doc.uploaded_by,
-        uploadedAt: doc.created_at,
-      })),
+      documents,
       count: documents.length,
     });
   } catch (error) {
@@ -456,47 +609,62 @@ router.get('/deadlines', async (req: Request, res: Response) => {
 
     const daysAhead = parseInt(req.query.daysAhead as string) || 90;
 
-    const clientResult = await pool.query(
-      'SELECT id FROM clients WHERE user_id = $1',
-      [userId]
-    );
-
-    if (clientResult.rows.length === 0) {
+    const client = await ClientService.getClientByUserId(userId);
+    if (!client) {
       return res.json({ deadlines: [], count: 0 });
     }
 
-    const clientId = clientResult.rows[0].id;
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() + daysAhead);
 
-    const deadlinesResult = await pool.query(
-      `SELECT 
-        id, title, document_type, due_date, priority, penalty_amount
-      FROM compliance_actions
-      WHERE 
-        client_id = $1 
-        AND status != 'completed'
-        AND due_date <= CURRENT_DATE + INTERVAL '${daysAhead} days'
-      ORDER BY due_date ASC`,
-      [clientId]
-    );
+    const deadlines = await db
+      .select({
+        id: complianceTracking.id,
+        dueDate: complianceTracking.dueDate,
+        priority: complianceTracking.priority,
+        estimatedPenalty: complianceTracking.estimatedPenalty,
+        complianceType: complianceTracking.complianceType,
+        serviceType: complianceTracking.serviceType,
+        ruleCode: complianceRules.ruleCode,
+        complianceName: complianceRules.complianceName,
+        formNumber: complianceRules.formNumber,
+      })
+      .from(complianceTracking)
+      .leftJoin(complianceRules, eq(complianceTracking.complianceRuleId, complianceRules.id))
+      .where(
+        and(
+          eq(complianceTracking.businessEntityId, client.id),
+          or(
+            eq(complianceTracking.status, 'pending'),
+            eq(complianceTracking.status, 'overdue'),
+            eq(complianceTracking.status, 'in_progress')
+          )
+        )
+      );
 
-    return res.json({
-      deadlines: deadlinesResult.rows.map(deadline => {
-        const daysUntil = Math.ceil(
-          (new Date(deadline.due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-        );
-        
+    const filteredDeadlines = deadlines
+      .filter(item => item.dueDate && new Date(item.dueDate) <= cutoffDate)
+      .map(item => {
+        const dueDate = item.dueDate ? new Date(item.dueDate) : null;
+        const daysUntil = dueDate
+          ? Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+          : 0;
+
         return {
-          id: deadline.id,
-          title: deadline.title,
-          documentType: deadline.document_type,
-          dueDate: deadline.due_date,
+          id: item.id,
+          title: item.complianceName || item.serviceType || item.complianceType || 'Compliance',
+          documentType: item.formNumber || item.complianceType || undefined,
+          dueDate,
           daysUntil,
-          priority: deadline.priority,
-          penaltyAmount: deadline.penalty_amount,
+          priority: item.priority || 'medium',
+          penaltyAmount: item.estimatedPenalty || 0,
           riskLevel: daysUntil <= 7 ? 'high' : daysUntil <= 30 ? 'medium' : 'low',
         };
-      }),
-      count: deadlinesResult.rows.length,
+      });
+
+    return res.json({
+      deadlines: filteredDeadlines,
+      count: filteredDeadlines.length,
     });
   } catch (error) {
     console.error('Error getting deadlines:', error);

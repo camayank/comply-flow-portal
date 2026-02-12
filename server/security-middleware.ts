@@ -1,9 +1,12 @@
 import type { Express, Request, Response, NextFunction } from "express";
+import { db } from "./db";
+import { userSessions } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 
 export function registerSecurityMiddleware(app: Express) {
 
   // Security headers middleware
-  app.use((req: Request, res: Response, next: NextFunction) => {
+  app.use(async (req: Request, res: Response, next: NextFunction) => {
     // Prevent clickjacking
     res.setHeader('X-Frame-Options', 'DENY');
 
@@ -58,7 +61,7 @@ export function registerSecurityMiddleware(app: Express) {
 
   // CSRF protection for state-changing operations
   // Checks for custom header on all POST/PUT/PATCH/DELETE requests
-  app.use((req: Request, res: Response, next: NextFunction) => {
+  app.use(async (req: Request, res: Response, next: NextFunction) => {
     // Skip CSRF check for:
     // - GET/HEAD/OPTIONS requests (safe methods)
     // - Health check endpoints
@@ -73,7 +76,6 @@ export function registerSecurityMiddleware(app: Express) {
       req.path.includes('/webhook') ||
       // Auth endpoints that don't require session (read-only or initial auth)
       req.path === '/api/auth/staff/login' ||
-      req.path === '/api/auth/verify-session' || // Session verification is idempotent
       // SECURITY: verify-otp is state-changing, MUST require CSRF protection
       // Client registration - initial registration only
       req.path === '/api/client/register'
@@ -92,6 +94,48 @@ export function registerSecurityMiddleware(app: Express) {
           success: false,
           error: 'CSRF protection: Missing required security headers (X-Requested-With or X-CSRF-Token)'
         });
+      }
+
+      // If a session is present, validate CSRF token against session
+      const sessionToken = req.cookies?.sessionToken;
+      const csrfHeader = req.headers['x-csrf-token'];
+      if (sessionToken) {
+        const [session] = await db
+          .select()
+          .from(userSessions)
+          .where(
+            and(
+              eq(userSessions.sessionToken, sessionToken),
+              eq(userSessions.isActive, true)
+            )
+          )
+          .limit(1);
+
+        if (!session) {
+          return res.status(401).json({
+            success: false,
+            error: 'Invalid or expired session.',
+          });
+        }
+
+        if (session.expiresAt < new Date()) {
+          await db
+            .update(userSessions)
+            .set({ isActive: false })
+            .where(eq(userSessions.id, session.id));
+
+          return res.status(401).json({
+            success: false,
+            error: 'Session expired.',
+          });
+        }
+
+        if (!csrfHeader || csrfHeader !== session.csrfToken) {
+          return res.status(403).json({
+            success: false,
+            error: 'CSRF protection: Invalid or missing CSRF token'
+          });
+        }
       }
     }
 
