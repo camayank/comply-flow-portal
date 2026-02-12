@@ -38,7 +38,7 @@ import {
   Save, RefreshCw, Filter
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 // Column definition for the data grid
 export interface ColumnDefinition {
@@ -112,28 +112,39 @@ export function BulkUploadDialogEnhanced({
   const templateHeaders = columns.map(col => col.key);
 
   // Download Excel template
-  const downloadTemplate = () => {
-    const wb = XLSX.utils.book_new();
+  const downloadTemplate = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(entityName);
 
-    // Create header row with labels
-    const headerRow = columns.reduce((obj, col) => ({
-      ...obj,
-      [col.key]: col.required ? `${col.label} *` : col.label
-    }), {});
+    // Add header row with labels (required fields marked with *)
+    const headerLabels = columns.map(col => col.required ? `${col.label} *` : col.label);
+    worksheet.addRow(headerLabels);
+    worksheet.getRow(1).font = { bold: true };
 
     // Sample data rows
     const sampleRows = sampleData.length > 0
       ? sampleData
-      : [columns.reduce((obj, col) => ({ ...obj, [col.key]: '' }), {})];
+      : [columns.reduce((obj, col) => ({ ...obj, [col.key]: '' }), {} as Record<string, any>)];
 
-    const ws = XLSX.utils.json_to_sheet([headerRow, ...sampleRows], { skipHeader: true });
+    for (const row of sampleRows) {
+      const values = columns.map(col => row[col.key] ?? '');
+      worksheet.addRow(values);
+    }
 
     // Set column widths
-    const wscols = columns.map(col => ({ wch: col.width || 20 }));
-    ws['!cols'] = wscols;
+    worksheet.columns.forEach((column, i) => {
+      column.width = columns[i]?.width ? columns[i].width / 7 : 20;
+    });
 
-    XLSX.utils.book_append_sheet(wb, ws, entityName);
-    XLSX.writeFile(wb, `${entityName.toLowerCase().replace(/\s+/g, '_')}_bulk_upload_template.xlsx`);
+    // Generate and download file
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${entityName.toLowerCase().replace(/\s+/g, '_')}_bulk_upload_template.xlsx`;
+    link.click();
+    URL.revokeObjectURL(url);
 
     toast({
       title: "Template Downloaded",
@@ -200,24 +211,43 @@ export function BulkUploadDialogEnhanced({
 
   // Parse uploaded file
   const parseFile = async (file: File): Promise<Record<string, any>[]> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(arrayBuffer);
 
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-          resolve(jsonData);
-        } catch (error) {
-          reject(error);
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) {
+      throw new Error('No worksheet found in file');
+    }
+
+    const jsonData: Record<string, any>[] = [];
+    const headers: string[] = [];
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) {
+        // First row is headers - extract key names (remove * from required fields)
+        row.eachCell((cell, colNumber) => {
+          const header = String(cell.value ?? '').replace(/\s*\*$/, '').trim();
+          // Map label back to key
+          const col = columns.find(c => c.label === header || c.key === header);
+          headers[colNumber - 1] = col?.key || header;
+        });
+      } else {
+        // Data rows
+        const rowData: Record<string, any> = {};
+        row.eachCell((cell, colNumber) => {
+          const header = headers[colNumber - 1];
+          if (header) {
+            rowData[header] = cell.value;
+          }
+        });
+        if (Object.keys(rowData).length > 0) {
+          jsonData.push(rowData);
         }
-      };
-
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsArrayBuffer(file);
+      }
     });
+
+    return jsonData;
   };
 
   // Handle file selection

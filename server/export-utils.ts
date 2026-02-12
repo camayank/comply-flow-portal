@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { Request, Response } from 'express';
 
 export function convertToCSV(data: any[]): string {
@@ -24,11 +24,29 @@ export function convertToCSV(data: any[]): string {
   return csvRows.join('\n');
 }
 
-export function convertToExcel(data: any[], sheetName: string = 'Sheet1'): Buffer {
-  const worksheet = XLSX.utils.json_to_sheet(data);
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+export async function convertToExcel(data: any[], sheetName: string = 'Sheet1'): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet(sheetName);
+
+  if (data.length > 0) {
+    const headers = Object.keys(data[0]);
+    worksheet.addRow(headers);
+
+    // Style header row
+    worksheet.getRow(1).font = { bold: true };
+
+    for (const row of data) {
+      const values = headers.map(h => row[h] ?? '');
+      worksheet.addRow(values);
+    }
+
+    // Auto-fit columns
+    worksheet.columns.forEach(column => {
+      column.width = 15;
+    });
+  }
+
+  return Buffer.from(await workbook.xlsx.writeBuffer());
 }
 
 export function sendCSVResponse(res: Response, data: any[], filename: string) {
@@ -38,24 +56,36 @@ export function sendCSVResponse(res: Response, data: any[], filename: string) {
   res.send(csv);
 }
 
-export function sendExcelResponse(res: Response, data: any[], filename: string, sheetName?: string) {
-  const buffer = convertToExcel(data, sheetName);
+export async function sendExcelResponse(res: Response, data: any[], filename: string, sheetName?: string) {
+  const buffer = await convertToExcel(data, sheetName);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}-${new Date().toISOString().split('T')[0]}.xlsx"`);
   res.send(buffer);
 }
 
-export function sendMultiSheetExcel(res: Response, sheets: { name: string; data: any[] }[], filename: string) {
-  const workbook = XLSX.utils.book_new();
-  
+export async function sendMultiSheetExcel(res: Response, sheets: { name: string; data: any[] }[], filename: string) {
+  const workbook = new ExcelJS.Workbook();
+
   for (const sheet of sheets) {
     if (sheet.data && sheet.data.length > 0) {
-      const worksheet = XLSX.utils.json_to_sheet(sheet.data);
-      XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name.substring(0, 31));
+      const worksheet = workbook.addWorksheet(sheet.name.substring(0, 31));
+      const headers = Object.keys(sheet.data[0]);
+
+      worksheet.addRow(headers);
+      worksheet.getRow(1).font = { bold: true };
+
+      for (const row of sheet.data) {
+        const values = headers.map(h => row[h] ?? '');
+        worksheet.addRow(values);
+      }
+
+      worksheet.columns.forEach(column => {
+        column.width = 15;
+      });
     }
   }
 
-  const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}-${new Date().toISOString().split('T')[0]}.xlsx"`);
   res.send(buffer);

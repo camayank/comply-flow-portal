@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Upload, Download, CheckCircle, XCircle, AlertCircle, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 interface BulkUploadDialogProps {
   open: boolean;
@@ -36,22 +36,39 @@ export function BulkUploadDialog({
   const [result, setResult] = useState<{ success: number; failed: number; errors?: string[] } | null>(null);
   const { toast } = useToast();
 
-  const downloadTemplate = () => {
-    const wb = XLSX.utils.book_new();
-    
+  const downloadTemplate = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet(entityName);
+
+    // Add headers
+    worksheet.addRow(templateHeaders);
+    worksheet.getRow(1).font = { bold: true };
+
+    // Add sample data
     const sampleRows = sampleData.length > 0 ? sampleData : [
       templateHeaders.reduce((obj, header) => ({ ...obj, [header]: '' }), {})
     ];
-    
-    const ws = XLSX.utils.json_to_sheet(sampleRows);
-    
-    const wscols = templateHeaders.map(() => ({ wch: 20 }));
-    ws['!cols'] = wscols;
-    
-    XLSX.utils.book_append_sheet(wb, ws, entityName);
-    
-    XLSX.writeFile(wb, `${entityName}_bulk_upload_template.xlsx`);
-    
+
+    for (const row of sampleRows) {
+      const values = templateHeaders.map(h => row[h] ?? '');
+      worksheet.addRow(values);
+    }
+
+    // Set column widths
+    worksheet.columns.forEach(column => {
+      column.width = 20;
+    });
+
+    // Generate and download file
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${entityName}_bulk_upload_template.xlsx`;
+    link.click();
+    URL.revokeObjectURL(url);
+
     toast({
       title: "Template Downloaded",
       description: `${entityName} template has been downloaded successfully`,
@@ -75,27 +92,41 @@ export function BulkUploadDialog({
     }
   };
 
-  const parseFile = (file: File): Promise<any[]> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
-          
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-          
-          resolve(jsonData);
-        } catch (error) {
-          reject(error);
+  const parseFile = async (file: File): Promise<any[]> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(arrayBuffer);
+
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet) {
+      throw new Error('No worksheet found in file');
+    }
+
+    const jsonData: any[] = [];
+    const headers: string[] = [];
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) {
+        // First row is headers
+        row.eachCell((cell, colNumber) => {
+          headers[colNumber - 1] = String(cell.value ?? '');
+        });
+      } else {
+        // Data rows
+        const rowData: Record<string, any> = {};
+        row.eachCell((cell, colNumber) => {
+          const header = headers[colNumber - 1];
+          if (header) {
+            rowData[header] = cell.value;
+          }
+        });
+        if (Object.keys(rowData).length > 0) {
+          jsonData.push(rowData);
         }
-      };
-      
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsArrayBuffer(file);
+      }
     });
+
+    return jsonData;
   };
 
   const validateData = (data: any[]): { valid: any[]; errors: string[] } => {
