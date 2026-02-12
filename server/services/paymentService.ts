@@ -36,11 +36,7 @@ export interface VerifyPaymentOptions {
  */
 export async function createPaymentOrder(options: CreateOrderOptions): Promise<any> {
   try {
-    if (!razorpay) {
-      throw new Error('Razorpay not configured');
-    }
-
-    // Mock payment in development if configured
+    // Mock payment in development if configured (check FIRST before razorpay null check)
     if (process.env.MOCK_PAYMENT === 'true') {
       const mockOrder = {
         id: `order_mock_${Date.now()}`,
@@ -52,6 +48,10 @@ export async function createPaymentOrder(options: CreateOrderOptions): Promise<a
 
       paymentLogger.info('Mock payment order created:', mockOrder);
       return mockOrder;
+    }
+
+    if (!razorpay) {
+      throw new Error('Razorpay not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, or enable MOCK_PAYMENT=true for development.');
     }
 
     // Create order in Razorpay
@@ -116,8 +116,21 @@ export function verifyPaymentSignature(options: VerifyPaymentOptions): boolean {
  */
 export async function capturePayment(paymentId: string, amount: number): Promise<any> {
   try {
+    // Mock capture in development
+    if (process.env.MOCK_PAYMENT === 'true') {
+      const mockCapture = {
+        id: paymentId,
+        amount: amount * 100,
+        currency: 'INR',
+        status: 'captured',
+        captured: true,
+      };
+      paymentLogger.info('Mock payment captured:', mockCapture);
+      return mockCapture;
+    }
+
     if (!razorpay) {
-      throw new Error('Razorpay not configured');
+      throw new Error('Razorpay not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, or enable MOCK_PAYMENT=true for development.');
     }
 
     const payment = await razorpay.payments.capture(paymentId, amount * 100, 'INR');
@@ -140,8 +153,21 @@ export async function capturePayment(paymentId: string, amount: number): Promise
  */
 export async function createRefund(paymentId: string, amount?: number): Promise<any> {
   try {
+    // Mock refund in development
+    if (process.env.MOCK_PAYMENT === 'true') {
+      const mockRefund = {
+        id: `rfnd_mock_${Date.now()}`,
+        payment_id: paymentId,
+        amount: amount ? amount * 100 : 0,
+        currency: 'INR',
+        status: 'processed',
+      };
+      paymentLogger.info('Mock refund created:', mockRefund);
+      return mockRefund;
+    }
+
     if (!razorpay) {
-      throw new Error('Razorpay not configured');
+      throw new Error('Razorpay not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, or enable MOCK_PAYMENT=true for development.');
     }
 
     const refundOptions: any = { payment_id: paymentId };
@@ -192,8 +218,23 @@ export function verifyWebhookSignature(payload: string, signature: string): bool
  */
 export async function getPaymentDetails(paymentId: string): Promise<any> {
   try {
+    // Mock payment details in development
+    if (process.env.MOCK_PAYMENT === 'true') {
+      const mockPayment = {
+        id: paymentId,
+        amount: 10000, // Mock amount in paise
+        currency: 'INR',
+        status: 'captured',
+        method: 'mock',
+        captured: true,
+        created_at: Date.now(),
+      };
+      paymentLogger.info('Mock payment details fetched:', mockPayment);
+      return mockPayment;
+    }
+
     if (!razorpay) {
-      throw new Error('Razorpay not configured');
+      throw new Error('Razorpay not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, or enable MOCK_PAYMENT=true for development.');
     }
 
     const payment = await razorpay.payments.fetch(paymentId);
