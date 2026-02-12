@@ -337,8 +337,15 @@ export class DbServiceRequestsStorage {
   async createServiceRequest(request: InsertServiceRequest): Promise<ServiceRequest> {
     // Generate readable request ID using centralized ID generator
     const requestId = await generateServiceRequestId();
-    const [newRequest] = await db.insert(serviceRequests).values({
+    const alignedRequest: InsertServiceRequest = {
       ...request,
+      businessEntityId: request.businessEntityId ?? request.entityId,
+      entityId: request.entityId ?? request.businessEntityId,
+      serviceId: request.serviceId ?? request.serviceType,
+      serviceType: request.serviceType ?? request.serviceId
+    };
+    const [newRequest] = await db.insert(serviceRequests).values({
+      ...alignedRequest,
       requestId
     } as any).returning();
     return newRequest;

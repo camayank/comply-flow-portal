@@ -56,13 +56,14 @@ export default function ClientRegistration() {
   });
 
   const registrationMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/client/register', 'POST', data),
+    mutationFn: (data: any) => apiRequest('POST', '/api/client/register', data),
     onSuccess: (data) => {
       toast({
         title: "Registration Successful!",
         description: "Your account has been created. Please check your email for verification.",
       });
-      setLocation(`/client/onboarding-complete?id=${data.clientId}`);
+      const email = encodeURIComponent(formData.email);
+      setLocation(`/login?registered=1&email=${email}`);
     },
     onError: (error: any) => {
       toast({

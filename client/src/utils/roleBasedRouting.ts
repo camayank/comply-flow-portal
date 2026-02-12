@@ -135,7 +135,7 @@ export function getRoleDashboardRoute(role: string): string {
       return '/agent';
 
     case USER_ROLES.CLIENT:
-      return '/client-portal';
+      return '/portal-v2';
 
     default:
       // Default fallback based on role level

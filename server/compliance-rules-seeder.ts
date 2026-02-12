@@ -121,7 +121,161 @@ export async function seedComplianceRules(storage: IStorage) {
       metadata: { warning: 'Company cannot commence business until filed' }
     },
 
+    {
+      ruleCode: 'ROC_MSME1_HALF_YEARLY',
+      regulationCategory: 'companies_act',
+      complianceName: 'MSME-1: Half-Yearly Return (MSME Payments)',
+      formNumber: 'MSME-1',
+      description: 'Half-yearly return for outstanding payments to MSME vendors',
+      periodicity: 'half_yearly',
+      dueDateCalculationType: 'fixed_date',
+      dueDateFormula: { type: 'fixed', day: 30, month: 4 }, // 30 Apr / 31 Oct (see metadata)
+      applicableEntityTypes: ['pvt_ltd', 'public_limited', 'llp'],
+      priorityLevel: 'medium',
+      penaltyRiskLevel: 'medium',
+      metadata: { periods: ['Apr-Sep', 'Oct-Mar'], second_cycle: { day: 31, month: 10 } }
+    },
+
+    {
+      ruleCode: 'ROC_PAS6_HALF_YEARLY',
+      regulationCategory: 'companies_act',
+      complianceName: 'PAS-6: Reconciliation of Share Capital Audit',
+      formNumber: 'PAS-6',
+      description: 'Half-yearly reconciliation for unlisted public companies',
+      periodicity: 'half_yearly',
+      dueDateCalculationType: 'fixed_date',
+      dueDateFormula: { type: 'fixed', day: 30, month: 5 }, // 30 May / 29 Nov
+      applicableEntityTypes: ['public_limited'],
+      priorityLevel: 'medium',
+      penaltyRiskLevel: 'medium',
+      metadata: { note: 'Due within 60 days of half-year end' }
+    },
+
+    {
+      ruleCode: 'ROC_BEN2_EVENT',
+      regulationCategory: 'companies_act',
+      complianceName: 'BEN-2: Significant Beneficial Owner Return',
+      formNumber: 'BEN-2',
+      description: 'Filing for significant beneficial ownership disclosures',
+      periodicity: 'event_based',
+      dueDateCalculationType: 'event_triggered',
+      dueDateFormula: { type: 'event', days_after_event: 30, trigger_event: 'ben1_received' },
+      applicableEntityTypes: ['pvt_ltd', 'public_limited'],
+      priorityLevel: 'high',
+      penaltyRiskLevel: 'high'
+    },
+
+    {
+      ruleCode: 'LLP_FORM11_ANNUAL',
+      regulationCategory: 'companies_act',
+      complianceName: 'LLP Form 11: Annual Return',
+      formNumber: 'Form 11',
+      description: 'Annual return for LLPs with partner and contribution details',
+      periodicity: 'annual',
+      dueDateCalculationType: 'fixed_date',
+      dueDateFormula: { type: 'fixed', day: 30, month: 5 },
+      applicableEntityTypes: ['llp'],
+      priorityLevel: 'high',
+      penaltyRiskLevel: 'high'
+    },
+
+    {
+      ruleCode: 'LLP_FORM8_ANNUAL',
+      regulationCategory: 'companies_act',
+      complianceName: 'LLP Form 8: Statement of Account & Solvency',
+      formNumber: 'Form 8',
+      description: 'Statement of Account and Solvency for LLPs',
+      periodicity: 'annual',
+      dueDateCalculationType: 'fixed_date',
+      dueDateFormula: { type: 'fixed', day: 30, month: 10 },
+      applicableEntityTypes: ['llp'],
+      priorityLevel: 'high',
+      penaltyRiskLevel: 'high'
+    },
+
+    // ==================== BUSINESS REGISTRATION ====================
+
+    {
+      ruleCode: 'REG_PVT_LTD_INCORP',
+      regulationCategory: 'business_registration',
+      complianceName: 'Private Limited Company Incorporation (SPICe+)',
+      formNumber: 'SPICe+ (INC-32)',
+      description: 'Incorporation of Private Limited Company',
+      periodicity: 'one_time',
+      dueDateCalculationType: 'event_triggered',
+      dueDateFormula: { type: 'event', days_after_event: 30, trigger_event: 'name_approval' },
+      applicableEntityTypes: ['pvt_ltd'],
+      priorityLevel: 'critical',
+      penaltyRiskLevel: 'high'
+    },
+
+    {
+      ruleCode: 'REG_OPC_INCORP',
+      regulationCategory: 'business_registration',
+      complianceName: 'OPC Incorporation (SPICe+)',
+      formNumber: 'SPICe+ (INC-32)',
+      description: 'Incorporation of One Person Company',
+      periodicity: 'one_time',
+      dueDateCalculationType: 'event_triggered',
+      dueDateFormula: { type: 'event', days_after_event: 30, trigger_event: 'name_approval' },
+      applicableEntityTypes: ['opc'],
+      priorityLevel: 'critical',
+      penaltyRiskLevel: 'high'
+    },
+
+    {
+      ruleCode: 'REG_LLP_INCORP',
+      regulationCategory: 'business_registration',
+      complianceName: 'LLP Incorporation (FiLLiP)',
+      formNumber: 'FiLLiP',
+      description: 'Incorporation of LLP',
+      periodicity: 'one_time',
+      dueDateCalculationType: 'event_triggered',
+      dueDateFormula: { type: 'event', days_after_event: 30, trigger_event: 'name_approval' },
+      applicableEntityTypes: ['llp'],
+      priorityLevel: 'high',
+      penaltyRiskLevel: 'medium'
+    },
+
+    {
+      ruleCode: 'REG_SOLE_PROP',
+      regulationCategory: 'business_registration',
+      complianceName: 'Sole Proprietorship Setup',
+      description: 'Local registration and bank setup for proprietorship',
+      periodicity: 'one_time',
+      dueDateCalculationType: 'event_triggered',
+      dueDateFormula: { type: 'event', days_after_event: 30, trigger_event: 'business_start' },
+      applicableEntityTypes: ['proprietorship'],
+      priorityLevel: 'high',
+      penaltyRiskLevel: 'medium'
+    },
+
+    {
+      ruleCode: 'REG_MSME_UDYAM',
+      regulationCategory: 'business_registration',
+      complianceName: 'MSME (Udyam) Registration',
+      description: 'Udyam registration for MSME classification',
+      periodicity: 'one_time',
+      dueDateCalculationType: 'event_triggered',
+      dueDateFormula: { type: 'event', days_after_event: 60, trigger_event: 'business_start' },
+      priorityLevel: 'medium',
+      penaltyRiskLevel: 'low'
+    },
+
     // ==================== GST (GOODS & SERVICES TAX) ====================
+
+    {
+      ruleCode: 'REG_GST',
+      regulationCategory: 'gst',
+      complianceName: 'GST Registration',
+      formNumber: 'GST REG-01',
+      description: 'GST registration for businesses crossing threshold or inter-state supply',
+      periodicity: 'one_time',
+      dueDateCalculationType: 'event_triggered',
+      dueDateFormula: { type: 'event', days_after_event: 30, trigger_event: 'threshold_crossed' },
+      priorityLevel: 'critical',
+      penaltyRiskLevel: 'critical'
+    },
 
     {
       ruleCode: 'GST_GSTR3B_MONTHLY',
@@ -227,6 +381,34 @@ export async function seedComplianceRules(storage: IStorage) {
       penaltyRiskLevel: 'high'
     },
 
+    {
+      ruleCode: 'GST_CMP08_QUARTERLY',
+      regulationCategory: 'gst',
+      complianceName: 'CMP-08: Composition Tax Payment',
+      formNumber: 'CMP-08',
+      description: 'Quarterly tax payment for composition scheme taxpayers',
+      periodicity: 'quarterly',
+      dueDateCalculationType: 'relative_to_quarter_end',
+      dueDateFormula: { type: 'relative', days_after: 18 },
+      priorityLevel: 'high',
+      penaltyRiskLevel: 'high',
+      metadata: { scheme: 'Composition' }
+    },
+
+    {
+      ruleCode: 'GST_GSTR4_ANNUAL',
+      regulationCategory: 'gst',
+      complianceName: 'GSTR-4: Annual Return (Composition)',
+      formNumber: 'GSTR-4',
+      description: 'Annual return for composition scheme taxpayers',
+      periodicity: 'annual',
+      dueDateCalculationType: 'fixed_date',
+      dueDateFormula: { type: 'fixed', day: 30, month: 4 },
+      priorityLevel: 'high',
+      penaltyRiskLevel: 'high',
+      metadata: { scheme: 'Composition' }
+    },
+
     // ==================== INCOME TAX ====================
 
     {
@@ -311,6 +493,58 @@ export async function seedComplianceRules(storage: IStorage) {
       penaltyRiskLevel: 'high'
     },
 
+    {
+      ruleCode: 'TDS_27EQ_QUARTERLY',
+      regulationCategory: 'income_tax',
+      complianceName: 'Form 27EQ: TCS Return',
+      formNumber: '27EQ',
+      description: 'Quarterly TCS return for tax collected at source',
+      periodicity: 'quarterly',
+      dueDateCalculationType: 'relative_to_quarter_end',
+      dueDateFormula: { type: 'quarter_end', days_after: 31 },
+      priorityLevel: 'medium',
+      penaltyRiskLevel: 'medium'
+    },
+
+    {
+      ruleCode: 'TDS_CHALLAN_281_MONTHLY',
+      regulationCategory: 'income_tax',
+      complianceName: 'TDS Payment: Challan 281',
+      formNumber: 'Challan 281',
+      description: 'Monthly deposit of TDS deducted',
+      periodicity: 'monthly',
+      dueDateCalculationType: 'fixed_date',
+      dueDateFormula: { type: 'fixed', day: 7, month_offset: 1 },
+      priorityLevel: 'high',
+      penaltyRiskLevel: 'high'
+    },
+
+    {
+      ruleCode: 'TDS_FORM16_ANNUAL',
+      regulationCategory: 'income_tax',
+      complianceName: 'Form 16 Issuance',
+      formNumber: 'Form 16',
+      description: 'Annual TDS certificate for salary payments',
+      periodicity: 'annual',
+      dueDateCalculationType: 'fixed_date',
+      dueDateFormula: { type: 'fixed', day: 15, month: 6 },
+      priorityLevel: 'medium',
+      penaltyRiskLevel: 'medium'
+    },
+
+    {
+      ruleCode: 'TDS_FORM16A_QUARTERLY',
+      regulationCategory: 'income_tax',
+      complianceName: 'Form 16A Issuance',
+      formNumber: 'Form 16A',
+      description: 'Quarterly TDS certificate for non-salary payments',
+      periodicity: 'quarterly',
+      dueDateCalculationType: 'relative_to_quarter_end',
+      dueDateFormula: { type: 'quarter_end', days_after: 15 },
+      priorityLevel: 'medium',
+      penaltyRiskLevel: 'medium'
+    },
+
     // ==================== PF/ESI ====================
 
     {
@@ -382,6 +616,127 @@ export async function seedComplianceRules(storage: IStorage) {
       employeeCountMin: 10,
       priorityLevel: 'medium',
       penaltyRiskLevel: 'medium'
+    },
+
+    // ==================== PROFESSIONAL TAX (PT) ====================
+
+    {
+      ruleCode: 'PT_MONTHLY',
+      regulationCategory: 'professional_tax',
+      complianceName: 'Professional Tax Payment',
+      description: 'Monthly professional tax payment and return (state-specific)',
+      periodicity: 'monthly',
+      dueDateCalculationType: 'fixed_date',
+      dueDateFormula: { type: 'fixed', day: 20, month_offset: 1 },
+      stateSpecific: true,
+      applicableStates: ['Maharashtra', 'Karnataka', 'West Bengal', 'Gujarat', 'Tamil Nadu', 'Telangana', 'Andhra Pradesh', 'Kerala'],
+      priorityLevel: 'medium',
+      penaltyRiskLevel: 'medium'
+    },
+
+    {
+      ruleCode: 'PT_ANNUAL_RETURN',
+      regulationCategory: 'professional_tax',
+      complianceName: 'Professional Tax Annual Return',
+      description: 'Annual PT return where applicable (state-specific)',
+      periodicity: 'annual',
+      dueDateCalculationType: 'fixed_date',
+      dueDateFormula: { type: 'fixed', day: 30, month: 4 },
+      stateSpecific: true,
+      applicableStates: ['Maharashtra', 'Karnataka', 'West Bengal'],
+      priorityLevel: 'medium',
+      penaltyRiskLevel: 'medium'
+    },
+
+    // ==================== LICENSES & STATE COMPLIANCE ====================
+
+    {
+      ruleCode: 'LICENSE_SHOPS_ESTABLISHMENT',
+      regulationCategory: 'licenses',
+      complianceName: 'Shops & Establishment Registration',
+      description: 'State registration under Shops & Establishment Act',
+      periodicity: 'one_time',
+      dueDateCalculationType: 'event_triggered',
+      dueDateFormula: { type: 'event', days_after_event: 30, trigger_event: 'business_start' },
+      stateSpecific: true,
+      priorityLevel: 'high',
+      penaltyRiskLevel: 'high'
+    },
+
+    {
+      ruleCode: 'LICENSE_SHOPS_ESTABLISHMENT_RENEWAL',
+      regulationCategory: 'licenses',
+      complianceName: 'Shops & Establishment Renewal',
+      description: 'Periodic renewal of Shops & Establishment registration',
+      periodicity: 'annual',
+      dueDateCalculationType: 'event_triggered',
+      dueDateFormula: { type: 'event', days_after_event: 0, trigger_event: 'license_expiry' },
+      stateSpecific: true,
+      priorityLevel: 'medium',
+      penaltyRiskLevel: 'medium'
+    },
+
+    {
+      ruleCode: 'LICENSE_FSSAI_RENEWAL',
+      regulationCategory: 'licenses',
+      complianceName: 'FSSAI License Renewal',
+      description: 'Renewal for FSSAI license/registration',
+      periodicity: 'annual',
+      dueDateCalculationType: 'event_triggered',
+      dueDateFormula: { type: 'event', days_after_event: 0, trigger_event: 'license_expiry' },
+      priorityLevel: 'high',
+      penaltyRiskLevel: 'high'
+    },
+
+    {
+      ruleCode: 'LICENSE_TRADE_RENEWAL',
+      regulationCategory: 'licenses',
+      complianceName: 'Trade License Renewal',
+      description: 'Municipal trade license renewal',
+      periodicity: 'annual',
+      dueDateCalculationType: 'fixed_date',
+      dueDateFormula: { type: 'fixed', day: 31, month: 3 },
+      stateSpecific: true,
+      priorityLevel: 'medium',
+      penaltyRiskLevel: 'medium'
+    },
+
+    // ==================== FUNDING READINESS ====================
+
+    {
+      ruleCode: 'FUNDING_DUE_DILIGENCE_PACK',
+      regulationCategory: 'funding_readiness',
+      complianceName: 'Investor Due Diligence Pack',
+      description: 'Prepare diligence documentation before fundraising',
+      periodicity: 'event_based',
+      dueDateCalculationType: 'event_triggered',
+      dueDateFormula: { type: 'event', days_after_event: 0, trigger_event: 'fundraising' },
+      priorityLevel: 'high',
+      penaltyRiskLevel: 'medium'
+    },
+
+    {
+      ruleCode: 'FUNDING_CAP_TABLE_UPDATE',
+      regulationCategory: 'funding_readiness',
+      complianceName: 'Cap Table & ESOP Register Update',
+      description: 'Keep cap table and ESOP register updated',
+      periodicity: 'quarterly',
+      dueDateCalculationType: 'relative_to_quarter_end',
+      dueDateFormula: { type: 'quarter_end', days_after: 15 },
+      priorityLevel: 'medium',
+      penaltyRiskLevel: 'low'
+    },
+
+    {
+      ruleCode: 'FUNDING_GOVERNANCE_MINUTES',
+      regulationCategory: 'funding_readiness',
+      complianceName: 'Board & Shareholder Minutes Archive',
+      description: 'Ensure board/shareholder minutes are archived',
+      periodicity: 'quarterly',
+      dueDateCalculationType: 'relative_to_quarter_end',
+      dueDateFormula: { type: 'quarter_end', days_after: 15 },
+      priorityLevel: 'medium',
+      penaltyRiskLevel: 'low'
     }
   ];
 

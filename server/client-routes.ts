@@ -4,11 +4,14 @@ import {
   serviceRequests,
   businessEntities,
   complianceTracking,
+  complianceAlerts,
+  complianceRules,
   messages,
   users
 } from '@shared/schema';
 import { eq, desc, and, gte, lte, or, asc } from 'drizzle-orm';
 import { COMPLIANCE_KNOWLEDGE_BASE, getComplianceByCode } from './compliance-knowledge-base';
+import { mapComplianceCategory } from './compliance-taxonomy';
 import {
   sessionAuthMiddleware,
   requireRole,
@@ -245,6 +248,8 @@ export function registerClientRoutes(app: Express) {
           penaltyRisk: item.penaltyRisk || false,
           estimatedPenalty: item.estimatedPenalty || 0,
           serviceId: item.serviceId,
+          complianceRuleId: item.complianceRuleId || null,
+          lastCompleted: item.lastCompleted ? item.lastCompleted.toISOString() : null,
           // Enhanced regulatory knowledge from knowledge base
           regulatoryInfo: knowledgeRule ? {
             formNumber: knowledgeRule.formNumber,
@@ -322,11 +327,11 @@ export function registerClientRoutes(app: Express) {
       let entityName = 'My Business';
       if (userEntityId) {
         const [entity] = await db
-          .select({ businessName: businessEntities.businessName })
+          .select({ name: businessEntities.name })
           .from(businessEntities)
           .where(eq(businessEntities.id, userEntityId));
-        if (entity?.businessName) {
-          entityName = entity.businessName;
+        if (entity?.name) {
+          entityName = entity.name;
         }
       }
 
@@ -841,137 +846,99 @@ export function registerClientRoutes(app: Express) {
       // Get user's entity
       const userEntityId = await getUserEntityId(userId);
       if (!userEntityId) {
-        return res.json({ alerts: [], total: 0 });
+        return res.json({ alerts: [], total: 0, summary: { total: 0, critical: 0, warning: 0, info: 0, acknowledged: 0 } });
       }
 
-      // Mock alerts - In production, query from complianceAlerts table
-      const alerts = [
-        {
-          id: 1,
-          entityId: userEntityId,
-          alertType: 'upcoming_deadline',
-          severity: 'critical',
-          title: 'GST Return Due in 3 Days',
-          message: 'GSTR-3B for January 2026 is due on 20th February. Please ensure timely filing to avoid penalties.',
-          actionRequired: 'File GSTR-3B before deadline',
-          complianceType: 'gst',
-          deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-          isActive: true,
-          isAcknowledged: false,
-          triggeredAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-          metadata: {
-            filingPeriod: 'January 2026',
-            returnType: 'GSTR-3B',
-            estimatedPenalty: 5000,
-          },
-        },
-        {
-          id: 2,
-          entityId: userEntityId,
-          alertType: 'upcoming_deadline',
-          severity: 'warning',
-          title: 'TDS Return Due in 15 Days',
-          message: 'Quarterly TDS return for Q3 FY 2025-26 is due on 31st January 2026.',
-          actionRequired: 'File TDS return',
-          complianceType: 'income_tax',
-          deadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-          isActive: true,
-          isAcknowledged: false,
-          triggeredAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-          metadata: {
-            quarter: 'Q3 FY 2025-26',
-            returnType: '26Q',
-          },
-        },
-        {
-          id: 3,
-          entityId: userEntityId,
-          alertType: 'document_expiry',
-          severity: 'info',
-          title: 'GST Certificate Renewal',
-          message: 'Your GST registration certificate will expire in 30 days. Renewal process should be initiated.',
-          actionRequired: 'Initiate GST certificate renewal',
-          complianceType: 'gst',
-          deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          isActive: true,
-          isAcknowledged: true,
-          acknowledgedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-          triggeredAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-          metadata: {
-            documentType: 'GST Certificate',
-            expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          },
-        },
-        {
-          id: 4,
-          entityId: userEntityId,
-          alertType: 'regulatory_updates',
-          severity: 'info',
-          title: 'New GST Compliance Update',
-          message: 'CBIC has issued new guidelines for e-invoicing threshold. Review changes that may affect your business.',
-          actionRequired: 'Review new guidelines',
-          complianceType: 'gst',
-          deadline: null,
-          isActive: true,
-          isAcknowledged: false,
-          triggeredAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-          metadata: {
-            circularNumber: 'CBIC/2026/01/15',
-            effectiveDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          },
-        },
-        {
-          id: 5,
-          entityId: userEntityId,
-          alertType: 'service_status',
-          severity: 'info',
-          title: 'Service Request Update',
-          message: 'Your Annual ROC Filing (SR-001) has moved to "Documents Pending" status.',
-          actionRequired: 'Upload required documents',
-          complianceType: 'roc',
-          deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-          isActive: true,
-          isAcknowledged: false,
-          triggeredAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
-          metadata: {
-            serviceRequestId: 'SR-001',
-            previousStatus: 'Payment Received',
-            newStatus: 'Documents Pending',
-          },
-        },
+      const whereConditions = [
+        eq(complianceAlerts.entityId, userEntityId),
+        eq(complianceAlerts.isActive, true),
       ];
 
-      // Apply filters
-      let filteredAlerts = alerts;
-
       if (severity && severity !== 'all') {
-        filteredAlerts = filteredAlerts.filter(a => a.severity === severity);
+        whereConditions.push(eq(complianceAlerts.severity, String(severity).toUpperCase()));
       }
       if (type && type !== 'all') {
-        filteredAlerts = filteredAlerts.filter(a => a.alertType === type);
+        whereConditions.push(eq(complianceAlerts.alertType, String(type).toUpperCase()));
       }
       if (acknowledged !== undefined) {
         const isAck = acknowledged === 'true';
-        filteredAlerts = filteredAlerts.filter(a => a.isAcknowledged === isAck);
+        whereConditions.push(eq(complianceAlerts.isAcknowledged, isAck));
       }
+
+      const alerts = await db
+        .select({
+          id: complianceAlerts.id,
+          entityId: complianceAlerts.entityId,
+          alertType: complianceAlerts.alertType,
+          severity: complianceAlerts.severity,
+          title: complianceAlerts.title,
+          message: complianceAlerts.message,
+          actionRequired: complianceAlerts.actionRequired,
+          isActive: complianceAlerts.isActive,
+          isAcknowledged: complianceAlerts.isAcknowledged,
+          acknowledgedAt: complianceAlerts.acknowledgedAt,
+          triggeredAt: complianceAlerts.triggeredAt,
+          expiresAt: complianceAlerts.expiresAt,
+          metadata: complianceAlerts.metadata,
+          ruleId: complianceAlerts.ruleId,
+          complianceName: complianceRules.complianceName,
+          regulationCategory: complianceRules.regulationCategory,
+        })
+        .from(complianceAlerts)
+        .leftJoin(complianceRules, eq(complianceAlerts.ruleId, complianceRules.ruleCode))
+        .where(and(...whereConditions))
+        .orderBy(desc(complianceAlerts.triggeredAt));
+
+      const normalizedAlerts = alerts.map(alert => {
+        const severityValue = (alert.severity || 'INFO').toLowerCase();
+        const alertTypeValue = (alert.alertType || 'INFO').toLowerCase();
+        const status = !alert.isActive ? 'resolved' : alert.isAcknowledged ? 'acknowledged' : 'pending';
+        const deadline =
+          (alert.metadata as any)?.deadline ||
+          (alert.metadata as any)?.dueDate ||
+          (alert.metadata as any)?.due_date ||
+          alert.expiresAt ||
+          null;
+        const category = mapComplianceCategory(alert.regulationCategory || alert.alertType);
+
+        return {
+          id: alert.id,
+          entityId: alert.entityId,
+          alertType: alertTypeValue,
+          severity: severityValue,
+          title: alert.title,
+          message: alert.message,
+          actionRequired: alert.actionRequired,
+          complianceType: alert.regulationCategory || undefined,
+          category,
+          complianceName: alert.complianceName || undefined,
+          deadline,
+          isActive: alert.isActive,
+          isAcknowledged: alert.isAcknowledged,
+          acknowledgedAt: alert.acknowledgedAt,
+          triggeredAt: alert.triggeredAt,
+          metadata: alert.metadata,
+          status,
+        };
+      });
 
       // Sort by severity and date
       const severityOrder = { critical: 0, warning: 1, info: 2 };
-      filteredAlerts.sort((a, b) => {
+      normalizedAlerts.sort((a, b) => {
         const sevDiff = severityOrder[a.severity as keyof typeof severityOrder] - severityOrder[b.severity as keyof typeof severityOrder];
         if (sevDiff !== 0) return sevDiff;
         return new Date(b.triggeredAt).getTime() - new Date(a.triggeredAt).getTime();
       });
 
       res.json({
-        alerts: filteredAlerts.slice(0, parseInt(limit as string)),
-        total: filteredAlerts.length,
+        alerts: normalizedAlerts.slice(0, parseInt(limit as string, 10)),
+        total: normalizedAlerts.length,
         summary: {
-          total: alerts.length,
-          critical: alerts.filter(a => a.severity === 'critical' && !a.isAcknowledged).length,
-          warning: alerts.filter(a => a.severity === 'warning' && !a.isAcknowledged).length,
-          info: alerts.filter(a => a.severity === 'info' && !a.isAcknowledged).length,
-          acknowledged: alerts.filter(a => a.isAcknowledged).length,
+          total: normalizedAlerts.length,
+          critical: normalizedAlerts.filter(a => a.severity === 'critical' && !a.isAcknowledged).length,
+          warning: normalizedAlerts.filter(a => a.severity === 'warning' && !a.isAcknowledged).length,
+          info: normalizedAlerts.filter(a => a.severity === 'info' && !a.isAcknowledged).length,
+          acknowledged: normalizedAlerts.filter(a => a.isAcknowledged).length,
         },
       });
     } catch (error) {
@@ -995,13 +962,41 @@ export function registerClientRoutes(app: Express) {
         return res.status(401).json({ error: 'Authentication required' });
       }
 
-      // Mock acknowledge - In production, update complianceAlerts table
+      const userEntityId = await getUserEntityId(userId);
+      if (!userEntityId) {
+        return res.status(404).json({ error: 'No entity associated with user' });
+      }
+
+      const [existing] = await db
+        .select({ metadata: complianceAlerts.metadata })
+        .from(complianceAlerts)
+        .where(and(
+          eq(complianceAlerts.id, parseInt(id)),
+          eq(complianceAlerts.entityId, userEntityId)
+        ))
+        .limit(1);
+
+      if (!existing) {
+        return res.status(404).json({ error: 'Alert not found' });
+      }
+
+      const [updated] = await db
+        .update(complianceAlerts)
+        .set({
+          isAcknowledged: true,
+          acknowledgedAt: new Date(),
+          acknowledgedBy: userId,
+          metadata: {
+            ...(existing?.metadata || {}),
+            acknowledgeNotes: notes,
+          },
+        })
+        .where(eq(complianceAlerts.id, parseInt(id)))
+        .returning();
+
       res.json({
         message: 'Alert acknowledged successfully',
-        alertId: parseInt(id),
-        acknowledgedAt: new Date(),
-        acknowledgedBy: userId,
-        notes,
+        alert: updated,
       });
     } catch (error) {
       console.error('Error acknowledging alert:', error);
@@ -1028,13 +1023,32 @@ export function registerClientRoutes(app: Express) {
         return res.status(400).json({ error: `Invalid channel. Must be one of: ${validChannels.join(', ')}` });
       }
 
-      // Mock test notification - In production, actually send test notification
+      const userEntityId = await getUserEntityId(userId);
+      if (!userEntityId) {
+        return res.status(404).json({ error: 'No entity associated with user' });
+      }
+
+      const [alert] = await db.insert(complianceAlerts).values({
+        entityId: userEntityId,
+        ruleId: 'TEST_NOTIFICATION',
+        alertType: 'TEST',
+        severity: 'INFO',
+        title: `Test ${channel.toUpperCase()} Notification`,
+        message: `Test notification sent to ${channel}. Please confirm receipt.`,
+        actionRequired: 'Confirm receipt',
+        triggeredAt: new Date(),
+        metadata: {
+          channel,
+          initiatedBy: userId,
+        },
+      }).returning();
+
       res.json({
         message: `Test notification sent to ${channel}`,
         channel,
         sentAt: new Date(),
         status: 'sent',
-        note: `A test notification has been sent to your registered ${channel}. Please check and confirm receipt.`,
+        alert,
       });
     } catch (error) {
       console.error('Error sending test notification:', error);
@@ -1056,82 +1070,79 @@ export function registerClientRoutes(app: Express) {
 
       const { days = 30 } = req.query;
 
-      // Mock upcoming deadlines - In production, query from compliance tracking
-      const upcomingDeadlines = [
-        {
-          id: 1,
-          complianceType: 'gst',
-          complianceName: 'GSTR-3B',
-          period: 'January 2026',
-          deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-          daysRemaining: 3,
-          status: 'pending',
-          priority: 'critical',
-          estimatedPenalty: 5000,
-          relatedServiceRequest: null,
-        },
-        {
-          id: 2,
-          complianceType: 'income_tax',
-          complianceName: 'TDS Return (26Q)',
-          period: 'Q3 FY 2025-26',
-          deadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000),
-          daysRemaining: 15,
-          status: 'pending',
-          priority: 'high',
-          estimatedPenalty: 10000,
-          relatedServiceRequest: null,
-        },
-        {
-          id: 3,
-          complianceType: 'gst',
-          complianceName: 'GSTR-1',
-          period: 'January 2026',
-          deadline: new Date(Date.now() + 11 * 24 * 60 * 60 * 1000),
-          daysRemaining: 11,
-          status: 'pending',
-          priority: 'high',
-          estimatedPenalty: 5000,
-          relatedServiceRequest: null,
-        },
-        {
-          id: 4,
-          complianceType: 'roc',
-          complianceName: 'AOC-4 (Financial Statements)',
-          period: 'FY 2024-25',
-          deadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
-          daysRemaining: 45,
-          status: 'in_progress',
-          priority: 'medium',
-          estimatedPenalty: 100000,
-          relatedServiceRequest: 'SR-001',
-        },
-        {
-          id: 5,
-          complianceType: 'roc',
-          complianceName: 'DIR-3 KYC',
-          period: 'Annual',
-          deadline: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
-          daysRemaining: 60,
-          status: 'pending',
-          priority: 'low',
-          estimatedPenalty: 5000,
-          relatedServiceRequest: null,
-        },
-      ];
+      const userEntityId = await getUserEntityId(userId);
+      if (!userEntityId) {
+        return res.json({
+          deadlines: [],
+          summary: {
+            total: 0,
+            critical: 0,
+            thisWeek: 0,
+            thisMonth: 0,
+            totalEstimatedPenalty: 0,
+          },
+        });
+      }
 
-      // Filter by days
-      const maxDays = parseInt(days as string);
-      const filtered = upcomingDeadlines.filter(d => d.daysRemaining <= maxDays);
+      const maxDays = parseInt(days as string, 10) || 30;
+      const startDate = new Date();
+      const endDate = new Date(startDate.getTime() + maxDays * 24 * 60 * 60 * 1000);
+
+      const items = await db
+        .select({
+          id: complianceTracking.id,
+          complianceType: complianceTracking.complianceType,
+          dueDate: complianceTracking.dueDate,
+          status: complianceTracking.status,
+          priority: complianceTracking.priority,
+          estimatedPenalty: complianceTracking.estimatedPenalty,
+          serviceType: complianceTracking.serviceType,
+          serviceId: complianceTracking.serviceId,
+          complianceName: complianceRules.complianceName,
+          regulationCategory: complianceRules.regulationCategory,
+        })
+        .from(complianceTracking)
+        .leftJoin(complianceRules, eq(complianceTracking.complianceRuleId, complianceRules.id))
+        .where(and(
+          eq(complianceTracking.businessEntityId, userEntityId),
+          gte(complianceTracking.dueDate, startDate),
+          lte(complianceTracking.dueDate, endDate),
+          or(
+            eq(complianceTracking.status, 'pending'),
+            eq(complianceTracking.status, 'overdue'),
+            eq(complianceTracking.status, 'in_progress')
+          )
+        ))
+        .orderBy(asc(complianceTracking.dueDate));
+
+      const deadlines = items.map(item => {
+        const deadline = new Date(item.dueDate!);
+        const daysRemaining = Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+        const category = mapComplianceCategory(item.regulationCategory || item.complianceType);
+
+        return {
+          id: item.id,
+          complianceType: item.regulationCategory || item.complianceType,
+          category,
+          complianceName: item.complianceName || item.serviceType || item.serviceId,
+          period: item.complianceType,
+          deadline,
+          daysRemaining,
+          status: item.status,
+          priority: item.priority,
+          estimatedPenalty: Number(item.estimatedPenalty || 0),
+          relatedServiceRequest: null,
+        };
+      });
 
       res.json({
-        deadlines: filtered,
+        deadlines,
         summary: {
-          total: filtered.length,
-          critical: filtered.filter(d => d.daysRemaining <= 7).length,
-          thisWeek: filtered.filter(d => d.daysRemaining <= 7).length,
-          thisMonth: filtered.filter(d => d.daysRemaining <= 30).length,
-          totalEstimatedPenalty: filtered.reduce((sum, d) => sum + (d.estimatedPenalty || 0), 0),
+          total: deadlines.length,
+          critical: deadlines.filter(d => d.daysRemaining <= 7).length,
+          thisWeek: deadlines.filter(d => d.daysRemaining <= 7).length,
+          thisMonth: deadlines.filter(d => d.daysRemaining <= 30).length,
+          totalEstimatedPenalty: deadlines.reduce((sum, d) => sum + (d.estimatedPenalty || 0), 0),
         },
       });
     } catch (error) {

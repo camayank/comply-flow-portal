@@ -98,17 +98,17 @@ export const adminService = {
 
   // Commission Management
   getCommissions: async (filters?: any) => {
-    const response = await apiClient.get('/admin/commissions', { params: filters });
+    const response = await apiClient.get('/api/commissions', { params: filters });
     return response.data;
   },
 
   approveCommission: async (id: string) => {
-    const response = await apiClient.post(`/admin/commissions/${id}/approve`);
+    const response = await apiClient.patch(`/api/commissions/${id}/approve`);
     return response.data;
   },
 
   bulkApproveCommissions: async (ids: string[]) => {
-    const response = await apiClient.post('/admin/commissions/bulk-approve', { ids });
+    const response = await apiClient.post('/api/commissions/bulk-approve', { commissionIds: ids });
     return response.data;
   },
 

@@ -22,6 +22,7 @@ import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES, type Authenticat
 import { storage } from './storage';
 import { nanoid } from 'nanoid';
 import { createHash } from 'crypto';
+import { resolveDownloadUrl } from './storage-url';
 
 // Data room access token structure
 interface DataRoomToken {
@@ -577,9 +578,11 @@ export function registerInvestorDataRoomRoutes(app: Express) {
         })
         .where(eq(documentVault.id, document.id));
 
+      const downloadUrl = await resolveDownloadUrl(document.fileUrl);
+
       res.json({
         success: true,
-        downloadUrl: document.fileUrl,
+        downloadUrl,
         fileName: document.originalFileName || document.fileName,
         // In production, generate a signed URL with watermark
         watermarked: true,

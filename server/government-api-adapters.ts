@@ -13,6 +13,22 @@ interface ApiResponse {
   statusCode?: number;
 }
 
+const isMockAllowed = process.env.NODE_ENV !== 'production';
+
+async function logMissingIntegration(portalType: string, apiEndpoint: string, requestPayload?: any, startTime?: number) {
+  await integrationHub.logApiCall({
+    portalType,
+    apiEndpoint,
+    httpMethod: 'POST',
+    requestPayload,
+    statusCode: 503,
+    success: false,
+    errorMessage: 'Integration not configured',
+    errorCategory: 'integration_missing',
+    responseTime: startTime ? Date.now() - startTime : 0,
+  });
+}
+
 // ============================================================================
 // GSP ADAPTER - GST Suvidha Provider API
 // ============================================================================
@@ -24,6 +40,11 @@ export class GSPAdapter {
     const startTime = Date.now();
     
     try {
+      if (!isMockAllowed) {
+        await logMissingIntegration('gsp', '/authenticate', { gstin, username }, startTime);
+        return { success: false, error: 'GSP integration not configured', statusCode: 503 };
+      }
+
       // GSP authentication logic
       // This would call actual GSP API endpoints
       const response = {
@@ -68,6 +89,11 @@ export class GSPAdapter {
     const startTime = Date.now();
     
     try {
+      if (!isMockAllowed) {
+        await logMissingIntegration('gsp', '/gstr1/file', { gstin, period }, startTime);
+        return { success: false, error: 'GSP integration not configured', statusCode: 503 };
+      }
+
       // File GSTR1 return
       const response = {
         success: true,
@@ -111,6 +137,11 @@ export class GSPAdapter {
     const startTime = Date.now();
     
     try {
+      if (!isMockAllowed) {
+        await logMissingIntegration('gsp', '/filing/status', { arn }, startTime);
+        return { success: false, error: 'GSP integration not configured', statusCode: 503 };
+      }
+
       const response = {
         success: true,
         data: {
@@ -149,6 +180,11 @@ export class ERIAdapter {
     const startTime = Date.now();
     
     try {
+      if (!isMockAllowed) {
+        await logMissingIntegration('eri', '/authenticate', { pan }, startTime);
+        return { success: false, error: 'ERI integration not configured', statusCode: 503 };
+      }
+
       const response = {
         success: true,
         data: {
@@ -190,6 +226,11 @@ export class ERIAdapter {
     const startTime = Date.now();
     
     try {
+      if (!isMockAllowed) {
+        await logMissingIntegration('eri', '/itr/file', { pan, assessmentYear, itrType }, startTime);
+        return { success: false, error: 'ERI integration not configured', statusCode: 503 };
+      }
+
       const response = {
         success: true,
         data: {
@@ -240,6 +281,11 @@ export class MCA21Adapter {
     const startTime = Date.now();
     
     try {
+      if (!isMockAllowed) {
+        await logMissingIntegration('mca21', '/authenticate', { cin, din }, startTime);
+        return { success: false, error: 'MCA21 integration not configured', statusCode: 503 };
+      }
+
       const response = {
         success: true,
         data: {
@@ -281,6 +327,11 @@ export class MCA21Adapter {
     const startTime = Date.now();
     
     try {
+      if (!isMockAllowed) {
+        await logMissingIntegration('mca21', '/form/file', { cin, formType, financialYear }, startTime);
+        return { success: false, error: 'MCA21 integration not configured', statusCode: 503 };
+      }
+
       const response = {
         success: true,
         data: {

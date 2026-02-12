@@ -52,6 +52,7 @@ export interface WorkQueueItem {
   slaDeadline: string | null;
   slaStatus: string | null;
   slaHoursRemaining: number | null;
+  slaDaysRemaining?: number | null;
   dueDate: string | null;
   assignedTo: number | null;
   assignedToName: string | null;
@@ -62,6 +63,26 @@ export interface WorkQueueItem {
   serviceTypeName: string | null;
   periodLabel: string | null;
   createdAt: string;
+  complianceRuleId?: number | null;
+  complianceRuleCode?: string | null;
+  complianceName?: string | null;
+  complianceType?: string | null;
+  evidenceSummary?: {
+    required: number;
+    uploaded: number;
+    missing: number;
+  } | null;
+  missingDocuments?: string[];
+  requiredDocuments?: string[];
+}
+
+export interface OpsTeamMember {
+  id: number;
+  name: string;
+  role: string;
+  activeWorkload: number;
+  maxCapacity: number;
+  available: boolean;
 }
 
 export interface SLABreach {
@@ -334,6 +355,30 @@ export function useWorkQueueStats() {
     queryKey: ['operations', 'work-queue', 'stats'],
     queryFn: () => operationsService.getWorkQueueStats(),
     staleTime: 30000,
+  });
+}
+
+export function useOpsTeamMembers(enabled = true) {
+  return useQuery<OpsTeamMember[]>({
+    queryKey: ['operations', 'team-members'],
+    queryFn: () => operationsService.getOpsTeamMembers(),
+    enabled,
+    staleTime: 60000,
+  });
+}
+
+export function useAssignWorkItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ workItemId, assigneeId, notes }: { workItemId: number; assigneeId?: number | null; notes?: string }) =>
+      operationsService.assignWorkItem(workItemId, { assigneeId, notes }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operations', 'work-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['operations', 'work-queue', 'at-risk'] });
+      queryClient.invalidateQueries({ queryKey: ['operations', 'work-queue', 'breached'] });
+      queryClient.invalidateQueries({ queryKey: ['operations', 'work-queue', 'stats'] });
+    },
   });
 }
 

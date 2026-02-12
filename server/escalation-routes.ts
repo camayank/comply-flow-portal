@@ -10,6 +10,7 @@
  */
 
 import type { Express, Response } from "express";
+import { Router } from "express";
 import {
   sessionAuthMiddleware,
   requireMinimumRole,
@@ -23,11 +24,12 @@ import {
   getUnifiedWorkQueue,
   getSlaBreachReport,
   SlaStatus,
-  DEFAULT_ESCALATION_RULES
+  DEFAULT_ESCALATION_RULES,
+  logWorkItemActivity
 } from './auto-escalation-engine';
 import { db } from './db';
-import { escalationRules, escalationExecutions, slaBreachRecords, workItemQueue } from '@shared/schema';
-import { eq, desc, and, sql, count } from 'drizzle-orm';
+import { escalationRules, escalationExecutions, slaBreachRecords, workItemQueue, users, serviceRequests, notifications, activityLogs } from '@shared/schema';
+import { eq, desc, and, sql, count, inArray } from 'drizzle-orm';
 
 // Middleware chains
 const requireOpsAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE)] as const;
@@ -36,6 +38,7 @@ const requireAdminAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES
 
 export function registerEscalationRoutes(app: Express) {
   console.log('📊 Registering Escalation routes...');
+  const router = Router();
 
   // =============================================================================
   // WORK QUEUE ENDPOINTS
@@ -45,7 +48,7 @@ export function registerEscalationRoutes(app: Express) {
    * Get unified work queue with filtering
    * The central view of all work items with SLA status
    */
-  app.get('/api/escalation/work-queue', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+  router.get('/work-queue', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { slaStatus, priority, assignedTo, serviceKey, limit, offset } = req.query;
 
@@ -68,7 +71,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Get work queue dashboard stats
    */
-  app.get('/api/escalation/work-queue/stats', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+  router.get('/work-queue/stats', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const result = await getUnifiedWorkQueue({});
       res.json({
@@ -86,7 +89,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Trigger work queue refresh
    */
-  app.post('/api/escalation/work-queue/refresh', ...requireOpsManager, async (req: AuthenticatedRequest, res: Response) => {
+  router.post('/work-queue/refresh', ...requireOpsManager, async (req: AuthenticatedRequest, res: Response) => {
     try {
       await autoEscalationEngine.refreshWorkQueue();
       const result = await getUnifiedWorkQueue({});
@@ -101,6 +104,235 @@ export function registerEscalationRoutes(app: Express) {
     }
   });
 
+  /**
+   * Get operations team members for assignment
+   */
+  router.get('/team-members', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const allowedRoles = [
+        USER_ROLES.OPS_MANAGER,
+        USER_ROLES.OPS_EXECUTIVE,
+        USER_ROLES.QC_EXECUTIVE,
+        USER_ROLES.CUSTOMER_SERVICE,
+      ];
+
+      const members = await db
+        .select({
+          id: users.id,
+          fullName: users.fullName,
+          email: users.email,
+          username: users.username,
+          role: users.role,
+          isActive: users.isActive,
+        })
+        .from(users)
+        .where(and(inArray(users.role, allowedRoles), eq(users.isActive, true)))
+        .orderBy(users.fullName, users.email);
+
+      const memberIds = members.map((member) => member.id).filter((id) => id !== null && id !== undefined) as number[];
+
+      const workloads = memberIds.length > 0
+        ? await db
+            .select({
+              assigneeId: workItemQueue.assignedTo,
+              count: count(),
+            })
+            .from(workItemQueue)
+            .where(inArray(workItemQueue.assignedTo, memberIds))
+            .groupBy(workItemQueue.assignedTo)
+        : [];
+
+      const workloadMap = new Map<number, number>();
+      workloads.forEach((entry) => {
+        if (entry.assigneeId !== null && entry.assigneeId !== undefined) {
+          workloadMap.set(entry.assigneeId, Number(entry.count || 0));
+        }
+      });
+
+      const maxCapacityByRole: Record<string, number> = {
+        [USER_ROLES.OPS_MANAGER]: 12,
+        [USER_ROLES.OPS_EXECUTIVE]: 10,
+        [USER_ROLES.QC_EXECUTIVE]: 8,
+        [USER_ROLES.CUSTOMER_SERVICE]: 8,
+      };
+
+      const payload = members.map((member) => {
+        const activeWorkload = workloadMap.get(member.id) || 0;
+        const maxCapacity = maxCapacityByRole[member.role] || 10;
+        return {
+          id: member.id,
+          name: member.fullName || member.email || member.username || `User ${member.id}`,
+          role: member.role,
+          activeWorkload,
+          maxCapacity,
+          available: activeWorkload < maxCapacity,
+        };
+      });
+
+      res.json(payload);
+    } catch (error: any) {
+      console.error('Error fetching team members:', error);
+      res.status(500).json({ error: 'Failed to fetch team members' });
+    }
+  });
+
+  /**
+   * Assign a work queue item to an operations team member
+   */
+  router.patch('/work-queue/:id/assign', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const workItemId = parseInt(req.params.id);
+      const rawAssignee = req.body.assigneeId ?? req.body.assignee_id ?? null;
+      const notes = req.body.notes;
+
+      const [item] = await db.select()
+        .from(workItemQueue)
+        .where(eq(workItemQueue.id, workItemId));
+
+      if (!item) {
+        return res.status(404).json({ error: 'Work item not found' });
+      }
+
+      const allowedRoles = new Set([
+        USER_ROLES.OPS_MANAGER,
+        USER_ROLES.OPS_EXECUTIVE,
+        USER_ROLES.QC_EXECUTIVE,
+        USER_ROLES.CUSTOMER_SERVICE,
+      ]);
+
+      const requesterRole = req.user?.role;
+      const isManager =
+        requesterRole === USER_ROLES.OPS_MANAGER ||
+        requesterRole === USER_ROLES.ADMIN ||
+        requesterRole === USER_ROLES.SUPER_ADMIN;
+
+      if (!isManager) {
+        if (requesterRole !== USER_ROLES.OPS_EXECUTIVE) {
+          return res.status(403).json({ error: 'Insufficient permissions to assign work items' });
+        }
+        if (item.assignedTo && item.assignedTo !== req.user?.id) {
+          return res.status(403).json({ error: 'Ops executives may only self-assign unassigned items' });
+        }
+      }
+
+      let assigneeId: number | null = null;
+      let assigneeName: string | null = null;
+      let assigneeRole: string | null = null;
+
+      if (rawAssignee !== null && rawAssignee !== undefined && rawAssignee !== '') {
+        assigneeId = parseInt(String(rawAssignee), 10);
+        if (Number.isNaN(assigneeId)) {
+          return res.status(400).json({ error: 'Invalid assignee id' });
+        }
+
+        if (!isManager && assigneeId !== req.user?.id) {
+          return res.status(403).json({ error: 'Ops executives may only assign work items to themselves' });
+        }
+
+        const [assignee] = await db
+          .select({
+            id: users.id,
+            fullName: users.fullName,
+            email: users.email,
+            username: users.username,
+            role: users.role,
+            isActive: users.isActive,
+          })
+          .from(users)
+          .where(eq(users.id, assigneeId));
+
+        if (!assignee) {
+          return res.status(400).json({ error: 'Assignee not found' });
+        }
+
+        if (!assignee.isActive) {
+          return res.status(400).json({ error: 'Assignee is inactive' });
+        }
+
+        if (!allowedRoles.has(assignee.role)) {
+          return res.status(400).json({ error: 'Assignee role not eligible for work queue items' });
+        }
+
+        assigneeName = assignee.fullName || assignee.email || assignee.username || `User ${assignee.id}`;
+        assigneeRole = assignee.role;
+      } else if (!isManager) {
+        return res.status(403).json({ error: 'Ops executives may only assign work items to themselves' });
+      }
+
+      const previousAssignee = item.assignedTo;
+
+      await db.update(workItemQueue)
+        .set({
+          assignedTo: assigneeId,
+          assignedToName: assigneeName,
+          assignedToRole: assigneeRole,
+          lastActivityAt: new Date(),
+        })
+        .where(eq(workItemQueue.id, workItemId));
+
+      if (item.serviceRequestId) {
+        await db.update(serviceRequests)
+          .set({
+            assignedTeamMember: assigneeId,
+            updatedAt: new Date(),
+          })
+          .where(eq(serviceRequests.id, item.serviceRequestId));
+
+        await db.insert(activityLogs).values({
+          userId: req.user?.id,
+          serviceRequestId: item.serviceRequestId,
+          action: 'assignment',
+          entityType: 'service_request',
+          entityId: item.serviceRequestId,
+          details: assigneeName ? 'Assigned to operations team member' : 'Unassigned from operations team',
+          metadata: {
+            assigneeId,
+            assigneeName,
+            workItemId: workItemId
+          },
+          createdAt: new Date()
+        });
+      }
+
+      await logWorkItemActivity({
+        workItemQueueId: workItemId,
+        serviceRequestId: item.serviceRequestId ?? undefined,
+        activityType: 'assignment',
+        activityDescription: assigneeName
+          ? `Assigned to ${assigneeName}${notes ? ` (${notes})` : ''}`
+          : `Unassigned${notes ? ` (${notes})` : ''}`,
+        previousValue: { assignedTo: previousAssignee },
+        newValue: { assignedTo: assigneeId, assigneeName },
+        performedBy: req.user?.id,
+        performedByName: req.user?.username,
+        performedByRole: req.user?.role,
+        triggerSource: 'ops_assignment'
+      });
+
+      if (assigneeId && assigneeName) {
+        await db.insert(notifications).values({
+          userId: assigneeId,
+          title: 'New Work Item Assigned',
+          message: `You have been assigned ${item.serviceTypeName || item.workItemType} for ${item.entityName || 'a client'}.`,
+          type: 'task_assignment',
+          category: 'service',
+          priority: item.priority?.toLowerCase() === 'urgent' ? 'urgent' : 'normal',
+          actionUrl: item.serviceRequestId ? `/ops/service-requests/${item.serviceRequestId}` : undefined,
+          actionText: item.serviceRequestId ? 'View Service Request' : 'View Work Item',
+          createdAt: new Date()
+        });
+      }
+
+      res.json({
+        success: true,
+        message: assigneeName ? `Assigned to ${assigneeName}` : 'Work item unassigned'
+      });
+    } catch (error: any) {
+      console.error('Error assigning work item:', error);
+      res.status(500).json({ error: 'Failed to assign work item' });
+    }
+  });
+
   // =============================================================================
   // SLA BREACH ENDPOINTS
   // =============================================================================
@@ -108,7 +340,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Get SLA breach records
    */
-  app.get('/api/escalation/breaches', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+  router.get('/breaches', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { severity, remediationStatus, fromDate, toDate, limit } = req.query;
 
@@ -148,7 +380,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Update breach remediation status
    */
-  app.patch('/api/escalation/breaches/:breachId/remediation', ...requireOpsManager, async (req: AuthenticatedRequest, res: Response) => {
+  router.patch('/breaches/:breachId/remediation', ...requireOpsManager, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { breachId } = req.params;
       const { status, notes, remediatedBy } = req.body;
@@ -179,7 +411,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Get all escalation rules
    */
-  app.get('/api/escalation/rules', ...requireOpsManager, async (req: AuthenticatedRequest, res: Response) => {
+  router.get('/rules', ...requireOpsManager, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const rules = await db.select()
         .from(escalationRules)
@@ -195,7 +427,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Create or update escalation rule
    */
-  app.post('/api/escalation/rules', ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
+  router.post('/rules', ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const {
         ruleKey,
@@ -266,7 +498,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Toggle rule active status
    */
-  app.patch('/api/escalation/rules/:ruleId/toggle', ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
+  router.patch('/rules/:ruleId/toggle', ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { ruleId } = req.params;
       const { isActive } = req.body;
@@ -288,7 +520,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Seed default escalation rules
    */
-  app.post('/api/escalation/rules/seed-defaults', ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
+  router.post('/rules/seed-defaults', ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       let created = 0;
       let skipped = 0;
@@ -326,7 +558,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Get escalation history for a service request
    */
-  app.get('/api/escalation/history/:serviceRequestId', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+  router.get('/history/:serviceRequestId', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { serviceRequestId } = req.params;
 
@@ -342,7 +574,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Get activity log for a work item
    */
-  app.get('/api/escalation/activity/:workItemId', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+  router.get('/activity/:workItemId', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { workItemId } = req.params;
 
@@ -358,7 +590,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Get recent escalation executions
    */
-  app.get('/api/escalation/executions', ...requireOpsManager, async (req: AuthenticatedRequest, res: Response) => {
+  router.get('/executions', ...requireOpsManager, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { limit = '50' } = req.query;
 
@@ -381,7 +613,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Get engine status
    */
-  app.get('/api/escalation/engine/status', ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
+  router.get('/engine/status', ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       // Check if engine is running by looking at processing interval
       const isRunning = (autoEscalationEngine as any).processingInterval !== null;
@@ -399,7 +631,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Start the escalation engine
    */
-  app.post('/api/escalation/engine/start', ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
+  router.post('/engine/start', ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { intervalMinutes = 15 } = req.body;
 
@@ -418,7 +650,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Stop the escalation engine
    */
-  app.post('/api/escalation/engine/stop', ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
+  router.post('/engine/stop', ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       await stopEscalationEngine();
 
@@ -435,7 +667,7 @@ export function registerEscalationRoutes(app: Express) {
   /**
    * Trigger manual processing
    */
-  app.post('/api/escalation/engine/process', ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
+  router.post('/engine/process', ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       await autoEscalationEngine.processAllWorkItems();
 
@@ -451,6 +683,9 @@ export function registerEscalationRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to process' });
     }
   });
+
+  const mountPaths = ['/api/escalation', '/api/v1/escalation', '/api/v2/escalation'];
+  mountPaths.forEach((path) => app.use(path, router));
 
   console.log('✅ Escalation routes registered');
 }

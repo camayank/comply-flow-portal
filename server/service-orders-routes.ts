@@ -168,15 +168,20 @@ export function registerServiceOrdersRoutes(app: Express) {
         description
       } = req.body;
 
+      const normalizedPriority = String(priority || 'medium').toLowerCase();
+
       const [newOrder] = await db
         .insert(serviceRequests)
         .values({
+          businessEntityId: entityId,
           entityId,
+          serviceId: serviceType,
           serviceType,
           periodLabel,
-          dueDate,
-          priority,
-          status: 'Created',
+          dueDate: dueDate ? new Date(dueDate) : null,
+          priority: normalizedPriority,
+          status: 'initiated',
+          totalAmount: 0,
           description
         })
         .returning();

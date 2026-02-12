@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Settings, Plus, FileText, Calendar, Users, Workflow, Target, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { apiRequest } from '@/lib/queryClient';
 
 interface Service {
   id: number;
@@ -100,8 +101,7 @@ export default function AdminServiceConfig() {
 
   const fetchServices = async () => {
     try {
-      const response = await fetch('/api/admin/services');
-      const data = await response.json();
+      const data = await apiRequest<Service[]>('/api/admin/services');
       setServices(data);
       if (data.length > 0 && !selectedService) {
         setSelectedService(data[0].serviceKey);
@@ -117,8 +117,7 @@ export default function AdminServiceConfig() {
 
   const fetchTemplates = async (serviceKey: string) => {
     try {
-      const response = await fetch(`/api/admin/workflows/${serviceKey}`);
-      const data = await response.json();
+      const data = await apiRequest<WorkflowTemplate[]>(`/api/admin/workflows/${serviceKey}`);
       setTemplates(data);
     } catch (error) {
       console.error('Error fetching templates:', error);
@@ -127,8 +126,7 @@ export default function AdminServiceConfig() {
 
   const fetchDocTypes = async (serviceKey: string) => {
     try {
-      const response = await fetch(`/api/admin/services/${serviceKey}/doc-types`);
-      const data = await response.json();
+      const data = await apiRequest<DocType[]>(`/api/admin/services/${serviceKey}/doc-types`);
       setDocTypes(data);
     } catch (error) {
       console.error('Error fetching doc types:', error);
@@ -137,8 +135,7 @@ export default function AdminServiceConfig() {
 
   const fetchDueDateRules = async (serviceKey: string) => {
     try {
-      const response = await fetch(`/api/admin/due-dates/${serviceKey}`);
-      const data = await response.json();
+      const data = await apiRequest<DueDateRule[]>(`/api/admin/due-dates/${serviceKey}`);
       setDueDateRules(data);
     } catch (error) {
       console.error('Error fetching due date rules:', error);
@@ -147,8 +144,7 @@ export default function AdminServiceConfig() {
 
   const fetchConfigStats = async () => {
     try {
-      const response = await fetch('/api/admin/config-stats');
-      const data = await response.json();
+      const data = await apiRequest<any>('/api/admin/config-stats');
       setConfigStats(data);
     } catch (error) {
       console.error('Error fetching config stats:', error);
@@ -158,26 +154,19 @@ export default function AdminServiceConfig() {
   const createService = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/admin/services', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newService)
+      await apiRequest('POST', '/api/admin/services', newService);
+      toast({
+        title: "Success",
+        description: "Service created successfully"
       });
-
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Service created successfully"
-        });
-        fetchServices();
-        setNewService({
-          serviceKey: '',
-          name: '',
-          periodicity: 'MONTHLY',
-          description: '',
-          category: 'compliance'
-        });
-      }
+      fetchServices();
+      setNewService({
+        serviceKey: '',
+        name: '',
+        periodicity: 'MONTHLY',
+        description: '',
+        category: 'compliance'
+      });
     } catch (error) {
       toast({
         title: "Error",
@@ -194,27 +183,20 @@ export default function AdminServiceConfig() {
     
     setLoading(true);
     try {
-      const response = await fetch(`/api/admin/services/${selectedService}/doc-types`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newDocType)
+      await apiRequest('POST', `/api/admin/services/${selectedService}/doc-types`, newDocType);
+      toast({
+        title: "Success",
+        description: "Document type created successfully"
       });
-
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Document type created successfully"
-        });
-        fetchDocTypes(selectedService);
-        setNewDocType({
-          doctype: '',
-          label: '',
-          clientUploads: true,
-          isDeliverable: false,
-          stepKey: '',
-          mandatory: true
-        });
-      }
+      fetchDocTypes(selectedService);
+      setNewDocType({
+        doctype: '',
+        label: '',
+        clientUploads: true,
+        isDeliverable: false,
+        stepKey: '',
+        mandatory: true
+      });
     } catch (error) {
       toast({
         title: "Error",
@@ -231,19 +213,12 @@ export default function AdminServiceConfig() {
     
     setLoading(true);
     try {
-      const response = await fetch(`/api/admin/due-dates/${selectedService}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newDueDateRule)
+      await apiRequest('POST', `/api/admin/due-dates/${selectedService}`, newDueDateRule);
+      toast({
+        title: "Success",
+        description: "Due date rule created successfully"
       });
-
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "Due date rule created successfully"
-        });
-        fetchDueDateRules(selectedService);
-      }
+      fetchDueDateRules(selectedService);
     } catch (error) {
       toast({
         title: "Error",
@@ -258,18 +233,13 @@ export default function AdminServiceConfig() {
   const seedAllServices = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/admin/seed-templates', {
-        method: 'POST'
+      await apiRequest('POST', '/api/admin/seed-templates');
+      toast({
+        title: "Success",
+        description: "All services and templates seeded successfully"
       });
-
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: "All services and templates seeded successfully"
-        });
-        fetchServices();
-        fetchConfigStats();
-      }
+      fetchServices();
+      fetchConfigStats();
     } catch (error) {
       toast({
         title: "Error",
@@ -285,19 +255,12 @@ export default function AdminServiceConfig() {
     if (!selectedService) return;
 
     try {
-      const response = await fetch(`/api/admin/workflows/${selectedService}/publish`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ version })
+      await apiRequest('POST', `/api/admin/workflows/${selectedService}/publish`, { version });
+      toast({
+        title: "Success",
+        description: `Template version ${version} published successfully`
       });
-
-      if (response.ok) {
-        toast({
-          title: "Success",
-          description: `Template version ${version} published successfully`
-        });
-        fetchTemplates(selectedService);
-      }
+      fetchTemplates(selectedService);
     } catch (error) {
       toast({
         title: "Error",

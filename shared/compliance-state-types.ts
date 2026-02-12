@@ -103,6 +103,7 @@ export interface EntityComplianceState {
  */
 export interface StateCalculationInput {
   entityId: number;
+  entityName?: string;
   entityType: string;
   incorporationDate: Date | null;
   turnover: number | null; // annual turnover
@@ -135,6 +136,17 @@ export interface StateCalculationInput {
     filedDate: Date;
     period: string;
   }[];
+
+  // Compliance tracking records (actual due dates and status)
+  trackingItems?: {
+    complianceRuleId?: number | null;
+    serviceId?: string | null;
+    dueDate: Date | null;
+    nextDueDate: Date | null;
+    status: string | null;
+    lastCompleted: Date | null;
+    priority?: string | null;
+  }[];
 }
 
 // ============================================================================
@@ -148,6 +160,7 @@ export interface ComplianceRule {
   ruleId: string;
   ruleName: string;
   domain: ComplianceDomain;
+  complianceRuleId?: number;
   
   // Applicability
   applicableEntityTypes: string[];
@@ -156,7 +169,7 @@ export interface ComplianceRule {
   hasGSTRequired?: boolean;
   
   // Timing
-  frequency: 'ONE_TIME' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'EVENT_BASED';
+  frequency: 'ONE_TIME' | 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'ANNUAL' | 'EVENT_BASED';
   dueDateLogic: string; // e.g., "20th of next month", "31st October"
   graceDays?: number;
   

@@ -34,6 +34,8 @@ import {
   type ContentSearchIndex, type InsertContentSearchIndex,
   type EnhancedFaq, type InsertEnhancedFaq
 } from "@shared/schema";
+import { db } from "./db";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -2233,72 +2235,69 @@ export class MemStorage implements IStorage {
     limit?: number;
     offset?: number;
   }): Promise<{ feedback: ClientFeedback[]; total: number }> {
-    // This would typically come from the clientFeedback table
-    // For now, return mock data structure
-    const mockFeedback: ClientFeedback[] = [
-      {
-        id: 1,
-        serviceRequestId: 1,
-        deliveryConfirmationId: 1,
-        clientId: 1,
-        overallRating: 5,
-        serviceQuality: 5,
-        timeliness: 4,
-        communication: 5,
-        documentation: 5,
-        positiveAspects: 'Excellent service quality and very professional team',
-        improvementSuggestions: 'Could be slightly faster',
-        additionalComments: 'Very satisfied with the incorporation process',
-        npsScore: 9,
-        wouldRecommend: true,
-        referralPotential: 'high',
-        serviceCategory: 'incorporation',
-        specificService: 'company-incorporation',
-        requestsFollowUp: false,
-        followUpType: null,
-        followUpCompleted: false,
-        hasIssues: false,
-        issuesDescription: null,
-        issueResolved: false,
-        resolutionNotes: null,
-        feedbackChannel: 'portal',
-        isAnonymous: false,
-        ipAddress: null,
-        userAgent: null,
-        submittedAt: new Date('2024-01-16'),
-        acknowledgedAt: new Date('2024-01-17'),
-        respondedAt: null,
-        createdAt: new Date('2024-01-16')
-      }
-    ];
-    
-    return { feedback: mockFeedback, total: mockFeedback.length };
+    const conditions: any[] = [];
+    if (filters?.clientId) {
+      conditions.push(eq(clientFeedback.clientId, filters.clientId));
+    }
+    if (filters?.serviceCategory) {
+      conditions.push(eq(clientFeedback.serviceCategory, filters.serviceCategory));
+    }
+    if (filters?.overallRating) {
+      conditions.push(eq(clientFeedback.overallRating, filters.overallRating));
+    }
+    if (filters?.hasIssues !== undefined) {
+      conditions.push(eq(clientFeedback.hasIssues, filters.hasIssues));
+    }
+
+    const limit = Math.min(100, Math.max(1, filters?.limit || 20));
+    const offset = Math.max(0, filters?.offset || 0);
+
+    const feedbackRows = await db
+      .select()
+      .from(clientFeedback)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(clientFeedback.submittedAt))
+      .limit(limit)
+      .offset(offset);
+
+    const countResult = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(clientFeedback)
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+    return { feedback: feedbackRows, total: Number(countResult[0]?.count || 0) };
   }
 
   async getClientFeedback(id: number): Promise<ClientFeedback | undefined> {
-    const { feedback } = await this.getAllClientFeedback();
-    return feedback.find(f => f.id === id);
+    const [row] = await db
+      .select()
+      .from(clientFeedback)
+      .where(eq(clientFeedback.id, id))
+      .limit(1);
+    return row;
   }
 
   async createClientFeedback(feedback: InsertClientFeedback): Promise<ClientFeedback> {
-    // This would create actual feedback record
-    const newFeedback: ClientFeedback = {
-      id: this.feedbackIdCounter++,
-      ...feedback,
-      submittedAt: new Date(),
-      createdAt: new Date()
-    };
-    return newFeedback;
+    const [created] = await db
+      .insert(clientFeedback)
+      .values({
+        ...feedback,
+        submittedAt: new Date(),
+        createdAt: new Date(),
+      })
+      .returning();
+    return created;
   }
 
   async updateClientFeedback(id: number, updates: Partial<ClientFeedback>): Promise<ClientFeedback | undefined> {
-    const existing = await this.getClientFeedback(id);
-    if (!existing) return undefined;
-    
-    return {
-      ...existing,
-      ...updates
-    };
+    const [updated] = await db
+      .update(clientFeedback)
+      .set({
+        ...updates,
+      })
+      .where(eq(clientFeedback.id, id))
+      .returning();
+    return updated;
   }
 
   async getFeedbackAnalytics(): Promise<{

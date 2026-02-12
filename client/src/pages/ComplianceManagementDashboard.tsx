@@ -68,7 +68,7 @@ const complianceBulkColumns: ColumnDefinition[] = [
 interface ComplianceItem {
   id: number;
   businessEntityId: number;
-  serviceId: number;
+  serviceId: string | number;
   complianceType: string;
   dueDate: string;
   actualCompletionDate: string | null;
@@ -82,6 +82,9 @@ interface ComplianceItem {
   daysUntilDue: number;
   urgency: 'overdue' | 'critical' | 'warning' | 'safe';
   penaltyRisk?: number;
+  requiredDocuments?: { documentType: string; documentName: string; isMandatory: boolean | null }[];
+  missingDocuments?: { documentType: string; documentName: string; isMandatory: boolean | null }[];
+  evidenceSummary?: { required: number; uploaded: number; missing: number };
 }
 
 interface CalendarDay {
@@ -153,7 +156,10 @@ const ComplianceManagementDashboard = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error('Failed to complete item');
+      if (!res.ok) {
+        const errorPayload = await res.json().catch(() => ({}));
+        throw new Error(errorPayload.message || errorPayload.error || 'Failed to complete item');
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -162,8 +168,8 @@ const ComplianceManagementDashboard = () => {
       setShowCompleteDialog(false);
       setSelectedItem(null);
     },
-    onError: () => {
-      toast({ title: 'Error', description: 'Failed to complete item', variant: 'destructive' });
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error?.message || 'Failed to complete item', variant: 'destructive' });
     },
   });
 
@@ -244,7 +250,7 @@ const ComplianceManagementDashboard = () => {
     }
   };
 
-  const categories = ['all', 'GST', 'Income Tax', 'MCA', 'Payroll', 'Licenses', 'Other'];
+  const categories = ['all', 'GST', 'Income Tax', 'MCA', 'Payroll', 'Labor', 'Licenses', 'Registrations', 'Funding Readiness', 'Other'];
 
   const handleBulkUpload = async (data: Record<string, any>[]): Promise<BulkUploadResult> => {
     try {
@@ -704,6 +710,26 @@ const ComplianceManagementDashboard = () => {
                                             <p className="text-sm">{item.notes}</p>
                                           </div>
                                         )}
+                                        {item.evidenceSummary && (
+                                          <div>
+                                            <Label className="text-gray-500">Evidence</Label>
+                                            <p className="text-sm">
+                                              Required: {item.evidenceSummary.required} · Uploaded: {item.evidenceSummary.uploaded} · Missing: {item.evidenceSummary.missing}
+                                            </p>
+                                            {item.missingDocuments && item.missingDocuments.length > 0 ? (
+                                              <div className="mt-2 rounded-md border border-red-100 bg-red-50 p-2">
+                                                <p className="text-xs font-semibold text-red-700">Missing Documents</p>
+                                                <ul className="mt-1 list-disc pl-4 text-xs text-red-700">
+                                                  {item.missingDocuments.map(doc => (
+                                                    <li key={doc.documentType}>{doc.documentName}</li>
+                                                  ))}
+                                                </ul>
+                                              </div>
+                                            ) : (
+                                              <p className="text-xs text-green-700 mt-1">All required documents uploaded.</p>
+                                            )}
+                                          </div>
+                                        )}
                                         <div className="flex gap-2 pt-4">
                                           {item.status !== 'completed' && (
                                             <>
@@ -769,6 +795,18 @@ const ComplianceManagementDashboard = () => {
                               <Badge variant="outline" className="text-red-600 border-red-300">
                                 <IndianRupee className="h-3 w-3" />
                                 {item.penaltyRisk.toLocaleString()} risk
+                              </Badge>
+                            ) : null}
+                            {item.evidenceSummary ? (
+                              <Badge
+                                variant="outline"
+                                className={
+                                  item.evidenceSummary.missing > 0
+                                    ? 'text-red-600 border-red-300'
+                                    : 'text-green-600 border-green-300'
+                                }
+                              >
+                                Evidence {item.evidenceSummary.uploaded}/{item.evidenceSummary.required}
                               </Badge>
                             ) : null}
                           </div>

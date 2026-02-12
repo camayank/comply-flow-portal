@@ -1,7 +1,8 @@
 import type { Express, Response } from "express";
 import { db } from "./db";
-import { services, serviceRequests, businessEntities, qualityReviews, documentsUploads, deliveryConfirmations } from "@shared/schema";
-import { eq, sql, desc, and, inArray } from "drizzle-orm";
+import { services, serviceRequests, businessEntities, qualityReviews, documentsUploads, deliveryConfirmations, documentVault, users, notifications } from "@shared/schema";
+import { resolveDownloadUrl } from './storage-url';
+import { eq, sql, desc, and, inArray, isNull, or, ilike } from "drizzle-orm";
 import {
   sessionAuthMiddleware,
   requireMinimumRole,
@@ -34,13 +35,34 @@ export function registerOperationsRoutes(app: Express) {
   // Supports pagination: ?page=1&limit=20
   app.get('/api/ops/service-orders', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { status } = req.query;
-      const { page, limit, offset } = parsePagination(req.query);
+    const { status, priority, assignedTo, search } = req.query;
+    const { page, limit, offset } = parsePagination(req.query);
 
-      // Build where conditions
+    // Build where conditions
       const conditions = [];
       if (status) {
         conditions.push(eq(serviceRequests.status, status as string));
+      }
+      if (priority) {
+        conditions.push(eq(serviceRequests.priority, priority as string));
+      }
+      if (assignedTo) {
+        if ((assignedTo as string).toLowerCase() === 'unassigned') {
+          conditions.push(isNull(serviceRequests.assignedTeamMember));
+        } else {
+          conditions.push(eq(serviceRequests.assignedTeamMember, parseInt(assignedTo as string)));
+        }
+      }
+      if (search) {
+        const term = `%${search}%`;
+        conditions.push(
+          or(
+            ilike(serviceRequests.serviceId, term),
+            ilike(serviceRequests.requestId, term),
+            sql`${serviceRequests.id}::text ILIKE ${term}`,
+            ilike(businessEntities.name, term)
+          )
+        );
       }
 
       // Get total count
@@ -54,6 +76,7 @@ export function registerOperationsRoutes(app: Express) {
       let query = db
         .select({
           id: serviceRequests.id,
+          requestId: serviceRequests.requestId,
           serviceId: serviceRequests.serviceId,
           businessEntityId: serviceRequests.businessEntityId,
           status: serviceRequests.status,
@@ -63,9 +86,16 @@ export function registerOperationsRoutes(app: Express) {
           slaDeadline: serviceRequests.slaDeadline,
           priority: serviceRequests.priority,
           createdAt: serviceRequests.createdAt,
-          updatedAt: serviceRequests.updatedAt
+          updatedAt: serviceRequests.updatedAt,
+          assignedTeamMember: serviceRequests.assignedTeamMember,
+          assignedToName: users.fullName,
+          assignedToRole: users.role,
+          entityName: businessEntities.name,
+          entityType: businessEntities.entityType
         })
         .from(serviceRequests)
+        .leftJoin(businessEntities, eq(serviceRequests.businessEntityId, businessEntities.id))
+        .leftJoin(users, eq(serviceRequests.assignedTeamMember, users.id))
         .orderBy(desc(serviceRequests.createdAt))
         .limit(limit)
         .offset(offset);
@@ -75,9 +105,13 @@ export function registerOperationsRoutes(app: Express) {
       }
 
       const orders = await query;
+      const ordersWithDisplayId = orders.map(order => ({
+        ...order,
+        displayId: (order as any).requestId || `SR-${order.id}`
+      }));
 
       res.json({
-        data: orders,
+        data: ordersWithDisplayId,
         pagination: {
           page,
           limit,
@@ -340,6 +374,171 @@ export function registerOperationsRoutes(app: Express) {
     } catch (error) {
       console.error('Error fetching delivery handoff:', error);
       res.status(500).json({ error: 'Failed to fetch delivery handoff data' });
+    }
+  });
+
+  // ========== DOCUMENT VAULT REVIEW QUEUE ==========
+  // Requires: ops_executive or higher
+  app.get('/api/ops/document-vault', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { status } = req.query;
+      const { page, limit, offset } = parsePagination(req.query);
+
+      const conditions = [];
+      if (status && status !== 'all') {
+        conditions.push(eq(documentVault.approvalStatus, status as string));
+      }
+
+      const totalResult = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(documentVault)
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+      const total = totalResult[0]?.count || 0;
+
+      let query = db
+        .select({
+          id: documentVault.id,
+          documentType: documentVault.documentType,
+          category: documentVault.category,
+          fileName: documentVault.fileName,
+          originalFileName: documentVault.originalFileName,
+          fileSize: documentVault.fileSize,
+          mimeType: documentVault.mimeType,
+          fileUrl: documentVault.fileUrl,
+          approvalStatus: documentVault.approvalStatus,
+          rejectionReason: documentVault.rejectionReason,
+          createdAt: documentVault.createdAt,
+          expiryDate: documentVault.expiryDate,
+          businessEntityId: documentVault.businessEntityId,
+          userId: documentVault.userId,
+          entityName: businessEntities.name,
+          uploaderName: users.fullName,
+          uploaderEmail: users.email,
+        })
+        .from(documentVault)
+        .leftJoin(businessEntities, eq(documentVault.businessEntityId, businessEntities.id))
+        .leftJoin(users, eq(documentVault.userId, users.id))
+        .orderBy(desc(documentVault.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions));
+      }
+
+      const documents = await query;
+      const documentsWithUrls = await Promise.all(
+        documents.map(async (doc) => ({
+          ...doc,
+          fileUrl: await resolveDownloadUrl(doc.fileUrl),
+        }))
+      );
+
+      res.json({
+        data: documentsWithUrls,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+          hasMore: offset + documentsWithUrls.length < total
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching document vault queue:', error);
+      res.status(500).json({ error: 'Failed to fetch document vault queue' });
+    }
+  });
+
+  // Approve a document (ops review)
+  app.patch('/api/ops/document-vault/:id/approve', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const documentId = parseInt(req.params.id);
+      const reviewerId = req.user?.id;
+
+      if (!reviewerId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const [updated] = await db.update(documentVault)
+        .set({
+          approvalStatus: 'approved',
+          approvedBy: reviewerId,
+          approvedAt: new Date(),
+          rejectionReason: null,
+        })
+        .where(eq(documentVault.id, documentId))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      await db.insert(notifications).values({
+        userId: updated.userId,
+        title: 'Document approved',
+        message: `${updated.fileName} has been approved by operations.`,
+        type: 'document_approval',
+        category: 'document',
+        priority: 'normal',
+        actionUrl: '/lifecycle/documents',
+        actionText: 'View Documents',
+        metadata: { documentId: updated.id, status: 'approved' },
+      });
+
+      res.json({ success: true, document: updated });
+    } catch (error) {
+      console.error('Error approving document:', error);
+      res.status(500).json({ error: 'Failed to approve document' });
+    }
+  });
+
+  // Reject a document (ops review)
+  app.patch('/api/ops/document-vault/:id/reject', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const documentId = parseInt(req.params.id);
+      const reviewerId = req.user?.id;
+      const { reason } = req.body || {};
+
+      if (!reviewerId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      if (!reason || typeof reason !== 'string' || !reason.trim()) {
+        return res.status(400).json({ error: 'Rejection reason is required' });
+      }
+
+      const [updated] = await db.update(documentVault)
+        .set({
+          approvalStatus: 'rejected',
+          approvedBy: reviewerId,
+          approvedAt: new Date(),
+          rejectionReason: reason.trim(),
+        })
+        .where(eq(documentVault.id, documentId))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      await db.insert(notifications).values({
+        userId: updated.userId,
+        title: 'Document rejected',
+        message: `${updated.fileName} was rejected. Reason: ${reason.trim()}`,
+        type: 'document_rejection',
+        category: 'document',
+        priority: 'high',
+        actionUrl: '/lifecycle/documents',
+        actionText: 'Upload Updated Document',
+        metadata: { documentId: updated.id, status: 'rejected', reason: reason.trim() },
+      });
+
+      res.json({ success: true, document: updated });
+    } catch (error) {
+      console.error('Error rejecting document:', error);
+      res.status(500).json({ error: 'Failed to reject document' });
     }
   });
 

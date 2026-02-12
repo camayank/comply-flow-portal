@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   FileText,
   Download,
@@ -33,6 +35,7 @@ import {
   X
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { withCsrfHeaders } from '@/lib/csrf';
 import { useToast } from '@/hooks/use-toast';
 import type { DocumentVault } from '@shared/schema';
 import { SkeletonCard, SkeletonDashboard } from '@/components/ui/skeleton-loader';
@@ -63,6 +66,29 @@ const DocumentVault = () => {
   const [previewDoc, setPreviewDoc] = useState<DocumentWithMetrics | null>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [shareDoc, setShareDoc] = useState<DocumentWithMetrics | null>(null);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadDocumentType, setUploadDocumentType] = useState('');
+  const [uploadCategory, setUploadCategory] = useState('compliance');
+  const [uploadExpiryDate, setUploadExpiryDate] = useState('');
+
+  const missingParam = new URLSearchParams(window.location.search).get('missing');
+  const missingTypes = missingParam
+    ? missingParam.split(',').map((type) => type.trim()).filter(Boolean)
+    : [];
+  const missingTypesKey = missingTypes.join('|');
+  const missingTypeLabels = missingTypes.map((type) =>
+    type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+  );
+
+  useEffect(() => {
+    if (missingTypes.length > 0) {
+      setShowUploadDialog(true);
+      if (!uploadDocumentType) {
+        setUploadDocumentType(missingTypes[0]);
+      }
+    }
+  }, [missingTypesKey]);
 
   // Fetch documents
   const { data: documents = [], isLoading } = useQuery<DocumentWithMetrics[]>({
@@ -101,6 +127,51 @@ const DocumentVault = () => {
         description: "Document has been permanently deleted.",
         variant: "destructive"
       });
+    },
+  });
+
+  const uploadDocumentMutation = useMutation({
+    mutationFn: async () => {
+      if (!uploadFile) {
+        throw new Error('Please select a file to upload.');
+      }
+      if (!uploadDocumentType.trim()) {
+        throw new Error('Please select a document type.');
+      }
+
+      const formData = new FormData();
+      formData.append('file', uploadFile);
+      formData.append('documentType', uploadDocumentType.trim());
+      formData.append('category', uploadCategory || 'compliance');
+      if (uploadExpiryDate) {
+        formData.append('expiryDate', uploadExpiryDate);
+      }
+
+      const response = await fetch('/api/document-vault/upload-file', {
+        method: 'POST',
+        headers: withCsrfHeaders({}),
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Upload failed' }));
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/document-vault'] });
+      toast({
+        title: "Upload Complete",
+        description: "Your document has been uploaded for review.",
+      });
+      setShowUploadDialog(false);
+      setUploadFile(null);
+      setUploadDocumentType('');
+      setUploadCategory('compliance');
+      setUploadExpiryDate('');
     },
   });
 
@@ -322,6 +393,23 @@ const DocumentVault = () => {
         </Card>
       </div>
 
+      {missingTypes.length > 0 && (
+        <Card className="mb-6 border-amber-200 bg-amber-50">
+          <CardContent className="p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="font-medium text-amber-900">Compliance needs documents</p>
+              <p className="text-sm text-amber-800">
+                Upload: {missingTypeLabels.join(', ')}
+              </p>
+            </div>
+            <Button size="sm" onClick={() => setShowUploadDialog(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Now
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Search and Filter Bar */}
       <Card className="mb-6">
         <CardContent className="p-6">
@@ -360,7 +448,7 @@ const DocumentVault = () => {
                 <option value="type">Sort by Type</option>
                 <option value="size">Sort by Size</option>
               </select>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => setShowUploadDialog(true)}>
                 <Upload className="h-4 w-4 mr-2" />
                 Upload
               </Button>
@@ -532,7 +620,7 @@ const DocumentVault = () => {
                     title="No Documents Found"
                     description="Start by uploading your first document to your secure vault"
                     actionLabel="Upload Document"
-                    onAction={() => {/* Handle upload */}}
+                    onAction={() => setShowUploadDialog(true)}
                   />
                 )
               )}
@@ -702,6 +790,110 @@ const DocumentVault = () => {
             >
               <Download className="h-4 w-4 mr-2" />
               Download
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Upload Document Dialog */}
+      <Dialog
+        open={showUploadDialog}
+        onOpenChange={(open) => {
+          setShowUploadDialog(open);
+          if (open && missingTypes.length > 0 && !uploadDocumentType) {
+            setUploadDocumentType(missingTypes[0]);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Document</DialogTitle>
+            <DialogDescription>
+              Upload compliance evidence and supporting files for review.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Document Type</Label>
+              {missingTypes.length > 0 ? (
+                <>
+                  <Select value={uploadDocumentType} onValueChange={setUploadDocumentType}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select document type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {missingTypes.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Requested by compliance checkpoints.
+                  </p>
+                </>
+              ) : (
+                <Input
+                  placeholder="e.g., gst_return, audited_financials"
+                  value={uploadDocumentType}
+                  onChange={(event) => setUploadDocumentType(event.target.value)}
+                />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <Select value={uploadCategory} onValueChange={setUploadCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="compliance">Compliance</SelectItem>
+                  <SelectItem value="tax">Tax</SelectItem>
+                  <SelectItem value="license">License</SelectItem>
+                  <SelectItem value="legal">Legal</SelectItem>
+                  <SelectItem value="kyc">KYC</SelectItem>
+                  <SelectItem value="registration">Registration</SelectItem>
+                  <SelectItem value="finance">Finance</SelectItem>
+                  <SelectItem value="general">General</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>File</Label>
+              <Input
+                type="file"
+                onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
+              />
+              {uploadFile && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: {uploadFile.name}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Expiry Date (optional)</Label>
+              <Input
+                type="date"
+                value={uploadExpiryDate}
+                onChange={(event) => setUploadExpiryDate(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUploadDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => uploadDocumentMutation.mutate()}
+              disabled={!uploadFile || !uploadDocumentType.trim() || uploadDocumentMutation.isPending}
+            >
+              {uploadDocumentMutation.isPending ? 'Uploading...' : 'Upload'}
             </Button>
           </DialogFooter>
         </DialogContent>

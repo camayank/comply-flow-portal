@@ -24,7 +24,10 @@ await initializeEncryption();
 
 const app = express();
 
-// Register security headers first
+// Parse cookies before security middleware (CSRF/session checks use cookies)
+app.use(cookieParser());
+
+// Register security headers early
 registerSecurityMiddleware(app);
 
 // CORS middleware - restricted even in development for security
@@ -54,7 +57,6 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-Tenant-ID'],
 }));
-app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(express.static('public'));
@@ -81,6 +83,35 @@ app.use('/uploads', express.static(uploadsPath));
 log(`📁 File uploads directory: ${uploadsPath}`);
 
 // Request timeout (30 seconds for all requests)
+const SENSITIVE_KEYS = new Set([
+  'password',
+  'otp',
+  'token',
+  'sessionToken',
+  'csrfToken',
+  'authorization',
+  'cookie',
+  'set-cookie',
+]);
+
+function redactSensitive(value: any): any {
+  if (Array.isArray(value)) {
+    return value.map(redactSensitive);
+  }
+  if (value && typeof value === 'object') {
+    const redacted: Record<string, any> = {};
+    for (const [key, val] of Object.entries(value)) {
+      if (SENSITIVE_KEYS.has(key.toLowerCase())) {
+        redacted[key] = '[REDACTED]';
+      } else {
+        redacted[key] = redactSensitive(val);
+      }
+    }
+    return redacted;
+  }
+  return value;
+}
+
 app.use((req, res, next) => {
   req.setTimeout(30000); // 30 seconds
   res.setTimeout(30000);
@@ -175,8 +206,9 @@ app.use((req, res, next) => {
     
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      if (capturedJsonResponse && process.env.NODE_ENV !== 'production') {
+        const safeBody = redactSensitive(capturedJsonResponse);
+        logLine += ` :: ${JSON.stringify(safeBody)}`;
       }
 
       if (logLine.length > 80) {
@@ -228,6 +260,11 @@ app.use((req, res, next) => {
   // Initialize task reminder processor
   const { taskReminderProcessor } = await import('./task-reminder-processor');
   console.log('📋 Task reminder processor initialized');
+
+  // Initialize compliance alert processor
+  const { ComplianceAlertProcessor } = await import('./compliance-alert-processor');
+  new ComplianceAlertProcessor();
+  console.log('📢 Compliance alert processor initialized');
   
   // Initialize platform-wide synchronization orchestrator
   // const { platformSyncOrchestrator } = await import('./platform-sync-orchestrator');

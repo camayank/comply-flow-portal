@@ -7,12 +7,12 @@
  * Architecture:
  * - services_catalog: 96 available services (GST, TDS, Accounting, etc.)
  * - entity_services: Client's subscribed services
- * - compliance_actions: Tasks generated from subscribed services
+ * - compliance_tracking: Compliance obligations generated from the rules engine
  * - client_compliance_state: Aggregated health from all services
  */
 
 import { pool } from '../../db';
-import * as ComplianceService from './compliance-service';
+import { syncComplianceTracking } from '../../compliance-tracking-sync';
 
 export interface ServiceCatalogEntry {
   serviceKey: string;
@@ -125,7 +125,7 @@ export async function getClientServices(clientId: number): Promise<EntityService
 
 /**
  * Subscribe client to a service
- * Creates entity_service binding and generates initial compliance actions
+ * Creates entity_service binding and syncs compliance tracking
  */
 export async function subscribeClientToService(
   clientId: number,
@@ -147,8 +147,6 @@ export async function subscribeClientToService(
       throw new Error(`Service ${serviceKey} not found in catalog`);
     }
 
-    const service = serviceResult.rows[0];
-
     // Create entity_service binding
     const bindingResult = await client.query(
       `INSERT INTO entity_services 
@@ -164,8 +162,8 @@ export async function subscribeClientToService(
 
     const entityServiceId = bindingResult.rows[0].id;
 
-    // Generate initial compliance action based on service
-    await generateComplianceActionsForService(clientId, service, client);
+    // Ensure compliance tracking is synced for the entity
+    await syncComplianceTracking({ entityIds: [clientId] });
 
     await client.query('COMMIT');
     return entityServiceId;
@@ -179,151 +177,111 @@ export async function subscribeClientToService(
 }
 
 /**
- * Calculate next due date based on periodicity
- * Used for recurring services
- */
-function calculateNextDueDate(periodicity: string, startDate: Date): Date | null {
-  if (periodicity === 'ONE_TIME') {
-    return null; // One-time services don't have recurring due dates
-  }
-
-  const nextDate = new Date(startDate);
-
-  switch (periodicity) {
-    case 'MONTHLY':
-      nextDate.setMonth(nextDate.getMonth() + 1);
-      break;
-    case 'QUARTERLY':
-      nextDate.setMonth(nextDate.getMonth() + 3);
-      break;
-    case 'ANNUAL':
-      nextDate.setFullYear(nextDate.getFullYear() + 1);
-      break;
-    case 'ONGOING':
-      // For ongoing services, set next review to 1 month
-      nextDate.setMonth(nextDate.getMonth() + 1);
-      break;
-  }
-
-  return nextDate;
-}
-
-/**
- * Generate compliance actions from service subscription
- * Following Vanta pattern: Each service generates compliance requirements
- */
-async function generateComplianceActionsForService(
-  clientId: number,
-  service: any,
-  client: any
-): Promise<void> {
-  // Map service keys to compliance actions
-  const actionMapping: Record<string, any> = {
-    'gst_returns': {
-      actionType: 'upload',
-      title: `Upload GST documents for ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`,
-      description: 'Upload sales register, purchase register, and GST return documents',
-      documentType: 'GST Return Documents',
-      priority: 'high',
-      estimatedMinutes: 15,
-      benefits: [
-        'Complete your GST filing before deadline',
-        'Avoid late filing penalties',
-        'Maintain good compliance record',
-        'Enable ITC claims'
-      ],
-      instructions: [
-        'Gather all sales invoices',
-        'Prepare purchase invoices and ITC documents',
-        'Ensure all documents are in PDF format',
-        'Upload files through the portal',
-        'Review and submit for processing'
-      ]
-    },
-    'tds_quarterly': {
-      actionType: 'pay',
-      title: 'File and Pay TDS for current quarter',
-      description: 'Submit TDS returns and payment',
-      documentType: 'TDS Return',
-      priority: 'high',
-      estimatedMinutes: 20,
-      benefits: [
-        'Avoid TDS late filing penalties',
-        'Generate Form 16/16A for payees',
-        'Maintain compliance with Income Tax Act',
-        'Enable smooth ITR filing'
-      ]
-    },
-    'accounting_monthly': {
-      actionType: 'review',
-      title: 'Monthly accounting books closure',
-      description: 'Review and finalize monthly accounting books',
-      documentType: 'Monthly Financial Statements',
-      priority: 'medium',
-      estimatedMinutes: 30,
-      benefits: [
-        'Accurate financial visibility',
-        'Timely management reporting',
-        'Smoother year-end closing',
-        'Better business decisions'
-      ]
-    }
-  };
-
-  const actionConfig = actionMapping[service.service_key];
-  
-  if (actionConfig) {
-    // Calculate due date based on service periodicity
-    const dueDate = calculateNextDueDate(service.periodicity, new Date()) || 
-                    new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days default
-
-    await client.query(
-      `INSERT INTO compliance_actions 
-       (client_id, action_type, title, description, document_type, 
-        due_date, priority, status, estimated_time_minutes, benefits, instructions)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9, $10)`,
-      [
-        clientId,
-        actionConfig.actionType,
-        actionConfig.title,
-        actionConfig.description,
-        actionConfig.documentType,
-        dueDate,
-        actionConfig.priority,
-        actionConfig.estimatedMinutes,
-        actionConfig.benefits,
-        actionConfig.instructions
-      ]
-    );
-  }
-}
-
-/**
  * Get compliance summary grouped by service
  * Shows which services are compliant and which need attention
  */
 export async function getServiceComplianceSummary(clientId: number): Promise<any[]> {
-  const result = await pool.query(
-    `SELECT 
-      sc.service_key,
-      sc.name,
-      sc.category,
-      es.status as subscription_status,
-      es.next_due_date,
-      COUNT(ca.id) FILTER (WHERE ca.status = 'pending') as pending_actions,
-      COUNT(ca.id) FILTER (WHERE ca.status = 'completed') as completed_actions,
-      MAX(ca.due_date) FILTER (WHERE ca.status = 'pending') as next_action_due
-    FROM entity_services es
-    JOIN services_catalog sc ON es.service_key = sc.service_key
-    LEFT JOIN compliance_actions ca ON ca.client_id = $1 
-      AND ca.metadata->>'service_key' = sc.service_key
-    WHERE es.entity_id = $1
-    GROUP BY sc.service_key, sc.name, sc.category, es.status, es.next_due_date
-    ORDER BY pending_actions DESC, next_action_due ASC`,
+  const servicesResult = await pool.query(
+    `SELECT es.service_key, es.is_active, sc.name, sc.category
+     FROM entity_services es
+     JOIN services_catalog sc ON es.service_key = sc.service_key
+     WHERE es.entity_id = $1`,
     [clientId]
   );
 
-  return result.rows;
+  const trackingResult = await pool.query(
+    `SELECT cr.regulation_category, ct.status, ct.due_date
+     FROM compliance_tracking ct
+     JOIN compliance_rules cr ON ct.compliance_rule_id = cr.id
+     WHERE ct.business_entity_id = $1`,
+    [clientId]
+  );
+
+  const categoryStats = new Map<string, { pending: number; completed: number; overdue: number; nextDue?: Date }>();
+  trackingResult.rows.forEach((row: any) => {
+    const category = row.regulation_category || 'other';
+    const bucket = categoryStats.get(category) || { pending: 0, completed: 0, overdue: 0 };
+    const status = String(row.status || '').toLowerCase();
+    if (status === 'completed') bucket.completed += 1;
+    else if (status === 'overdue') bucket.overdue += 1;
+    else bucket.pending += 1;
+    if (row.due_date && (status === 'pending' || status === 'overdue')) {
+      const dueDate = new Date(row.due_date);
+      if (!bucket.nextDue || dueDate < bucket.nextDue) {
+        bucket.nextDue = dueDate;
+      }
+    }
+    categoryStats.set(category, bucket);
+  });
+
+  const mapServiceToCategories = (serviceKey: string, serviceCategory: string | null): string[] => {
+    const key = serviceKey.toLowerCase();
+    const categories: string[] = [];
+
+    if (key.includes('gst')) categories.push('gst');
+    if (key.includes('tds') || key.includes('itr') || key.includes('income_tax')) categories.push('income_tax');
+    if (key.includes('roc') || key.includes('companies') || key.includes('mca')) categories.push('companies_act');
+    if (key.includes('pf') || key.includes('esi')) categories.push('pf_esi');
+    if (key.includes('pt') || key.includes('professional')) categories.push('professional_tax');
+    if (key.includes('license') || key.includes('fssai') || key.includes('shops')) categories.push('licenses');
+    if (key.includes('registration') || key.includes('incorp') || key.includes('formation')) categories.push('business_registration');
+    if (key.includes('funding') || key.includes('cap_table')) categories.push('funding_readiness');
+    if (key.includes('payroll') && !categories.includes('pf_esi')) categories.push('pf_esi', 'professional_tax');
+
+    if (categories.length > 0) return categories;
+
+    switch ((serviceCategory || '').toLowerCase()) {
+      case 'business_registration':
+        return ['business_registration'];
+      case 'tax_registration':
+        return ['gst', 'income_tax'];
+      case 'tax_compliance':
+        return ['gst', 'income_tax'];
+      case 'statutory_compliance':
+        return ['companies_act', 'pf_esi', 'professional_tax', 'licenses'];
+      case 'licenses':
+        return ['licenses'];
+      case 'payroll':
+        return ['pf_esi', 'professional_tax'];
+      case 'financial_services':
+        return ['funding_readiness'];
+      default:
+        return [];
+    }
+  };
+
+  const summaries = servicesResult.rows.map((service: any) => {
+    const mappedCategories = mapServiceToCategories(service.service_key, service.category);
+    let pending = 0;
+    let completed = 0;
+    let overdue = 0;
+    let nextDue: Date | undefined;
+
+    mappedCategories.forEach((category) => {
+      const stats = categoryStats.get(category);
+      if (!stats) return;
+      pending += stats.pending;
+      completed += stats.completed;
+      overdue += stats.overdue;
+      if (stats.nextDue && (!nextDue || stats.nextDue < nextDue)) {
+        nextDue = stats.nextDue;
+      }
+    });
+
+    return {
+      service_key: service.service_key,
+      name: service.name,
+      category: service.category,
+      subscription_status: service.is_active ? 'active' : 'inactive',
+      next_due_date: nextDue || null,
+      pending_actions: pending + overdue,
+      completed_actions: completed,
+      overdue_actions: overdue,
+      mapped_categories: mappedCategories
+    };
+  });
+
+  return summaries;
 }
 
 /**

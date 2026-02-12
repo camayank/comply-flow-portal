@@ -2,13 +2,19 @@ import { db } from './db';
 import {
   serviceRequests,
   businessEntities,
-  users
+  users,
+  notificationRules,
+  notificationOutbox,
+  notificationTemplates
 } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import cron from 'node-cron';
 import { EventEmitter } from 'events';
 import { sendWhatsApp, verifyWhatsAppConfig } from './services/whatsappService';
 import nodemailer from 'nodemailer';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
 
 // Email transporter configuration
 const emailTransporter = nodemailer.createTransport({
@@ -22,8 +28,10 @@ const emailTransporter = nodemailer.createTransport({
 });
 
 // SMS provider configuration (Twilio)
-const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN
-  ? new (require('twilio'))(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+const twilioAccountSid = process.env.TWILIO_ACCOUNT_SID || '';
+const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN || '';
+const twilioClient = twilioAccountSid.startsWith('AC') && twilioAuthToken
+  ? new (require('twilio'))(twilioAccountSid, twilioAuthToken)
   : null;
 
 // Enterprise Notification Engine for Universal Service Provider Platform
@@ -43,7 +51,7 @@ export class NotificationEngine {
     await this.loadNotificationRules();
     
     // Start the outbox processor
-    this.startOutboxProcessor();
+    await this.startOutboxProcessor();
     
     // Register event handlers
     this.registerEventHandlers();
@@ -53,18 +61,36 @@ export class NotificationEngine {
 
   private async loadNotificationRules() {
     try {
-      // For now, create sample rules in memory until notification tables are available
-      const rules = this.getSampleNotificationRules();
+      const rules = await db
+        .select()
+        .from(notificationRules)
+        .where(eq(notificationRules.isEnabled, true));
 
-      for (const rule of rules) {
+      const resolvedRules = rules.length > 0
+        ? rules
+        : (process.env.NODE_ENV !== 'production' ? this.getSampleNotificationRules() : []);
+
+      for (const rule of resolvedRules) {
+        if (rule.type === 'SCHEDULE' && !rule.scheduleJson) {
+          console.warn(`⚠️  Notification rule ${rule.ruleKey} is missing scheduleJson, skipping.`);
+          continue;
+        }
         if (rule.type === 'SCHEDULE') {
-          this.registerScheduledRule(rule);
+          await this.registerScheduledRule(rule);
         } else if (rule.type === 'EVENT') {
           this.registerEventRule(rule);
         }
       }
 
-      console.log(`📋 Loaded ${rules.length} sample notification rules`);
+      if (rules.length === 0) {
+        if (resolvedRules.length > 0) {
+          console.log(`📋 Loaded ${resolvedRules.length} sample notification rules (no DB rules found)`);
+        } else {
+          console.log('📋 No notification rules configured');
+        }
+      } else {
+        console.log(`📋 Loaded ${resolvedRules.length} notification rules from database`);
+      }
     } catch (error) {
       console.error('❌ Error loading notification rules:', error);
     }
@@ -89,7 +115,7 @@ export class NotificationEngine {
     ];
   }
 
-  private registerScheduledRule(rule: any) {
+  private async registerScheduledRule(rule: any) {
     try {
       const { jobManager } = await import('./job-lifecycle-manager.js');
       const scheduleConfig = JSON.parse(rule.scheduleJson);
@@ -155,7 +181,7 @@ export class NotificationEngine {
 
       // Apply scope filters
       if (scope.serviceType) {
-        query = query.where(eq(serviceRequests.serviceType, scope.serviceType));
+        query = query.where(eq(serviceRequests.serviceId, scope.serviceType));
       }
 
       const results = await query;
@@ -170,7 +196,7 @@ export class NotificationEngine {
 
         // Check for smart due date logic (T-7, T-3, T-1)
         if (logic.relativeDueDays) {
-          const dueDate = new Date(serviceRequest.dueDate || '');
+          const dueDate = new Date(serviceRequest.slaDeadline || serviceRequest.expectedCompletion || '');
           const today = new Date();
           const daysDiff = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
@@ -262,14 +288,19 @@ export class NotificationEngine {
       const template = templateKey || rule.templateKey;
 
       // Prepare template variables
+      const portalBase = process.env.FRONTEND_URL || '';
       const templateVars = {
         entityName: entity?.name || 'Your Business',
         clientFirstName: contact?.firstName || 'Client',
-        serviceName: serviceRequest.serviceType,
+        serviceName: serviceRequest.serviceId || serviceRequest.serviceType,
         periodLabel: serviceRequest.periodLabel || 'Current Period',
-        dueDate: serviceRequest.dueDate ? new Date(serviceRequest.dueDate).toLocaleDateString('en-IN') : 'TBD',
+        dueDate: serviceRequest.slaDeadline
+          ? new Date(serviceRequest.slaDeadline).toLocaleDateString('en-IN')
+          : serviceRequest.expectedCompletion
+            ? new Date(serviceRequest.expectedCompletion).toLocaleDateString('en-IN')
+            : 'TBD',
         nextClientAction: 'Please check your portal for next steps',
-        portalDeepLink: `${process.env.FRONTEND_URL}/portal/service/${serviceRequest.id}`,
+        portalDeepLink: `${portalBase}/service-request/${serviceRequest.id}`,
         pendingItem: 'Document review and approval',
         reason: 'Please review and resubmit'
       };
@@ -287,7 +318,7 @@ export class NotificationEngine {
               eq(notificationOutbox.ruleKey, rule.ruleKey),
               eq(notificationOutbox.serviceRequestId, serviceRequest.id),
               eq(notificationOutbox.channel, channel),
-              sql`created_at > datetime('now', '-${rule.dedupeWindowMins || 120} minutes')`
+              sql`${notificationOutbox.createdAt} > NOW() - INTERVAL '${rule.dedupeWindowMins || 120} minutes'`
             )
           )
           .limit(1);
@@ -319,7 +350,7 @@ export class NotificationEngine {
     }
   }
 
-  private startOutboxProcessor() {
+  private async startOutboxProcessor() {
     const { jobManager } = await import('./job-lifecycle-manager.js');
 
     // Process outbox every 30 seconds

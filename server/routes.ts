@@ -13,10 +13,16 @@ import {
   type Service,
   leads as leadsTable,
   serviceRequests,
-  documentsUploads
+  documentsUploads,
+  users,
+  workItemQueue,
+  notifications,
+  activityLogs,
+  workItemActivityLog,
+  slaExceptions
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, inArray, or } from "drizzle-orm";
 import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES, type AuthenticatedRequest } from "./rbac-middleware";
 import { validateIdParam, parseIdParam, ID_TYPES } from "./middleware/id-validator";
 import { registerProposalRoutes } from "./proposals-routes";
@@ -38,6 +44,7 @@ import lifecycleApiRoutes from "./routes/lifecycle-api"; // Lifecycle management
 import { complianceStateRoutes } from "./compliance-state-routes"; // Compliance state & score management
 import { registerClientSupportRoutes } from "./client-support-routes"; // Client support ticket routes
 import { registerBulkImportRoutes } from "./bulk-import-routes"; // Bulk data import routes
+import { logWorkItemActivity } from "./auto-escalation-engine";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const requireAdminAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ADMIN)] as const;
@@ -168,6 +175,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updates = req.body;
+      const assignmentNotes = updates.assignmentNotes ?? updates.notes;
+      const clientVisible = updates.clientVisible === true || updates.clientVisible === 'true';
+      const clientMessage = updates.clientMessage || (clientVisible ? 'Your request has been assigned to our operations team.' : null);
+      const priorityNotes = updates.priorityNotes ?? updates.notes;
+
+      const assignmentChangeRequested = Object.prototype.hasOwnProperty.call(updates, 'assignedTeamMember');
+      if (assignmentChangeRequested) {
+        const requesterRole = req.user?.role;
+        const isManager =
+          requesterRole === USER_ROLES.OPS_MANAGER ||
+          requesterRole === USER_ROLES.ADMIN ||
+          requesterRole === USER_ROLES.SUPER_ADMIN;
+        const isOpsExecutive = requesterRole === USER_ROLES.OPS_EXECUTIVE;
+
+        if (!isManager && !isOpsExecutive) {
+          return res.status(403).json({ error: 'Insufficient permissions to assign service requests' });
+        }
+
+        const rawAssignee = updates.assignedTeamMember ?? null;
+        if (!isManager) {
+          if (rawAssignee === null || rawAssignee === undefined) {
+            return res.status(403).json({ error: 'Ops executives may only assign requests to themselves' });
+          }
+          if (currentRequest.assignedTeamMember && currentRequest.assignedTeamMember !== req.user?.id) {
+            return res.status(403).json({ error: 'Ops executives may only self-assign unassigned requests' });
+          }
+        }
+
+        let assigneeId: number | null = null;
+        let assigneeName: string | null = null;
+        let assigneeRole: string | null = null;
+
+        if (rawAssignee !== null && rawAssignee !== undefined && rawAssignee !== '') {
+          assigneeId = parseInt(String(rawAssignee), 10);
+          if (Number.isNaN(assigneeId)) {
+            return res.status(400).json({ error: 'Invalid assignee id' });
+          }
+
+          if (!isManager && assigneeId !== req.user?.id) {
+            return res.status(403).json({ error: 'Ops executives may only assign requests to themselves' });
+          }
+
+          const [assignee] = await db
+            .select({
+              id: users.id,
+              fullName: users.fullName,
+              email: users.email,
+              username: users.username,
+              role: users.role,
+              isActive: users.isActive
+            })
+            .from(users)
+            .where(eq(users.id, assigneeId));
+
+          if (!assignee) {
+            return res.status(400).json({ error: 'Assignee not found' });
+          }
+
+          if (!assignee.isActive) {
+            return res.status(400).json({ error: 'Assignee is inactive' });
+          }
+
+          const allowedAssigneeRoles = new Set([
+            USER_ROLES.OPS_MANAGER,
+            USER_ROLES.OPS_EXECUTIVE,
+            USER_ROLES.QC_EXECUTIVE,
+            USER_ROLES.CUSTOMER_SERVICE,
+          ]);
+
+          if (!allowedAssigneeRoles.has(assignee.role)) {
+            return res.status(400).json({ error: 'Assignee role not eligible for service requests' });
+          }
+
+          assigneeName = assignee.fullName || assignee.email || assignee.username || `User ${assignee.id}`;
+          assigneeRole = assignee.role;
+        }
+
+        await db.update(serviceRequests)
+          .set({
+            assignedTeamMember: assigneeId,
+            updatedAt: new Date()
+          })
+          .where(eq(serviceRequests.id, id));
+
+        const workItems = await db
+          .select({
+            id: workItemQueue.id,
+            assignedTo: workItemQueue.assignedTo
+          })
+          .from(workItemQueue)
+          .where(eq(workItemQueue.serviceRequestId, id));
+
+        for (const item of workItems) {
+          await db.update(workItemQueue)
+            .set({
+              assignedTo: assigneeId,
+              assignedToName: assigneeName,
+              assignedToRole: assigneeRole,
+              lastActivityAt: new Date()
+            })
+            .where(eq(workItemQueue.id, item.id));
+
+          await logWorkItemActivity({
+            workItemQueueId: item.id,
+            serviceRequestId: id,
+            activityType: 'assignment',
+            activityDescription: assigneeName
+              ? `Assigned to ${assigneeName}${assignmentNotes ? ` (${assignmentNotes})` : ''}`
+              : `Unassigned${assignmentNotes ? ` (${assignmentNotes})` : ''}`,
+            previousValue: { assignedTo: item.assignedTo },
+            newValue: { assignedTo: assigneeId, assigneeName },
+            performedBy: req.user?.id,
+            performedByName: req.user?.username,
+            performedByRole: req.user?.role,
+            triggerSource: 'service_request',
+            clientVisible: clientVisible || false,
+            clientMessage: clientVisible ? clientMessage : undefined
+          });
+        }
+
+        await db.insert(activityLogs).values({
+          userId: req.user?.id,
+          serviceRequestId: id,
+          action: 'assignment',
+          entityType: 'service_request',
+          entityId: id,
+          details: assigneeName ? 'Assigned to operations team member' : 'Unassigned from operations team',
+          metadata: {
+            assigneeId,
+            assigneeName,
+            notes: assignmentNotes || null,
+            clientVisible: clientVisible || false
+          },
+          createdAt: new Date()
+        });
+
+        if (assigneeId && assigneeName) {
+          await db.insert(notifications).values({
+            userId: assigneeId,
+            title: 'New Service Request Assigned',
+            message: `Service request #${id} has been assigned to you.`,
+            type: 'task_assignment',
+            category: 'service',
+            priority: 'normal',
+            actionUrl: `/ops/service-requests/${id}`,
+            actionText: 'View Service Request',
+            createdAt: new Date()
+          });
+        }
+
+        delete updates.assignedTeamMember;
+        delete updates.assignmentNotes;
+        delete updates.clientVisible;
+        delete updates.clientMessage;
+      }
 
       // If updating with document hash, verify integrity
       if (updates.documentHash && updates.uploadedDocs) {
@@ -207,12 +369,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
         delete updates.status;
       }
 
+      const priorityChangeRequested = Object.prototype.hasOwnProperty.call(updates, 'priority');
+      const previousPriority = currentRequest.priority;
+
+      if (priorityChangeRequested) {
+        const requesterRole = req.user?.role;
+        const canUpdatePriority =
+          requesterRole === USER_ROLES.OPS_MANAGER ||
+          requesterRole === USER_ROLES.ADMIN ||
+          requesterRole === USER_ROLES.SUPER_ADMIN;
+
+        if (!canUpdatePriority) {
+          return res.status(403).json({ error: 'Insufficient permissions to update priority' });
+        }
+
+        if (updates.priority && updates.priority !== previousPriority) {
+          const fromPriority = (previousPriority || '').toLowerCase();
+          const toPriority = updates.priority.toLowerCase();
+          const isUrgentDowngrade = fromPriority === 'urgent' && toPriority !== 'urgent';
+
+          if (isUrgentDowngrade && currentRequest.slaDeadline) {
+            const hoursRemaining =
+              (new Date(currentRequest.slaDeadline).getTime() - Date.now()) / (1000 * 60 * 60);
+
+            if (hoursRemaining <= 24) {
+              return res.status(400).json({
+                error: 'Priority downgrade blocked',
+                message: 'Cannot downgrade urgent priority within 24 hours of the SLA deadline.'
+              });
+            }
+          }
+        }
+
+        delete updates.priorityNotes;
+      }
+
       // Update other fields (non-status)
       if (Object.keys(updates).length > 0) {
         const updatedRequest = await storage.updateServiceRequest(id, updates);
 
         if (!updatedRequest) {
           return res.status(404).json({ error: "Service request not found" });
+        }
+
+        if (priorityChangeRequested && updates.priority && updates.priority !== previousPriority) {
+          const newPriority = updates.priority;
+          const workItems = await db
+            .select({
+              id: workItemQueue.id,
+              assignedTo: workItemQueue.assignedTo
+            })
+            .from(workItemQueue)
+            .where(eq(workItemQueue.serviceRequestId, id));
+
+          for (const item of workItems) {
+            await db.update(workItemQueue)
+              .set({
+                priority: newPriority,
+                lastActivityAt: new Date()
+              })
+              .where(eq(workItemQueue.id, item.id));
+
+            await logWorkItemActivity({
+              workItemQueueId: item.id,
+              serviceRequestId: id,
+              activityType: 'priority_change',
+              activityDescription: `Priority changed from ${previousPriority} to ${newPriority}${priorityNotes ? ` (${priorityNotes})` : ''}`,
+              previousValue: { priority: previousPriority },
+              newValue: { priority: newPriority },
+              performedBy: req.user?.id,
+              performedByName: req.user?.username,
+              performedByRole: req.user?.role,
+              triggerSource: 'service_request'
+            });
+          }
+
+          await db.insert(activityLogs).values({
+            userId: req.user?.id,
+            serviceRequestId: id,
+            action: 'priority_change',
+            entityType: 'service_request',
+            entityId: id,
+            details: `Priority changed from ${previousPriority} to ${newPriority}`,
+            metadata: {
+              previousPriority,
+              newPriority,
+              notes: priorityNotes || null
+            },
+            createdAt: new Date()
+          });
         }
 
         res.json(updatedRequest);
@@ -323,14 +568,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Get activity logs for this service request
-      try {
-        const activities = await storage.getActivityLogs({
-          entityType: 'service_request',
-          entityId: id
-        });
+      const role = req.user?.role;
+      const isClient = role === USER_ROLES.CLIENT;
+      const isInternal = !isClient;
 
-        activities.forEach((activity: any, index: number) => {
+      // Activity logs for this service request (exclude assignment to avoid duplicates)
+      const activities = await db
+        .select({
+          id: activityLogs.id,
+          action: activityLogs.action,
+          details: activityLogs.details,
+          createdAt: activityLogs.createdAt,
+          userId: activityLogs.userId,
+          metadata: activityLogs.metadata
+        })
+        .from(activityLogs)
+        .where(
+          or(
+            eq(activityLogs.serviceRequestId, id),
+            and(eq(activityLogs.entityType, 'service_request'), eq(activityLogs.entityId, id))
+          )
+        )
+        .orderBy(desc(activityLogs.createdAt));
+
+      activities
+        .filter(activity => activity.action !== 'assignment')
+        .forEach((activity, index) => {
+          let metadata: any = activity.metadata;
+          if (metadata && typeof metadata === 'string') {
+            try {
+              metadata = JSON.parse(metadata);
+            } catch {
+              metadata = null;
+            }
+          }
+
+          if (isClient && metadata?.clientVisible === false) {
+            return;
+          }
+
           timeline.push({
             id: `activity-${activity.id || index}`,
             type: 'activity',
@@ -341,12 +617,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
             user: activity.userId ? `User #${activity.userId}` : 'System'
           });
         });
-      } catch (e) {
-        // Activity logs may not exist for all requests
+
+      // Assignment history from work item activity log
+      const assignmentActivities = await db
+        .select({
+          id: workItemActivityLog.id,
+          activityType: workItemActivityLog.activityType,
+          activityDescription: workItemActivityLog.activityDescription,
+          createdAt: workItemActivityLog.createdAt,
+          performedByName: workItemActivityLog.performedByName,
+          performedByRole: workItemActivityLog.performedByRole,
+          clientVisible: workItemActivityLog.clientVisible,
+          clientMessage: workItemActivityLog.clientMessage
+        })
+        .from(workItemActivityLog)
+        .where(and(eq(workItemActivityLog.serviceRequestId, id), eq(workItemActivityLog.activityType, 'assignment')))
+        .orderBy(desc(workItemActivityLog.createdAt));
+
+      assignmentActivities.forEach((activity) => {
+        if (isClient && !activity.clientVisible) return;
+
+        timeline.push({
+          id: `assignment-${activity.id}`,
+          type: 'assignment',
+          status: 'assignment',
+          title: 'Assignment Update',
+          description: activity.clientVisible && activity.clientMessage
+            ? activity.clientMessage
+            : activity.activityDescription,
+          timestamp: activity.createdAt,
+          user: isInternal
+            ? activity.performedByName || activity.performedByRole || 'Operations'
+            : 'Operations Team'
+        });
+      });
+
+      if (assignmentActivities.length === 0 && isInternal) {
+        activities
+          .filter(activity => activity.action === 'assignment')
+          .forEach((activity, index) => {
+            timeline.push({
+              id: `assignment-log-${activity.id || index}`,
+              type: 'assignment',
+              status: 'assignment',
+              title: 'Assignment Update',
+              description: activity.details || 'Assignment updated',
+              timestamp: activity.createdAt,
+              user: activity.userId ? `User #${activity.userId}` : 'Operations'
+            });
+          });
       }
 
-      // Sort timeline by timestamp
-      timeline.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      // Sort timeline by timestamp (ascending)
+      timeline.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
       res.json({
         serviceRequestId: id,
@@ -363,6 +686,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==========================================================================
   // SERVICE REQUEST STATUS TRANSITIONS - STATE MACHINE VALIDATED
   // ==========================================================================
+
+  // POST /api/service-requests/transition-preview - Preview bulk transitions
+  app.post("/api/service-requests/transition-preview", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { serviceRequestIds, toStatus } = req.body;
+
+      if (!toStatus) {
+        return res.status(400).json({ error: "toStatus is required" });
+      }
+
+      if (!Array.isArray(serviceRequestIds) || serviceRequestIds.length === 0) {
+        return res.status(400).json({ error: "serviceRequestIds must be a non-empty array" });
+      }
+
+      const numericIds: number[] = [];
+      const readableIds: string[] = [];
+
+      serviceRequestIds.forEach((rawId: string | number) => {
+        if (typeof rawId === 'number' || /^\d+$/.test(String(rawId))) {
+          const numeric = parseInt(String(rawId), 10);
+          numericIds.push(numeric);
+        } else {
+          readableIds.push(String(rawId));
+        }
+      });
+
+      const results: any[] = [];
+      const missing: Array<string | number> = [];
+
+      const [byNumeric, byReadable] = await Promise.all([
+        numericIds.length
+          ? db.select().from(serviceRequests).where(inArray(serviceRequests.id, numericIds))
+          : Promise.resolve([]),
+        readableIds.length
+          ? db.select().from(serviceRequests).where(inArray(serviceRequests.requestId, readableIds))
+          : Promise.resolve([])
+      ]);
+
+      const requestMap = new Map<number, any>();
+      byNumeric.forEach(req => requestMap.set(req.id, req));
+      byReadable.forEach(req => requestMap.set(req.id, req));
+
+      const readableMap = new Map<string, any>();
+      byReadable.forEach(req => readableMap.set(req.requestId, req));
+
+      // Import state machine
+      const { isValidTransition, getValidNextStatuses } = await import('./services/service-request-state-machine');
+
+      serviceRequestIds.forEach((rawId: string | number) => {
+        let request = null;
+        if (typeof rawId === 'number' || /^\d+$/.test(String(rawId))) {
+          const numeric = parseInt(String(rawId), 10);
+          request = requestMap.get(numeric);
+        } else {
+          request = readableMap.get(String(rawId));
+        }
+
+        if (!request) {
+          missing.push(rawId);
+          return;
+        }
+
+        const validNextStatuses = getValidNextStatuses(request.status);
+        const canTransition = isValidTransition(request.status, toStatus);
+
+        results.push({
+          id: request.id,
+          displayId: request.requestId || `SR-${request.id}`,
+          currentStatus: request.status,
+          canTransition,
+          validNextStatuses,
+          reason: canTransition
+            ? null
+            : `Cannot transition from '${request.status}' to '${toStatus}'. Valid: ${validNextStatuses.join(', ')}`
+        });
+      });
+
+      res.json({
+        toStatus,
+        allowed: results.filter(item => item.canTransition),
+        blocked: results.filter(item => !item.canTransition),
+        missing
+      });
+    } catch (error: any) {
+      console.error('Error previewing transitions:', error);
+      res.status(500).json({ error: "Failed to preview transitions", message: error.message });
+    }
+  });
 
   // POST /api/service-requests/:id/transition - Validated status transition
   app.post("/api/service-requests/:id/transition", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
@@ -1322,7 +1733,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Legacy routes for backward compatibility
-  app.post("/api/admin/services", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
+  app.post("/api/admin/legacy/services", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const serviceData = req.body;
       const service = await storage.createService({
@@ -1460,16 +1871,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/sla/exception/bulk", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { serviceRequestIds, extensionHours, reason, notes, clientVisible } = req.body;
+
+      const requesterRole = req.user?.role;
+      const canExtend =
+        requesterRole === USER_ROLES.OPS_MANAGER ||
+        requesterRole === USER_ROLES.ADMIN ||
+        requesterRole === USER_ROLES.SUPER_ADMIN;
+
+      if (!canExtend) {
+        return res.status(403).json({ error: "Insufficient permissions to extend SLA" });
+      }
+
+      if (!Array.isArray(serviceRequestIds) || serviceRequestIds.length === 0) {
+        return res.status(400).json({ error: "Provide at least one service request id" });
+      }
+
+      const parsedHours = Number(extensionHours);
+      if (!Number.isFinite(parsedHours) || parsedHours <= 0) {
+        return res.status(400).json({ error: "Extension hours must be a positive number" });
+      }
+
+      if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
+        return res.status(400).json({ error: "Reason is required for SLA extension" });
+      }
+
+      const uniqueIds = Array.from(
+        new Set(
+          serviceRequestIds
+            .map((id: any) => Number(id))
+            .filter((id: number) => Number.isFinite(id))
+        )
+      );
+
+      if (uniqueIds.length === 0) {
+        return res.status(400).json({ error: "No valid service request ids supplied" });
+      }
+
+      const serviceRequestsToUpdate = await db
+        .select({
+          id: serviceRequests.id,
+          slaDeadline: serviceRequests.slaDeadline,
+          businessEntityId: serviceRequests.businessEntityId
+        })
+        .from(serviceRequests)
+        .where(inArray(serviceRequests.id, uniqueIds));
+
+      const foundIds = new Set(serviceRequestsToUpdate.map((item) => item.id));
+      const missingIds = uniqueIds.filter((id) => !foundIds.has(id));
+
+      const updated: Array<{ id: number; previousDeadline: string | null; newDeadline: string }> = [];
+      const now = new Date();
+
+      for (const item of serviceRequestsToUpdate) {
+        const currentDeadline = item.slaDeadline ? new Date(item.slaDeadline) : now;
+        const newDeadline = new Date(currentDeadline.getTime() + parsedHours * 60 * 60 * 1000);
+
+        await db
+          .update(serviceRequests)
+          .set({
+            slaDeadline: newDeadline,
+            updatedAt: new Date()
+          })
+          .where(eq(serviceRequests.id, item.id));
+
+        await db
+          .update(workItemQueue)
+          .set({
+            slaDeadline: newDeadline,
+            dueDate: newDeadline,
+            lastActivityAt: new Date()
+          })
+          .where(eq(workItemQueue.serviceRequestId, item.id));
+
+        await db.insert(slaExceptions).values({
+          serviceRequestId: item.id,
+          requestedBy: req.user?.id || 0,
+          approvedBy: req.user?.id || null,
+          exceptionType: "manual_extension",
+          reason: reason.trim(),
+          requestedExtensionHours: parsedHours,
+          approvedExtensionHours: parsedHours,
+          status: "approved",
+          validFrom: currentDeadline,
+          validUntil: newDeadline,
+          approvalNotes: notes || null,
+          createdAt: new Date(),
+          approvedAt: new Date()
+        });
+
+        const workItems = await db
+          .select({ id: workItemQueue.id })
+          .from(workItemQueue)
+          .where(eq(workItemQueue.serviceRequestId, item.id));
+
+        for (const workItem of workItems) {
+          await logWorkItemActivity({
+            workItemQueueId: workItem.id,
+            serviceRequestId: item.id,
+            activityType: "sla_extension",
+            activityDescription: `SLA extended by ${parsedHours}h (${reason.trim()})`,
+            previousValue: { slaDeadline: currentDeadline.toISOString() },
+            newValue: { slaDeadline: newDeadline.toISOString(), extensionHours: parsedHours },
+            performedBy: req.user?.id,
+            performedByName: req.user?.username,
+            performedByRole: req.user?.role,
+            triggerSource: "ops_bulk",
+            clientVisible: clientVisible === true,
+            clientMessage: clientVisible === true ? `SLA extended by ${parsedHours} hours.` : undefined
+          });
+        }
+
+        await db.insert(activityLogs).values({
+          userId: req.user?.id,
+          businessEntityId: item.businessEntityId ?? null,
+          serviceRequestId: item.id,
+          action: "sla_extension",
+          entityType: "service_request",
+          entityId: item.id,
+          details: `SLA extended by ${parsedHours} hours`,
+          metadata: {
+            reason: reason.trim(),
+            notes: notes || null,
+            previousDeadline: currentDeadline.toISOString(),
+            newDeadline: newDeadline.toISOString(),
+            extensionHours: parsedHours,
+            clientVisible: clientVisible === true
+          },
+          createdAt: new Date()
+        });
+
+        updated.push({
+          id: item.id,
+          previousDeadline: item.slaDeadline ? new Date(item.slaDeadline).toISOString() : null,
+          newDeadline: newDeadline.toISOString()
+        });
+      }
+
+      res.json({
+        success: true,
+        updatedCount: updated.length,
+        missingIds,
+        updated
+      });
+    } catch (error: any) {
+      console.error("Error applying bulk SLA extensions:", error);
+      res.status(500).json({ error: "Failed to extend SLA", message: error.message });
+    }
+  });
+
   app.post("/api/sla/exception/:serviceRequestId", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { serviceRequestId } = req.params;
-      const { extensionHours, reason, approvedBy } = req.body;
+      const { extensionHours, reason } = req.body;
+
+      const parsedHours = Number(extensionHours);
+      if (!Number.isFinite(parsedHours) || parsedHours <= 0) {
+        return res.status(400).json({ error: "Extension hours must be a positive number" });
+      }
+
+      if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
+        return res.status(400).json({ error: "Reason is required for SLA extension" });
+      }
       
       await EnhancedSlaSystem.grantSlaException(
         parseInt(serviceRequestId),
-        extensionHours,
-        reason,
-        approvedBy
+        parsedHours,
+        reason.trim(),
+        req.user?.id || 0
       );
       
       res.json({ success: true, message: "SLA exception granted" });
@@ -1483,7 +2054,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { serviceRequestId } = req.params;
       const { reason } = req.body;
       
-      EnhancedSlaSystem.pauseServiceSla(parseInt(serviceRequestId), reason);
+      await EnhancedSlaSystem.pauseServiceSla(parseInt(serviceRequestId), reason);
       res.json({ success: true, message: "SLA timer paused" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1495,7 +2066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { serviceRequestId } = req.params;
       const { reason } = req.body;
       
-      EnhancedSlaSystem.resumeServiceSla(parseInt(serviceRequestId), reason);
+      await EnhancedSlaSystem.resumeServiceSla(parseInt(serviceRequestId), reason);
       res.json({ success: true, message: "SLA timer resumed" });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -1505,7 +2076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/sla/status/:serviceRequestId", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { serviceRequestId } = req.params;
-      const status = EnhancedSlaSystem.getServiceTimerStatus(parseInt(serviceRequestId));
+      const status = await EnhancedSlaSystem.getServiceTimerStatus(parseInt(serviceRequestId));
       
       if (!status) {
         return res.status(404).json({ error: "SLA timer not found" });

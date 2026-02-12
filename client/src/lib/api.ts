@@ -3,6 +3,8 @@
  * Centralized API request handling with consistent error handling
  */
 
+import { withCsrfHeaders } from './csrf';
+
 interface RequestOptions extends RequestInit {
   body?: any;
 }
@@ -30,10 +32,10 @@ export async function apiRequest<T = any>(
 
   const config: RequestInit = {
     ...restOptions,
-    headers: {
+    headers: withCsrfHeaders({
       'Content-Type': 'application/json',
       ...headers,
-    },
+    }),
     credentials: 'include', // Include cookies for authentication
   };
 

@@ -15,10 +15,10 @@ import { db } from './db';
 import { 
   complianceStates, 
   complianceStateHistory, 
-  complianceStateRules, 
   complianceAlerts,
   stateCalculationLog 
 } from '../shared/compliance-state-schema';
+import { complianceRules, complianceTracking, businessEntities, serviceRequests, documentsUploads, documentVault } from '../shared/schema';
 import {
   ComplianceState,
   ComplianceDomain,
@@ -30,6 +30,7 @@ import {
   ComplianceRule
 } from '../shared/compliance-state-types';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
+import { computeDueDateFromFormula } from './compliance-due-date';
 
 const CALCULATION_VERSION = '1.0.0';
 
@@ -71,7 +72,7 @@ export class ComplianceStateEngine {
       // 6. Build entity state
       const entityState: EntityComplianceState = {
         entityId: input.entityId,
-        entityName: input.entityType, // TODO: Get actual name
+        entityName: input.entityName || input.entityType,
         entityType: input.entityType,
         overallState: overallState.state,
         overallRiskScore: overallState.riskScore,
@@ -149,50 +150,82 @@ export class ComplianceStateEngine {
 
   private async gatherInputData(entityId: number): Promise<StateCalculationInput | null> {
     // Gather all data needed for state calculation
-    const entity = await db.query.businessEntities.findFirst({
-      where: (entities: any, { eq }: any) => eq(entities.id, entityId)
-    });
+    const [entity] = await db
+      .select()
+      .from(businessEntities)
+      .where(eq(businessEntities.id, entityId))
+      .limit(1);
 
     if (!entity) return null;
 
     // Get active service requests
-    const serviceRequests = await db.query.serviceRequests.findMany({
-      where: (requests: any, { eq }: any) => eq(requests.entityId, entityId)
-    });
+    const serviceRequestsList = await db
+      .select()
+      .from(serviceRequests)
+      .where(eq(serviceRequests.businessEntityId, entityId));
 
     // Get document status
-    const documents = await db.query.documents.findMany({
-      where: (docs: any, { eq }: any) => eq(docs.entityId, entityId)
-    });
+    const uploadedDocuments = await db
+      .select()
+      .from(documentsUploads)
+      .where(eq(documentsUploads.entityId, entityId));
+
+    const vaultDocuments = await db
+      .select()
+      .from(documentVault)
+      .where(eq(documentVault.businessEntityId, entityId));
+
+    const trackingItems = await db
+      .select({
+        complianceRuleId: complianceTracking.complianceRuleId,
+        serviceId: complianceTracking.serviceId,
+        dueDate: complianceTracking.dueDate,
+        nextDueDate: complianceTracking.nextDueDate,
+        status: complianceTracking.status,
+        lastCompleted: complianceTracking.lastCompleted,
+        priority: complianceTracking.priority
+      })
+      .from(complianceTracking)
+      .where(eq(complianceTracking.businessEntityId, entityId));
 
     // Build input
     const input: StateCalculationInput = {
       entityId: entity.id,
+      entityName: (entity as any).name || (entity as any).businessName || null,
       entityType: entity.entityType || 'pvt_ltd',
       incorporationDate: entity.incorporationDate || null,
-      turnover: parseFloat(entity.annualTurnover || '0'),
-      employeeCount: entity.employeeCount || 0,
+      turnover: entity.annualTurnover ? parseFloat(entity.annualTurnover) : null,
+      employeeCount: entity.employeeCount ?? null,
       state: entity.state || null,
       hasGST: entity.gstin ? true : false,
       hasPF: entity.employeeCount ? entity.employeeCount >= 20 : false,
       hasESI: entity.employeeCount ? entity.employeeCount >= 10 : false,
       hasForeignTransactions: false, // TODO: Detect from services
       
-      activeServices: serviceRequests.map((sr: any) => ({
+      activeServices: serviceRequestsList.map((sr: any) => ({
         serviceKey: sr.serviceType || '',
         status: sr.status || 'pending',
         dueDate: sr.expectedCompletionDate || null,
         lastCompleted: sr.completedAt || null,
       })),
       
-      documentStatus: documents.map((doc: any) => ({
-        documentType: doc.documentType || '',
-        uploaded: true,
-        approved: doc.status === 'approved',
-        expiryDate: null, // TODO: Add expiry tracking
-      })),
+      documentStatus: [
+        ...uploadedDocuments.map((doc: any) => ({
+          documentType: doc.doctype || '',
+          uploaded: true,
+          approved: doc.status === 'approved',
+          expiryDate: null,
+        })),
+        ...vaultDocuments.map((doc: any) => ({
+          documentType: doc.documentType || '',
+          uploaded: true,
+          approved: doc.approvalStatus === 'approved',
+          expiryDate: doc.expiryDate || null,
+        })),
+      ],
       
       filingHistory: [], // TODO: Implement filing history tracking
+      trackingItems,
     };
 
     return input;
@@ -204,60 +237,204 @@ export class ComplianceStateEngine {
 
   private async loadApplicableRules(input: StateCalculationInput): Promise<ComplianceRule[]> {
     const allRules = await db.select().from(complianceRules).where(eq(complianceRules.isActive, true));
+    const now = new Date();
+    const normalizedEntityType = this.normalizeEntityType(input.entityType);
 
     // Filter rules based on applicability
     const applicableRules = allRules.filter((rule: any) => {
       // Check entity type
-      if (rule.applicableEntityTypes && !rule.applicableEntityTypes.includes(input.entityType)) {
-        return false;
+      if (rule.applicableEntityTypes) {
+        const applicableTypes = Array.isArray(rule.applicableEntityTypes)
+          ? rule.applicableEntityTypes
+          : [rule.applicableEntityTypes];
+        const normalizedApplicable = applicableTypes
+          .filter(Boolean)
+          .map((value: string) => this.normalizeEntityType(value));
+
+        if (normalizedApplicable.length > 0 && !normalizedApplicable.includes(normalizedEntityType)) {
+          return false;
+        }
       }
 
       // Check turnover threshold
-      if (input.turnover) {
-        if (rule.turnoverMin && input.turnover < parseFloat(rule.turnoverMin)) return false;
-        if (rule.turnoverMax && input.turnover > parseFloat(rule.turnoverMax)) return false;
+      if (input.turnover !== null && input.turnover !== undefined) {
+        if (rule.turnoverThresholdMin && input.turnover < parseFloat(rule.turnoverThresholdMin)) return false;
+        if (rule.turnoverThresholdMax && input.turnover > parseFloat(rule.turnoverThresholdMax)) return false;
       }
 
       // Check employee count
-      if (rule.employeeCountMin && input.employeeCount && input.employeeCount < rule.employeeCountMin) {
-        return false;
+      if (rule.employeeCountMin && input.employeeCount !== null && input.employeeCount !== undefined) {
+        if (input.employeeCount < rule.employeeCountMin) return false;
+      }
+      if (rule.employeeCountMax && input.employeeCount !== null && input.employeeCount !== undefined) {
+        if (input.employeeCount > rule.employeeCountMax) return false;
       }
 
-      // Check GST requirement
-      if (rule.requiresGST && !input.hasGST) return false;
-      if (rule.requiresPF && !input.hasPF) return false;
-      if (rule.requiresESI && !input.hasESI) return false;
+      // Check effective window (date-granular to avoid time-of-day exclusions)
+      if (rule.effectiveFrom) {
+        const effectiveFrom = new Date(rule.effectiveFrom);
+        const effectiveStart = new Date(
+          effectiveFrom.getFullYear(),
+          effectiveFrom.getMonth(),
+          effectiveFrom.getDate()
+        );
+        if (now < effectiveStart) return false;
+      }
+      if (rule.effectiveUntil) {
+        const effectiveUntil = new Date(rule.effectiveUntil);
+        const effectiveEnd = new Date(
+          effectiveUntil.getFullYear(),
+          effectiveUntil.getMonth(),
+          effectiveUntil.getDate(),
+          23,
+          59,
+          59,
+          999
+        );
+        if (now > effectiveEnd) return false;
+      }
+
+      // Check GST/PF/ESI requirement by category
+      if (String(rule.regulationCategory || '').toLowerCase() === 'gst' && !input.hasGST) return false;
+      if (String(rule.regulationCategory || '').toLowerCase() === 'pf_esi' && !input.hasPF && !input.hasESI) return false;
+
+      // State-specific compliance
+      if (rule.stateSpecific && Array.isArray(rule.applicableStates) && rule.applicableStates.length > 0) {
+        if (!input.state || !rule.applicableStates.includes(input.state)) {
+          return false;
+        }
+      }
 
       return true;
     });
 
-    return applicableRules.map(this.convertToComplianceRule);
+    return applicableRules.map((rule: any) => this.convertToComplianceRule(rule));
   }
 
   private convertToComplianceRule(dbRule: any): ComplianceRule {
+    const rawFormula = dbRule.dueDateFormula || {};
+    const formulaList = Array.isArray(rawFormula) ? [...rawFormula] : [rawFormula];
+    const metadata = dbRule.metadata && typeof dbRule.metadata === 'object' ? dbRule.metadata : null;
+
+    if (metadata?.second_cycle?.day && metadata?.second_cycle?.month) {
+      formulaList.push({
+        type: 'fixed',
+        day: metadata.second_cycle.day,
+        month: metadata.second_cycle.month,
+      });
+    }
+
+    const dueDateLogic = JSON.stringify(
+      (formulaList.length > 0 ? formulaList : [{}]).map((formula: any) => ({
+        ...formula,
+        calcType: formula.calcType || dbRule.dueDateCalculationType || formula.type,
+      }))
+    );
+
     return {
-      ruleId: dbRule.ruleId,
-      ruleName: dbRule.ruleName,
-      domain: dbRule.domain as ComplianceDomain,
+      ruleId: dbRule.ruleCode,
+      ruleName: dbRule.complianceName || dbRule.ruleCode,
+      domain: this.mapRegulationCategoryToDomain(dbRule.regulationCategory),
+      complianceRuleId: dbRule.id,
       applicableEntityTypes: dbRule.applicableEntityTypes || [],
       turnoverThreshold: {
-        min: dbRule.turnoverMin ? parseFloat(dbRule.turnoverMin) : undefined,
-        max: dbRule.turnoverMax ? parseFloat(dbRule.turnoverMax) : undefined,
+        min: dbRule.turnoverThresholdMin ? parseFloat(dbRule.turnoverThresholdMin) : undefined,
+        max: dbRule.turnoverThresholdMax ? parseFloat(dbRule.turnoverThresholdMax) : undefined,
       },
       employeeCountThreshold: {
         min: dbRule.employeeCountMin || undefined,
       },
-      frequency: dbRule.frequency,
-      dueDateLogic: dbRule.dueDateLogic,
+      frequency: this.mapPeriodicityToFrequency(dbRule.periodicity),
+      dueDateLogic,
       graceDays: dbRule.graceDays || 0,
       penaltyPerDay: dbRule.penaltyPerDay ? parseFloat(dbRule.penaltyPerDay) : undefined,
       maxPenalty: dbRule.maxPenalty ? parseFloat(dbRule.maxPenalty) : undefined,
-      criticalityScore: dbRule.criticalityScore,
-      amberThresholdDays: dbRule.amberThresholdDays,
+      criticalityScore: this.mapPriorityToCriticalityScore(dbRule.priorityLevel),
+      amberThresholdDays: dbRule.amberThresholdDays || 7,
       redTriggers: {
-        daysOverdue: dbRule.redThresholdDays,
+        daysOverdue: dbRule.redThresholdDays || 0,
       },
     };
+  }
+
+  private mapRegulationCategoryToDomain(category?: string): ComplianceDomain {
+    const normalized = (category || '').toLowerCase();
+    if (['companies_act', 'business_registration', 'funding_readiness'].includes(normalized)) {
+      return 'CORPORATE';
+    }
+    if (normalized === 'gst') return 'TAX_GST';
+    if (['income_tax', 'tds', 'tcs'].includes(normalized)) return 'TAX_INCOME';
+    if (['pf_esi', 'labour_laws', 'professional_tax', 'payroll'].includes(normalized)) {
+      return 'LABOUR';
+    }
+    if (normalized === 'fema') return 'FEMA';
+    if (normalized === 'licenses' || normalized === 'license') return 'LICENSES';
+    if (normalized === 'general') return 'STATUTORY';
+    return 'STATUTORY';
+  }
+
+  private normalizeEntityType(entityType?: string | null): string {
+    if (!entityType) return '';
+    const normalized = entityType.toLowerCase().replace(/[^a-z]/g, '');
+    switch (normalized) {
+      case 'privatelimited':
+      case 'privateltd':
+      case 'pvtlimited':
+      case 'pvtltd':
+      case 'pvtltdcompany':
+        return 'pvt_ltd';
+      case 'publiclimited':
+      case 'publicltd':
+        return 'public_limited';
+      case 'opc':
+      case 'onepersoncompany':
+        return 'opc';
+      case 'llp':
+        return 'llp';
+      case 'proprietorship':
+      case 'soleproprietorship':
+      case 'soleprop':
+        return 'sole_prop';
+      case 'partnership':
+        return 'partnership';
+      default:
+        return entityType.toLowerCase();
+    }
+  }
+
+  private mapPeriodicityToFrequency(periodicity?: string): ComplianceRule['frequency'] {
+    const normalized = (periodicity || '').toLowerCase();
+    switch (normalized) {
+      case 'monthly':
+        return 'MONTHLY';
+      case 'quarterly':
+        return 'QUARTERLY';
+      case 'half_yearly':
+        return 'HALF_YEARLY';
+      case 'annual':
+        return 'ANNUAL';
+      case 'event_based':
+        return 'EVENT_BASED';
+      case 'one_time':
+        return 'ONE_TIME';
+      default:
+        return 'ANNUAL';
+    }
+  }
+
+  private mapPriorityToCriticalityScore(priority?: string): number {
+    const normalized = (priority || '').toLowerCase();
+    switch (normalized) {
+      case 'critical':
+        return 9;
+      case 'high':
+        return 7;
+      case 'low':
+        return 3;
+      case 'medium':
+      default:
+        return 5;
+    }
   }
 
   // ============================================================================
@@ -301,13 +478,56 @@ export class ComplianceStateEngine {
     rule: ComplianceRule,
     input: StateCalculationInput
   ): ComplianceRequirementStatus {
-    // Calculate due date based on rule logic
-    const dueDate = this.calculateDueDate(rule, input);
+    const tracking = this.findTrackingForRule(rule, input);
+    const trackingPriority = this.normalizePriority(tracking?.priority);
+    const trackingStatus = tracking?.status ? tracking.status.toLowerCase() : null;
+    const trackingDueDate = tracking?.nextDueDate || tracking?.dueDate || null;
+
+    // Calculate due date based on tracking (preferred) or rule logic
+    let dueDate = trackingDueDate || this.calculateDueDate(rule, input);
     const now = new Date();
     
     let daysUntilDue: number | null = null;
     let daysOverdue: number | null = null;
     let state: ComplianceState = 'GREEN';
+
+    if (trackingStatus === 'completed' && !tracking?.nextDueDate) {
+      return {
+        requirementId: rule.ruleId,
+        name: rule.ruleName,
+        domain: rule.domain,
+        state: 'GREEN',
+        dueDate: null,
+        daysUntilDue: null,
+        daysOverdue: null,
+        penaltyExposure: 0,
+        priority: trackingPriority || this.determinePriority('GREEN', rule.criticalityScore, null),
+        isRecurring: rule.frequency !== 'ONE_TIME',
+        nextOccurrence: null,
+        lastFiled: tracking?.lastCompleted || null,
+        blockers: [],
+        actionRequired: 'No action required',
+      };
+    }
+
+    if (trackingStatus === 'not_applicable') {
+      return {
+        requirementId: rule.ruleId,
+        name: rule.ruleName,
+        domain: rule.domain,
+        state: 'GREEN',
+        dueDate: null,
+        daysUntilDue: null,
+        daysOverdue: null,
+        penaltyExposure: 0,
+        priority: trackingPriority || this.determinePriority('GREEN', rule.criticalityScore, null),
+        isRecurring: rule.frequency !== 'ONE_TIME',
+        nextOccurrence: null,
+        lastFiled: tracking?.lastCompleted || null,
+        blockers: [],
+        actionRequired: 'Not applicable',
+      };
+    }
 
     if (dueDate) {
       const diffMs = dueDate.getTime() - now.getTime();
@@ -334,7 +554,7 @@ export class ComplianceStateEngine {
       : 0;
 
     // Determine priority
-    const priority = this.determinePriority(state, rule.criticalityScore, daysUntilDue);
+    const priority = trackingPriority || this.determinePriority(state, rule.criticalityScore, daysUntilDue);
 
     return {
       requirementId: rule.ruleId,
@@ -348,18 +568,125 @@ export class ComplianceStateEngine {
       priority,
       isRecurring: rule.frequency !== 'ONE_TIME',
       nextOccurrence: dueDate,
-      lastFiled: null, // TODO: Track from filing history
+      lastFiled: tracking?.lastCompleted || null,
       blockers: this.identifyBlockers(rule, input),
       actionRequired: this.generateActionText(state, rule, daysUntilDue, daysOverdue),
     };
   }
 
+  private findTrackingForRule(rule: ComplianceRule, input: StateCalculationInput) {
+    if (!input.trackingItems || input.trackingItems.length === 0) return null;
+
+    const matching = input.trackingItems.filter((item) => {
+      if (rule.complianceRuleId && item.complianceRuleId === rule.complianceRuleId) return true;
+      if (item.serviceId && item.serviceId === rule.ruleId) return true;
+      return false;
+    });
+
+    if (matching.length === 0) return null;
+
+    const withEffectiveDueDate = matching.map((item) => ({
+      ...item,
+      effectiveDueDate: item.nextDueDate || item.dueDate || null,
+    }));
+
+    const active = withEffectiveDueDate
+      .filter(item => item.status && !['completed', 'not_applicable'].includes(item.status.toLowerCase()))
+      .sort((a, b) => {
+        const aTime = a.effectiveDueDate ? a.effectiveDueDate.getTime() : Number.POSITIVE_INFINITY;
+        const bTime = b.effectiveDueDate ? b.effectiveDueDate.getTime() : Number.POSITIVE_INFINITY;
+        return aTime - bTime;
+      });
+
+    if (active.length > 0) {
+      return active[0];
+    }
+
+    const completedWithNext = withEffectiveDueDate
+      .filter(item => item.status && item.status.toLowerCase() === 'completed' && item.nextDueDate)
+      .sort((a, b) => {
+        const aTime = a.effectiveDueDate ? a.effectiveDueDate.getTime() : Number.POSITIVE_INFINITY;
+        const bTime = b.effectiveDueDate ? b.effectiveDueDate.getTime() : Number.POSITIVE_INFINITY;
+        return aTime - bTime;
+      });
+
+    if (completedWithNext.length > 0) {
+      return completedWithNext[0];
+    }
+
+    const completed = withEffectiveDueDate
+      .filter(item => item.status && item.status.toLowerCase() === 'completed')
+      .sort((a, b) => {
+        const aTime = a.lastCompleted ? a.lastCompleted.getTime() : 0;
+        const bTime = b.lastCompleted ? b.lastCompleted.getTime() : 0;
+        return bTime - aTime;
+      });
+
+    return completed[0] || matching[0];
+  }
+
+  private normalizePriority(priority?: string | null): 'critical' | 'high' | 'medium' | 'low' | null {
+    if (!priority) return null;
+    const normalized = priority.toLowerCase();
+    if (normalized === 'critical' || normalized === 'high' || normalized === 'medium' || normalized === 'low') {
+      return normalized;
+    }
+    return null;
+  }
+
   private calculateDueDate(rule: ComplianceRule, input: StateCalculationInput): Date | null {
-    // Parse due date logic (simplified version)
-    // In production, this would be more sophisticated
-    
     const now = new Date();
-    const logic = rule.dueDateLogic.toLowerCase();
+    const formulaInput = (rule as any).dueDateFormula;
+    const calcType = (rule as any).dueDateCalculationType;
+
+    if (formulaInput) {
+      let baseDate = now;
+      const rawFormula = Array.isArray(formulaInput) ? formulaInput : [formulaInput];
+      const triggerEvent = rawFormula
+        .map((formula: any) => formula?.trigger_event)
+        .find((value: any) => typeof value === 'string' && value.trim().length > 0);
+
+      if (calcType === 'event_triggered') {
+        if (triggerEvent === 'incorporation_date' && input.incorporationDate) {
+          baseDate = new Date(input.incorporationDate);
+        } else if (triggerEvent) {
+          return null;
+        }
+      }
+
+      return computeDueDateFromFormula(formulaInput as any, calcType, baseDate);
+    }
+
+    const rawLogic = (rule.dueDateLogic || '').trim();
+
+    if (!rawLogic) {
+      return null;
+    }
+
+    if (rawLogic.startsWith('{') || rawLogic.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(rawLogic);
+        if (parsed && typeof parsed === 'object') {
+          const formulaList = Array.isArray(parsed) ? parsed : [parsed];
+          const trigger = formulaList
+            .map((formula: any) => formula?.trigger_event)
+            .find((value: any) => typeof value === 'string' && value.trim().length > 0);
+
+          if (trigger) {
+            if (trigger === 'incorporation_date' && input.incorporationDate) {
+              return computeDueDateFromFormula(parsed, undefined, new Date(input.incorporationDate));
+            }
+            return null;
+          }
+
+          return computeDueDateFromFormula(parsed, undefined, now);
+        }
+      } catch (error) {
+        // Fall back to string parsing below
+      }
+    }
+
+    const logic = rawLogic.toLowerCase();
 
     // Monthly deadlines
     if (logic.includes('20th of next month')) {

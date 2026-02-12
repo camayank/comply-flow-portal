@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import { db } from './db';
 import { users, userSessions } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
@@ -72,6 +73,27 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return res.status(401).json({
         success: false,
         error: 'Session expired. Please log in again.',
+      });
+    }
+
+    // Validate session fingerprint to detect hijacking
+    const userAgent = req.headers['user-agent'] || '';
+    const ipSubnet = (req.ip || '').split('.').slice(0, 3).join('.');
+    const fingerprint = crypto
+      .createHash('sha256')
+      .update(userAgent)
+      .update(ipSubnet)
+      .digest('hex');
+
+    if (session.fingerprint && session.fingerprint !== fingerprint) {
+      await db
+        .update(userSessions)
+        .set({ isActive: false })
+        .where(eq(userSessions.id, session.id));
+
+      return res.status(401).json({
+        success: false,
+        error: 'Session validation failed. Please log in again.',
       });
     }
 

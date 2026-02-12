@@ -76,7 +76,7 @@ export class ServiceSpawner {
                 businessEntityId: entity.id,
                 serviceId: service.serviceKey,
                 status: 'initiated',
-                totalAmount: service.basePrice || 0,
+                totalAmount: 0,
                 priority: 'medium'
               });
 

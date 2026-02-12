@@ -12,9 +12,10 @@
 import type { Express, Request, Response } from "express";
 import { db } from './db';
 import { users, businessEntities, payments, serviceRequests, documentVault } from '@shared/schema';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, isNull } from 'drizzle-orm';
 import { sessionAuthMiddleware, type AuthenticatedRequest } from './rbac-middleware';
 import { storage } from './storage';
+import { syncComplianceTracking } from './compliance-tracking-sync';
 
 export function registerClientAccountRoutes(app: Express) {
 
@@ -32,10 +33,12 @@ export function registerClientAccountRoutes(app: Express) {
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: 'User not found' });
 
-      // Get primary business entity
-      const primaryEntity = user.businessEntityId
-        ? await db.select().from(businessEntities).where(eq(businessEntities.id, user.businessEntityId)).then(r => r[0])
-        : null;
+      // Get primary business entity (first created for the owner)
+      const [primaryEntity] = await db.select()
+        .from(businessEntities)
+        .where(eq(businessEntities.ownerId, userId))
+        .orderBy(desc(businessEntities.createdAt))
+        .limit(1);
 
       const profile = {
         id: user.id,
@@ -43,11 +46,11 @@ export function registerClientAccountRoutes(app: Express) {
         email: user.email,
         phone: user.phone,
         role: user.role,
-        clientId: user.clientId,
-        status: user.status,
+        clientId: primaryEntity?.clientId || null,
+        status: primaryEntity?.clientStatus || (user.isActive ? 'active' : 'inactive'),
         createdAt: user.createdAt,
         // Profile settings
-        profilePhoto: user.profilePhoto || null,
+        profilePhoto: null,
         timezone: 'Asia/Kolkata',
         language: 'en',
         notifications: {
@@ -59,7 +62,7 @@ export function registerClientAccountRoutes(app: Express) {
         // Primary business
         primaryBusiness: primaryEntity ? {
           id: primaryEntity.id,
-          name: primaryEntity.companyName,
+          name: primaryEntity.name,
           type: primaryEntity.entityType,
           gstin: primaryEntity.gstin,
           pan: primaryEntity.pan,
@@ -117,29 +120,30 @@ export function registerClientAccountRoutes(app: Express) {
       // Get all business entities associated with this user
       const entities = await db.select()
         .from(businessEntities)
-        .where(eq(businessEntities.userId, userId))
+        .where(eq(businessEntities.ownerId, userId))
         .orderBy(desc(businessEntities.createdAt));
 
+      const primaryEntityId = user?.businessEntityId || entities[0]?.id;
       const businessList = entities.map(entity => ({
         id: entity.id,
         clientId: entity.clientId,
-        companyName: entity.companyName,
+        companyName: entity.name,
         entityType: entity.entityType,
-        registrationNumber: entity.registrationNumber,
+        registrationNumber: entity.cin,
         cin: entity.cin,
         gstin: entity.gstin,
         pan: entity.pan,
-        tan: entity.tan,
-        status: entity.status,
-        incorporationDate: entity.incorporationDate,
-        financialYearEnd: entity.financialYearEnd,
-        industry: entity.industry,
+        tan: null,
+        status: entity.clientStatus,
+        incorporationDate: entity.registrationDate,
+        financialYearEnd: null,
+        industry: entity.industryType,
         address: entity.address,
         city: entity.city,
         state: entity.state,
         pincode: entity.pincode,
         createdAt: entity.createdAt,
-        isPrimary: entity.id === user?.businessEntityId,
+        isPrimary: entity.id === primaryEntityId,
       }));
 
       res.json({ businesses: businessList, total: businessList.length });
@@ -160,6 +164,7 @@ export function registerClientAccountRoutes(app: Express) {
 
       const {
         companyName,
+        name,
         entityType,
         gstin,
         pan,
@@ -167,9 +172,17 @@ export function registerClientAccountRoutes(app: Express) {
         city,
         state,
         pincode,
+        contactEmail,
+        contactPhone,
+        annualTurnover,
+        employeeCount,
+        registrationDate,
+        status,
       } = req.body;
 
-      if (!companyName || !entityType) {
+      const resolvedName = companyName || name;
+
+      if (!resolvedName || !entityType) {
         return res.status(400).json({ error: 'Company name and entity type are required' });
       }
 
@@ -179,9 +192,9 @@ export function registerClientAccountRoutes(app: Express) {
 
       const [newEntity] = await db.insert(businessEntities)
         .values({
-          userId,
+          ownerId: userId,
           clientId,
-          companyName,
+          name: resolvedName,
           entityType,
           gstin,
           pan,
@@ -189,9 +202,21 @@ export function registerClientAccountRoutes(app: Express) {
           city,
           state,
           pincode,
-          status: 'active',
+          contactEmail: contactEmail || null,
+          contactPhone: contactPhone || null,
+          annualTurnover: annualTurnover ?? null,
+          employeeCount: employeeCount ?? null,
+          registrationDate: registrationDate ? new Date(registrationDate) : null,
+          clientStatus: status || 'active',
+          isActive: status ? status === 'active' : true,
         })
         .returning();
+
+      await db.update(users)
+        .set({ businessEntityId: newEntity.id })
+        .where(and(eq(users.id, userId), isNull(users.businessEntityId)));
+
+      await syncComplianceTracking({ entityIds: [newEntity.id] });
 
       res.status(201).json({ message: 'Business added successfully', business: newEntity });
     } catch (error) {
@@ -211,15 +236,36 @@ export function registerClientAccountRoutes(app: Express) {
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
       const updates = req.body;
+      const updatePayload: Record<string, any> = {
+        name: updates.companyName ?? updates.name,
+        entityType: updates.entityType,
+        gstin: updates.gstin,
+        pan: updates.pan,
+        address: updates.address,
+        city: updates.city,
+        state: updates.state,
+        pincode: updates.pincode,
+        contactEmail: updates.contactEmail,
+        contactPhone: updates.contactPhone,
+        annualTurnover: updates.annualTurnover,
+        employeeCount: updates.employeeCount,
+        registrationDate: updates.registrationDate ? new Date(updates.registrationDate) : undefined,
+        clientStatus: updates.status ?? updates.clientStatus,
+        isActive: typeof updates.status === 'string' ? updates.status === 'active' : undefined,
+        updatedAt: new Date(),
+      };
+
+      Object.keys(updatePayload).forEach((key) => {
+        if (updatePayload[key] === undefined) {
+          delete updatePayload[key];
+        }
+      });
 
       const [updatedEntity] = await db.update(businessEntities)
-        .set({
-          ...updates,
-          updatedAt: new Date(),
-        })
+        .set(updatePayload)
         .where(and(
           eq(businessEntities.id, parseInt(id)),
-          eq(businessEntities.userId, userId)
+          eq(businessEntities.ownerId, userId)
         ))
         .returning();
 

@@ -1,150 +1,147 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { AlertTriangle, Clock, CheckCircle, TrendingUp, Shield, FileText, Calendar, Zap } from 'lucide-react';
+import { AlertTriangle, Clock, CheckCircle, TrendingUp, Calendar, Zap } from 'lucide-react';
 
-interface ComplianceItem {
-  id: string;
+export interface UnifiedComplianceItem {
+  id: string | number;
   name: string;
-  status: 'completed' | 'pending' | 'overdue' | 'upcoming';
+  status: 'completed' | 'pending' | 'overdue' | 'upcoming' | 'in_progress' | string;
   dueDate: string;
   penaltyRisk: number;
   priority: 'low' | 'medium' | 'high' | 'critical';
   category: string;
-  description: string;
+  description?: string;
 }
 
-interface UpsellOpportunity {
-  id: string;
-  service: string;
-  reason: string;
-  benefit: string;
-  discount: number;
-  price: number;
-  urgency: 'low' | 'medium' | 'high';
+interface UnifiedComplianceDashboardProps {
+  items: UnifiedComplianceItem[];
 }
 
-const UnifiedComplianceDashboard = () => {
-  const [selectedView, setSelectedView] = useState<'heatmap' | 'timeline' | 'health'>('heatmap');
+const priorityOrder: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
 
-  // Sample compliance data with penalty risk
-  const complianceItems: ComplianceItem[] = [
-    {
-      id: 'gstr3b',
-      name: 'GSTR-3B Filing',
-      status: 'overdue',
-      dueDate: '2025-01-20',
-      penaltyRisk: 25000,
-      priority: 'critical',
-      category: 'GST',
-      description: 'Monthly GST return filing'
-    },
-    {
-      id: 'tds',
-      name: 'TDS Return Filing',
-      status: 'pending',
-      dueDate: '2025-01-31',
-      penaltyRisk: 15000,
-      priority: 'high',
-      category: 'Income Tax',
-      description: 'Quarterly TDS return'
-    },
-    {
-      id: 'adt1',
-      name: 'ADT-1 Filing',
-      status: 'upcoming',
-      dueDate: '2025-02-15',
-      penaltyRisk: 50000,
-      priority: 'high',
-      category: 'MCA',
-      description: 'Appointment of first auditor'
-    },
-    {
-      id: 'roc',
-      name: 'ROC Annual Filing',
-      status: 'completed',
-      dueDate: '2024-12-30',
-      penaltyRisk: 0,
-      priority: 'medium',
-      category: 'MCA',
-      description: 'Annual ROC compliance'
-    }
-  ];
+const UnifiedComplianceDashboard = ({ items }: UnifiedComplianceDashboardProps) => {
+  const [selectedView, setSelectedView] = useState<'priority' | 'timeline' | 'health'>('priority');
 
-  // AI-powered contextual upsells
-  const upsellOpportunities: UpsellOpportunity[] = [
-    {
-      id: 'msme-upsell',
-      service: 'MSME Registration',
-      reason: 'You have GST services - get 50% GST discount with MSME!',
-      benefit: 'Save ₹45,000 annually on GST payments',
-      discount: 30,
-      price: 999,
-      urgency: 'high'
-    },
-    {
-      id: 'esi-pf',
-      service: 'ESI & PF Registration',
-      reason: 'Your employee count suggests compliance requirement',
-      benefit: 'Avoid ₹25,000 penalty for delayed registration',
-      discount: 20,
-      price: 2499,
-      urgency: 'medium'
-    }
-  ];
+  const normalized = useMemo(() => {
+    const now = new Date();
+    return items.map((item) => {
+      const due = new Date(item.dueDate);
+      const daysUntil = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      const statusEffective = item.status === 'completed'
+        ? 'completed'
+        : daysUntil < 0
+          ? 'overdue'
+          : item.status || 'pending';
+      return {
+        ...item,
+        dueDateObj: due,
+        daysUntil,
+        statusEffective,
+      };
+    });
+  }, [items]);
 
-  const calculateComplianceHealth = () => {
-    const total = complianceItems.length;
-    const completed = complianceItems.filter(item => item.status === 'completed').length;
-    const overdue = complianceItems.filter(item => item.status === 'overdue').length;
-    
-    const baseScore = (completed / total) * 100;
-    const penaltyDeduction = overdue * 15; // 15 points deduction per overdue item
-    
-    return Math.max(0, Math.round(baseScore - penaltyDeduction));
-  };
+  const totals = useMemo(() => {
+    const total = normalized.length;
+    const completed = normalized.filter(i => i.statusEffective === 'completed').length;
+    const overdue = normalized.filter(i => i.statusEffective === 'overdue').length;
+    const pending = normalized.filter(i => i.statusEffective !== 'completed').length;
+    const penaltyRisk = normalized
+      .filter(i => i.statusEffective !== 'completed')
+      .reduce((sum, i) => sum + (i.penaltyRisk || 0), 0);
 
-  const getTotalPenaltyRisk = () => {
-    return complianceItems
-      .filter(item => item.status === 'overdue' || item.status === 'pending')
-      .reduce((sum, item) => sum + item.penaltyRisk, 0);
-  };
+    const baseScore = total > 0 ? (completed / total) * 100 : 100;
+    const penaltyDeduction = overdue * 10;
+    const complianceHealth = Math.max(0, Math.round(baseScore - penaltyDeduction));
 
-  const getStatusColor = (status: string) => {
+    const nextDeadline = normalized
+      .filter(i => i.statusEffective !== 'completed')
+      .sort((a, b) => a.dueDateObj.getTime() - b.dueDateObj.getTime())[0];
+
+    const categoryStats = normalized.reduce((acc: Record<string, { total: number; completed: number }>, item) => {
+      const key = item.category || 'Other';
+      if (!acc[key]) acc[key] = { total: 0, completed: 0 };
+      acc[key].total += 1;
+      if (item.statusEffective === 'completed') acc[key].completed += 1;
+      return acc;
+    }, {});
+
+    const categoryHealth = Object.entries(categoryStats).map(([name, stats]) => ({
+      name,
+      total: stats.total,
+      health: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 100,
+    }));
+
+    return {
+      total,
+      completed,
+      pending,
+      overdue,
+      penaltyRisk,
+      complianceHealth,
+      nextDeadline,
+      categoryHealth,
+    };
+  }, [normalized]);
+
+  const priorityQueue = useMemo(() => {
+    return [...normalized]
+      .filter(item => item.statusEffective !== 'completed')
+      .sort((a, b) => {
+        const statusWeight = (s: string) => (s === 'overdue' ? 0 : 1);
+        const sDiff = statusWeight(a.statusEffective) - statusWeight(b.statusEffective);
+        if (sDiff !== 0) return sDiff;
+        const pDiff = (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3);
+        if (pDiff !== 0) return pDiff;
+        return a.dueDateObj.getTime() - b.dueDateObj.getTime();
+      })
+      .slice(0, 6);
+  }, [normalized]);
+
+  const timeline = useMemo(() => {
+    return [...normalized]
+      .filter(item => item.statusEffective !== 'completed')
+      .sort((a, b) => a.dueDateObj.getTime() - b.dueDateObj.getTime())
+      .slice(0, 8);
+  }, [normalized]);
+
+  const formatRupees = (amount: number) =>
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
+
+  const statusBadge = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      case 'overdue': return 'bg-red-100 text-red-800';
-      case 'upcoming': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'overdue':
+        return 'bg-red-100 text-red-800';
+      case 'pending':
+      case 'in_progress':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'critical': return 'border-red-500 bg-red-50';
-      case 'high': return 'border-orange-500 bg-orange-50';
-      case 'medium': return 'border-yellow-500 bg-yellow-50';
-      default: return 'border-gray-200 bg-white';
-    }
-  };
-
-  const formatIndianRupees = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const complianceHealth = calculateComplianceHealth();
-  const totalPenaltyRisk = getTotalPenaltyRisk();
+  if (normalized.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-6 text-center text-sm text-gray-500">
+          No compliance items available yet.
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Compliance Health Score */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="col-span-1">
           <CardHeader className="pb-2">
@@ -153,14 +150,14 @@ const UnifiedComplianceDashboard = () => {
           <CardContent>
             <div className="text-center">
               <div className="text-4xl font-bold mb-2">
-                <span className={`${complianceHealth >= 80 ? 'text-green-600' : complianceHealth >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
-                  {complianceHealth}
+                <span className={`${totals.complianceHealth >= 80 ? 'text-green-600' : totals.complianceHealth >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
+                  {totals.complianceHealth}
                 </span>
                 <span className="text-2xl text-gray-400">/100</span>
               </div>
-              <Progress value={complianceHealth} className="mb-2" />
+              <Progress value={totals.complianceHealth} className="mb-2" />
               <p className="text-sm text-gray-600">
-                {complianceHealth >= 80 ? 'Excellent' : complianceHealth >= 60 ? 'Good' : 'Needs Attention'}
+                {totals.complianceHealth >= 80 ? 'Excellent' : totals.complianceHealth >= 60 ? 'Good' : 'Needs Attention'}
               </p>
             </div>
           </CardContent>
@@ -176,10 +173,10 @@ const UnifiedComplianceDashboard = () => {
           <CardContent>
             <div className="text-center">
               <div className="text-3xl font-bold text-red-600 mb-2">
-                {formatIndianRupees(totalPenaltyRisk)}
+                {formatRupees(totals.penaltyRisk)}
               </div>
               <p className="text-sm text-gray-600">
-                {complianceItems.filter(item => item.status === 'overdue' || item.status === 'pending').length} items at risk
+                {totals.pending} items open
               </p>
             </div>
           </CardContent>
@@ -194,125 +191,148 @@ const UnifiedComplianceDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600 mb-2">
-                5 days
-              </div>
-              <p className="text-sm text-gray-600">GSTR-3B Filing</p>
+              {totals.nextDeadline ? (
+                <>
+                  <div className="text-2xl font-bold text-blue-600 mb-2">
+                    {totals.nextDeadline.daysUntil} days
+                  </div>
+                  <p className="text-sm text-gray-600">{totals.nextDeadline.name}</p>
+                </>
+              ) : (
+                <p className="text-sm text-gray-600">No upcoming deadlines</p>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* View Toggle */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex justify-center gap-2">
         <Button
-          variant={selectedView === 'heatmap' ? 'default' : 'outline'}
-          onClick={() => setSelectedView('heatmap')}
           size="sm"
+          variant={selectedView === 'priority' ? 'default' : 'outline'}
+          onClick={() => setSelectedView('priority')}
         >
-          Risk Heatmap
+          Priority Queue
         </Button>
         <Button
+          size="sm"
           variant={selectedView === 'timeline' ? 'default' : 'outline'}
           onClick={() => setSelectedView('timeline')}
-          size="sm"
         >
-          Timeline View
+          Timeline
         </Button>
         <Button
+          size="sm"
           variant={selectedView === 'health' ? 'default' : 'outline'}
           onClick={() => setSelectedView('health')}
-          size="sm"
         >
-          Health Metrics
+          Category Health
         </Button>
       </div>
 
-      {/* Penalty Risk Heatmap */}
-      {selectedView === 'heatmap' && (
+      {selectedView === 'priority' && (
         <Card>
           <CardHeader>
-            <CardTitle>Compliance Risk Heatmap</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="h-5 w-5 text-orange-600" />
+              Priority Queue
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {complianceItems.map((item) => (
-                <Card key={item.id} className={`${getPriorityColor(item.priority)} transition-all hover:shadow-md`}>
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-semibold">{item.name}</h3>
-                      <Badge className={getStatusColor(item.status)}>
-                        {item.status.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-3">{item.description}</p>
-                    
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Due Date:</span>
-                        <span className="font-medium">{item.dueDate}</span>
-                      </div>
-                      
-                      {item.penaltyRisk > 0 && (
-                        <div className="flex justify-between text-sm">
-                          <span>Penalty Risk:</span>
-                          <span className="font-medium text-red-600">
-                            {formatIndianRupees(item.penaltyRisk)}
-                          </span>
-                        </div>
-                      )}
-                      
-                      <div className="flex justify-between text-sm">
-                        <span>Category:</span>
-                        <Badge variant="outline" className="text-xs">
-                          {item.category}
-                        </Badge>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+              {priorityQueue.map(item => (
+                <div key={item.id} className="p-4 rounded-lg border">
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="font-semibold">{item.name}</h4>
+                    <Badge className={statusBadge(item.statusEffective)}>
+                      {item.statusEffective}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-2">{item.description || item.category}</p>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-4 w-4" />
+                      {item.dueDateObj.toLocaleDateString('en-IN')}
+                    </span>
+                    <span className="font-medium text-red-600">
+                      {formatRupees(item.penaltyRisk || 0)}
+                    </span>
+                  </div>
+                </div>
               ))}
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Contextual Upsell Opportunities */}
-      <Card className="border-green-200 bg-green-50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="h-5 w-5 text-green-600" />
-            Smart Recommendations
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {upsellOpportunities.map((opportunity) => (
-              <div key={opportunity.id} className="bg-white rounded-lg p-4 border border-green-200">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold text-green-800">{opportunity.service}</h3>
-                  <Badge className="bg-green-600 text-white">
-                    {opportunity.discount}% OFF
-                  </Badge>
-                </div>
-                
-                <p className="text-sm text-green-700 mb-2">{opportunity.reason}</p>
-                <p className="text-sm font-medium text-green-800 mb-3">{opportunity.benefit}</p>
-                
-                <div className="flex justify-between items-center">
-                  <div className="text-lg font-bold text-green-600">
-                    {formatIndianRupees(opportunity.price)}
-                    <span className="text-sm text-gray-500 ml-2">+ 18% GST</span>
+      {selectedView === 'timeline' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-blue-600" />
+              Upcoming Timeline
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {timeline.map(item => (
+                <div key={item.id} className="flex items-center gap-4 p-3 border rounded-lg">
+                  <div className="flex-shrink-0">
+                    {item.statusEffective === 'overdue' ? (
+                      <AlertTriangle className="h-6 w-6 text-red-500" />
+                    ) : item.statusEffective === 'pending' ? (
+                      <Clock className="h-6 w-6 text-yellow-500" />
+                    ) : (
+                      <CheckCircle className="h-6 w-6 text-green-500" />
+                    )}
                   </div>
-                  <Button className="bg-green-600 hover:bg-green-700 text-white">
-                    Add for {formatIndianRupees(opportunity.price)}
-                  </Button>
+                  <div className="flex-1">
+                    <h4 className="font-medium">{item.name}</h4>
+                    <p className="text-sm text-gray-600">{item.category}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium">
+                      {item.dueDateObj.toLocaleDateString('en-IN')}
+                    </p>
+                    <Badge className={statusBadge(item.statusEffective)}>
+                      {item.statusEffective}
+                    </Badge>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedView === 'health' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-green-600" />
+              Category Health Scores
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {totals.categoryHealth.map(category => (
+                <div key={category.name} className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">{category.name}</span>
+                    <span className={`font-bold ${category.health >= 80 ? 'text-green-600' : category.health >= 60 ? 'text-yellow-600' : 'text-red-600'}`}>
+                      {category.health}%
+                    </span>
+                  </div>
+                  <Progress value={category.health} className="h-2" />
+                  <p className="text-sm text-gray-600">
+                    {category.total} items tracked
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

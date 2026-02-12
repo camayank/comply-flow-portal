@@ -16,6 +16,7 @@ import {
   DELIVERY_STATUS,
   QC_REVIEW_STATUS
 } from "@shared/schema";
+import { resolveDownloadUrl } from "./storage-url";
 
 export function registerDeliveryRoutes(app: Application) {
   console.log('📦 Registering Delivery routes...');
@@ -90,6 +91,13 @@ export function registerDeliveryRoutes(app: Application) {
         .from(documentVault)
         .where(eq(documentVault.serviceRequestId, deliveryDetails.serviceRequest.id));
 
+      const deliverablesWithUrls = await Promise.all(
+        deliverables.map(async (doc) => ({
+          ...doc,
+          downloadUrl: await resolveDownloadUrl(doc.downloadUrl),
+        }))
+      );
+
       // Build handoff document with QC information
       const handoffDocument = {
         qcApprovalDate: new Date().toISOString(),
@@ -119,7 +127,7 @@ export function registerDeliveryRoutes(app: Application) {
       res.json({
         serviceRequest: deliveryDetails.serviceRequest,
         deliveryConfirmation: deliveryDetails.deliveryConfirmation,
-        deliverables,
+        deliverables: deliverablesWithUrls,
         handoffDocument,
         clientName: deliveryDetails.clientName,
         serviceName: deliveryDetails.serviceName

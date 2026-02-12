@@ -14,8 +14,8 @@
 import { Router, Request, Response } from 'express';
 import { coreDataEngine, UserContext, UserRole } from './core-data-engine';
 import { db } from './db';
-import { users, businessEntities, services } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { users, businessEntities, services, complianceTracking, complianceStates, complianceAlerts, complianceRules, activityLogs, workItemActivityLog, workItemQueue } from '@shared/schema';
+import { eq, and, or, gte, lte, desc, sql } from 'drizzle-orm';
 
 const router = Router();
 
@@ -338,35 +338,241 @@ router.get('/compliance', requireAuth, async (req: AuthenticatedRequest, res: Re
       return res.status(401).json({ error: 'Invalid user context' });
     }
 
+    const resolveEntityId = async () => {
+      if (userContext.entityId) return userContext.entityId;
+      const [entity] = await db
+        .select({ id: businessEntities.id })
+        .from(businessEntities)
+        .where(eq(businessEntities.ownerId, userContext.userId))
+        .limit(1);
+      return entity?.id ?? null;
+    };
+
     // Compliance data varies significantly by role
     let complianceData: any = {};
 
     if (userContext.role === 'client') {
-      // Client sees their own compliance status
-      complianceData = {
-        overallScore: 85,
-        status: 'GOOD',
-        upcomingDeadlines: [],
-        recentFilings: [],
-        pendingActions: []
-      };
+      const entityId = await resolveEntityId();
+      if (!entityId) {
+        complianceData = {
+          overallScore: 0,
+          status: 'UNKNOWN',
+          upcomingDeadlines: [],
+          recentFilings: [],
+          pendingActions: []
+        };
+      } else {
+        const [state] = await db
+          .select()
+          .from(complianceStates)
+          .where(eq(complianceStates.entityId, entityId))
+          .orderBy(desc(complianceStates.calculatedAt))
+          .limit(1);
+
+        const riskScore = state?.overallRiskScore ? Number(state.overallRiskScore) : 0;
+        const score = Math.max(0, Math.round(100 - riskScore));
+        const status = state?.overallState || 'GREEN';
+
+        const today = new Date();
+        const inThirty = new Date();
+        inThirty.setDate(today.getDate() + 30);
+
+        const upcoming = await db
+          .select({
+            id: complianceTracking.id,
+            dueDate: complianceTracking.dueDate,
+            status: complianceTracking.status,
+            priority: complianceTracking.priority,
+            complianceName: complianceRules.complianceName,
+            ruleCode: complianceRules.ruleCode,
+          })
+          .from(complianceTracking)
+          .leftJoin(complianceRules, eq(complianceTracking.complianceRuleId, complianceRules.id))
+          .where(and(
+            eq(complianceTracking.businessEntityId, entityId),
+            gte(complianceTracking.dueDate, today),
+            lte(complianceTracking.dueDate, inThirty),
+            or(
+              eq(complianceTracking.status, 'pending'),
+              eq(complianceTracking.status, 'overdue')
+            )
+          ))
+          .orderBy(complianceTracking.dueDate)
+          .limit(10);
+
+        const recentFilings = await db
+          .select({
+            id: complianceTracking.id,
+            lastCompleted: complianceTracking.lastCompleted,
+            complianceName: complianceRules.complianceName,
+            ruleCode: complianceRules.ruleCode,
+          })
+          .from(complianceTracking)
+          .leftJoin(complianceRules, eq(complianceTracking.complianceRuleId, complianceRules.id))
+          .where(and(
+            eq(complianceTracking.businessEntityId, entityId),
+            eq(complianceTracking.status, 'completed')
+          ))
+          .orderBy(desc(complianceTracking.lastCompleted))
+          .limit(5);
+
+        const pendingActions = await db
+          .select({
+            id: complianceTracking.id,
+            dueDate: complianceTracking.dueDate,
+            status: complianceTracking.status,
+            priority: complianceTracking.priority,
+            complianceName: complianceRules.complianceName,
+            ruleCode: complianceRules.ruleCode,
+          })
+          .from(complianceTracking)
+          .leftJoin(complianceRules, eq(complianceTracking.complianceRuleId, complianceRules.id))
+          .where(and(
+            eq(complianceTracking.businessEntityId, entityId),
+            or(
+              eq(complianceTracking.status, 'pending'),
+              eq(complianceTracking.status, 'overdue')
+            )
+          ))
+          .orderBy(complianceTracking.dueDate)
+          .limit(8);
+
+        complianceData = {
+          overallScore: score,
+          status,
+          upcomingDeadlines: upcoming.map(item => ({
+            id: item.id,
+            title: item.complianceName || item.ruleCode,
+            dueDate: item.dueDate,
+            status: item.status,
+            priority: item.priority,
+          })),
+          recentFilings: recentFilings.map(item => ({
+            id: item.id,
+            title: item.complianceName || item.ruleCode,
+            completedAt: item.lastCompleted,
+          })),
+          pendingActions: pendingActions.map(item => ({
+            id: item.id,
+            title: item.complianceName || item.ruleCode,
+            dueDate: item.dueDate,
+            status: item.status,
+            priority: item.priority,
+          })),
+        };
+      }
     } else if (['ops_executive', 'ops_lead', 'customer_service'].includes(userContext.role)) {
-      // Ops sees compliance issues across their assigned clients
+      const today = new Date();
+      const inSeven = new Date();
+      inSeven.setDate(today.getDate() + 7);
+
+      const [atRiskClients] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(complianceStates)
+        .where(or(
+          eq(complianceStates.overallState, 'AMBER'),
+          eq(complianceStates.overallState, 'RED')
+        ));
+
+      const [upcomingDeadlines] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(complianceTracking)
+        .where(and(
+          gte(complianceTracking.dueDate, today),
+          lte(complianceTracking.dueDate, inSeven),
+          or(
+            eq(complianceTracking.status, 'pending'),
+            eq(complianceTracking.status, 'overdue')
+          )
+        ));
+
+      const [overdueItems] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(complianceTracking)
+        .where(and(
+          lte(complianceTracking.dueDate, today),
+          or(
+            eq(complianceTracking.status, 'pending'),
+            eq(complianceTracking.status, 'overdue')
+          )
+        ));
+
+      const [escalations] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(complianceAlerts)
+        .where(and(
+          eq(complianceAlerts.isActive, true),
+          eq(complianceAlerts.severity, 'CRITICAL')
+        ));
+
       complianceData = {
-        atRiskClients: 12,
-        upcomingDeadlines: 45,
-        overdueItems: 3,
-        escalations: 2
+        atRiskClients: Number(atRiskClients?.count || 0),
+        upcomingDeadlines: Number(upcomingDeadlines?.count || 0),
+        overdueItems: Number(overdueItems?.count || 0),
+        escalations: Number(escalations?.count || 0)
       };
     } else if (['admin', 'super_admin'].includes(userContext.role)) {
-      // Admin sees platform-wide compliance metrics
+      const [totalClients] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(businessEntities)
+        .where(eq(businessEntities.isActive, true));
+
+      const [compliantClients] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(complianceStates)
+        .where(eq(complianceStates.overallState, 'GREEN'));
+
+      const [amberClients] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(complianceStates)
+        .where(eq(complianceStates.overallState, 'AMBER'));
+
+      const [redClients] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(complianceStates)
+        .where(eq(complianceStates.overallState, 'RED'));
+
+      const [avgRiskRow] = await db
+        .select({ avg: sql<number>`avg(${complianceStates.overallRiskScore})` })
+        .from(complianceStates);
+
+      const avgRisk = avgRiskRow?.avg ? Number(avgRiskRow.avg) : 0;
+      const averageScore = Math.max(0, Math.round(100 - avgRisk));
+
+      const today = new Date();
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(today.getDate() - 90);
+
+      const [totalDue] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(complianceTracking)
+        .where(and(
+          gte(complianceTracking.dueDate, ninetyDaysAgo),
+          lte(complianceTracking.dueDate, today)
+        ));
+
+      const [completedDue] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(complianceTracking)
+        .where(and(
+          gte(complianceTracking.lastCompleted, ninetyDaysAgo),
+          lte(complianceTracking.lastCompleted, today),
+          eq(complianceTracking.status, 'completed')
+        ));
+
+      const totalDueCount = Number(totalDue?.count || 0);
+      const completedCount = Number(completedDue?.count || 0);
+      const filingSuccess = totalDueCount > 0
+        ? Math.round((completedCount / totalDueCount) * 1000) / 10
+        : 100;
+
       complianceData = {
-        totalClients: 500,
-        compliantClients: 450,
-        atRiskClients: 35,
-        criticalClients: 15,
-        averageScore: 82,
-        filingSuccess: 98.5
+        totalClients: Number(totalClients?.count || 0),
+        compliantClients: Number(compliantClients?.count || 0),
+        atRiskClients: Number(amberClients?.count || 0),
+        criticalClients: Number(redClients?.count || 0),
+        averageScore,
+        filingSuccess
       };
     }
 
@@ -399,18 +605,95 @@ router.get('/activity', requireAuth, async (req: AuthenticatedRequest, res: Resp
     }
 
     const { limit = '20' } = req.query;
+    const take = Math.min(100, Math.max(1, parseInt(limit as string)));
 
-    // Activity varies by role
-    // For now, return mock structure - would connect to activity log table
-    const activities = [
-      {
-        id: 1,
-        type: 'status_change',
-        message: 'Service request #123 moved to Processing',
-        timestamp: new Date().toISOString(),
-        actor: 'System'
+    let activities: any[] = [];
+
+    if (userContext.role === 'client') {
+      const entityId = userContext.entityId
+        ? userContext.entityId
+        : (await db
+            .select({ id: businessEntities.id })
+            .from(businessEntities)
+            .where(eq(businessEntities.ownerId, userContext.userId))
+            .limit(1))[0]?.id;
+
+      if (entityId) {
+        const rows = await db
+          .select({
+            id: activityLogs.id,
+            action: activityLogs.action,
+            details: activityLogs.details,
+            createdAt: activityLogs.createdAt,
+            userId: activityLogs.userId,
+          })
+          .from(activityLogs)
+          .where(or(
+            eq(activityLogs.businessEntityId, entityId),
+            eq(activityLogs.userId, userContext.userId)
+          ))
+          .orderBy(desc(activityLogs.createdAt))
+          .limit(take);
+
+        activities = rows.map(row => ({
+          id: row.id,
+          type: row.action,
+          message: row.details || row.action,
+          timestamp: row.createdAt?.toISOString() || new Date().toISOString(),
+          actor: row.userId ? `User ${row.userId}` : 'System'
+        }));
       }
-    ];
+    } else {
+      const workItemRows = await db
+        .select({
+          id: workItemActivityLog.id,
+          type: workItemActivityLog.activityType,
+          description: workItemActivityLog.activityDescription,
+          occurredAt: workItemActivityLog.occurredAt,
+          performedByName: workItemActivityLog.performedByName,
+          entityName: workItemQueue.entityName,
+          serviceTypeName: workItemQueue.serviceTypeName
+        })
+        .from(workItemActivityLog)
+        .leftJoin(workItemQueue, eq(workItemActivityLog.workItemQueueId, workItemQueue.id))
+        .orderBy(desc(workItemActivityLog.occurredAt))
+        .limit(take);
+
+      const logRows = await db
+        .select({
+          id: activityLogs.id,
+          action: activityLogs.action,
+          details: activityLogs.details,
+          createdAt: activityLogs.createdAt,
+          userId: activityLogs.userId,
+        })
+        .from(activityLogs)
+        .orderBy(desc(activityLogs.createdAt))
+        .limit(take);
+
+      const merged = [
+        ...workItemRows.map(row => ({
+          id: `work-${row.id}`,
+          type: row.type,
+          message: row.entityName
+            ? `${row.description} (${row.entityName})`
+            : row.description,
+          timestamp: row.occurredAt?.toISOString() || new Date().toISOString(),
+          actor: row.performedByName || 'System',
+          context: row.serviceTypeName || null
+        })),
+        ...logRows.map(row => ({
+          id: `log-${row.id}`,
+          type: row.action,
+          message: row.details || row.action,
+          timestamp: row.createdAt?.toISOString() || new Date().toISOString(),
+          actor: row.userId ? `User ${row.userId}` : 'System'
+        }))
+      ];
+
+      merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      activities = merged.slice(0, take);
+    }
 
     res.json({
       success: true,
@@ -442,17 +725,60 @@ router.get('/notifications', requireAuth, async (req: AuthenticatedRequest, res:
 
     const { unreadOnly = 'false' } = req.query;
 
-    // Would connect to notifications table
-    const notifications = [
-      {
-        id: 1,
-        type: 'info',
-        title: 'Welcome to DigiComply',
-        message: 'Your dashboard is ready',
-        read: false,
-        createdAt: new Date().toISOString()
+    const unreadFilter = String(unreadOnly).toLowerCase() === 'true';
+    let alerts: any[] = [];
+
+    if (userContext.role === 'client') {
+      const entityId = userContext.entityId
+        ? userContext.entityId
+        : (await db
+            .select({ id: businessEntities.id })
+            .from(businessEntities)
+            .where(eq(businessEntities.ownerId, userContext.userId))
+            .limit(1))[0]?.id;
+
+      if (entityId) {
+        alerts = await db
+          .select({
+            id: complianceAlerts.id,
+            title: complianceAlerts.title,
+            message: complianceAlerts.message,
+            severity: complianceAlerts.severity,
+            isAcknowledged: complianceAlerts.isAcknowledged,
+            triggeredAt: complianceAlerts.triggeredAt,
+          })
+          .from(complianceAlerts)
+          .where(and(
+            eq(complianceAlerts.entityId, entityId),
+            unreadFilter ? eq(complianceAlerts.isAcknowledged, false) : sql`TRUE`
+          ))
+          .orderBy(desc(complianceAlerts.triggeredAt))
+          .limit(20);
       }
-    ];
+    } else {
+      alerts = await db
+        .select({
+          id: complianceAlerts.id,
+          title: complianceAlerts.title,
+          message: complianceAlerts.message,
+          severity: complianceAlerts.severity,
+          isAcknowledged: complianceAlerts.isAcknowledged,
+          triggeredAt: complianceAlerts.triggeredAt,
+        })
+        .from(complianceAlerts)
+        .where(unreadFilter ? eq(complianceAlerts.isAcknowledged, false) : sql`TRUE`)
+        .orderBy(desc(complianceAlerts.triggeredAt))
+        .limit(50);
+    }
+
+    const notifications = alerts.map(alert => ({
+      id: alert.id,
+      type: String(alert.severity || 'INFO').toLowerCase(),
+      title: alert.title,
+      message: alert.message,
+      read: !!alert.isAcknowledged,
+      createdAt: alert.triggeredAt ? new Date(alert.triggeredAt).toISOString() : new Date().toISOString()
+    }));
 
     res.json({
       success: true,
@@ -584,7 +910,7 @@ router.get('/context', requireAuth, async (req: AuthenticatedRequest, res: Respo
         },
         entity: entityDetails ? {
           id: entityDetails.id,
-          name: entityDetails.businessName,
+          name: entityDetails.name,
           clientId: entityDetails.clientId,
           type: entityDetails.entityType
         } : null,

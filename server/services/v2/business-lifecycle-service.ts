@@ -19,7 +19,6 @@
 
 import { pool } from '../../db';
 import * as ComplianceService from './compliance-service';
-import * as DocumentService from './document-management-service';
 import * as ServiceCatalogService from './service-catalog-service';
 
 export type BusinessStage = 
@@ -589,6 +588,87 @@ export const LIFECYCLE_STAGES: Record<BusinessStage, LifecycleStageConfig> = {
   }
 };
 
+const normalizeDocumentKey = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+const extractListingStatus = (metadata: any): string | null => {
+  if (!metadata) return null;
+  if (typeof metadata === 'string') {
+    try {
+      const parsed = JSON.parse(metadata);
+      return parsed?.listing_status || null;
+    } catch (error) {
+      return null;
+    }
+  }
+  return metadata?.listing_status || null;
+};
+
+async function getApprovedDocumentKeys(clientId: number): Promise<Set<string>> {
+  const [vaultDocs, uploadDocs] = await Promise.all([
+    pool.query(
+      `SELECT document_type 
+       FROM document_vault 
+       WHERE business_entity_id = $1 
+         AND approval_status = 'approved'`,
+      [clientId]
+    ),
+    pool.query(
+      `SELECT doctype 
+       FROM documents 
+       WHERE entity_id = $1 
+         AND status IN ('approved', 'verified')`,
+      [clientId]
+    )
+  ]);
+
+  const keys = new Set<string>();
+
+  vaultDocs.rows.forEach((row) => {
+    if (row.document_type) {
+      keys.add(normalizeDocumentKey(row.document_type));
+    }
+  });
+
+  uploadDocs.rows.forEach((row) => {
+    if (row.doctype) {
+      keys.add(normalizeDocumentKey(row.doctype));
+    }
+  });
+
+  return keys;
+}
+
+async function getDocumentCounts(clientId: number): Promise<{ total: number; approved: number }> {
+  const [vaultDocs, uploadDocs] = await Promise.all([
+    pool.query(
+      `SELECT approval_status 
+       FROM document_vault 
+       WHERE business_entity_id = $1`,
+      [clientId]
+    ),
+    pool.query(
+      `SELECT status 
+       FROM documents 
+       WHERE entity_id = $1`,
+      [clientId]
+    )
+  ]);
+
+  const approvedVault = vaultDocs.rows.filter((row) => row.approval_status === 'approved').length;
+  const approvedUploads = uploadDocs.rows.filter((row) => ['approved', 'verified'].includes(row.status)).length;
+  const total = vaultDocs.rows.length + uploadDocs.rows.length;
+
+  return {
+    total,
+    approved: approvedVault + approvedUploads,
+  };
+}
+
 /**
  * Log stage transition for audit trail
  */
@@ -620,7 +700,13 @@ export async function logStageTransition(
 
   // Update client's current stage
   await pool.query(
-    'UPDATE clients SET current_lifecycle_stage = $1, stage_last_updated = CURRENT_TIMESTAMP WHERE id = $2',
+    `UPDATE business_entities 
+     SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
+       'lifecycle_stage', $1,
+       'stage_last_updated', CURRENT_TIMESTAMP
+     ),
+     updated_at = CURRENT_TIMESTAMP
+     WHERE id = $2`,
     [toStage, clientId]
   );
 }
@@ -650,7 +736,7 @@ export async function getClientLifecycleStage(clientId: number): Promise<{
   documentationGaps: string[];
 }> {
   const client = await pool.query(
-    'SELECT incorporation_date, business_type, industry, status FROM clients WHERE id = $1',
+    'SELECT registration_date, entity_type, industry_type, client_status, metadata FROM business_entities WHERE id = $1',
     [clientId]
   );
 
@@ -659,8 +745,9 @@ export async function getClientLifecycleStage(clientId: number): Promise<{
   }
 
   // Determine current stage based on age and metrics
-  const incorporationDate = client.rows[0].incorporation_date;
-  const currentStage = await determineStage(clientId, incorporationDate);
+  const incorporationDate = client.rows[0].registration_date;
+  const listingStatus = extractListingStatus(client.rows[0].metadata);
+  const currentStage = await determineStage(clientId, incorporationDate, listingStatus);
   const stageConfig = LIFECYCLE_STAGES[currentStage];
 
   // Calculate progress in current stage
@@ -682,7 +769,11 @@ export async function getClientLifecycleStage(clientId: number): Promise<{
 /**
  * Determine current stage based on business metrics
  */
-async function determineStage(clientId: number, incorporationDate: Date | null): Promise<BusinessStage> {
+async function determineStage(
+  clientId: number,
+  incorporationDate: Date | null,
+  listingStatus: string | null
+): Promise<BusinessStage> {
   if (!incorporationDate) return 'idea';
 
   const ageInMonths = Math.floor(
@@ -699,14 +790,9 @@ async function determineStage(clientId: number, incorporationDate: Date | null):
 
   const hasFunding = fundingResult.rows[0]?.funding_rounds > 0;
 
-  // Check for listing indicators
-  const listingResult = await pool.query(
-    `SELECT listing_status FROM clients WHERE id = $1`,
-    [clientId]
-  );
-
-  if (listingResult.rows[0]?.listing_status === 'listed') return 'public';
-  if (listingResult.rows[0]?.listing_status === 'pre_ipo') return 'pre_ipo';
+  // Check for listing indicators (stored in business_entities.metadata)
+  if (listingStatus === 'listed') return 'public';
+  if (listingStatus === 'pre_ipo') return 'pre_ipo';
 
   // Age-based + funding-based determination
   if (hasFunding) return 'funded';
@@ -731,17 +817,13 @@ async function calculateStageProgress(clientId: number, stage: BusinessStage): P
     subscribedServices.includes(s)
   ).length;
   
-  // Get documents
-  const documents = await pool.query(
-    'SELECT document_key FROM client_documents WHERE client_id = $1 AND status = \'verified\'',
-    [clientId]
-  );
-  const verifiedDocs = documents.rows.map(d => d.document_key);
+  // Get approved documents from document vault/uploads
+  const approvedDocs = await getApprovedDocumentKeys(clientId);
   
   // Calculate document completion
   const criticalDocsCount = config.criticalDocuments.length;
   const verifiedCriticalCount = config.criticalDocuments.filter(d => 
-    verifiedDocs.includes(d)
+    approvedDocs.has(normalizeDocumentKey(d))
   ).length;
   
   // Weighted average: 60% services, 40% documents
@@ -770,14 +852,10 @@ async function identifyComplianceGaps(
     !subscribedServices.includes(s)
   );
   
-  const documents = await pool.query(
-    'SELECT document_key FROM client_documents WHERE client_id = $1 AND status = \'verified\'',
-    [clientId]
-  );
-  const verifiedDocs = documents.rows.map(d => d.document_key);
+  const approvedDocs = await getApprovedDocumentKeys(clientId);
   
   const documentationGaps = config.criticalDocuments.filter(d => 
-    !verifiedDocs.includes(d)
+    !approvedDocs.has(normalizeDocumentKey(d))
   );
   
   return { complianceGaps, documentationGaps };
@@ -822,15 +900,9 @@ export async function getFundingReadinessAssessment(clientId: number): Promise<{
                          complianceState?.overallState === 'AMBER' ? 70 : 40;
   
   // Documentation score (35%)
-  const docResult = await pool.query(
-    `SELECT COUNT(*) as total, 
-            COUNT(*) FILTER (WHERE status = 'verified') as verified
-     FROM client_documents 
-     WHERE client_id = $1`,
-    [clientId]
-  );
-  const docScore = docResult.rows[0].total > 0 
-    ? (docResult.rows[0].verified / docResult.rows[0].total) * 100 
+  const docCounts = await getDocumentCounts(clientId);
+  const docScore = docCounts.total > 0
+    ? (docCounts.approved / docCounts.total) * 100
     : 0;
   
   // Governance score (25%)
@@ -1004,17 +1076,31 @@ export async function getClientMetrics(clientId: number): Promise<BusinessMetric
   );
   
   if (result.rows.length === 0) {
-    // Try to get from clients table
+    // Try to get from business_entities table
     const clientResult = await pool.query(
-      'SELECT annual_revenue, employee_count, funding_raised FROM clients WHERE id = $1',
+      `SELECT annual_turnover, employee_count, metadata 
+       FROM business_entities 
+       WHERE id = $1`,
       [clientId]
     );
     
     if (clientResult.rows.length > 0) {
+      const metadata = clientResult.rows[0].metadata || {};
+      const fundingRaised = typeof metadata === 'string'
+        ? (() => {
+            try {
+              const parsed = JSON.parse(metadata);
+              return parsed?.funding_raised ?? null;
+            } catch (error) {
+              return null;
+            }
+          })()
+        : metadata?.funding_raised ?? null;
+
       return {
-        annualRevenue: clientResult.rows[0].annual_revenue,
+        annualRevenue: clientResult.rows[0].annual_turnover,
         employeeCount: clientResult.rows[0].employee_count,
-        fundingRaised: clientResult.rows[0].funding_raised
+        fundingRaised
       };
     }
     

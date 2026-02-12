@@ -22,6 +22,17 @@ import * as ComplianceService from '../services/v2/compliance-service';
 import * as ServiceCatalogService from '../services/v2/service-catalog-service';
 import * as DocumentService from '../services/v2/document-management-service';
 import * as LifecycleService from '../services/v2/business-lifecycle-service';
+import { db } from '../db';
+import {
+  complianceTracking,
+  complianceRules,
+  complianceRequiredDocuments,
+  documentVault,
+  documentsUploads
+} from '@shared/schema';
+import { eq, inArray } from 'drizzle-orm';
+import { mapComplianceCategory } from '../compliance-taxonomy';
+import { ensureRequiredDocumentsForRuleIds } from '../compliance-evidence';
 import {
   validateRequest,
   performanceMonitor,
@@ -51,6 +62,13 @@ function getAuthenticatedUserId(req: Request): string | null {
   const user = (req as AuthenticatedRequest).user;
   return user?.id ? String(user.id) : null;
 }
+
+const normalizeDocumentKey = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
 
 /**
  * GET /api/v2/lifecycle/dashboard
@@ -189,56 +207,161 @@ router.get('/compliance-detail', async (req, res) => {
       return res.status(404).json({ error: 'Client not found' });
     }
 
-    const lifecycleStage = await LifecycleService.getClientLifecycleStage(client.id);
     const complianceState = await ComplianceService.getComplianceState(client.id);
 
-    // Get all compliance checkpoints for current stage
-    const checkpoints = lifecycleStage.stageConfig.complianceCheckpoints;
+    const trackingItems = await db
+      .select({
+        id: complianceTracking.id,
+        complianceType: complianceTracking.complianceType,
+        dueDate: complianceTracking.dueDate,
+        status: complianceTracking.status,
+        priority: complianceTracking.priority,
+        estimatedPenalty: complianceTracking.estimatedPenalty,
+        ruleId: complianceTracking.complianceRuleId,
+        ruleCode: complianceRules.ruleCode,
+        complianceName: complianceRules.complianceName,
+        description: complianceRules.description,
+        periodicity: complianceRules.periodicity,
+        formNumber: complianceRules.formNumber,
+        regulationCategory: complianceRules.regulationCategory,
+      })
+      .from(complianceTracking)
+      .leftJoin(complianceRules, eq(complianceTracking.complianceRuleId, complianceRules.id))
+      .where(eq(complianceTracking.businessEntityId, client.id));
 
-    // Get actual compliance actions
-    const actionsResult = await ComplianceService.getComplianceState(client.id);
+    const ruleIds = trackingItems
+      .map(item => item.ruleId)
+      .filter((id): id is number => typeof id === 'number');
+
+    if (ruleIds.length > 0) {
+      await ensureRequiredDocumentsForRuleIds(ruleIds);
+    }
+
+    const requiredDocs = ruleIds.length > 0
+      ? await db
+          .select({
+            complianceRuleId: complianceRequiredDocuments.complianceRuleId,
+            documentName: complianceRequiredDocuments.documentName,
+            documentType: complianceRequiredDocuments.documentType,
+            isMandatory: complianceRequiredDocuments.isMandatory,
+          })
+          .from(complianceRequiredDocuments)
+          .where(inArray(complianceRequiredDocuments.complianceRuleId, ruleIds))
+      : [];
+
+    const docsByRule = new Map<number, { documentName: string; documentType: string; isMandatory: boolean | null }[]>();
+    requiredDocs.forEach(doc => {
+      const list = docsByRule.get(doc.complianceRuleId) || [];
+      list.push({
+        documentName: doc.documentName,
+        documentType: doc.documentType,
+        isMandatory: doc.isMandatory,
+      });
+      docsByRule.set(doc.complianceRuleId, list);
+    });
+
+    const normalizeDocumentType = (value: string) => value.trim().toLowerCase();
+
+    const vaultDocs = await db
+      .select({
+        documentType: documentVault.documentType,
+        approvalStatus: documentVault.approvalStatus,
+      })
+      .from(documentVault)
+      .where(eq(documentVault.businessEntityId, client.id));
+
+    const uploadDocs = await db
+      .select({
+        documentType: documentsUploads.doctype,
+        status: documentsUploads.status,
+      })
+      .from(documentsUploads)
+      .where(eq(documentsUploads.entityId, client.id));
+
+    const uploadedTypes = new Set<string>();
+
+    vaultDocs.forEach(doc => {
+      if (!doc.documentType) return;
+      if (doc.approvalStatus !== 'approved') return;
+      uploadedTypes.add(normalizeDocumentType(doc.documentType));
+    });
+
+    uploadDocs.forEach(doc => {
+      if (!doc.documentType) return;
+      if (doc.status !== 'approved') return;
+      uploadedTypes.add(normalizeDocumentType(doc.documentType));
+    });
+
+    const now = new Date();
+    const monthly: any[] = [];
+    const quarterly: any[] = [];
+    const annual: any[] = [];
+    const other: any[] = [];
+
+    const normalizeStatus = (status: string | null | undefined, dueDate?: Date | null) => {
+      if (status === 'completed') return 'completed';
+      if (dueDate && dueDate < now) return 'overdue';
+      return status || 'pending';
+    };
+
+    trackingItems.forEach(item => {
+      const due = item.dueDate ? new Date(item.dueDate) : null;
+      const status = normalizeStatus(item.status, due);
+      const frequency = (item.periodicity || item.complianceType || 'annual').toLowerCase();
+      const penalty = item.estimatedPenalty ? `₹${Number(item.estimatedPenalty).toLocaleString('en-IN')}` : 'N/A';
+      const requiredDocs = item.ruleId ? (docsByRule.get(item.ruleId) || []) : [];
+      const missingDocs = requiredDocs.filter(doc => {
+        if (doc.isMandatory === false) return false;
+        return !uploadedTypes.has(normalizeDocumentType(doc.documentType));
+      });
+      const requiredTypes = requiredDocs.map(doc => doc.documentType).filter(Boolean);
+      const missingTypes = missingDocs.map(doc => doc.documentType).filter(Boolean);
+      const entry = {
+        id: item.id,
+        name: item.complianceName || item.formNumber || item.complianceType || 'Compliance item',
+        description: item.description || 'Compliance requirement',
+        nextDue: due ? due.toISOString().split('T')[0] : null,
+        penaltyForMiss: penalty,
+        documentsRequired: requiredDocs.map(doc => doc.documentName),
+        documentsMissing: missingDocs.map(doc => doc.documentName),
+        documentsRequiredTypes: requiredTypes,
+        documentsMissingTypes: missingTypes,
+        documentsUploaded: requiredDocs.length - missingDocs.length,
+        status,
+        priority: item.priority || 'medium',
+        ruleCode: item.ruleCode || undefined,
+        category: mapComplianceCategory(item.regulationCategory || item.complianceType),
+      };
+
+      if (frequency === 'monthly') monthly.push(entry);
+      else if (frequency === 'quarterly') quarterly.push(entry);
+      else if (frequency === 'annual' || frequency === 'half_yearly' || frequency === 'one_time') annual.push(entry);
+      else other.push(entry);
+    });
+
+    const completedCount = trackingItems.filter(item => item.status === 'completed').length;
+    const overdueCount = trackingItems.filter(item => {
+      if (item.status === 'completed') return false;
+      return item.dueDate ? new Date(item.dueDate) < now : false;
+    }).length;
 
     return res.json({
       summary: {
         overallStatus: complianceState?.overallState,
-        totalCheckpoints: checkpoints.length,
-        completedCheckpoints: complianceState?.compliantItems || 0,
-        upcomingCheckpoints: complianceState?.pendingItems || 0
+        totalCheckpoints: trackingItems.length,
+        completedCheckpoints: completedCount,
+        upcomingCheckpoints: Math.max(0, trackingItems.length - completedCount - overdueCount)
       },
 
-      // Checkpoints by frequency
-      monthly: checkpoints.filter(c => c.frequency === 'monthly').map(c => ({
-        name: c.name,
-        description: c.description,
-        nextDue: calculateNextDue(c.frequency),
-        penaltyForMiss: c.penaltyForMiss,
-        documentsRequired: c.documentationRequired,
-        status: 'pending' // TODO: Calculate actual status
-      })),
+      monthly,
+      quarterly,
+      annual,
+      other,
 
-      quarterly: checkpoints.filter(c => c.frequency === 'quarterly').map(c => ({
-        name: c.name,
-        description: c.description,
-        nextDue: calculateNextDue(c.frequency),
-        penaltyForMiss: c.penaltyForMiss,
-        documentsRequired: c.documentationRequired,
-        status: 'pending'
-      })),
-
-      annual: checkpoints.filter(c => c.frequency === 'annual').map(c => ({
-        name: c.name,
-        description: c.description,
-        nextDue: calculateNextDue(c.frequency),
-        penaltyForMiss: c.penaltyForMiss,
-        documentsRequired: c.documentationRequired,
-        status: 'pending'
-      })),
-
-      // Risk analysis
       riskAnalysis: {
-        highRisk: checkpoints.filter(c => c.penaltyForMiss.includes('lakh')).length,
-        mediumRisk: checkpoints.filter(c => c.penaltyForMiss.includes('₹') && !c.penaltyForMiss.includes('lakh')).length,
-        lowRisk: checkpoints.filter(c => !c.penaltyForMiss.includes('₹')).length
+        highRisk: trackingItems.filter(item => item.priority === 'critical' || Number(item.estimatedPenalty || 0) >= 10000).length,
+        mediumRisk: trackingItems.filter(item => item.priority === 'high' || Number(item.estimatedPenalty || 0) >= 5000).length,
+        lowRisk: trackingItems.filter(item => !item.estimatedPenalty || Number(item.estimatedPenalty) < 5000).length
       }
     });
 
@@ -362,8 +485,16 @@ router.get('/documents-detail', async (req, res) => {
 
     documents.forEach(doc => {
       const category = doc.category || 'operational';
+      const docPayload = {
+        ...doc,
+        name: doc.documentName,
+        documentKey: doc.documentKey,
+        uploadedAt: doc.uploadedAt,
+        verifiedAt: doc.verifiedAt,
+        expiryDate: doc.expiryDate,
+      };
       if (documentsByCategory[category]) {
-        documentsByCategory[category].push(doc);
+        documentsByCategory[category].push(docPayload);
       }
     });
 
@@ -386,14 +517,15 @@ router.get('/documents-detail', async (req, res) => {
 
       // Critical documents status
       criticalDocuments: critical.map(docKey => {
-        const doc = documents.find(d => d.document_key === docKey);
+        const normalizedKey = normalizeDocumentKey(docKey);
+        const doc = documents.find(d => normalizeDocumentKey(d.documentKey) === normalizedKey);
         return {
           documentKey: docKey,
           status: doc ? doc.status : 'missing',
           uploaded: !!doc,
           verified: doc?.status === 'verified',
-          expiryDate: doc?.expiry_date,
-          lastUpdated: doc?.updated_at
+          expiryDate: doc?.expiryDate,
+          lastUpdated: doc?.verifiedAt || doc?.uploadedAt
         };
       }),
 
@@ -700,4 +832,3 @@ router.use((error: any, req: any, res: any, next: any) => {
 });
 
 export default router;
-

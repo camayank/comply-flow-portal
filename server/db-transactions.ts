@@ -152,10 +152,18 @@ export async function createServiceRequestTransaction(
   return await withTransaction(async (tx) => {
     const { serviceRequests, taskItems } = require('@shared/schema');
 
+    const alignedServiceRequest = {
+      ...serviceRequestData,
+      businessEntityId: serviceRequestData.businessEntityId ?? serviceRequestData.entityId,
+      entityId: serviceRequestData.entityId ?? serviceRequestData.businessEntityId,
+      serviceId: serviceRequestData.serviceId ?? serviceRequestData.serviceType,
+      serviceType: serviceRequestData.serviceType ?? serviceRequestData.serviceId
+    };
+
     // Create service request
     const [serviceRequest] = await tx
       .insert(serviceRequests)
-      .values(serviceRequestData)
+      .values(alignedServiceRequest)
       .returning();
 
     // Create associated tasks

@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { db } from './db';
-import { pgTable, text, serial, integer, boolean, timestamp, json } from "drizzle-orm/pg-core";
+import { workflowAutomationRules, workflowAutomationHistory } from '@shared/schema';
+import { and, desc, eq } from 'drizzle-orm';
+import { triggerWorkflowAutomation } from './workflow-automation-engine';
 
 // Workflow Automation Engine - No-code workflow triggers and actions
 export function registerWorkflowAutomationRoutes(app: Express) {
@@ -8,75 +10,10 @@ export function registerWorkflowAutomationRoutes(app: Express) {
   // Get all workflow automation rules
   app.get('/api/workflows/automation', async (req, res) => {
     try {
-      // In production, this would query from workflow_automation_rules table
-      // For now, return sample automation workflows
-      const automations = [
-        {
-          id: 1,
-          name: "Welcome Email on Registration",
-          trigger: "client_registered",
-          enabled: true,
-          actions: [
-            { type: "send_email", template: "welcome", delay: 0 },
-            { type: "create_task", assignTo: "relationship_manager", delay: 60 }
-          ]
-        },
-        {
-          id: 2,
-          name: "Payment Reminder - 24hrs before due",
-          trigger: "payment_due_soon",
-          enabled: true,
-          conditions: [{ field: "hours_until_due", operator: "equals", value: 24 }],
-          actions: [
-            { type: "send_email", template: "payment_reminder" },
-            { type: "send_whatsapp", message: "Payment reminder" }
-          ]
-        },
-        {
-          id: 3,
-          name: "Service Milestone Completed",
-          trigger: "milestone_completed",
-          enabled: true,
-          actions: [
-            { type: "send_notification", message: "Milestone completed" },
-            { type: "update_progress", increment: 25 }
-          ]
-        },
-        {
-          id: 4,
-          name: "Document Upload Reminder",
-          trigger: "document_pending",
-          enabled: true,
-          conditions: [{ field: "days_pending", operator: "greater_than", value: 2 }],
-          actions: [
-            { type: "send_email", template: "document_reminder" },
-            { type: "escalate_to", role: "customer_service" }
-          ]
-        },
-        {
-          id: 5,
-          name: "Compliance Due Alert - 7 Days",
-          trigger: "compliance_due_soon",
-          enabled: true,
-          conditions: [{ field: "days_until_due", operator: "equals", value: 7 }],
-          actions: [
-            { type: "send_email", template: "compliance_alert" },
-            { type: "send_whatsapp", message: "Compliance deadline approaching" },
-            { type: "create_task", priority: "high" }
-          ]
-        },
-        {
-          id: 6,
-          name: "Referral Credit - Successful Onboarding",
-          trigger: "referral_completed",
-          enabled: true,
-          actions: [
-            { type: "credit_wallet", percentage: 10 },
-            { type: "send_email", template: "referral_success" },
-            { type: "send_notification", message: "You earned referral credit!" }
-          ]
-        }
-      ];
+      const automations = await db
+        .select()
+        .from(workflowAutomationRules)
+        .orderBy(desc(workflowAutomationRules.createdAt));
 
       res.json(automations);
     } catch (error) {
@@ -95,17 +32,18 @@ export function registerWorkflowAutomationRoutes(app: Express) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
-      const newAutomation = {
-        id: Math.floor(Math.random() * 10000),
-        name,
-        trigger,
-        conditions: conditions || [],
-        actions,
-        enabled: enabled !== false,
-        createdAt: new Date(),
-      };
+      const [created] = await db
+        .insert(workflowAutomationRules)
+        .values({
+          name,
+          trigger,
+          conditions: conditions || [],
+          actions,
+          enabled: enabled !== false,
+        })
+        .returning();
 
-      res.json({ message: 'Automation created', automation: newAutomation });
+      res.json({ message: 'Automation created', automation: created });
     } catch (error) {
       console.error('Create automation error:', error);
       res.status(500).json({ error: 'Failed to create automation' });
@@ -117,43 +55,20 @@ export function registerWorkflowAutomationRoutes(app: Express) {
     try {
       const { trigger, entityId, entityType, data } = req.body;
 
-      // Log workflow execution
-      console.log(`[Workflow Automation] Triggered: ${trigger}`, {
-        entityId,
+      if (!trigger) {
+        return res.status(400).json({ error: 'Trigger is required' });
+      }
+
+      const result = await triggerWorkflowAutomation({
+        trigger,
+        entityId: entityId ? Number(entityId) : null,
         entityType,
         data,
-        timestamp: new Date()
       });
-
-      // Execute actions based on trigger
-      const executedActions = [];
-      
-      switch (trigger) {
-        case 'client_registered':
-          executedActions.push({ action: 'send_email', status: 'sent', template: 'welcome' });
-          executedActions.push({ action: 'create_task', status: 'created', assignTo: 'relationship_manager' });
-          break;
-        
-        case 'payment_due_soon':
-          executedActions.push({ action: 'send_email', status: 'sent', template: 'payment_reminder' });
-          break;
-        
-        case 'milestone_completed':
-          executedActions.push({ action: 'send_notification', status: 'sent' });
-          executedActions.push({ action: 'update_progress', status: 'updated' });
-          break;
-        
-        case 'referral_completed':
-          executedActions.push({ action: 'credit_wallet', status: 'credited' });
-          executedActions.push({ action: 'send_email', status: 'sent', template: 'referral_success' });
-          break;
-      }
 
       res.json({
         message: 'Workflow triggered successfully',
-        trigger,
-        actionsExecuted: executedActions.length,
-        actions: executedActions
+        ...result,
       });
     } catch (error) {
       console.error('Trigger workflow error:', error);
@@ -165,39 +80,13 @@ export function registerWorkflowAutomationRoutes(app: Express) {
   app.get('/api/workflows/history', async (req, res) => {
     try {
       const { limit = 50 } = req.query;
+      const history = await db
+        .select()
+        .from(workflowAutomationHistory)
+        .orderBy(desc(workflowAutomationHistory.executedAt))
+        .limit(Math.min(100, Math.max(1, parseInt(limit as string))));
 
-      // Sample workflow execution history
-      const history = [
-        {
-          id: 1,
-          workflow: "Welcome Email on Registration",
-          trigger: "client_registered",
-          entityId: 123,
-          status: "success",
-          actionsExecuted: 2,
-          executedAt: new Date(Date.now() - 3600000),
-        },
-        {
-          id: 2,
-          workflow: "Payment Reminder - 24hrs before due",
-          trigger: "payment_due_soon",
-          entityId: 456,
-          status: "success",
-          actionsExecuted: 2,
-          executedAt: new Date(Date.now() - 7200000),
-        },
-        {
-          id: 3,
-          workflow: "Referral Credit - Successful Onboarding",
-          trigger: "referral_completed",
-          entityId: 789,
-          status: "success",
-          actionsExecuted: 3,
-          executedAt: new Date(Date.now() - 10800000),
-        }
-      ];
-
-      res.json(history.slice(0, parseInt(limit as string)));
+      res.json(history);
     } catch (error) {
       console.error('Get workflow history error:', error);
       res.status(500).json({ error: 'Failed to fetch workflow history' });
@@ -209,12 +98,13 @@ export function registerWorkflowAutomationRoutes(app: Express) {
     try {
       const { id } = req.params;
       const { enabled } = req.body;
+      const [updated] = await db
+        .update(workflowAutomationRules)
+        .set({ enabled: enabled !== false, updatedAt: new Date() })
+        .where(eq(workflowAutomationRules.id, parseInt(id)))
+        .returning();
 
-      res.json({
-        message: 'Automation updated',
-        id: parseInt(id),
-        enabled
-      });
+      res.json({ message: 'Automation updated', automation: updated });
     } catch (error) {
       console.error('Update automation error:', error);
       res.status(500).json({ error: 'Failed to update automation' });
@@ -223,34 +113,46 @@ export function registerWorkflowAutomationRoutes(app: Express) {
 
   // Register duplicate routes at /api/v1 paths for backward compatibility
   app.get('/api/v1/workflows/automation', async (req, res) => {
-    const automations = [
-      { id: 1, name: "Welcome Email on Registration", trigger: "client_registered", enabled: true },
-      { id: 2, name: "Payment Reminder - 24hrs before due", trigger: "payment_due_soon", enabled: true },
-      { id: 3, name: "Service Milestone Completed", trigger: "milestone_completed", enabled: true },
-      { id: 4, name: "Document Upload Reminder", trigger: "document_pending", enabled: true },
-      { id: 5, name: "Compliance Due Alert - 7 Days", trigger: "compliance_due_soon", enabled: true },
-      { id: 6, name: "Referral Credit - Successful Onboarding", trigger: "referral_completed", enabled: true },
-    ];
+    const automations = await db
+      .select()
+      .from(workflowAutomationRules)
+      .orderBy(desc(workflowAutomationRules.createdAt));
     res.json(automations);
   });
 
   app.get('/api/v1/workflows/history', async (req, res) => {
-    const history = [
-      { id: 1, workflow: "Welcome Email on Registration", trigger: "client_registered", status: "success", executedAt: new Date() },
-      { id: 2, workflow: "Payment Reminder", trigger: "payment_due_soon", status: "success", executedAt: new Date(Date.now() - 3600000) },
-    ];
+    const history = await db
+      .select()
+      .from(workflowAutomationHistory)
+      .orderBy(desc(workflowAutomationHistory.executedAt))
+      .limit(50);
     res.json(history);
   });
 
   app.post('/api/v1/workflows/automation', async (req, res) => {
     const { name, trigger, actions, enabled } = req.body;
-    res.json({ message: 'Automation created', automation: { id: Math.floor(Math.random() * 10000), name, trigger, actions, enabled } });
+    const [created] = await db
+      .insert(workflowAutomationRules)
+      .values({
+        name,
+        trigger,
+        actions,
+        enabled: enabled !== false,
+        conditions: []
+      })
+      .returning();
+    res.json({ message: 'Automation created', automation: created });
   });
 
   app.patch('/api/v1/workflows/automation/:id', async (req, res) => {
     const { id } = req.params;
     const { enabled } = req.body;
-    res.json({ message: 'Automation updated', id: parseInt(id), enabled });
+    const [updated] = await db
+      .update(workflowAutomationRules)
+      .set({ enabled: enabled !== false, updatedAt: new Date() })
+      .where(eq(workflowAutomationRules.id, parseInt(id)))
+      .returning();
+    res.json({ message: 'Automation updated', automation: updated });
   });
 
   console.log('✅ Workflow Automation routes registered');

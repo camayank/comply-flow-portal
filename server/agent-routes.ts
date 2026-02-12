@@ -13,7 +13,7 @@
 
 import type { Express, Request, Response } from "express";
 import { db } from './db';
-import { leads, commissionRecords, users } from '@shared/schema';
+import { leads, users, commissions, serviceRequests, services, businessEntities } from '@shared/schema';
 import { eq, and, desc, sql, gte, lte } from 'drizzle-orm';
 import { sessionAuthMiddleware, requireMinimumRole, requireRole, USER_ROLES, type AuthenticatedRequest } from './rbac-middleware';
 
@@ -52,17 +52,17 @@ export function registerAgentRoutes(app: Express) {
       });
 
       // Get commission statistics
-      const commissions = await db.select()
-        .from(commissionRecords)
-        .where(eq(commissionRecords.agentId, parseInt(agentId) || 1));
+      const commissionsData = await db.select()
+        .from(commissions)
+        .where(eq(commissions.agentId, parseInt(agentId) || 1));
 
-      const totalCommission = commissions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-      const pendingCommission = commissions
-        .filter(c => c.status === 'pending')
-        .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-      const paidCommission = commissions
+      const totalCommission = commissionsData.reduce((sum, c) => sum + (Number(c.commissionAmount) || 0), 0);
+      const pendingCommission = commissionsData
+        .filter(c => ['pending', 'pending_approval'].includes(c.status || ''))
+        .reduce((sum, c) => sum + (Number(c.commissionAmount) || 0), 0);
+      const paidCommission = commissionsData
         .filter(c => c.status === 'paid')
-        .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+        .reduce((sum, c) => sum + (Number(c.commissionAmount) || 0), 0);
 
       const stats = {
         // Lead stats
@@ -321,30 +321,97 @@ export function registerAgentRoutes(app: Express) {
     try {
       const agentId = req.user?.id;
       const userRole = req.user?.role;
-      const { status, limit = 50 } = req.query;
+      const { status, period, limit = 50 } = req.query;
 
       if (!agentId) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      let query = db.select().from(commissionRecords);
+      const filters = [];
 
-      // Filter by agentId for agents, admins see all
       if (userRole === 'agent') {
-        query = query.where(eq(commissionRecords.agentId, parseInt(String(agentId)) || 0)) as any;
+        filters.push(eq(commissions.agentId, parseInt(String(agentId)) || 0));
       }
 
       if (status && status !== 'all') {
-        query = query.where(eq(commissionRecords.status, status as string)) as any;
+        if (status === 'cleared') {
+          filters.push(eq(commissions.status, 'paid'));
+        } else if (status === 'processing') {
+          filters.push(eq(commissions.status, 'approved'));
+        } else if (status === 'pending') {
+          filters.push(sql`(${commissions.status} = 'pending' OR ${commissions.status} = 'pending_approval')` as any);
+        } else {
+          filters.push(eq(commissions.status, status as string));
+        }
       }
 
-      const commissions = await query
-        .orderBy(desc(commissionRecords.createdAt))
+      if (period && period !== 'all') {
+        const now = new Date();
+        let startDate = new Date(0);
+        let endDate = now;
+
+        if (period === 'this_month') {
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        } else if (period === 'last_month') {
+          startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          endDate = new Date(now.getFullYear(), now.getMonth(), 0);
+        } else if (period === 'this_quarter') {
+          const quarter = Math.floor(now.getMonth() / 3);
+          startDate = new Date(now.getFullYear(), quarter * 3, 1);
+        } else if (period === 'this_year') {
+          startDate = new Date(now.getFullYear(), 0, 1);
+        }
+
+        filters.push(gte(commissions.createdAt, startDate));
+        filters.push(lte(commissions.createdAt, endDate));
+      }
+
+      const whereClause = filters.length > 0 ? and(...filters) : undefined;
+
+      let query = db
+        .select({
+          id: commissions.id,
+          createdAt: commissions.createdAt,
+          clientName: businessEntities.name,
+          serviceName: services.name,
+          serviceAmount: serviceRequests.totalAmount,
+          commissionAmount: commissions.commissionAmount,
+          status: commissions.status,
+          payoutDate: commissions.paidOn,
+          payableOn: commissions.payableOn,
+        })
+        .from(commissions)
+        .leftJoin(serviceRequests, eq(commissions.serviceRequestId, serviceRequests.id))
+        .leftJoin(services, eq(serviceRequests.serviceId, services.serviceId))
+        .leftJoin(businessEntities, eq(serviceRequests.businessEntityId, businessEntities.id))
+        .orderBy(desc(commissions.createdAt))
         .limit(parseInt(limit as string));
 
+      if (whereClause) {
+        query = query.where(whereClause) as any;
+      }
+
+      const commissionRows = await query;
+
+      const mapped = commissionRows.map((row) => {
+        let mappedStatus = 'pending';
+        if (row.status === 'paid') mappedStatus = 'cleared';
+        else if (row.status === 'approved') mappedStatus = 'processing';
+        else if (row.status === 'pending_approval') mappedStatus = 'pending';
+        else if (row.status === 'pending') mappedStatus = 'pending';
+
+        return {
+          ...row,
+          serviceAmount: row.serviceAmount ? Number(row.serviceAmount) : 0,
+          commissionAmount: row.commissionAmount ? Number(row.commissionAmount) : 0,
+          status: mappedStatus,
+          payoutDate: row.payoutDate || row.payableOn || null,
+        };
+      });
+
       res.json({
-        commissions,
-        total: commissions.length,
+        commissions: mapped,
+        total: mapped.length,
       });
     } catch (error) {
       console.error('Error fetching commissions:', error);
@@ -366,49 +433,51 @@ export function registerAgentRoutes(app: Express) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      let query = db.select().from(commissionRecords);
+      let query = db
+        .select({
+          id: commissions.id,
+          commissionAmount: commissions.commissionAmount,
+          status: commissions.status,
+          createdAt: commissions.createdAt,
+          paidOn: commissions.paidOn,
+          payableOn: commissions.payableOn,
+        })
+        .from(commissions);
 
-      // Filter by agentId for agents
       if (userRole === 'agent') {
-        query = query.where(eq(commissionRecords.agentId, parseInt(String(agentId)) || 0)) as any;
+        query = query.where(eq(commissions.agentId, parseInt(String(agentId)) || 0)) as any;
       }
 
-      const commissions = await query;
-
+      const rows = await query;
+      const toNumber = (value: any) => Number(value || 0);
       const now = new Date();
-      const thisMonth = commissions.filter(c => {
-        const created = new Date(c.createdAt || Date.now());
+
+      const thisMonthRows = rows.filter((row) => {
+        const created = new Date(row.createdAt || Date.now());
         return created.getMonth() === now.getMonth() &&
                created.getFullYear() === now.getFullYear();
       });
 
-      const lastMonth = commissions.filter(c => {
-        const created = new Date(c.createdAt || Date.now());
-        const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        return created.getMonth() === lastMonthDate.getMonth() &&
-               created.getFullYear() === lastMonthDate.getFullYear();
-      });
+      const totalEarned = rows.reduce((sum, row) => sum + toNumber(row.commissionAmount), 0);
+      const pendingAmount = rows
+        .filter(row => ['pending', 'pending_approval'].includes(row.status || ''))
+        .reduce((sum, row) => sum + toNumber(row.commissionAmount), 0);
+      const clearedAmount = rows
+        .filter(row => row.status === 'paid')
+        .reduce((sum, row) => sum + toNumber(row.commissionAmount), 0);
+      const thisMonthEarnings = thisMonthRows.reduce((sum, row) => sum + toNumber(row.commissionAmount), 0);
+      const nextPayoutDate = new Date(now.getFullYear(), now.getMonth() + 1, 5);
+      const nextPayoutAmount = rows
+        .filter(row => row.status === 'approved' && !row.paidOn)
+        .reduce((sum, row) => sum + toNumber(row.commissionAmount), 0);
 
       const summary = {
-        totalEarned: commissions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0),
-        pendingPayout: commissions
-          .filter(c => c.status === 'pending')
-          .reduce((sum, c) => sum + (Number(c.amount) || 0), 0),
-        paidOut: commissions
-          .filter(c => c.status === 'paid')
-          .reduce((sum, c) => sum + (Number(c.amount) || 0), 0),
-        thisMonthEarned: thisMonth.reduce((sum, c) => sum + (Number(c.amount) || 0), 0),
-        lastMonthEarned: lastMonth.reduce((sum, c) => sum + (Number(c.amount) || 0), 0),
-        recentTransactions: commissions.slice(0, 5).map(c => ({
-          id: c.id,
-          amount: c.amount,
-          status: c.status,
-          type: c.type,
-          description: c.description,
-          createdAt: c.createdAt,
-        })),
-        nextPayoutDate: '5th of next month',
-        payoutMethod: 'Bank Transfer',
+        totalEarned,
+        pendingAmount,
+        clearedAmount,
+        thisMonthEarnings,
+        nextPayoutDate: nextPayoutDate.toISOString(),
+        nextPayoutAmount,
       };
 
       res.json(summary);
@@ -437,11 +506,11 @@ export function registerAgentRoutes(app: Express) {
 
       // Filter data by agent if not admin
       let leadsQuery = db.select().from(leads);
-      let commissionsQuery = db.select().from(commissionRecords);
+      let commissionsQuery = db.select().from(commissions);
 
       if (userRole === 'agent') {
         leadsQuery = leadsQuery.where(eq(leads.agentId, String(agentId))) as any;
-        commissionsQuery = commissionsQuery.where(eq(commissionRecords.agentId, parseInt(String(agentId)) || 0)) as any;
+        commissionsQuery = commissionsQuery.where(eq(commissions.agentId, parseInt(String(agentId)) || 0)) as any;
       }
 
       const allLeads = await leadsQuery;
@@ -470,7 +539,7 @@ export function registerAgentRoutes(app: Express) {
           month: monthName,
           leads: monthLeads.length,
           conversions: monthLeads.filter(l => l.stage === 'converted').length,
-          commission: monthCommissions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0),
+          commission: monthCommissions.reduce((sum, c) => sum + (Number(c.commissionAmount) || 0), 0),
         });
       }
 
@@ -483,7 +552,7 @@ export function registerAgentRoutes(app: Express) {
         conversionRate: allLeads.length > 0
           ? Math.round((convertedLeads.length / allLeads.length) * 100)
           : 0,
-        totalRevenue: commissions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0),
+        totalRevenue: commissions.reduce((sum, c) => sum + (Number(c.commissionAmount) || 0), 0),
 
         // Rankings
         rank: 5,

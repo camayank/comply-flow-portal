@@ -40,10 +40,27 @@ export default function AgentCommissionTracker() {
 
   const { data: commissionsData, isLoading } = useQuery({
     queryKey: ['/api/agent/commissions', { status: statusFilter, period: periodFilter }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
+      if (periodFilter && periodFilter !== 'all') params.append('period', periodFilter);
+      const response = await fetch(`/api/agent/commissions?${params.toString()}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch commissions');
+      return response.json();
+    },
   });
 
   const { data: summaryData, isLoading: loadingSummary } = useQuery({
     queryKey: ['/api/agent/commissions/summary'],
+    queryFn: async () => {
+      const response = await fetch('/api/agent/commissions/summary', {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch commission summary');
+      return response.json();
+    },
   });
 
   const commissions = (commissionsData as any)?.commissions || [];

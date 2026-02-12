@@ -269,7 +269,7 @@ function getModuleDetails(moduleId: string) {
       components: [
         { name: 'ComplianceStateEngine', file: 'compliance-state-engine.ts' },
         { name: 'ComplianceRulesSeeder', file: 'compliance-rules-seeder.ts' },
-        { name: 'SLAEngine', file: 'sla-engine.ts' },
+        { name: 'SLAEngine', file: 'enhanced-sla-system.ts' },
         { name: 'StateScheduler', file: 'compliance-state-scheduler.ts' }
       ],
       stateTransitions: {

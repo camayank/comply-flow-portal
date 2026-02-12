@@ -2,19 +2,28 @@ import type { Express } from "express";
 import { db } from './db';
 import { 
   serviceRequests,
-  businessEntities
+  businessEntities,
+  notificationRules,
+  notificationTemplates,
+  notificationOutbox
 } from '@shared/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES } from './rbac-middleware';
+import { notificationEngine } from './notification-engine';
+import { ServiceSeeder } from './service-seeder';
+import { ServiceTemplateSeeder } from './service-template-seeder';
 
 export function registerNotificationRoutes(app: Express) {
   const requireAdminAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ADMIN)] as const;
+  const serviceSeeder = new ServiceSeeder();
+  const serviceTemplateSeeder = new ServiceTemplateSeeder();
   
   // Initialize/Seed Templates and Rules
   app.post('/api/admin/seed-templates', ...requireAdminAccess, async (req, res) => {
     try {
+      await serviceSeeder.seedAllServices();
       await serviceTemplateSeeder.seedAllTemplates();
-      res.json({ message: 'All service templates seeded successfully' });
+      res.json({ message: 'All service configurations and templates seeded successfully' });
     } catch (error) {
       console.error('Error seeding templates:', error);
       res.status(500).json({ error: 'Failed to seed templates' });

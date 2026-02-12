@@ -6,7 +6,17 @@
  * - Audit trail for all state changes
  */
 
-import { pool } from '../../db';
+import { db } from '../../db';
+import {
+  complianceStates,
+  complianceTracking,
+  complianceRules,
+  activityLogs,
+  businessEntities,
+  complianceRequiredDocuments,
+} from '@shared/schema';
+import { and, desc, eq, or, count } from 'drizzle-orm';
+import { ensureRequiredDocumentsForRuleIds } from '../../compliance-evidence';
 
 export interface ComplianceState {
   overallState: 'GREEN' | 'AMBER' | 'RED';
@@ -50,306 +60,275 @@ export interface Activity {
  * Uses cached state from database with real-time validation
  */
 export async function getComplianceState(clientId: number): Promise<ComplianceState | null> {
-  const result = await pool.query(
-    `SELECT 
-      overall_state,
-      days_until_critical,
-      next_critical_deadline,
-      total_penalty_exposure,
-      compliant_items,
-      pending_items,
-      overdue_items,
-      calculation_metadata,
-      calculated_at
-    FROM client_compliance_state
-    WHERE client_id = $1`,
-    [clientId]
-  );
+  const [state] = await db
+    .select()
+    .from(complianceStates)
+    .where(eq(complianceStates.entityId, clientId))
+    .limit(1);
 
-  if (result.rows.length === 0) {
+  const trackingItems = await db
+    .select({
+      status: complianceTracking.status,
+      dueDate: complianceTracking.dueDate,
+      estimatedPenalty: complianceTracking.estimatedPenalty,
+    })
+    .from(complianceTracking)
+    .where(eq(complianceTracking.businessEntityId, clientId));
+
+  if (!state && trackingItems.length === 0) {
     return null;
   }
 
-  const row = result.rows[0];
+  const today = new Date();
+  let compliant = 0;
+  let pending = 0;
+  let overdue = 0;
+  let criticalSoon = 0;
+  let nextDeadline: Date | null = null;
+  let totalPenalty = 0;
+
+  for (const item of trackingItems) {
+    const dueDate = item.dueDate ? new Date(item.dueDate) : null;
+    const isCompleted = item.status === 'completed';
+
+    if (isCompleted) {
+      compliant++;
+      continue;
+    }
+
+    if (dueDate) {
+      const daysUntil = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysUntil < 0) overdue++;
+      else pending++;
+
+      if (daysUntil <= 7) {
+        criticalSoon++;
+      }
+
+      if (!nextDeadline || dueDate.getTime() < nextDeadline.getTime()) {
+        nextDeadline = dueDate;
+      }
+    } else {
+      pending++;
+    }
+
+    totalPenalty += Number(item.estimatedPenalty || 0);
+  }
+
+  const computedOverallState: ComplianceState['overallState'] =
+    overdue > 0 ? 'RED' : criticalSoon > 0 ? 'AMBER' : 'GREEN';
+
+  const daysUntilCritical = nextDeadline
+    ? Math.ceil((nextDeadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+    : 0;
+
   return {
-    overallState: row.overall_state,
-    daysUntilCritical: row.days_until_critical,
-    nextCriticalDeadline: row.next_critical_deadline,
-    totalPenaltyExposure: parseFloat(row.total_penalty_exposure || 0),
-    compliantItems: row.compliant_items,
-    pendingItems: row.pending_items,
-    overdueItems: row.overdue_items,
-    calculationMetadata: row.calculation_metadata
+    overallState: (state?.overallState as ComplianceState['overallState']) || computedOverallState,
+    daysUntilCritical: state?.daysUntilNextDeadline ?? daysUntilCritical,
+    nextCriticalDeadline: state?.nextCriticalDeadline ?? nextDeadline,
+    totalPenaltyExposure: Number(state?.totalPenaltyExposure ?? totalPenalty),
+    compliantItems: compliant,
+    pendingItems: pending,
+    overdueItems: overdue,
+    calculationMetadata: {
+      source: state ? 'state_table' : 'computed_from_tracking',
+      calculatedAt: state?.calculatedAt ?? new Date(),
+    }
   };
 }
 
 /**
  * Get prioritized next action for client
- * Uses smart prioritization based on:
- * - Deadline urgency
- * - Penalty amount
- * - Compliance impact
- * - Client history
  */
 export async function getNextPrioritizedAction(clientId: number): Promise<ComplianceAction | null> {
-  const result = await pool.query(
-    `SELECT 
-      id,
-      client_id,
-      action_type,
-      title,
-      description,
-      priority,
-      status,
-      due_date,
-      estimated_time_minutes,
-      document_type,
-      penalty_amount,
-      instructions,
-      benefits,
-      metadata
-    FROM compliance_actions
-    WHERE client_id = $1 
-      AND status IN ('pending', 'in_progress')
-    ORDER BY 
-      CASE priority 
-        WHEN 'high' THEN 1 
-        WHEN 'medium' THEN 2 
-        ELSE 3 
-      END,
-      due_date ASC,
-      penalty_amount DESC NULLS LAST
-    LIMIT 1`,
-    [clientId]
-  );
+  const pendingItems = await db
+    .select({
+      id: complianceTracking.id,
+      dueDate: complianceTracking.dueDate,
+      status: complianceTracking.status,
+      priority: complianceTracking.priority,
+      estimatedPenalty: complianceTracking.estimatedPenalty,
+      complianceType: complianceTracking.complianceType,
+      serviceType: complianceTracking.serviceType,
+      complianceRuleId: complianceTracking.complianceRuleId,
+      ruleCode: complianceRules.ruleCode,
+      complianceName: complianceRules.complianceName,
+      description: complianceRules.description,
+      formNumber: complianceRules.formNumber,
+    })
+    .from(complianceTracking)
+    .leftJoin(complianceRules, eq(complianceTracking.complianceRuleId, complianceRules.id))
+    .where(
+      and(
+        eq(complianceTracking.businessEntityId, clientId),
+        or(eq(complianceTracking.status, 'pending'), eq(complianceTracking.status, 'overdue'))
+      )
+    );
 
-  if (result.rows.length === 0) {
+  if (pendingItems.length === 0) {
     return null;
   }
 
-  const row = result.rows[0];
+  const priorityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+
+  pendingItems.sort((a, b) => {
+    const pa = priorityOrder[a.priority || 'medium'] ?? 2;
+    const pb = priorityOrder[b.priority || 'medium'] ?? 2;
+    if (pa !== pb) return pa - pb;
+    const ad = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+    const bd = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER;
+    return ad - bd;
+  });
+
+  const next = pendingItems[0];
+  let requiresDocuments = false;
+
+  if (next.complianceRuleId) {
+    await ensureRequiredDocumentsForRuleIds([next.complianceRuleId]);
+    const [docCount] = await db
+      .select({ count: count() })
+      .from(complianceRequiredDocuments)
+      .where(eq(complianceRequiredDocuments.complianceRuleId, next.complianceRuleId))
+      .limit(1);
+
+    requiresDocuments = Number(docCount?.count || 0) > 0;
+  }
+  const priority = (next.priority === 'critical' || next.priority === 'high') ? 'high' :
+    next.priority === 'low' ? 'low' : 'medium';
+
   return {
-    id: row.id,
-    clientId: row.client_id,
-    actionType: row.action_type,
-    title: row.title,
-    description: row.description,
-    priority: row.priority,
-    status: row.status,
-    dueDate: row.due_date,
-    estimatedMinutes: row.estimated_time_minutes || 5,
-    documentType: row.document_type,
-    penaltyAmount: row.penalty_amount ? parseFloat(row.penalty_amount) : undefined,
-    instructions: row.instructions,
-    benefits: row.benefits,
-    metadata: row.metadata
+    id: next.id,
+    clientId,
+    actionType: requiresDocuments ? 'upload' : 'review',
+    title: next.complianceName || next.serviceType || next.complianceType || 'Compliance Action',
+    description: next.description || 'Complete the required compliance action before the due date.',
+    priority,
+    status: next.status === 'overdue' ? 'pending' : 'in_progress',
+    dueDate: next.dueDate ? new Date(next.dueDate) : new Date(),
+    estimatedMinutes: priority === 'high' ? 45 : priority === 'medium' ? 25 : 15,
+    documentType: next.formNumber || next.complianceType || undefined,
+    penaltyAmount: next.estimatedPenalty || undefined,
+    instructions: next.description ? [next.description] : undefined,
+    benefits: undefined,
+    metadata: { ruleCode: next.ruleCode }
   };
 }
 
 /**
  * Get recent activities for a client
- * Includes document uploads, filings, payments, approvals
  */
 export async function getRecentActivities(clientId: number, limit: number = 10): Promise<Activity[]> {
-  const result = await pool.query(
-    `SELECT 
-      id,
-      activity_type as type,
-      description,
-      created_at as timestamp,
-      actor_id as user_id,
-      metadata
-    FROM client_activities
-    WHERE client_id = $1
-    ORDER BY created_at DESC
-    LIMIT $2`,
-    [clientId, limit]
-  );
+  const logs = await db
+    .select({
+      id: activityLogs.id,
+      action: activityLogs.action,
+      details: activityLogs.details,
+      createdAt: activityLogs.createdAt,
+      userId: activityLogs.userId,
+      metadata: activityLogs.metadata,
+    })
+    .from(activityLogs)
+    .where(eq(activityLogs.businessEntityId, clientId))
+    .orderBy(desc(activityLogs.createdAt))
+    .limit(limit);
 
-  return result.rows.map(row => ({
+  const mapActionToType = (action: string | null | undefined): Activity['type'] => {
+    const normalized = (action || '').toLowerCase();
+    if (normalized.includes('document')) return 'document_uploaded';
+    if (normalized.includes('payment')) return 'payment_completed';
+    if (normalized.includes('approval')) return 'document_approved';
+    if (normalized.includes('alert')) return 'alert_created';
+    if (normalized.includes('filing')) return 'filing_initiated';
+    return 'alert_created';
+  };
+
+  return logs.map(row => ({
     id: row.id,
-    type: row.type,
-    description: row.description,
-    timestamp: row.timestamp,
-    userId: row.user_id,
+    type: mapActionToType(row.action),
+    description: row.details || row.action || 'Activity recorded',
+    timestamp: row.createdAt,
+    userId: row.userId ? String(row.userId) : undefined,
     metadata: row.metadata
   }));
 }
 
 /**
  * Complete a compliance action
- * Records completion, updates state, creates audit trail
  */
 export async function completeAction(
   actionId: number,
   completedBy: string,
   completionData?: any
 ): Promise<void> {
-  const client = await pool.connect();
-  
-  try {
-    await client.query('BEGIN');
+  const [item] = await db
+    .select({
+      id: complianceTracking.id,
+      businessEntityId: complianceTracking.businessEntityId,
+      serviceType: complianceTracking.serviceType,
+    })
+    .from(complianceTracking)
+    .where(eq(complianceTracking.id, actionId))
+    .limit(1);
 
-    // Update action status
-    await client.query(
-      `UPDATE compliance_actions 
-       SET status = 'completed',
-           completed_at = CURRENT_TIMESTAMP,
-           completed_by = $1,
-           completion_data = $2,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3`,
-      [completedBy, completionData, actionId]
-    );
+  if (!item) return;
 
-    // Get action details for activity log
-    const actionResult = await client.query(
-      'SELECT client_id, title FROM compliance_actions WHERE id = $1',
-      [actionId]
-    );
+  await db
+    .update(complianceTracking)
+    .set({
+      status: 'completed',
+      lastCompleted: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(complianceTracking.id, actionId));
 
-    if (actionResult.rows.length > 0) {
-      const { client_id, title } = actionResult.rows[0];
-
-      // Create activity record
-      await client.query(
-        `INSERT INTO client_activities 
-         (client_id, activity_type, description, user_id, metadata)
-         VALUES ($1, 'document_approved', $2, $3, $4)`,
-        [
-          client_id,
-          `Completed: ${title}`,
-          completedBy,
-          { actionId, completionData }
-        ]
-      );
-
-      // Trigger compliance state recalculation (async)
-      // In production, this would be a background job
-      await recalculateComplianceState(client_id, client);
-    }
-
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-/**
- * Recalculate compliance state for a client
- * Called after actions are completed or deadlines change
- */
-async function recalculateComplianceState(clientId: number, client: any): Promise<void> {
-  // Get all pending and overdue actions
-  const actionsResult = await client.query(
-    `SELECT 
-      COUNT(*) FILTER (WHERE status = 'completed') as compliant_count,
-      COUNT(*) FILTER (WHERE status IN ('pending', 'in_progress') AND due_date >= CURRENT_DATE) as pending_count,
-      COUNT(*) FILTER (WHERE status IN ('pending', 'in_progress') AND due_date < CURRENT_DATE) as overdue_count,
-      MIN(due_date) FILTER (WHERE status IN ('pending', 'in_progress')) as next_deadline,
-      SUM(penalty_amount) FILTER (WHERE status IN ('pending', 'in_progress')) as total_penalty
-    FROM compliance_actions
-    WHERE client_id = $1`,
-    [clientId]
-  );
-
-  const stats = actionsResult.rows[0];
-  const nextDeadline = stats.next_deadline ? new Date(stats.next_deadline) : null;
-  const daysUntilCritical = nextDeadline 
-    ? Math.ceil((nextDeadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    : 999;
-
-  // Determine overall state based on Vanta-style rules
-  let overallState: 'GREEN' | 'AMBER' | 'RED';
-  if (stats.overdue_count > 0) {
-    overallState = 'RED';
-  } else if (daysUntilCritical <= 14 || stats.pending_count > 3) {
-    overallState = 'AMBER';
-  } else {
-    overallState = 'GREEN';
-  }
-
-  // Update compliance state
-  await client.query(
-    `INSERT INTO client_compliance_state 
-     (client_id, overall_state, days_until_critical, next_critical_deadline, 
-      total_penalty_exposure, compliant_items, pending_items, overdue_items,
-      calculation_metadata, calculated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
-     ON CONFLICT (client_id) 
-     DO UPDATE SET
-       overall_state = EXCLUDED.overall_state,
-       days_until_critical = EXCLUDED.days_until_critical,
-       next_critical_deadline = EXCLUDED.next_critical_deadline,
-       total_penalty_exposure = EXCLUDED.total_penalty_exposure,
-       compliant_items = EXCLUDED.compliant_items,
-       pending_items = EXCLUDED.pending_items,
-       overdue_items = EXCLUDED.overdue_items,
-       calculation_metadata = EXCLUDED.calculation_metadata,
-       calculated_at = EXCLUDED.calculated_at,
-       updated_at = CURRENT_TIMESTAMP`,
-    [
-      clientId,
-      overallState,
-      daysUntilCritical,
-      nextDeadline,
-      stats.total_penalty || 0,
-      stats.compliant_count,
-      stats.pending_count,
-      stats.overdue_count,
-      { recalculatedAt: new Date(), stats }
-    ]
-  );
+  await db.insert(activityLogs).values({
+    businessEntityId: item.businessEntityId!,
+    action: 'compliance_completed',
+    details: `Completed: ${item.serviceType || 'Compliance item'}`,
+    userId: Number(completedBy) || undefined,
+    metadata: completionData || undefined,
+  });
 }
 
 /**
  * Create a new compliance action
- * Validates input and updates compliance state
+ * Maps to complianceTracking entry
  */
 export async function createAction(action: Omit<ComplianceAction, 'id'>): Promise<number> {
-  const result = await pool.query(
-    `INSERT INTO compliance_actions 
-     (client_id, action_type, title, description, priority, status, due_date,
-      estimated_time_minutes, document_type, penalty_amount,
-      instructions, benefits, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-     RETURNING id`,
-    [
-      action.clientId,
-      action.actionType,
-      action.title,
-      action.description,
-      action.priority,
-      action.status,
-      action.dueDate,
-      action.estimatedMinutes,
-      action.documentType,
-      action.penaltyAmount,
-      action.instructions,
-      action.benefits,
-      action.metadata
-    ]
-  );
+  const [entity] = await db
+    .select({ ownerId: businessEntities.ownerId })
+    .from(businessEntities)
+    .where(eq(businessEntities.id, action.clientId))
+    .limit(1);
 
-  const actionId = result.rows[0].id;
-
-  // Trigger compliance state recalculation
-  const client = await pool.connect();
-  try {
-    await recalculateComplianceState(action.clientId, client);
-  } finally {
-    client.release();
+  if (!entity) {
+    throw new Error('Client entity not found');
   }
 
-  return actionId;
+  const [created] = await db
+    .insert(complianceTracking)
+    .values({
+      userId: entity.ownerId,
+      businessEntityId: action.clientId,
+      complianceRuleId: null,
+      serviceId: action.documentType || action.title,
+      serviceType: action.title,
+      complianceType: action.actionType,
+      dueDate: action.dueDate,
+      status: action.status || 'pending',
+      priority: action.priority || 'medium',
+      estimatedPenalty: action.penaltyAmount || 0,
+      penaltyRisk: !!action.penaltyAmount,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .returning();
+
+  return created.id;
 }
 
 /**
  * Get upcoming deadlines for a client
- * Returns sorted list of compliance deadlines
  */
 export interface UpcomingDeadline {
   title: string;
@@ -360,39 +339,54 @@ export interface UpcomingDeadline {
 }
 
 export async function getUpcomingDeadlines(clientId: number, limit: number = 5): Promise<UpcomingDeadline[]> {
-  const result = await pool.query(
-    `SELECT
-      title,
-      due_date,
-      priority,
-      document_type
-    FROM compliance_actions
-    WHERE client_id = $1
-      AND status IN ('pending', 'in_progress')
-      AND due_date >= CURRENT_DATE
-    ORDER BY due_date ASC
-    LIMIT $2`,
-    [clientId, limit]
-  );
+  const items = await db
+    .select({
+      dueDate: complianceTracking.dueDate,
+      priority: complianceTracking.priority,
+      complianceType: complianceTracking.complianceType,
+      serviceType: complianceTracking.serviceType,
+      complianceName: complianceRules.complianceName,
+      category: complianceRules.regulationCategory,
+    })
+    .from(complianceTracking)
+    .leftJoin(complianceRules, eq(complianceTracking.complianceRuleId, complianceRules.id))
+    .where(
+      and(
+        eq(complianceTracking.businessEntityId, clientId),
+        or(eq(complianceTracking.status, 'pending'), eq(complianceTracking.status, 'overdue'))
+      )
+    )
+    .orderBy(desc(complianceTracking.dueDate))
+    .limit(limit);
 
-  return result.rows.map(row => {
-    const dueDate = new Date(row.due_date);
-    const today = new Date();
-    const daysLeft = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const today = new Date();
 
-    return {
-      title: row.title,
-      date: dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      daysLeft,
-      priority: row.priority || (daysLeft <= 7 ? 'high' : daysLeft <= 30 ? 'medium' : 'low'),
-      category: row.document_type
-    };
-  });
+  return items
+    .filter(item => item.dueDate && new Date(item.dueDate) >= today)
+    .map(item => {
+      const dueDate = new Date(item.dueDate!);
+      const daysLeft = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const priority: 'high' | 'medium' | 'low' =
+        item.priority === 'critical' || item.priority === 'high'
+          ? 'high'
+          : item.priority === 'low'
+            ? 'low'
+            : 'medium';
+
+      return {
+        title: item.complianceName || item.serviceType || item.complianceType || 'Compliance item',
+        date: dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        daysLeft,
+        priority,
+        category: item.category || undefined
+      };
+    })
+    .sort((a, b) => a.daysLeft - b.daysLeft)
+    .slice(0, limit);
 }
 
 /**
  * Get quick stats for client dashboard
- * Returns task completion and status metrics
  */
 export interface QuickStats {
   tasksCompleted: number;
@@ -404,28 +398,47 @@ export interface QuickStats {
 }
 
 export async function getQuickStats(clientId: number): Promise<QuickStats> {
-  const result = await pool.query(
-    `SELECT
-      COUNT(*) FILTER (WHERE status = 'completed') as tasks_completed,
-      COUNT(*) FILTER (WHERE status = 'completed' AND completed_at >= CURRENT_DATE - INTERVAL '30 days') as tasks_this_month,
-      COUNT(*) FILTER (WHERE status IN ('pending', 'in_progress')) as pending_actions,
-      MIN(due_date) FILTER (WHERE status IN ('pending', 'in_progress') AND due_date >= CURRENT_DATE) as next_deadline
-    FROM compliance_actions
-    WHERE client_id = $1`,
-    [clientId]
-  );
+  const items = await db
+    .select({
+      status: complianceTracking.status,
+      dueDate: complianceTracking.dueDate,
+      lastCompleted: complianceTracking.lastCompleted,
+    })
+    .from(complianceTracking)
+    .where(eq(complianceTracking.businessEntityId, clientId));
 
-  const stats = result.rows[0];
-  const nextDeadline = stats.next_deadline ? new Date(stats.next_deadline) : null;
+  const today = new Date();
+  let tasksCompleted = 0;
+  let tasksCompletedThisMonth = 0;
+  let pendingActions = 0;
+  let nextDeadline: Date | null = null;
+
+  for (const item of items) {
+    const dueDate = item.dueDate ? new Date(item.dueDate) : null;
+    if (item.status === 'completed') {
+      tasksCompleted++;
+      if (item.lastCompleted) {
+        const completedAt = new Date(item.lastCompleted);
+        const sameMonth = completedAt.getMonth() === today.getMonth() && completedAt.getFullYear() === today.getFullYear();
+        if (sameMonth) tasksCompletedThisMonth++;
+      }
+    } else {
+      pendingActions++;
+      if (dueDate && (!nextDeadline || dueDate.getTime() < nextDeadline.getTime())) {
+        nextDeadline = dueDate;
+      }
+    }
+  }
+
   const daysSafe = nextDeadline
-    ? Math.max(0, Math.ceil((nextDeadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    ? Math.max(0, Math.ceil((nextDeadline.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)))
     : 30;
 
   return {
-    tasksCompleted: parseInt(stats.tasks_completed) || 0,
-    tasksCompletedChange: stats.tasks_this_month > 0 ? `+${stats.tasks_this_month} this month` : undefined,
-    pendingActions: parseInt(stats.pending_actions) || 0,
-    pendingActionsLabel: parseInt(stats.pending_actions) > 0 ? 'Due soon' : 'All clear',
+    tasksCompleted,
+    tasksCompletedChange: tasksCompletedThisMonth > 0 ? `+${tasksCompletedThisMonth} this month` : undefined,
+    pendingActions,
+    pendingActionsLabel: pendingActions > 0 ? 'Due soon' : 'All clear',
     daysSafe,
     daysSafeLabel: 'Until next deadline'
   };

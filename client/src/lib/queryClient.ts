@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
+import { withCsrfHeaders } from './csrf';
 
 // Auth redirect handler for 401/403 errors
 function handleAuthError(status: number) {
@@ -74,15 +75,48 @@ export const queryClient = new QueryClient({
   },
 });
 
-export const apiRequest = async <T>(method: string, url: string, data?: unknown): Promise<T> => {
+type ApiRequestOptions = {
+  method?: string;
+  body?: unknown;
+  headers?: HeadersInit;
+};
+
+export const apiRequest = async <T>(
+  methodOrUrl: string,
+  urlOrMethod?: string | ApiRequestOptions,
+  data?: unknown
+): Promise<T> => {
+  let method = 'GET';
+  let url = '';
+  let body = data;
+  let extraHeaders: HeadersInit | undefined;
+
+  if (typeof urlOrMethod === 'object' && urlOrMethod !== null) {
+    // Signature: apiRequest(url, { method, body, headers })
+    url = methodOrUrl;
+    method = (urlOrMethod.method || 'GET').toUpperCase();
+    body = urlOrMethod.body ?? data;
+    extraHeaders = urlOrMethod.headers;
+  } else if (methodOrUrl.startsWith('/') || methodOrUrl.startsWith('http')) {
+    // Signature: apiRequest(url, method, data)
+    url = methodOrUrl;
+    method = (urlOrMethod || 'GET').toUpperCase();
+  } else {
+    // Signature: apiRequest(method, url, data)
+    method = methodOrUrl.toUpperCase();
+    url = (urlOrMethod || '').toString();
+  }
+
   const config: RequestInit = {
     method,
-    headers: {
+    headers: withCsrfHeaders({
       'Content-Type': 'application/json',
-      'X-Requested-With': 'XMLHttpRequest', // CSRF protection
-    },
-    credentials: 'include', // Include cookies for session
-    ...(data && { body: JSON.stringify(data) }),
+      ...(extraHeaders || {}),
+    }),
+    credentials: 'include',
+    ...(body !== undefined && method !== 'GET' && method !== 'HEAD'
+      ? { body: JSON.stringify(body) }
+      : {}),
   };
 
   const response = await fetch(url, config);

@@ -24,6 +24,7 @@ const Login = lazy(() => import("./pages/Login"));
 const ClientRegistration = lazy(() => import("./pages/ClientRegistration"));
 const LeadManagement = lazy(() => import("./pages/LeadManagement"));
 const ServiceRequestUI = lazy(() => import("./pages/ServiceRequestUI"));
+const ServiceRequestsHub = lazy(() => import("./pages/ServiceRequestsHub"));
 const ProposalManagement = lazy(() => import("./pages/ProposalManagement"));
 const ReferralDashboard = lazy(() => import("./pages/ReferralDashboard"));
 const AutoComply = lazy(() => import("./pages/AutoComply"));
@@ -75,6 +76,7 @@ const WorkflowImport = lazy(() => import("./pages/WorkflowImport"));
 const AdminServiceConfig = lazy(() => import("./pages/AdminServiceConfig"));
 const StatusManagement = lazy(() => import("./pages/StatusManagement"));
 const OperationsWorkQueue = lazy(() => import("./pages/OperationsWorkQueue"));
+const OperationsDocumentReview = lazy(() => import("./pages/OperationsDocumentReview"));
 const ClientServicesDashboard = lazy(() => import("./pages/ClientServicesDashboard"));
 const ServiceCatalogBrowser = lazy(() => import("./pages/ServiceCatalogBrowser"));
 const AdminServicesOverview = lazy(() => import("./pages/AdminServicesOverview"));
@@ -237,7 +239,7 @@ const AppContent = () => {
               <main id="main-content" className="flex-grow focus:outline-none" tabIndex={-1}>
                 <Suspense fallback={<PageLoader />}>
                   <Switch>
-                <Route path="/" component={DevHub} />
+                <Route path="/" component={UnifiedLanding} />
                 <Route path="/hub" component={DevHub} />
                 <Route path="/dev" component={DevHub} />
                 <Route path="/landing" component={UnifiedLanding} />
@@ -257,9 +259,9 @@ const AppContent = () => {
                 <Route path="/lead-pipeline" component={LeadPipeline} />
                 <Route path="/pipeline" component={LeadPipeline} />
                 <Route path="/crm" component={LeadPipeline} />
-                <Route path="/service-requests" component={ServiceRequestUI} />
-                <Route path="/requests" component={ServiceRequestUI} />
-                <Route path="/my-requests" component={ServiceRequestUI} />
+                <Route path="/service-requests" component={ServiceRequestsHub} />
+                <Route path="/requests" component={ServiceRequestsHub} />
+                <Route path="/my-requests" component={ServiceRequestsHub} />
                 <Route path="/proposals" component={ProposalManagement} />
                 <Route path="/proposal-management" component={ProposalManagement} />
                 <Route path="/referrals" component={ReferralDashboard} />
@@ -282,7 +284,7 @@ const AppContent = () => {
                 <Route path="/document-preparation" component={AiDocumentPreparation} />
                 <Route path="/doc-generator" component={AiDocumentPreparation} />
                 <Route path="/design-system" component={DesignSystemShowcase} />
-                <Route path="/landing" component={LandingPage} />
+                {/* Legacy landing retained for policy pages only */}
                 <Route path="/onboarding-flow" component={OnboardingFlow} />
                 <Route path="/platform-demo" component={PlatformDemo} />
                 <Route path="/compliance-dashboard" component={ComplianceTrackerDashboard} />
@@ -390,6 +392,9 @@ const AppContent = () => {
                 <Route path="/ops/work-queue" component={OperationsWorkQueue} />
                 <Route path="/operations/work-queue" component={OperationsWorkQueue} />
                 <Route path="/operations-queue" component={OperationsWorkQueue} />
+                <Route path="/ops/document-review" component={OperationsDocumentReview} />
+                <Route path="/operations/document-review" component={OperationsDocumentReview} />
+                <Route path="/document-review" component={OperationsDocumentReview} />
 
                 {/* Client Service Tracking */}
                 <Route path="/my-services" component={ClientServicesDashboard} />

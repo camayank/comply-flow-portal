@@ -144,7 +144,7 @@ export default function CommissionDisputes() {
   const { data: statements = [], isLoading: isLoadingStatements } = useQuery<CommissionStatement[]>({
     queryKey: ["/api/agent/commission-statements"],
     queryFn: async () => {
-      const response = await fetch("/api/agent/commission-statements");
+      const response = await fetch("/api/agent/commission-statements", { credentials: "include" });
       if (!response.ok) {
         return getMockStatements();
       }
@@ -159,7 +159,7 @@ export default function CommissionDisputes() {
       const params = new URLSearchParams();
       if (statusFilter !== "all") params.append("status", statusFilter);
 
-      const response = await fetch(`/api/agent/commission-disputes?${params.toString()}`);
+      const response = await fetch(`/api/agent/commission-disputes?${params.toString()}`, { credentials: "include" });
       if (!response.ok) {
         return getMockDisputes(statusFilter);
       }
@@ -173,6 +173,7 @@ export default function CommissionDisputes() {
       const response = await fetch("/api/agent/commission-disputes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(data),
       });
       if (!response.ok) throw new Error("Failed to submit dispute");
@@ -193,14 +194,16 @@ export default function CommissionDisputes() {
   const handleSubmitDispute = () => {
     if (!selectedLineItem) return;
 
-    // Simulate submission
-    toast({
-      title: "Dispute submitted",
-      description: "Your commission dispute has been submitted for review. You'll be notified of updates.",
+    submitDisputeMutation.mutate({
+      commissionId: selectedLineItem.id,
+      lineItemId: selectedLineItem.id,
+      statementId: selectedLineItem.statementId,
+      serviceRequestId: selectedLineItem.serviceRequestId,
+      reason: newDisputeData.reason,
+      category: newDisputeData.category,
+      expectedAmount: newDisputeData.expectedAmount ? Number(newDisputeData.expectedAmount) : undefined,
+      evidence: [],
     });
-    setIsNewDisputeDialogOpen(false);
-    setSelectedLineItem(null);
-    setNewDisputeData({ reason: "", category: "incorrect_rate", expectedAmount: "", details: "" });
   };
 
   const openDisputeDialog = (lineItem: CommissionLineItem) => {
@@ -741,7 +744,7 @@ export default function CommissionDisputes() {
             </Button>
             <Button
               onClick={handleSubmitDispute}
-              disabled={!newDisputeData.reason.trim() || !newDisputeData.expectedAmount}
+              disabled={!newDisputeData.reason.trim() || !newDisputeData.expectedAmount || submitDisputeMutation.isPending}
             >
               Submit Dispute
             </Button>

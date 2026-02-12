@@ -1,6 +1,7 @@
 import { db } from './db';
 import { 
-  serviceRequests
+  serviceRequests,
+  workflowTemplates
 } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 
@@ -49,29 +50,8 @@ export class AdminWorkflowBuilder {
         })
         .returning();
 
-      // Create individual workflow steps
-      for (let index = 0; index < templateData.workflow.length; index++) {
-        const step = templateData.workflow[index];
-        await db.insert(workflowSteps).values({
-          templateId: template.id,
-          stepKey: step.stepKey,
-          stepName: step.name,
-          stepOrder: index + 1,
-          stepType: step.qaRequired ? 'QA_REVIEW' : 'STANDARD',
-          assigneeRole: this.determineAssigneeRole(step),
-          estimatedHours: step.slaDays * 8, // Convert days to hours
-          dependsOn: index > 0 ? templateData.workflow[index - 1].stepKey : null,
-          isClientVisible: step.clientTasks && step.clientTasks.length > 0,
-          autoAdvance: !step.qaRequired,
-          configJson: JSON.stringify({
-            clientTasks: step.clientTasks || [],
-            opsChecklist: step.opsChecklist || [],
-            requiredDocuments: step.requiredDocuments || [],
-            deliverables: step.deliverables || [],
-            slaDays: step.slaDays
-          })
-        });
-      }
+      // Note: Step definitions are stored in workflowTemplates.workflowSteps JSON.
+      // Detailed step instances are created at runtime from this JSON.
 
       // Create associated notification rules
       if (templateData.notifications) {
@@ -195,6 +175,7 @@ export class AdminWorkflowBuilder {
   // Create notification rules for a service template
   private async createNotificationRulesForTemplate(serviceKey: string, notifications: any) {
     try {
+      const { notificationEngine } = await import('./notification-engine');
       const rules = [];
 
       // Create schedule-based reminders

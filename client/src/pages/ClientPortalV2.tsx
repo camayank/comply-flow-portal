@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'wouter';
 import { DashboardLayout } from '@/components/layouts/DashboardLayout';
 import { useStandardQuery } from '@/hooks/useStandardQuery';
 import ComplianceStatusCard from '@/components/portal-v2/ComplianceStatusCard';
@@ -126,6 +127,7 @@ export default function ClientPortalV2() {
       {statusQuery.render((data) => {
         const quickStats = getQuickStats(data);
         const upcomingDeadlines = data.upcomingDeadlines || [];
+        const showGettingStarted = !data.nextAction && upcomingDeadlines.length === 0;
 
         return (
         <div className="max-w-3xl mx-auto space-y-6 px-4 py-6">
@@ -160,6 +162,46 @@ export default function ClientPortalV2() {
             action={data.nextAction}
             onActionClick={() => setShowActionDetail(true)}
           />
+
+          {showGettingStarted && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Getting Started</CardTitle>
+                <CardDescription>
+                  Complete these steps to personalize your compliance plan and stay on track.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-gray-900">Update business profile</p>
+                    <p className="text-sm text-gray-600">Add GSTIN, PAN, and registration details.</p>
+                  </div>
+                  <Link href="/client-profile">
+                    <Button size="sm" variant="outline">Update</Button>
+                  </Link>
+                </div>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-gray-900">Upload core documents</p>
+                    <p className="text-sm text-gray-600">PAN, GST certificate, incorporation docs.</p>
+                  </div>
+                  <Link href="/client-portal/documents">
+                    <Button size="sm" variant="outline">Upload</Button>
+                  </Link>
+                </div>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-gray-900">Set alert preferences</p>
+                    <p className="text-sm text-gray-600">Choose email/WhatsApp reminders for due dates.</p>
+                  </div>
+                  <Link href="/client/alert-preferences">
+                    <Button size="sm" variant="outline">Configure</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Upcoming Deadlines */}
           <CollapsibleSection

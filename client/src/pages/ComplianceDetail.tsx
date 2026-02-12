@@ -146,6 +146,12 @@ export default function ComplianceDetailPage() {
     setExtensionDialogOpen(true);
   };
 
+  const handleUploadDocuments = (checkpoint: any) => {
+    const missingTypes: string[] = checkpoint?.documentsMissingTypes || [];
+    const query = missingTypes.length > 0 ? `?missing=${encodeURIComponent(missingTypes.join(','))}` : '';
+    setLocation(`/lifecycle/documents${query}`);
+  };
+
   const submitComplete = () => {
     if (!selectedCheckpoint?.id) return;
     markCompleteMutation.mutate({
@@ -354,6 +360,9 @@ export default function ComplianceDetailPage() {
                   const daysUntilDue = checkpoint.nextDue 
                     ? Math.ceil((new Date(checkpoint.nextDue).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
                     : null;
+                  const missingDocs: string[] = checkpoint.documentsMissing || [];
+                  const missingDocTypes: string[] = checkpoint.documentsMissingTypes || [];
+                  const hasMissingDocs = missingDocs.length > 0 || missingDocTypes.length > 0;
 
                   return (
                     <div
@@ -421,8 +430,14 @@ export default function ComplianceDetailPage() {
                             ))}
                           </div>
 
+                          {hasMissingDocs && (
+                            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                              Missing: {missingDocs.join(', ')}
+                            </div>
+                          )}
+
                           <button
-                            onClick={() => setLocation('/lifecycle/documents')}
+                            onClick={() => handleUploadDocuments(checkpoint)}
                             className="mt-3 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
                           >
                             Upload Documents →
@@ -433,14 +448,25 @@ export default function ComplianceDetailPage() {
                       {/* Action Buttons */}
                       {status !== 'completed' && (
                         <div className="flex gap-3 mt-4 pt-4 border-t border-gray-200">
-                          <Button
-                            size="sm"
-                            onClick={() => handleMarkComplete(checkpoint)}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            <Check className="h-4 w-4 mr-2" />
-                            Mark Complete
-                          </Button>
+                          {hasMissingDocs ? (
+                            <Button
+                              size="sm"
+                              onClick={() => handleUploadDocuments(checkpoint)}
+                              className="bg-indigo-600 hover:bg-indigo-700"
+                            >
+                              <FileText className="h-4 w-4 mr-2" />
+                              Upload Documents
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => handleMarkComplete(checkpoint)}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <Check className="h-4 w-4 mr-2" />
+                              Mark Complete
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"

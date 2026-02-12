@@ -15,7 +15,6 @@
  */
 
 import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
   useWorkQueue,
@@ -24,7 +23,11 @@ import {
   useWorkQueueStats,
   useTriggerEscalationCheck,
   useActivityLog,
+  useAssignWorkItem,
+  useOpsTeamMembers,
 } from "@/hooks/useOperations";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { SLA_STATUSES } from "@/constants";
 import {
   Card,
@@ -35,7 +38,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -58,10 +62,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Tabs,
-  TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
@@ -77,9 +81,7 @@ import {
   Clock,
   AlertCircle,
   RefreshCw,
-  Filter,
   User,
-  Calendar,
   Activity,
   TrendingUp,
   TrendingDown,
@@ -110,6 +112,7 @@ interface WorkItem {
   slaDeadline?: string;
   slaStatus?: string;
   slaHoursRemaining?: number;
+  slaDaysRemaining?: number | null;
   escalationLevel?: number;
   lastEscalatedAt?: string;
   createdAt?: string;
@@ -120,6 +123,17 @@ interface WorkItem {
   dueDate?: string;
   serviceTypeName?: string;
   periodLabel?: string;
+  complianceRuleId?: number | null;
+  complianceRuleCode?: string | null;
+  complianceName?: string | null;
+  complianceType?: string | null;
+  evidenceSummary?: {
+    required: number;
+    uploaded: number;
+    missing: number;
+  } | null;
+  missingDocuments?: string[];
+  requiredDocuments?: string[];
 }
 
 interface WorkQueueStats {
@@ -135,7 +149,15 @@ interface WorkQueueStats {
 }
 
 // SLA Status Badge Component
-function SlaStatusBadge({ status, hoursRemaining }: { status?: string; hoursRemaining?: number }) {
+function SlaStatusBadge({
+  status,
+  hoursRemaining,
+  daysRemaining,
+}: {
+  status?: string;
+  hoursRemaining?: number;
+  daysRemaining?: number | null;
+}) {
   const getStatusConfig = () => {
     switch (status) {
       case "breached":
@@ -159,27 +181,32 @@ function SlaStatusBadge({ status, hoursRemaining }: { status?: string; hoursRema
         <Icon className="h-3 w-3 mr-1" />
         {config.label}
       </Badge>
-      {hoursRemaining !== undefined && (
+      {daysRemaining !== undefined && daysRemaining !== null ? (
+        <span className="text-xs text-muted-foreground">
+          {daysRemaining > 0 ? `${daysRemaining}d left` : `${Math.abs(daysRemaining)}d over`}
+        </span>
+      ) : hoursRemaining !== undefined ? (
         <span className="text-xs text-muted-foreground">
           {hoursRemaining > 0 ? `${hoursRemaining}h left` : `${Math.abs(hoursRemaining)}h over`}
         </span>
-      )}
+      ) : null}
     </div>
   );
 }
 
 // Priority Badge Component
 function PriorityBadge({ priority }: { priority: string }) {
+  const normalized = (priority || "medium").toLowerCase();
   const colors: Record<string, string> = {
     urgent: "bg-red-100 text-red-800 border-red-200",
-    HIGH: "bg-orange-100 text-orange-800 border-orange-200",
-    MEDIUM: "bg-blue-100 text-blue-800 border-blue-200",
-    LOW: "bg-gray-100 text-gray-800 border-gray-200",
+    high: "bg-orange-100 text-orange-800 border-orange-200",
+    medium: "bg-blue-100 text-blue-800 border-blue-200",
+    low: "bg-gray-100 text-gray-800 border-gray-200",
   };
 
   return (
-    <Badge variant="outline" className={colors[priority] || colors.MEDIUM}>
-      {priority}
+    <Badge variant="outline" className={colors[normalized] || colors.medium}>
+      {normalized.toUpperCase()}
     </Badge>
   );
 }
@@ -333,7 +360,11 @@ function WorkItemDetailDialog({ item, onClose }: { item: WorkItem; onClose: () =
         </div>
         <div>
           <p className="text-sm text-muted-foreground">SLA Status</p>
-          <SlaStatusBadge status={item.slaStatus} hoursRemaining={item.slaHoursRemaining} />
+          <SlaStatusBadge
+            status={item.slaStatus}
+            hoursRemaining={item.slaHoursRemaining}
+            daysRemaining={item.workItemType === "compliance" ? item.slaDaysRemaining : null}
+          />
         </div>
         <div>
           <p className="text-sm text-muted-foreground">Priority</p>
@@ -353,6 +384,32 @@ function WorkItemDetailDialog({ item, onClose }: { item: WorkItem; onClose: () =
         </div>
       </div>
 
+      {item.workItemType === "compliance" && (
+        <div className="border-t pt-4">
+          <h4 className="font-medium mb-3 flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Evidence Status
+          </h4>
+          {item.evidenceSummary ? (
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span>Uploaded</span>
+                <span className="font-medium">
+                  {item.evidenceSummary.uploaded}/{item.evidenceSummary.required}
+                </span>
+              </div>
+              {item.evidenceSummary.missing > 0 && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-amber-800">
+                  Missing: {(item.missingDocuments || []).join(", ")}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No evidence requirements configured.</p>
+          )}
+        </div>
+      )}
+
       <div className="border-t pt-4">
         <h4 className="font-medium mb-3 flex items-center gap-2">
           <History className="h-4 w-4" />
@@ -366,9 +423,19 @@ function WorkItemDetailDialog({ item, onClose }: { item: WorkItem; onClose: () =
 
 // Main Component
 export default function OperationsWorkQueue() {
-  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const canManageAssignment =
+    user?.role === "ops_manager" ||
+    user?.role === "admin" ||
+    user?.role === "super_admin";
+  const canSelfAssign = user?.role === "ops_executive";
+
   const [activeTab, setActiveTab] = useState("all");
   const [selectedItem, setSelectedItem] = useState<WorkItem | null>(null);
+  const [assignmentTarget, setAssignmentTarget] = useState<WorkItem | null>(null);
+  const [selectedAssignee, setSelectedAssignee] = useState("unassigned");
+  const [assignmentNotes, setAssignmentNotes] = useState("");
   const [filters, setFilters] = useState({
     slaStatus: "" as '' | 'on_track' | 'at_risk' | 'warning' | 'breached',
     priority: "",
@@ -397,6 +464,11 @@ export default function OperationsWorkQueue() {
   // Manual process trigger using new hook
   const triggerCheck = useTriggerEscalationCheck();
 
+  // Ops team members for assignment
+  const { data: teamMembers = [], isLoading: isLoadingTeamMembers } = useOpsTeamMembers(canManageAssignment);
+
+  const assignWorkItem = useAssignWorkItem();
+
   const stats = workQueueData?.stats;
   const items = workQueueData?.items || [];
 
@@ -415,6 +487,109 @@ export default function OperationsWorkQueue() {
   };
 
   const filteredItems = getFilteredItems();
+  const assignmentRecommendation = assignmentTarget
+    ? getRecommendedAssignee(assignmentTarget)
+    : null;
+
+  const openAssignmentDialog = (item: WorkItem) => {
+    setAssignmentTarget(item);
+    setSelectedAssignee(item.assignedTo ? String(item.assignedTo) : "unassigned");
+    setAssignmentNotes("");
+  };
+
+  const closeAssignmentDialog = () => {
+    setAssignmentTarget(null);
+    setSelectedAssignee("unassigned");
+    setAssignmentNotes("");
+  };
+
+  const handleAssignmentSave = () => {
+    if (!assignmentTarget) return;
+
+    const assigneeId =
+      selectedAssignee === "unassigned" ? null : parseInt(selectedAssignee, 10);
+
+    assignWorkItem.mutate(
+      { workItemId: assignmentTarget.id, assigneeId, notes: assignmentNotes },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Assignment updated",
+            description: assigneeId
+              ? "Work item assigned successfully."
+              : "Work item unassigned successfully.",
+          });
+          closeAssignmentDialog();
+        },
+        onError: () => {
+          toast({
+            title: "Assignment failed",
+            description: "Unable to update assignment. Please try again.",
+            variant: "destructive",
+          });
+        },
+      }
+    );
+  };
+
+  const getHoursRemaining = (item: WorkItem) => {
+    if (item.slaDaysRemaining !== null && item.slaDaysRemaining !== undefined) {
+      return item.slaDaysRemaining * 24;
+    }
+    return item.slaHoursRemaining ?? null;
+  };
+
+  const getRecommendedAssignee = (item: WorkItem) => {
+    if (!teamMembers.length) return null;
+    const hoursRemaining = getHoursRemaining(item);
+    const isUrgent = hoursRemaining !== null && hoursRemaining <= 24;
+    const candidates = isUrgent
+      ? teamMembers.filter((member) => member.available)
+      : teamMembers;
+    const pool = candidates.length > 0 ? candidates : teamMembers;
+
+    let best = pool[0];
+    let bestScore =
+      (best.activeWorkload || 0) / (best.maxCapacity || 1) +
+      (best.available ? 0 : 0.5);
+
+    for (const member of pool) {
+      const score =
+        (member.activeWorkload || 0) / (member.maxCapacity || 1) +
+        (member.available ? 0 : 0.5);
+      if (score < bestScore) {
+        best = member;
+        bestScore = score;
+      }
+    }
+
+    return {
+      member: best,
+      hoursRemaining,
+    };
+  };
+
+  const handleSelfAssign = (item: WorkItem) => {
+    if (!user?.id) return;
+    assignWorkItem.mutate(
+      { workItemId: item.id, assigneeId: user.id },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Assigned to you",
+            description: "Work item has been assigned to you.",
+          });
+        },
+        onError: () => {
+          toast({
+            title: "Assignment failed",
+            description: "Unable to assign this work item. Please try again.",
+            variant: "destructive",
+          });
+        },
+      }
+    );
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -546,6 +721,7 @@ export default function OperationsWorkQueue() {
                   <TableHead>Service / Client</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>SLA Status</TableHead>
+                  <TableHead>Evidence</TableHead>
                   <TableHead>Priority</TableHead>
                   <TableHead>Assigned To</TableHead>
                   <TableHead>Escalation</TableHead>
@@ -588,22 +764,71 @@ export default function OperationsWorkQueue() {
                       <SlaStatusBadge
                         status={item.slaStatus}
                         hoursRemaining={item.slaHoursRemaining}
+                        daysRemaining={item.workItemType === "compliance" ? item.slaDaysRemaining : null}
                       />
+                    </TableCell>
+                    <TableCell>
+                      {item.workItemType === "compliance" ? (
+                        item.evidenceSummary ? (
+                          <div className="text-xs">
+                            <span className="font-medium">
+                              {item.evidenceSummary.uploaded}/{item.evidenceSummary.required}
+                            </span>{" "}
+                            uploaded
+                            {item.evidenceSummary.missing > 0 && (
+                              <div className="text-red-600">
+                                {item.evidenceSummary.missing} missing
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No requirements</span>
+                        )
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <PriorityBadge priority={item.priority} />
                     </TableCell>
                     <TableCell>
-                      {item.assignedToName ? (
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span>{item.assignedToName}</span>
-                        </div>
-                      ) : (
-                        <Badge variant="outline" className="text-purple-600">
-                          Unassigned
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {item.assignedToName ? (
+                          <>
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <span>{item.assignedToName}</span>
+                          </>
+                        ) : (
+                          <Badge variant="outline" className="text-purple-600">
+                            Unassigned
+                          </Badge>
+                        )}
+                        {canManageAssignment && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openAssignmentDialog(item)}
+                            title={item.assignedToName ? "Reassign" : "Assign"}
+                          >
+                            <UserPlus className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {!canManageAssignment && canSelfAssign && !item.assignedTo && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSelfAssign(item)}
+                            disabled={assignWorkItem.isPending}
+                          >
+                            Assign to me
+                          </Button>
+                        )}
+                        {!canManageAssignment && canSelfAssign && item.assignedTo === user?.id && (
+                          <Badge variant="outline" className="text-green-600">
+                            Assigned to you
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <EscalationIndicator
@@ -642,6 +867,83 @@ export default function OperationsWorkQueue() {
           )}
         </CardContent>
       </Card>
+
+      {/* Assignment Dialog */}
+      <Dialog
+        open={!!assignmentTarget}
+        onOpenChange={(open) => {
+          if (!open) closeAssignmentDialog();
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Assign Work Item</DialogTitle>
+            <DialogDescription>
+              {assignmentTarget
+                ? `${assignmentTarget.serviceTypeName || assignmentTarget.workItemType} • ${assignmentTarget.entityName || "Unknown Client"}`
+                : "Select a team member to assign this work item."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Assignee</Label>
+              <Select
+                value={selectedAssignee}
+                onValueChange={setSelectedAssignee}
+                disabled={!canManageAssignment || isLoadingTeamMembers}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select team member" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {teamMembers.map((member) => (
+                    <SelectItem key={member.id} value={String(member.id)}>
+                      {member.name} • {member.role.replace(/_/g, " ")} • {member.activeWorkload}/{member.maxCapacity}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!isLoadingTeamMembers && teamMembers.length === 0 && (
+                <p className="text-xs text-muted-foreground">No team members available for assignment.</p>
+              )}
+              {assignmentRecommendation?.member && (
+                <p className="text-xs text-amber-700">
+                  Recommended: {assignmentRecommendation.member.name}
+                  {assignmentRecommendation.hoursRemaining !== null && (
+                    <span className="ml-1 text-amber-600">
+                      (SLA {assignmentRecommendation.hoursRemaining <= 0 ? 'overdue' : `in ${assignmentRecommendation.hoursRemaining}h`})
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Notes (optional)</Label>
+              <Textarea
+                value={assignmentNotes}
+                onChange={(e) => setAssignmentNotes(e.target.value)}
+                rows={3}
+                placeholder="Add assignment context or priority details"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeAssignmentDialog}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAssignmentSave}
+              disabled={assignWorkItem.isPending || isLoadingTeamMembers}
+            >
+              {assignWorkItem.isPending ? "Saving..." : "Save Assignment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Breach Summary Alert */}
       {(stats?.breached || 0) > 0 && (

@@ -267,15 +267,16 @@ router.post('/client/service-request', async (req, res) => {
     // Create service request
     const [newRequest] = await db.insert(serviceRequests)
       .values({
+        businessEntityId: entity_id,
         entityId: entity_id,
         serviceType: service_key,
         serviceId: service_key,
         periodLabel: period_label,
-        dueDate: due_date,
-        priority,
+        dueDate: due_date ? new Date(due_date) : null,
+        priority: String(priority || 'medium').toLowerCase(),
         status: 'initiated',
         description,
-        isActive: true
+        totalAmount: 0
       })
       .returning();
 

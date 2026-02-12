@@ -1,3 +1,5 @@
+// DEPRECATED: This legacy SLA engine is kept for reference only.
+// Use server/enhanced-sla-system.ts for all SLA operations.
 import { eq, and, lt, gte } from "drizzle-orm";
 import { db } from "./db";
 import { 

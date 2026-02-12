@@ -64,13 +64,13 @@ export const agentService = {
 
   // Get commissions
   getCommissions: async (filters?: any) => {
-    const response = await apiClient.get('/agents/commissions', { params: filters });
+    const response = await apiClient.get('/api/agent/commissions', { params: filters });
     return response.data;
   },
 
   // Get commission summary
   getCommissionSummary: async (period?: string) => {
-    const response = await apiClient.get('/agents/commissions/summary', {
+    const response = await apiClient.get('/api/agent/commissions/summary', {
       params: { period },
     });
     return response.data;

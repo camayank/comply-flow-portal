@@ -238,6 +238,13 @@ export async function registerAuthRoutes(app: Express) {
         sameSite: 'strict',
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       });
+      // Expose CSRF token to client (readable cookie for header usage)
+      res.cookie('csrfToken', csrfToken, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
 
       res.json({
         success: true,
@@ -247,7 +254,6 @@ export async function registerAuthRoutes(app: Express) {
           fullName: user.fullName,
           role: user.role,
         },
-        sessionToken,
       });
     } catch (error) {
       console.error('Verify OTP error:', error);
@@ -325,6 +331,13 @@ export async function registerAuthRoutes(app: Express) {
         sameSite: 'strict',
         maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       });
+      // Expose CSRF token to client (readable cookie for header usage)
+      res.cookie('csrfToken', csrfToken, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
 
       res.json({
         success: true,
@@ -336,7 +349,6 @@ export async function registerAuthRoutes(app: Express) {
           role: user.role,
           department: user.department,
         },
-        sessionToken,
       });
     } catch (error) {
       console.error('Staff login error:', error);
@@ -407,10 +419,10 @@ export async function registerAuthRoutes(app: Express) {
   // Logout (both client and staff)
   app.post('/api/auth/logout', async (req, res) => {
     try {
-      const sessionToken = req.cookies?.sessionToken || req.body?.sessionToken;
+      const sessionToken = req.cookies?.sessionToken;
 
       if (!sessionToken) {
-        return res.status(400).json({ error: 'Session token required' });
+        return res.status(400).json({ error: 'Session cookie required' });
       }
 
       // Deactivate session
@@ -421,6 +433,7 @@ export async function registerAuthRoutes(app: Express) {
 
       // Clear session cookie
       res.clearCookie('sessionToken');
+      res.clearCookie('csrfToken');
 
       res.json({ success: true, message: 'Logged out successfully' });
     } catch (error) {
@@ -432,10 +445,10 @@ export async function registerAuthRoutes(app: Express) {
   // Verify session
   app.post('/api/auth/verify-session', async (req, res) => {
     try {
-      const { sessionToken } = req.body;
+      const sessionToken = req.cookies?.sessionToken;
 
       if (!sessionToken) {
-        return res.status(400).json({ error: 'Session token required' });
+        return res.status(400).json({ error: 'Session cookie required' });
       }
 
       const [session] = await db
@@ -488,7 +501,8 @@ export async function registerAuthRoutes(app: Express) {
   // Change password (for staff)
   app.post('/api/auth/change-password', async (req, res) => {
     try {
-      const { sessionToken, currentPassword, newPassword } = req.body;
+      const { currentPassword, newPassword } = req.body;
+      const sessionToken = req.cookies?.sessionToken;
 
       if (!sessionToken || !currentPassword || !newPassword) {
         return res.status(400).json({ error: 'All fields are required' });

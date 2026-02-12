@@ -8,7 +8,10 @@ import { db } from "./db";
 import {
   leads,
   serviceRequests,
-  businessEntities
+  businessEntities,
+  complianceTracking,
+  complianceRules,
+  services
 } from "@shared/schema";
 import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES, type AuthenticatedRequest } from "./rbac-middleware";
 import { eq, and } from "drizzle-orm";
@@ -528,14 +531,42 @@ export function registerBulkImportRoutes(app: Express) {
         return res.status(400).json({ error: "Maximum 1000 items per batch" });
       }
 
-      const tenantId = req.user?.tenantId || 1;
+      const entities = await db
+        .select({ id: businessEntities.id, ownerId: businessEntities.ownerId, name: businessEntities.name })
+        .from(businessEntities);
 
-      // Import compliance table if available
-      const { complianceItems } = await import('@shared/schema');
+      const entityMap = new Map(
+        entities.map(entity => [entity.name.trim().toLowerCase(), entity])
+      );
+
+      const rules = await db
+        .select({
+          id: complianceRules.id,
+          ruleCode: complianceRules.ruleCode,
+          complianceName: complianceRules.complianceName,
+          periodicity: complianceRules.periodicity,
+          priorityLevel: complianceRules.priorityLevel,
+          penaltyRiskLevel: complianceRules.penaltyRiskLevel,
+        })
+        .from(complianceRules);
+
+      const ruleCodeMap = new Map(
+        rules.map(rule => [rule.ruleCode.trim().toLowerCase(), rule])
+      );
+      const ruleNameMap = new Map(
+        rules.map(rule => [rule.complianceName.trim().toLowerCase(), rule])
+      );
+
+      const serviceRows = await db
+        .select({ serviceId: services.serviceId, name: services.name })
+        .from(services);
+      const serviceNameMap = new Map(
+        serviceRows.map(service => [service.name.trim().toLowerCase(), service])
+      );
 
       // PHASE 1: Validate all items BEFORE starting transaction
       const validationErrors: string[] = [];
-      const validItems: { item: typeof items[0]; dueDate: Date; rowNum: number }[] = [];
+      const validItems: { item: typeof items[0]; dueDate: Date; rowNum: number; entity: any; rule: any | null; service: any | null }[] = [];
 
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
@@ -554,7 +585,22 @@ export function registerBulkImportRoutes(app: Express) {
           continue;
         }
 
-        validItems.push({ item, dueDate, rowNum });
+        const entityKey = String(item.entityName).trim().toLowerCase();
+        const entity = entityMap.get(entityKey);
+        if (!entity) {
+          validationErrors.push(`Row ${rowNum}: Entity not found (${item.entityName})`);
+          continue;
+        }
+
+        const serviceName = (item.serviceName || '').trim().toLowerCase();
+        const complianceType = (item.complianceType || '').trim().toLowerCase();
+        const rule =
+          (serviceName && (ruleCodeMap.get(serviceName) || ruleNameMap.get(serviceName))) ||
+          (complianceType && (ruleCodeMap.get(complianceType) || ruleNameMap.get(complianceType))) ||
+          null;
+        const service = serviceName ? serviceNameMap.get(serviceName) || null : null;
+
+        validItems.push({ item, dueDate, rowNum, entity, rule, service });
       }
 
       // If any validation errors, reject entire batch
@@ -576,18 +622,28 @@ export function registerBulkImportRoutes(app: Express) {
       };
 
       await db.transaction(async (tx) => {
-        for (const { item, dueDate } of validItems) {
-          const [inserted] = await tx.insert(complianceItems).values({
-            tenantId,
-            entityName: item.entityName,
-            complianceType: item.complianceType,
+        for (const { item, dueDate, entity, rule, service } of validItems) {
+          const serviceId = rule?.ruleCode || service?.serviceId || item.serviceName || item.complianceType;
+          const serviceType = rule?.complianceName || service?.name || item.serviceName || item.complianceType;
+          const complianceType = rule?.periodicity || item.complianceType;
+          const penaltyRisk = rule ? ['high', 'critical'].includes(rule.penaltyRiskLevel || '') : Boolean(item.penaltyAmount);
+          const estimatedPenalty = item.penaltyAmount ? Number(item.penaltyAmount) : 0;
+
+          const [inserted] = await tx.insert(complianceTracking).values({
+            userId: entity.ownerId,
+            businessEntityId: entity.id,
+            complianceRuleId: rule?.id ?? null,
+            serviceId: String(serviceId),
+            serviceType,
+            complianceType,
             dueDate,
             status: item.status,
-            penaltyAmount: item.penaltyAmount ? Number(item.penaltyAmount) : null,
-            notes: item.notes || null,
+            priority: rule?.priorityLevel || 'medium',
+            penaltyRisk,
+            estimatedPenalty,
             createdAt: new Date(),
             updatedAt: new Date(),
-          }).returning({ id: complianceItems.id });
+          }).returning({ id: complianceTracking.id });
 
           result.success++;
           result.insertedIds.push(inserted.id);

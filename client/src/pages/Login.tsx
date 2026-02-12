@@ -20,6 +20,15 @@ export default function Login() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const selectedRole = params.get('role') || sessionStorage.getItem('selectedRole');
+    const registered = params.get('registered');
+    const email = params.get('email');
+
+    if (registered) {
+      sessionStorage.setItem('showRegisteredMessage', '1');
+      if (email) {
+        sessionStorage.setItem('prefillEmail', email);
+      }
+    }
 
     if (selectedRole) {
       const normalizedRole = selectedRole.toLowerCase();
@@ -81,6 +90,24 @@ function ClientLogin() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const showRegistered = sessionStorage.getItem('showRegisteredMessage');
+    const prefillEmail = sessionStorage.getItem('prefillEmail');
+
+    if (prefillEmail) {
+      setEmail(prefillEmail);
+      sessionStorage.removeItem('prefillEmail');
+    }
+
+    if (showRegistered) {
+      toast({
+        title: "Registration successful",
+        description: "Please sign in using OTP sent to your email.",
+      });
+      sessionStorage.removeItem('showRegisteredMessage');
+    }
+  }, [toast]);
 
   const sendOtpMutation = useMutation({
     mutationFn: (email: string) => apiRequest('/api/auth/client/send-otp', 'POST', { email }),

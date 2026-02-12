@@ -101,8 +101,8 @@ export class ServiceSpawner {
             .from(serviceRequests)
             .where(
               and(
-                eq(serviceRequests.entityId, b.entityId),
-                eq(serviceRequests.serviceType, b.serviceKey)
+                eq(serviceRequests.businessEntityId, b.entityId),
+                eq(serviceRequests.serviceId, b.serviceKey)
               )
             )
             .limit(1);
@@ -124,8 +124,8 @@ export class ServiceSpawner {
           .from(serviceRequests)
           .where(
             and(
-              eq(serviceRequests.entityId, b.entityId),
-              eq(serviceRequests.serviceType, b.serviceKey),
+              eq(serviceRequests.businessEntityId, b.entityId),
+              eq(serviceRequests.serviceId, b.serviceKey),
               eq(serviceRequests.periodLabel, periodLabel)
             )
           )
@@ -140,12 +140,15 @@ export class ServiceSpawner {
         const [newOrder] = await db
           .insert(serviceRequests)
           .values({
+            businessEntityId: b.entityId,
             entityId: b.entityId,
+            serviceId: b.serviceKey,
             serviceType: b.serviceKey,
+            totalAmount: 0,
             periodicity,
             periodLabel,
-            dueDate,
-            status: 'Created',
+            dueDate: new Date(dueDate),
+            status: 'initiated',
             priority: this.determinePriority(dueDate, today),
             description: `${s.name} for ${periodLabel}`
           })
@@ -171,6 +174,31 @@ export class ServiceSpawner {
 
   private computeDueDate(ruleJson: any, baseDate = new Date(), meta: any = {}): string {
     const r = typeof ruleJson === 'string' ? JSON.parse(ruleJson) : ruleJson;
+
+    if (r?.dueInDays || r?.days_after) {
+      const days = Number(r.dueInDays ?? r.days_after ?? 0);
+      const due = new Date(baseDate);
+      due.setDate(due.getDate() + days);
+      return due.toISOString().slice(0, 10);
+    }
+
+    if (r?.day && r?.month) {
+      const monthIndex = Number(r.month) - 1;
+      let year = baseDate.getFullYear();
+      const candidate = new Date(year, monthIndex, Number(r.day));
+      if (candidate < baseDate) {
+        year += 1;
+      }
+      const due = new Date(year, monthIndex, Number(r.day));
+      return due.toISOString().slice(0, 10);
+    }
+
+    if (r?.day && r?.month_offset !== undefined) {
+      const offset = Number(r.month_offset);
+      const baseMonth = new Date(baseDate.getFullYear(), baseDate.getMonth() + offset, 1);
+      const due = new Date(baseMonth.getFullYear(), baseMonth.getMonth(), Number(r.day));
+      return due.toISOString().slice(0, 10);
+    }
 
     // MONTHLY
     if (r.periodicity === 'MONTHLY') {
@@ -301,9 +329,14 @@ export class ServiceSpawner {
         fallbackDue: '03-31',
         nudges: { tMinus: [30, 7, 1] }
       },
+      'ONGOING': {
+        periodicity: 'ONGOING',
+        dueInDays: 7,
+        nudges: { tMinus: [3, 1] }
+      },
       'ONE_TIME': {
         periodicity: 'ONE_TIME',
-        dueDayOfMonth: 30,
+        dueInDays: 14,
         nudges: { tMinus: [7, 3, 1] }
       }
     };
@@ -315,9 +348,9 @@ export class ServiceSpawner {
     const due = new Date(dueDate);
     const daysDiff = Math.ceil((due.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
     
-    if (daysDiff <= 3) return 'HIGH';
-    if (daysDiff <= 7) return 'MEDIUM';
-    return 'LOW';
+    if (daysDiff <= 3) return 'high';
+    if (daysDiff <= 7) return 'medium';
+    return 'low';
   }
 
   private async generateSpawningSummary(spawnedCount: number, totalBindings: number) {
@@ -325,19 +358,19 @@ export class ServiceSpawner {
       // Get today's spawned orders by service type
       const todaySpawned = await db
         .select({
-          serviceType: serviceRequests.serviceType,
+          serviceKey: sql<string>`coalesce(${serviceRequests.serviceId}, ${serviceRequests.serviceType})`,
           count: sql`count(*)`
         })
         .from(serviceRequests)
         .where(sql`date(created_at) = date('now')`)
-        .groupBy(serviceRequests.serviceType);
+        .groupBy(sql`coalesce(${serviceRequests.serviceId}, ${serviceRequests.serviceType})`);
 
       const summary = {
         date: new Date().toISOString().slice(0, 10),
         spawnedCount,
         totalBindings,
         spawnedByService: todaySpawned.map(s => ({
-          serviceType: s.serviceType,
+          serviceType: s.serviceKey,
           count: Number(s.count)
         }))
       };
@@ -406,12 +439,15 @@ export class ServiceSpawner {
         const [newOrder] = await db
           .insert(serviceRequests)
           .values({
+            businessEntityId: b.entityId,
             entityId: b.entityId,
+            serviceId: b.serviceKey,
             serviceType: b.serviceKey,
+            totalAmount: 0,
             periodicity,
             periodLabel,
-            dueDate,
-            status: 'Created',
+            dueDate: new Date(dueDate),
+            status: 'initiated',
             priority: this.determinePriority(dueDate, new Date()),
             description: `${s.name} for ${periodLabel} (Manual)`
           })

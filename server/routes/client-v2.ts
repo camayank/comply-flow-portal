@@ -1,9 +1,10 @@
 import { Router } from 'express';
-import { getNextPrioritizedAction, getRecentActivities, completeAction } from '../services/next-action-recommender';
-import { pool } from '../db';
+import { db } from '../db';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
+import { and, desc, eq } from 'drizzle-orm';
+import { activityLogs, complianceRules, complianceTracking, documentsUploads } from '@shared/schema';
 
 // Import new V2 services (Vanta/Drata pattern)
 import * as ClientService from '../services/v2/client-service';
@@ -41,6 +42,14 @@ const upload = multer({
   },
 });
 
+const parseTrackingId = (rawId: string) => {
+  if (!rawId) return null;
+  const match = rawId.match(/(\d+)/);
+  if (!match) return null;
+  const parsed = Number(match[1]);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 /**
  * GET /api/v2/client/status
  * Single aggregated endpoint for entire portal state
@@ -48,9 +57,11 @@ const upload = multer({
  */
 router.get('/status', async (req, res) => {
   try {
-    const userId = req.user?.id || 'dev-user-123';
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
     
-    // 🔓 DEV MODE: Return mock data if no client exists (fallback only)
     try {
       // Use new service layer to get client
       const client = await ClientService.getClientByUserId(userId);
@@ -176,40 +187,101 @@ router.post('/actions/complete', upload.array('files', 10), async (req, res) => 
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const { actionId, confirmationData, paymentReference } = req.body;
+    const { actionId } = req.body;
 
     if (!actionId) {
       return res.status(400).json({ error: 'Action ID is required' });
     }
 
-    // Get client entity ID
-    const clientResult = await pool.query(
-      'SELECT id FROM clients WHERE user_id = $1 LIMIT 1',
-      [userId]
-    );
+    const trackingId = parseTrackingId(String(actionId));
+    if (!trackingId) {
+      return res.status(400).json({ error: 'Invalid action ID' });
+    }
 
-    if (clientResult.rows.length === 0) {
+    const client = await ClientService.getClientByUserId(String(userId));
+    if (!client) {
       return res.status(404).json({ error: 'Client not found' });
     }
 
-    const clientId = clientResult.rows[0].id;
+    const [trackingItem] = await db
+      .select({
+        id: complianceTracking.id,
+        businessEntityId: complianceTracking.businessEntityId,
+        complianceRuleId: complianceTracking.complianceRuleId,
+        serviceType: complianceTracking.serviceType,
+        serviceId: complianceTracking.serviceId,
+        ruleCode: complianceRules.ruleCode,
+        formNumber: complianceRules.formNumber,
+        complianceName: complianceRules.complianceName,
+      })
+      .from(complianceTracking)
+      .leftJoin(complianceRules, eq(complianceTracking.complianceRuleId, complianceRules.id))
+      .where(
+        and(
+          eq(complianceTracking.id, trackingId),
+          eq(complianceTracking.businessEntityId, client.id)
+        )
+      )
+      .limit(1);
+
+    if (!trackingItem) {
+      return res.status(404).json({ error: 'Compliance action not found' });
+    }
 
     // Process uploaded files
     const uploadedFiles = req.files as Express.Multer.File[];
-    const filePaths = uploadedFiles?.map(file => file.path) || [];
+    if (uploadedFiles && uploadedFiles.length > 0) {
+      const docType = String(
+        trackingItem.formNumber ||
+        trackingItem.ruleCode ||
+        trackingItem.serviceType ||
+        trackingItem.serviceId ||
+        'compliance_document'
+      );
 
-    // Complete the action
-    const result = await completeAction(actionId, clientId, {
-      files: filePaths,
-      confirmationData: confirmationData ? JSON.parse(confirmationData) : null,
-      paymentReference,
+      await db.insert(documentsUploads).values(
+        uploadedFiles.map(file => ({
+          entityId: client.id,
+          doctype: docType,
+          filename: file.originalname,
+          path: file.path,
+          sizeBytes: file.size,
+          mimeType: file.mimetype,
+          uploader: 'client',
+          status: 'pending_review',
+        }))
+      );
+    }
+
+    await db
+      .update(complianceTracking)
+      .set({
+        status: 'in_progress',
+        updatedAt: new Date(),
+      })
+      .where(eq(complianceTracking.id, trackingId));
+
+    const parsedUserId = Number(userId);
+    await db.insert(activityLogs).values({
+      userId: Number.isFinite(parsedUserId) ? parsedUserId : null,
+      businessEntityId: client.id,
+      action: uploadedFiles && uploadedFiles.length > 0 ? 'document_upload' : 'action_submitted',
+      entityType: 'compliance_tracking',
+      entityId: trackingId,
+      details: `Client submitted ${trackingItem.complianceName || trackingItem.serviceType || 'compliance action'} for review`,
+      metadata: {
+        complianceRuleId: trackingItem.complianceRuleId,
+        filesUploaded: uploadedFiles?.length || 0,
+      },
+      createdAt: new Date(),
     });
 
-    if (result.success) {
-      res.json(result);
-    } else {
-      res.status(400).json(result);
-    }
+    res.json({
+      success: true,
+      status: 'in_progress',
+      message: 'Submission received and sent for review.',
+      trackingId,
+    });
   } catch (error: any) {
     console.error('Error in /api/v2/client/actions/complete:', error);
     res.status(500).json({
@@ -230,42 +302,35 @@ router.get('/actions/history', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const clientResult = await pool.query(
-      'SELECT id FROM clients WHERE user_id = $1 LIMIT 1',
-      [userId]
-    );
-
-    if (clientResult.rows.length === 0) {
+    const client = await ClientService.getClientByUserId(String(userId));
+    if (!client) {
       return res.status(404).json({ error: 'Client not found' });
     }
 
-    const clientId = clientResult.rows[0].id;
-
-    const history = await pool.query(
-      `SELECT 
-        csh.id,
-        csh.rule_code,
-        cr.friendly_label,
-        csh.event_type,
-        csh.description,
-        csh.created_at,
-        csh.metadata
-      FROM compliance_state_history csh
-      LEFT JOIN compliance_rules cr ON cr.rule_code = csh.rule_code
-      WHERE csh.entity_id = $1
-        AND csh.event_type IN ('ACTION_COMPLETED', 'FILING_COMPLETED', 'DOCUMENT_UPLOADED')
-      ORDER BY csh.created_at DESC
-      LIMIT 50`,
-      [clientId]
-    );
+    const history = await db
+      .select({
+        id: activityLogs.id,
+        action: activityLogs.action,
+        details: activityLogs.details,
+        createdAt: activityLogs.createdAt,
+        metadata: activityLogs.metadata,
+      })
+      .from(activityLogs)
+      .where(
+        and(
+          eq(activityLogs.businessEntityId, client.id),
+          eq(activityLogs.entityType, 'compliance_tracking')
+        )
+      )
+      .orderBy(desc(activityLogs.createdAt))
+      .limit(50);
 
     res.json({
-      history: history.rows.map(row => ({
+      history: history.map(row => ({
         id: row.id,
-        ruleCode: row.rule_code,
-        title: row.friendly_label || row.description,
-        eventType: row.event_type,
-        completedAt: row.created_at,
+        title: row.details || row.action,
+        eventType: row.action,
+        completedAt: row.createdAt,
         metadata: row.metadata,
       })),
     });

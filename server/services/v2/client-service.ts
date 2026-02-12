@@ -38,7 +38,9 @@ export async function getClientByUserId(userId: string): Promise<Client | null> 
     `SELECT
       be.id, be.owner_id as user_id, be.name as business_name,
       be.entity_type as business_type, be.gstin, be.pan,
-      u.email, u.phone, be.address, be.city, be.state,
+      COALESCE(be.contact_email, u.email) as email,
+      COALESCE(be.contact_phone, u.phone) as phone,
+      be.address, be.city, be.state, be.pincode,
       be.industry_type as industry, be.registration_date as incorporation_date,
       be.client_status as status, be.is_active,
       be.created_at, be.updated_at
@@ -65,7 +67,7 @@ export async function getClientByUserId(userId: string): Promise<Client | null> 
     address: row.address,
     city: row.city,
     state: row.state,
-    pincode: null,
+    pincode: row.pincode,
     industry: row.industry,
     incorporationDate: row.incorporation_date,
     status: row.status || 'active',
@@ -80,11 +82,16 @@ export async function getClientByUserId(userId: string): Promise<Client | null> 
 export async function getClientById(id: number): Promise<Client | null> {
   const result = await pool.query(
     `SELECT 
-      id, user_id, business_name, business_type, gstin, pan,
-      email, phone, address, city, state, pincode, industry,
-      incorporation_date, status, created_at, updated_at
-    FROM clients
-    WHERE id = $1`,
+      be.id, be.owner_id as user_id, be.name as business_name,
+      be.entity_type as business_type, be.gstin, be.pan,
+      COALESCE(be.contact_email, u.email) as email,
+      COALESCE(be.contact_phone, u.phone) as phone,
+      be.address, be.city, be.state, be.pincode,
+      be.industry_type as industry, be.registration_date as incorporation_date,
+      be.client_status as status, be.created_at, be.updated_at
+    FROM business_entities be
+    LEFT JOIN users u ON be.owner_id = u.id
+    WHERE be.id = $1`,
     [id]
   );
 
@@ -129,14 +136,27 @@ export async function createClient(clientData: Omit<Client, 'id' | 'createdAt' |
     throw new Error('Invalid PAN format');
   }
 
+  const ownerId = Number(clientData.userId);
+  if (!Number.isFinite(ownerId)) {
+    throw new Error('Invalid owner user ID');
+  }
+
+  const lastResult = await pool.query(
+    'SELECT client_id FROM business_entities ORDER BY id DESC LIMIT 1'
+  );
+  const lastClientId = lastResult.rows[0]?.client_id as string | undefined;
+  const lastNumber = lastClientId ? parseInt(lastClientId.replace(/\D+/g, ''), 10) : 0;
+  const nextClientId = `C${String((Number.isFinite(lastNumber) ? lastNumber : 0) + 1).padStart(4, '0')}`;
+
   const result = await pool.query(
-    `INSERT INTO clients 
-     (user_id, business_name, business_type, gstin, pan, email, phone, address, 
-      city, state, pincode, industry, incorporation_date, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    `INSERT INTO business_entities
+     (owner_id, client_id, name, entity_type, gstin, pan, contact_email, contact_phone, address,
+      city, state, pincode, industry_type, registration_date, client_status, is_active)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
      RETURNING id`,
     [
-      clientData.userId,
+      ownerId,
+      nextClientId,
       clientData.businessName,
       clientData.businessType,
       clientData.gstin,
@@ -149,7 +169,8 @@ export async function createClient(clientData: Omit<Client, 'id' | 'createdAt' |
       clientData.pincode,
       clientData.industry,
       clientData.incorporationDate,
-      clientData.status || 'active'
+      clientData.status || 'active',
+      clientData.status ? clientData.status === 'active' : true,
     ]
   );
 
@@ -160,19 +181,27 @@ export async function createClient(clientData: Omit<Client, 'id' | 'createdAt' |
  * Update client information
  */
 export async function updateClient(id: number, updates: Partial<Client>): Promise<void> {
-  const allowedFields = [
-    'business_name', 'business_type', 'email', 'phone', 
-    'address', 'city', 'state', 'pincode', 'industry', 'status'
-  ];
+  const fieldMap: Record<string, string> = {
+    businessName: 'name',
+    businessType: 'entity_type',
+    email: 'contact_email',
+    phone: 'contact_phone',
+    address: 'address',
+    city: 'city',
+    state: 'state',
+    pincode: 'pincode',
+    industry: 'industry_type',
+    status: 'client_status',
+  };
 
   const setClause: string[] = [];
   const values: any[] = [];
   let paramIndex = 1;
 
   Object.entries(updates).forEach(([key, value]) => {
-    const snakeKey = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-    if (allowedFields.includes(snakeKey)) {
-      setClause.push(`${snakeKey} = $${paramIndex}`);
+    const mappedKey = fieldMap[key];
+    if (mappedKey) {
+      setClause.push(`${mappedKey} = $${paramIndex}`);
       values.push(value);
       paramIndex++;
     }
@@ -184,7 +213,7 @@ export async function updateClient(id: number, updates: Partial<Client>): Promis
 
   values.push(id);
   await pool.query(
-    `UPDATE clients 
+    `UPDATE business_entities
      SET ${setClause.join(', ')}, updated_at = CURRENT_TIMESTAMP
      WHERE id = $${paramIndex}`,
     values
@@ -202,28 +231,33 @@ export async function getAllClients(filters?: {
 }): Promise<Client[]> {
   let query = `
     SELECT 
-      id, user_id, business_name, business_type, gstin, pan,
-      email, phone, address, city, state, pincode, industry,
-      incorporation_date, status, created_at, updated_at
-    FROM clients
+      be.id, be.owner_id as user_id, be.name as business_name,
+      be.entity_type as business_type, be.gstin, be.pan,
+      COALESCE(be.contact_email, u.email) as email,
+      COALESCE(be.contact_phone, u.phone) as phone,
+      be.address, be.city, be.state, be.pincode,
+      be.industry_type as industry, be.registration_date as incorporation_date,
+      be.client_status as status, be.created_at, be.updated_at
+    FROM business_entities be
+    LEFT JOIN users u ON be.owner_id = u.id
     WHERE 1=1
   `;
   const params: any[] = [];
   let paramIndex = 1;
 
   if (filters?.status) {
-    query += ` AND status = $${paramIndex}`;
+    query += ` AND be.client_status = $${paramIndex}`;
     params.push(filters.status);
     paramIndex++;
   }
 
   if (filters?.businessType) {
-    query += ` AND business_type = $${paramIndex}`;
+    query += ` AND be.entity_type = $${paramIndex}`;
     params.push(filters.businessType);
     paramIndex++;
   }
 
-  query += ' ORDER BY created_at DESC';
+  query += ' ORDER BY be.created_at DESC';
 
   if (filters?.limit) {
     query += ` LIMIT $${paramIndex}`;

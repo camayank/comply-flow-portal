@@ -8,10 +8,39 @@ import { Request, Response, Router } from 'express';
 import { stateEngine } from './compliance-state-engine';
 import { db } from './db';
 import { complianceStates, complianceAlerts, complianceStateHistory } from '../shared/compliance-state-schema';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, sql } from 'drizzle-orm';
 import { requireAuth } from './auth-middleware';
+import { USER_ROLES } from './rbac-middleware';
+import { ensureRequiredDocumentsForRuleIds, getEvidenceStatusForRule } from './compliance-evidence';
+import { computeNextDueDate } from './compliance-due-date';
 
 export const complianceStateRoutes = Router();
+
+const normalizePeriodicity = (value?: string | null) => {
+  const raw = String(value || '').toLowerCase().trim();
+  switch (raw) {
+    case 'half-yearly':
+    case 'half_yearly':
+    case 'halfyearly':
+      return 'half_yearly';
+    case 'yearly':
+      return 'annual';
+    default:
+      return raw;
+  }
+};
+
+const shouldRollForward = (rule: { periodicity?: string | null; dueDateCalculationType?: string | null }) => {
+  const periodicity = normalizePeriodicity(rule.periodicity);
+  if (['one_time', 'event_based', 'event'].includes(periodicity)) {
+    return false;
+  }
+  const calcType = String(rule.dueDateCalculationType || '').toLowerCase();
+  if (calcType === 'event_triggered' || calcType === 'event') {
+    return false;
+  }
+  return true;
+};
 
 // ============================================================================
 // GET CURRENT STATE
@@ -470,11 +499,52 @@ complianceStateRoutes.get('/:entityId/score', async (req: Request, res: Response
 complianceStateRoutes.post('/tracking/:id/complete', requireAuth, async (req: Request, res: Response) => {
   try {
     const trackingId = parseInt(req.params.id);
-    const { completedBy, completionDate, evidenceDocId } = req.body;
+    const { completedBy, completionDate, evidenceDocId, overrideEvidence } = req.body;
     const userId = (req as any).user?.id || completedBy;
 
     // Import the complianceTracking table
     const { complianceTracking } = await import('../shared/schema');
+
+    const [trackingItem] = await db
+      .select({
+        businessEntityId: complianceTracking.businessEntityId,
+        complianceRuleId: complianceTracking.complianceRuleId,
+        serviceType: complianceTracking.serviceType,
+        serviceId: complianceTracking.serviceId,
+      })
+      .from(complianceTracking)
+      .where(eq(complianceTracking.id, trackingId))
+      .limit(1);
+
+    if (!trackingItem) {
+      return res.status(404).json({ error: 'Compliance tracking item not found' });
+    }
+
+    if (trackingItem.businessEntityId) {
+      const evidence = await getEvidenceStatusForRule(
+        trackingItem.businessEntityId,
+        trackingItem.complianceRuleId
+      );
+
+      const canOverride = [USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.OPS_MANAGER, USER_ROLES.OPS_EXECUTIVE].includes(
+        (req as any).user?.role
+      );
+
+      if (evidence.missingDocuments.length > 0 && overrideEvidence && !canOverride) {
+        return res.status(403).json({
+          error: 'Insufficient permissions to override evidence requirements',
+        });
+      }
+
+      if (evidence.missingDocuments.length > 0 && !overrideEvidence) {
+        return res.status(400).json({
+          error: 'Missing required documents',
+          message: `Required documents are missing for ${trackingItem.serviceType || trackingItem.serviceId}.`,
+          missingDocuments: evidence.missingDocuments,
+          requiredDocuments: evidence.requiredDocuments,
+        });
+      }
+    }
 
     // Update the tracking item
     const result = await db.update(complianceTracking)
@@ -490,15 +560,89 @@ complianceStateRoutes.post('/tracking/:id/complete', requireAuth, async (req: Re
       return res.status(404).json({ error: 'Compliance tracking item not found' });
     }
 
+    const updatedItem = result[0];
+
+    // Roll forward recurring compliances to the next due date
+    if (updatedItem.businessEntityId && updatedItem.complianceRuleId) {
+      try {
+        const { complianceRules, complianceTracking: complianceTrackingTable } = await import('../shared/schema');
+        const [rule] = await db
+          .select({
+            id: complianceRules.id,
+            ruleCode: complianceRules.ruleCode,
+            complianceName: complianceRules.complianceName,
+            periodicity: complianceRules.periodicity,
+            dueDateCalculationType: complianceRules.dueDateCalculationType,
+            dueDateFormula: complianceRules.dueDateFormula,
+            priorityLevel: complianceRules.priorityLevel,
+            penaltyRiskLevel: complianceRules.penaltyRiskLevel,
+          })
+          .from(complianceRules)
+          .where(eq(complianceRules.id, updatedItem.complianceRuleId))
+          .limit(1);
+
+        if (rule && shouldRollForward(rule)) {
+          const referenceDate = updatedItem.dueDate || updatedItem.lastCompleted || new Date();
+          const nextDueDate = computeNextDueDate(
+            rule.dueDateFormula as any,
+            rule.dueDateCalculationType,
+            rule.periodicity,
+            referenceDate
+          );
+
+          if (nextDueDate) {
+            const [existingNext] = await db
+              .select({ id: complianceTrackingTable.id })
+              .from(complianceTrackingTable)
+              .where(
+                and(
+                  eq(complianceTrackingTable.businessEntityId, updatedItem.businessEntityId),
+                  eq(complianceTrackingTable.complianceRuleId, updatedItem.complianceRuleId),
+                  sql`DATE(${complianceTrackingTable.dueDate}) = DATE(${nextDueDate})`
+                )
+              )
+              .limit(1);
+
+            if (!existingNext) {
+              await db.insert(complianceTrackingTable).values({
+                userId: updatedItem.userId,
+                businessEntityId: updatedItem.businessEntityId,
+                complianceRuleId: updatedItem.complianceRuleId,
+                serviceId: updatedItem.serviceId,
+                serviceType: updatedItem.serviceType || rule.complianceName,
+                complianceType: normalizePeriodicity(rule.periodicity) || updatedItem.complianceType,
+                dueDate: nextDueDate,
+                status: 'pending',
+                priority: rule.priorityLevel || updatedItem.priority || 'medium',
+                penaltyRisk: ['high', 'critical'].includes(String(rule.penaltyRiskLevel || '')),
+                estimatedPenalty: updatedItem.estimatedPenalty || 0,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              });
+
+              await ensureRequiredDocumentsForRuleIds([updatedItem.complianceRuleId]);
+            }
+
+            await db
+              .update(complianceTrackingTable)
+              .set({ nextDueDate, updatedAt: new Date() })
+              .where(eq(complianceTrackingTable.id, trackingId));
+          }
+        }
+      } catch (rollError) {
+        console.error('Error rolling compliance item forward:', rollError);
+      }
+    }
+
     // Trigger state recalculation for the entity
-    if (result[0].businessEntityId) {
-      stateEngine.calculateEntityState(result[0].businessEntityId)
+    if (updatedItem.businessEntityId) {
+      stateEngine.calculateEntityState(updatedItem.businessEntityId)
         .catch(err => console.error('Background state recalculation failed:', err));
     }
 
     res.json({
       success: true,
-      updatedItem: result[0],
+      updatedItem,
       message: 'Compliance item marked as complete',
     });
   } catch (error: any) {
@@ -536,6 +680,11 @@ complianceStateRoutes.post('/tracking/:id/extension', requireAuth, async (req: R
 
     if (result.length === 0) {
       return res.status(404).json({ error: 'Compliance tracking item not found' });
+    }
+
+    if (result[0].businessEntityId) {
+      stateEngine.calculateEntityState(result[0].businessEntityId)
+        .catch(err => console.error('Background state recalculation failed:', err));
     }
 
     res.json({

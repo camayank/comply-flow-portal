@@ -22,7 +22,8 @@ import {
   activityLogs,
   services,
   documentsUploads,
-  deliveryConfirmations
+  deliveryConfirmations,
+  slaSettings
 } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import {
@@ -72,6 +73,21 @@ export interface SLACalculation {
  */
 export async function calculateSLADeadline(serviceId: string, startDate: Date = new Date()): Promise<SLACalculation | null> {
   try {
+    const [slaConfig] = await db
+      .select()
+      .from(slaSettings)
+      .where(eq(slaSettings.serviceCode, serviceId))
+      .limit(1);
+
+    if (slaConfig?.standardHours) {
+      const slaDeadline = new Date(startDate.getTime() + slaConfig.standardHours * 60 * 60 * 1000);
+      return {
+        slaDeadline,
+        slaHours: slaConfig.standardHours,
+        workingDaysOnly: false
+      };
+    }
+
     // Get service definition
     const [service] = await db
       .select()

@@ -6,8 +6,8 @@ import fs from 'fs/promises';
 import type { Request } from 'express';
 
 const BUCKET_ID = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
-const PRIVATE_DIR = process.env.PRIVATE_OBJECT_DIR || '/.private';
-const PUBLIC_DIR = '/public';
+const PRIVATE_DIR = (process.env.PRIVATE_OBJECT_DIR || '.private').replace(/^\/+/, '');
+const PUBLIC_DIR = 'public';
 const LOCAL_STORAGE_PATH = process.env.LOCAL_STORAGE_PATH || './uploads';
 
 // Check if GCS is configured
@@ -144,7 +144,7 @@ async function uploadToGCS(
       // Generate signed URL for private files (valid for 1 hour)
       let url: string;
       if (isPublic) {
-        url = `https://storage.googleapis.com/${BUCKET_ID}${filePath}`;
+        url = `https://storage.googleapis.com/${BUCKET_ID}/${filePath}`;
       } else {
         const [signedUrl] = await blob.getSignedUrl({
           action: 'read',
@@ -183,7 +183,11 @@ async function uploadToLocal(
 }> {
   try {
     // Create directory structure
-    const fullPath = path.join(LOCAL_STORAGE_PATH, filePath);
+    const basePath = path.resolve(LOCAL_STORAGE_PATH);
+    const fullPath = path.resolve(basePath, filePath);
+    if (!fullPath.startsWith(basePath + path.sep)) {
+      throw new Error('Invalid file path');
+    }
     const directory = path.dirname(fullPath);
 
     await fs.mkdir(directory, { recursive: true });
@@ -193,7 +197,7 @@ async function uploadToLocal(
 
     // Generate URL
     // For local storage, we'll serve files from /uploads endpoint
-    const url = `/uploads${filePath}`;
+    const url = `/uploads/${filePath}`;
 
     return {
       url,
@@ -216,7 +220,11 @@ export async function deleteFromStorage(filePath: string): Promise<void> {
     if (isGCSConfigured && bucket) {
       await bucket.file(filePath).delete();
     } else {
-      const fullPath = path.join(LOCAL_STORAGE_PATH, filePath);
+      const basePath = path.resolve(LOCAL_STORAGE_PATH);
+      const fullPath = path.resolve(basePath, filePath);
+      if (!fullPath.startsWith(basePath + path.sep)) {
+        throw new Error('Invalid file path');
+      }
       await fs.unlink(fullPath);
     }
   } catch (error: any) {
@@ -240,7 +248,7 @@ export async function getSignedUrl(filePath: string, expiresIn: number = 60 * 60
     } else {
       // For local storage, return the direct URL
       // In production, this should be protected by authentication middleware
-      return `/uploads${filePath}`;
+      return `/uploads/${filePath}`;
     }
   } catch (error: any) {
     throw new Error(`Failed to generate signed URL: ${error.message}`);
@@ -253,8 +261,17 @@ export async function getSignedUrl(filePath: string, expiresIn: number = 60 * 60
  */
 export async function fileExists(filePath: string): Promise<boolean> {
   try {
-    const [exists] = await bucket.file(filePath).exists();
-    return exists;
+    if (isGCSConfigured && bucket) {
+      const [exists] = await bucket.file(filePath).exists();
+      return exists;
+    }
+    const basePath = path.resolve(LOCAL_STORAGE_PATH);
+    const fullPath = path.resolve(basePath, filePath);
+    if (!fullPath.startsWith(basePath + path.sep)) {
+      return false;
+    }
+    await fs.stat(fullPath);
+    return true;
   } catch (error) {
     return false;
   }
@@ -272,13 +289,28 @@ export async function getFileMetadata(filePath: string): Promise<{
   updated: Date;
 }> {
   try {
-    const [metadata] = await bucket.file(filePath).getMetadata();
+    if (isGCSConfigured && bucket) {
+      const [metadata] = await bucket.file(filePath).getMetadata();
+      return {
+        name: metadata.name || '',
+        size: parseInt(String(metadata.size || '0')),
+        contentType: metadata.contentType || 'application/octet-stream',
+        created: new Date(metadata.timeCreated || Date.now()),
+        updated: new Date(metadata.updated || Date.now())
+      };
+    }
+    const basePath = path.resolve(LOCAL_STORAGE_PATH);
+    const fullPath = path.resolve(basePath, filePath);
+    if (!fullPath.startsWith(basePath + path.sep)) {
+      throw new Error('Invalid file path');
+    }
+    const stat = await fs.stat(fullPath);
     return {
-      name: metadata.name || '',
-      size: parseInt(String(metadata.size || '0')),
-      contentType: metadata.contentType || 'application/octet-stream',
-      created: new Date(metadata.timeCreated || Date.now()),
-      updated: new Date(metadata.updated || Date.now())
+      name: path.basename(fullPath),
+      size: stat.size,
+      contentType: 'application/octet-stream',
+      created: stat.birthtime,
+      updated: stat.mtime
     };
   } catch (error: any) {
     throw new Error(`Failed to get file metadata: ${error.message}`);

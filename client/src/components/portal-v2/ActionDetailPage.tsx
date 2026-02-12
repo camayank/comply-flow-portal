@@ -43,7 +43,7 @@ export default function ActionDetailPage({
       onComplete();
       onClose();
     },
-    successMessage: 'Action completed successfully! Your status has been updated.',
+    successMessage: 'Submission received! We’ll review it and update your status shortly.',
   });
 
   const handleComplete = () => {

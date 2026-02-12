@@ -15,9 +15,11 @@ import cron from 'node-cron';
 import { ComplianceStateEngine } from './compliance-state-engine';
 import { db } from './db';
 import { complianceStates } from '../shared/compliance-state-schema';
-import { inArray } from 'drizzle-orm';
+import { businessEntities } from '../shared/schema';
+import { eq, inArray } from 'drizzle-orm';
 import { jobManager } from './job-lifecycle-manager';
 import { logger } from './logger';
+import { syncComplianceTracking } from './compliance-tracking-sync';
 
 interface SchedulerMetrics {
   lastNightlyRun: Date | null;
@@ -120,27 +122,31 @@ class ComplianceStateScheduler {
     try {
       logger.info('[Nightly] Starting full recalculation...');
       
-      // Get all client IDs
-      const clients = await db.query.clients.findMany({
-        columns: { id: true },
-      });
+      const syncResult = await syncComplianceTracking();
+      logger.info(`[Nightly] Compliance tracking sync created ${syncResult.created} items`);
 
-      logger.info(`[Nightly] Found ${clients.length} clients to recalculate`);
+      // Get all active business entities
+      const entities = await db
+        .select({ id: businessEntities.id })
+        .from(businessEntities)
+        .where(eq(businessEntities.isActive, true));
+
+      logger.info(`[Nightly] Found ${entities.length} entities to recalculate`);
 
       let successCount = 0;
       let failureCount = 0;
       const errors: string[] = [];
 
       // Recalculate each entity
-      for (const client of clients) {
+      for (const entity of entities) {
         try {
-          await this.engine.calculateEntityState(client.id);
+          await this.engine.calculateEntityState(entity.id);
           successCount++;
         } catch (error) {
           failureCount++;
           const errorMsg = error instanceof Error ? error.message : String(error);
-          errors.push(`Client ${client.id}: ${errorMsg}`);
-          logger.error(`[Nightly] Failed to recalculate client ${client.id}:`, error);
+          errors.push(`Entity ${entity.id}: ${errorMsg}`);
+          logger.error(`[Nightly] Failed to recalculate entity ${entity.id}:`, error);
         }
       }
 

@@ -4,6 +4,8 @@ import { documentVault } from '@shared/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { sessionAuthMiddleware, type AuthenticatedRequest } from './rbac-middleware';
 import { storage } from './storage';
+import { upload, uploadToStorage, validateFileSize } from './file-upload';
+import { resolveDownloadUrl } from './storage-url';
 
 export function registerDocumentVaultRoutes(app: Express) {
 
@@ -31,16 +33,19 @@ export function registerDocumentVaultRoutes(app: Express) {
         .orderBy(desc(documentVault.createdAt));
 
       // Calculate isExpiringSoon for each document
-      const documentsWithMetrics = documents.map(doc => {
-        const isExpiringSoon = doc.expiryDate
-          ? new Date(doc.expiryDate).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000 // 30 days
-          : false;
+      const documentsWithMetrics = await Promise.all(
+        documents.map(async (doc) => {
+          const isExpiringSoon = doc.expiryDate
+            ? new Date(doc.expiryDate).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000 // 30 days
+            : false;
 
-        return {
-          ...doc,
-          isExpiringSoon,
-        };
-      });
+          return {
+            ...doc,
+            fileUrl: await resolveDownloadUrl(doc.fileUrl),
+            isExpiringSoon,
+          };
+        })
+      );
 
       res.json(documentsWithMetrics);
     } catch (error: any) {
@@ -86,9 +91,11 @@ export function registerDocumentVaultRoutes(app: Express) {
         })
         .where(eq(documentVault.id, documentId));
 
+      const downloadUrl = await resolveDownloadUrl(document.fileUrl);
+
       res.json({
         success: true,
-        downloadUrl: document.fileUrl,
+        downloadUrl,
         fileName: document.originalFileName,
       });
     } catch (error: any) {
@@ -190,6 +197,80 @@ export function registerDocumentVaultRoutes(app: Express) {
     }
   });
 
+  // Upload a new document with file attachment
+  app.post(
+    '/api/document-vault/upload-file',
+    sessionAuthMiddleware,
+    upload.single('file'),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const userId = req.user?.id;
+
+        if (!userId) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const file = (req as any).file as Express.Multer.File | undefined;
+        if (!file) {
+          return res.status(400).json({ error: 'File is required' });
+        }
+
+        const sizeCheck = validateFileSize(file);
+        if (!sizeCheck.valid) {
+          return res.status(400).json({ error: sizeCheck.error || 'Invalid file size' });
+        }
+
+        const documentType = typeof req.body.documentType === 'string'
+          ? req.body.documentType.trim()
+          : '';
+
+        if (!documentType) {
+          return res.status(400).json({ error: 'Document type is required' });
+        }
+
+        const category = typeof req.body.category === 'string' && req.body.category.trim()
+          ? req.body.category.trim()
+          : 'compliance';
+
+        const expiryDate = req.body.expiryDate ? new Date(req.body.expiryDate) : null;
+        const tags = req.body.tags
+          ? Array.isArray(req.body.tags)
+            ? req.body.tags
+            : String(req.body.tags)
+                .split(',')
+                .map(tag => tag.trim())
+                .filter(Boolean)
+          : [];
+
+        const user = await storage.getUser(userId);
+        const stored = await uploadToStorage(file, false, 'document-vault');
+
+        const [newDocument] = await db.insert(documentVault)
+          .values({
+            userId,
+            businessEntityId: user?.businessEntityId,
+            documentType,
+            category,
+            fileName: file.originalname,
+            originalFileName: file.originalname,
+            fileSize: file.size,
+            mimeType: file.mimetype,
+            fileUrl: stored.path,
+            expiryDate,
+            tags,
+            accessLevel: 'private',
+            approvalStatus: 'pending',
+          })
+          .returning();
+
+        res.status(201).json(newDocument);
+      } catch (error: any) {
+        console.error('Error uploading document file:', error);
+        res.status(500).json({ error: 'Failed to upload document' });
+      }
+    }
+  );
+
   // Get document categories with counts
   app.get('/api/document-vault/categories', sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
@@ -255,12 +336,15 @@ export function registerDocumentVaultRoutes(app: Express) {
         )
         .orderBy(desc(documentVault.createdAt));
 
-      const documentsWithMetrics = documents.map(doc => ({
-        ...doc,
-        isExpiringSoon: doc.expiryDate
-          ? new Date(doc.expiryDate).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000
-          : false,
-      }));
+      const documentsWithMetrics = await Promise.all(
+        documents.map(async (doc) => ({
+          ...doc,
+          fileUrl: await resolveDownloadUrl(doc.fileUrl),
+          isExpiringSoon: doc.expiryDate
+            ? new Date(doc.expiryDate).getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000
+            : false,
+        }))
+      );
 
       res.json(documentsWithMetrics);
     } catch (error: any) {
@@ -281,7 +365,8 @@ export function registerDocumentVaultRoutes(app: Express) {
         .set({ downloadCount: sql`${documentVault.downloadCount} + 1`, lastAccessed: new Date() })
         .where(eq(documentVault.id, documentId));
 
-      res.json({ success: true, downloadUrl: document.fileUrl, fileName: document.originalFileName });
+      const downloadUrl = await resolveDownloadUrl(document.fileUrl);
+      res.json({ success: true, downloadUrl, fileName: document.originalFileName });
     } catch (error: any) {
       res.status(500).json({ error: 'Failed to download document' });
     }

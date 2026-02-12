@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,18 +7,15 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import DashboardNav from '@/components/DashboardNav';
-import UnifiedComplianceDashboard from '@/components/UnifiedComplianceDashboard';
+import UnifiedComplianceDashboard, { UnifiedComplianceItem } from '@/components/UnifiedComplianceDashboard';
 import TrustBar from '@/components/TrustBar';
 import { 
   Shield, 
   AlertTriangle, 
   Clock, 
   CheckCircle, 
-  TrendingDown,
   TrendingUp,
   Calendar,
-  FileText,
-  DollarSign,
   Bell,
   Target,
   Activity,
@@ -27,26 +24,53 @@ import {
 } from 'lucide-react';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import type { ComplianceTracking } from '@shared/schema';
 import { SkeletonCard, SkeletonDashboard } from '@/components/ui/skeleton-loader';
-import { EmptyList } from '@/components/ui/empty-state';
 
-interface ComplianceHealthMetrics {
-  overallScore: number;
-  totalCompliances: number;
-  pendingCount: number;
-  overdueCount: number;
-  completedThisMonth: number;
-  upcomingDeadlines: number;
-  penaltyRisk: number;
-  estimatedSavings: number;
+interface ComplianceItem {
+  id: number;
+  serviceType: string;
+  entityName?: string | null;
+  dueDate: string;
+  status: string;
+  priority: string;
+  complianceType: string;
+  healthScore: number;
+  penaltyRisk: boolean;
+  estimatedPenalty: number;
+  serviceId: string;
+  complianceRuleId?: number | null;
+  lastCompleted?: string | null;
+  regulatoryInfo?: {
+    formNumber?: string;
+    regulationCategory?: string;
+    description?: string;
+    dueDateInfo?: string;
+    penaltyInfo?: string;
+    requiredDocuments?: string[];
+    priorityLevel?: string;
+    penaltyRiskLevel?: string;
+  } | null;
 }
 
-interface ComplianceItem extends ComplianceTracking {
+interface NormalizedComplianceItem extends ComplianceItem {
   serviceName: string;
   categoryName: string;
   daysUntilDue: number;
-  riskLevel: 'low' | 'medium' | 'high' | 'critical';
+  statusEffective: string;
+}
+
+interface ClientAlert {
+  id: number;
+  severity: string;
+  title: string;
+  message: string;
+  alertType: string;
+  category?: string;
+  complianceName?: string;
+  deadline?: string | null;
+  isAcknowledged: boolean;
+  triggeredAt: string;
+  status?: string;
 }
 
 const ComplianceTrackerDashboard = () => {
@@ -56,21 +80,43 @@ const ComplianceTrackerDashboard = () => {
 
   // Fetch compliance tracking data
   const { data: complianceItems = [], isLoading } = useQuery<ComplianceItem[]>({
-    queryKey: ['/api/compliance-tracking'],
+    queryKey: ['/api/client/compliance-tracking'],
   });
 
-  // Fetch health metrics
-  const { data: healthMetrics } = useQuery<ComplianceHealthMetrics>({
-    queryKey: ['/api/compliance-health-metrics'],
+  const { data: summary } = useQuery<{
+    totalCompliance: number;
+    overdue: number;
+    dueThisWeek: number;
+    upcoming: number;
+    completed: number;
+    averageHealthScore: number;
+    highPriorityPending: number;
+  }>({
+    queryKey: ['/api/client/compliance-summary'],
+  });
+
+  const { data: alertsData } = useQuery<{
+    alerts: ClientAlert[];
+    summary: {
+      total: number;
+      critical: number;
+      warning: number;
+      info: number;
+      acknowledged: number;
+    };
+  }>({
+    queryKey: ['/api/client/compliance-alerts'],
   });
 
   // Mark compliance as completed mutation
   const markCompletedMutation = useMutation({
     mutationFn: (complianceId: number) => 
-      apiRequest('POST', `/api/compliance-tracking/${complianceId}/complete`),
+      apiRequest('POST', `/api/compliance-state/tracking/${complianceId}/complete`, {
+        completionDate: new Date().toISOString(),
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/compliance-tracking'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/compliance-health-metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/client/compliance-tracking'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/client/compliance-summary'] });
       toast({
         title: "Compliance Updated",
         description: "Compliance item marked as completed successfully.",
@@ -78,15 +124,30 @@ const ComplianceTrackerDashboard = () => {
     },
   });
 
-  // Snooze compliance mutation
-  const snoozeComplianceMutation = useMutation({
-    mutationFn: ({ complianceId, days }: { complianceId: number; days: number }) =>
-      apiRequest('POST', `/api/compliance-tracking/${complianceId}/snooze`, { days }),
+  // Request extension mutation
+  const requestExtensionMutation = useMutation({
+    mutationFn: ({ complianceId, requestedDate, reason }: { complianceId: number; requestedDate: string; reason: string }) =>
+      apiRequest('POST', `/api/compliance-state/tracking/${complianceId}/extension`, { requestedDate, reason }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/compliance-tracking'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/client/compliance-tracking'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/client/compliance-summary'] });
       toast({
         title: "Reminder Updated",
-        description: "Compliance reminder has been snoozed successfully.",
+        description: "Extension request has been submitted.",
+      });
+    },
+  });
+
+  const acknowledgeAlertMutation = useMutation({
+    mutationFn: (alertId: number) =>
+      apiRequest('PATCH', `/api/client/compliance-alerts/${alertId}/acknowledge`, {
+        notes: 'Acknowledged from compliance dashboard',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/client/compliance-alerts'] });
+      toast({
+        title: "Alert Acknowledged",
+        description: "The alert has been acknowledged.",
       });
     },
   });
@@ -114,6 +175,19 @@ const ComplianceTrackerDashboard = () => {
     }
   };
 
+  const getAlertBadge = (severity: string) => {
+    switch (severity) {
+      case 'critical':
+        return 'bg-red-100 text-red-800';
+      case 'warning':
+        return 'bg-orange-100 text-orange-800';
+      case 'info':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const styles = {
       pending: 'bg-yellow-100 text-yellow-800',
@@ -124,15 +198,119 @@ const ComplianceTrackerDashboard = () => {
     return styles[status as keyof typeof styles] || styles.pending;
   };
 
-  const filteredItems = complianceItems.filter(item => {
+  const categoryLabel = (value?: string | null) => {
+    const key = String(value || '').toLowerCase();
+    const map: Record<string, string> = {
+      gst: 'GST',
+      income_tax: 'Income Tax',
+      tds: 'TDS',
+      roc: 'ROC',
+      companies_act: 'MCA',
+      pf_esi: 'PF/ESI',
+      labour_laws: 'Labour Law',
+      professional_tax: 'Professional Tax',
+      licenses: 'Licenses',
+      statutory: 'Statutory',
+    };
+    return map[key] || (value ? value.replace(/_/g, ' ') : 'Other');
+  };
+
+  const normalizedItems = useMemo<NormalizedComplianceItem[]>(() => {
+    const now = new Date();
+    return complianceItems.map((item) => {
+      const dueDate = item.dueDate ? new Date(item.dueDate) : now;
+      const daysUntilDue = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      const statusEffective = item.status === 'completed'
+        ? 'completed'
+        : daysUntilDue < 0
+          ? 'overdue'
+          : item.status || 'pending';
+
+      const serviceName = item.serviceType || item.regulatoryInfo?.formNumber || item.serviceId || 'Compliance';
+      const categoryName = categoryLabel(item.regulatoryInfo?.regulationCategory || item.complianceType);
+
+      return {
+        ...item,
+        serviceName,
+        categoryName,
+        daysUntilDue,
+        statusEffective,
+      };
+    });
+  }, [complianceItems]);
+
+  const filteredItems = normalizedItems.filter(item => {
     if (selectedPriority !== 'all' && item.priority !== selectedPriority) return false;
-    if (selectedStatus !== 'all' && item.status !== selectedStatus) return false;
+    if (selectedStatus !== 'all' && item.statusEffective !== selectedStatus) return false;
     return true;
   });
 
-  const upcomingDeadlines = complianceItems
-    .filter(item => item.daysUntilDue <= 30 && item.status === 'pending')
+  const upcomingDeadlines = normalizedItems
+    .filter(item => item.statusEffective !== 'completed' && item.daysUntilDue >= 0 && item.daysUntilDue <= 30)
     .sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+
+  const totalCompliances = summary?.totalCompliance ?? normalizedItems.length;
+  const completedCount = summary?.completed ?? normalizedItems.filter(item => item.statusEffective === 'completed').length;
+  const overdueCount = summary?.overdue ?? normalizedItems.filter(item => item.statusEffective === 'overdue').length;
+  const pendingCount = Math.max(0, totalCompliances - completedCount);
+  const averageHealthScore = summary?.averageHealthScore ?? (
+    normalizedItems.length > 0
+      ? Math.round(normalizedItems.reduce((sum, item) => sum + (item.healthScore || 100), 0) / normalizedItems.length)
+      : 100
+  );
+  const completedThisMonth = normalizedItems.filter(item => {
+    if (!item.lastCompleted) return false;
+    const date = new Date(item.lastCompleted);
+    const now = new Date();
+    return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+  }).length;
+  const penaltyRiskTotal = normalizedItems
+    .filter(item => item.statusEffective !== 'completed')
+    .reduce((sum, item) => sum + Number(item.estimatedPenalty || 0), 0);
+  const penaltyAvoided = normalizedItems
+    .filter(item => item.statusEffective === 'completed')
+    .reduce((sum, item) => sum + Number(item.estimatedPenalty || 0), 0);
+
+  const categoryStats = normalizedItems.reduce((acc: Record<string, { total: number; completed: number; overdue: number }>, item) => {
+    const key = item.categoryName || 'Other';
+    if (!acc[key]) acc[key] = { total: 0, completed: 0, overdue: 0 };
+    acc[key].total += 1;
+    if (item.statusEffective === 'completed') acc[key].completed += 1;
+    if (item.statusEffective === 'overdue') acc[key].overdue += 1;
+    return acc;
+  }, {});
+
+  const categoryHealth = Object.entries(categoryStats).map(([name, stats]) => ({
+    name,
+    count: stats.total,
+    health: stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 100,
+    overdue: stats.overdue,
+  }));
+
+  const now = new Date();
+  const dueThisMonth = normalizedItems.filter(item => {
+    const date = new Date(item.dueDate);
+    return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+  }).length;
+  const completedDueThisMonth = normalizedItems.filter(item => {
+    if (item.statusEffective !== 'completed') return false;
+    const date = new Date(item.dueDate);
+    return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+  }).length;
+  const completionRateThisMonth = dueThisMonth > 0
+    ? Math.round((completedDueThisMonth / dueThisMonth) * 100)
+    : 100;
+
+  const unifiedItems: UnifiedComplianceItem[] = normalizedItems.map((item) => ({
+    id: item.id,
+    name: item.serviceName,
+    status: item.statusEffective,
+    dueDate: item.dueDate,
+    penaltyRisk: Number(item.estimatedPenalty || 0),
+    priority: (item.priority as UnifiedComplianceItem['priority']) || 'medium',
+    category: item.categoryName,
+    description: item.regulatoryInfo?.description || item.complianceType,
+  }));
 
   if (isLoading) {
     return (
@@ -167,19 +345,19 @@ const ComplianceTrackerDashboard = () => {
               <div>
                 <p className="text-sm font-medium text-gray-600">Overall Health Score</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className={`text-3xl font-bold ${getHealthScoreColor(healthMetrics?.overallScore || 85)}`}>
-                    {healthMetrics?.overallScore || 85}%
+                  <span className={`text-3xl font-bold ${getHealthScoreColor(averageHealthScore)}`}>
+                    {averageHealthScore}%
                   </span>
-                  <Badge variant="outline" className={getHealthScoreColor(healthMetrics?.overallScore || 85)}>
-                    {getHealthScoreLabel(healthMetrics?.overallScore || 85)}
+                  <Badge variant="outline" className={getHealthScoreColor(averageHealthScore)}>
+                    {getHealthScoreLabel(averageHealthScore)}
                   </Badge>
                 </div>
                 <Progress 
-                  value={healthMetrics?.overallScore || 85} 
+                  value={averageHealthScore} 
                   className="mt-2 h-2" 
                 />
               </div>
-              <Shield className={`h-8 w-8 ${getHealthScoreColor(healthMetrics?.overallScore || 85)}`} />
+              <Shield className={`h-8 w-8 ${getHealthScoreColor(averageHealthScore)}`} />
             </div>
           </CardContent>
         </Card>
@@ -189,9 +367,9 @@ const ComplianceTrackerDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Pending Tasks</p>
-                <p className="text-3xl font-bold">{healthMetrics?.pendingCount || 12}</p>
+                <p className="text-3xl font-bold">{pendingCount}</p>
                 <p className="text-sm text-gray-500">
-                  {healthMetrics?.overdueCount || 3} overdue
+                  {overdueCount} overdue
                 </p>
               </div>
               <Clock className="h-8 w-8 text-orange-500" />
@@ -204,10 +382,10 @@ const ComplianceTrackerDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Completed This Month</p>
-                <p className="text-3xl font-bold text-green-600">{healthMetrics?.completedThisMonth || 8}</p>
+                <p className="text-3xl font-bold text-green-600">{completedThisMonth}</p>
                 <div className="flex items-center mt-1">
                   <TrendingUp className="h-4 w-4 text-green-500 mr-1" />
-                  <p className="text-sm text-green-600">+25% vs last month</p>
+                  <p className="text-sm text-green-600">Completed filings this month</p>
                 </div>
               </div>
               <CheckCircle className="h-8 w-8 text-green-500" />
@@ -220,7 +398,7 @@ const ComplianceTrackerDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Penalty Risk</p>
-                <p className="text-3xl font-bold text-red-600">₹{(healthMetrics?.penaltyRisk || 25000).toLocaleString()}</p>
+                <p className="text-3xl font-bold text-red-600">₹{penaltyRiskTotal.toLocaleString()}</p>
                 <p className="text-sm text-gray-500">Estimated exposure</p>
               </div>
               <AlertTriangle className="h-8 w-8 text-red-500" />
@@ -243,17 +421,20 @@ const ComplianceTrackerDashboard = () => {
       )}
 
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="unified">Smart Compliance</TabsTrigger>
           <TabsTrigger value="pending">Pending Tasks</TabsTrigger>
+          <TabsTrigger value="alerts">
+            Alerts {alertsData?.summary?.total ? `(${alertsData.summary.total})` : ''}
+          </TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
         {/* Unified Smart Compliance Tab */}
         <TabsContent value="unified">
-          <UnifiedComplianceDashboard />
+          <UnifiedComplianceDashboard items={unifiedItems} />
         </TabsContent>
 
         {/* Dashboard Tab */}
@@ -279,8 +460,8 @@ const ComplianceTrackerDashboard = () => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge className={getStatusBadge(item.status)}>
-                        {item.status}
+                      <Badge className={getStatusBadge(item.statusEffective)}>
+                        {item.statusEffective}
                       </Badge>
                       <Button
                         size="sm"
@@ -313,41 +494,18 @@ const ComplianceTrackerDashboard = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>GST Compliance</span>
-                      <span className="font-medium">92%</span>
+                  {categoryHealth.length === 0 && (
+                    <p className="text-sm text-gray-500">No category data available yet.</p>
+                  )}
+                  {categoryHealth.map((category) => (
+                    <div key={category.name}>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>{category.name}</span>
+                        <span className="font-medium">{category.health}%</span>
+                      </div>
+                      <Progress value={category.health} className="h-2" />
                     </div>
-                    <Progress value={92} className="h-2" />
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>Income Tax</span>
-                      <span className="font-medium">88%</span>
-                    </div>
-                    <Progress value={88} className="h-2" />
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>TDS Compliance</span>
-                      <span className="font-medium">95%</span>
-                    </div>
-                    <Progress value={95} className="h-2" />
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>ROC Filings</span>
-                      <span className="font-medium">78%</span>
-                    </div>
-                    <Progress value={78} className="h-2" />
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>ESI/EPF</span>
-                      <span className="font-medium">85%</span>
-                    </div>
-                    <Progress value={85} className="h-2" />
-                  </div>
+                  ))}
                 </div>
                 
                 <div className="pt-4 border-t">
@@ -391,7 +549,7 @@ const ComplianceTrackerDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {filteredItems.filter(item => item.status !== 'completed').map((item) => (
+                {filteredItems.filter(item => item.statusEffective !== 'completed').map((item) => (
                   <div key={item.id} className="border rounded-lg p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-3">
@@ -411,16 +569,25 @@ const ComplianceTrackerDashboard = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge className={getStatusBadge(item.status)}>
-                          {item.status}
+                        <Badge className={getStatusBadge(item.statusEffective)}>
+                          {item.statusEffective}
                         </Badge>
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => snoozeComplianceMutation.mutate({ complianceId: item.id, days: 7 })}
-                          disabled={snoozeComplianceMutation.isPending}
+                          onClick={() => {
+                            const baseDate = item.dueDate ? new Date(item.dueDate) : new Date();
+                            const requested = new Date(baseDate);
+                            requested.setDate(requested.getDate() + 7);
+                            requestExtensionMutation.mutate({
+                              complianceId: item.id,
+                              requestedDate: requested.toISOString(),
+                              reason: 'Requested via compliance dashboard',
+                            });
+                          }}
+                          disabled={requestExtensionMutation.isPending}
                         >
-                          Snooze 7d
+                          Request Extension
                         </Button>
                         <Button
                           size="sm"
@@ -438,6 +605,101 @@ const ComplianceTrackerDashboard = () => {
           </Card>
         </TabsContent>
 
+        {/* Alerts Tab */}
+        <TabsContent value="alerts">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <Card className="bg-red-50 border-red-200">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-red-700">Critical</p>
+                    <p className="text-2xl font-bold text-red-600">{alertsData?.summary?.critical || 0}</p>
+                  </div>
+                  <AlertTriangle className="h-8 w-8 text-red-600" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-orange-50 border-orange-200">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-orange-700">Warnings</p>
+                    <p className="text-2xl font-bold text-orange-600">{alertsData?.summary?.warning || 0}</p>
+                  </div>
+                  <AlertCircle className="h-8 w-8 text-orange-600" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-blue-50 border-blue-200">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-blue-700">Info</p>
+                    <p className="text-2xl font-bold text-blue-600">{alertsData?.summary?.info || 0}</p>
+                  </div>
+                  <Bell className="h-8 w-8 text-blue-600" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Alerts</CardTitle>
+              <CardDescription>Actionable compliance alerts for your business</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(alertsData?.alerts || []).length > 0 ? (
+                <div className="space-y-3">
+                  {(alertsData?.alerts || []).map((alert) => (
+                    <div key={alert.id} className="p-4 border rounded-lg">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Badge className={getAlertBadge(alert.severity)}>
+                              {alert.severity.toUpperCase()}
+                            </Badge>
+                            {alert.alertType && (
+                              <Badge variant="outline">{alert.alertType}</Badge>
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium">{alert.title}</p>
+                            <p className="text-sm text-gray-600">{alert.message}</p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                            {alert.category && <span>{alert.category}</span>}
+                            {alert.complianceName && <span>{alert.complianceName}</span>}
+                            {alert.deadline && (
+                              <span>Deadline: {new Date(alert.deadline).toLocaleDateString()}</span>
+                            )}
+                            <span>{new Date(alert.triggeredAt).toLocaleString()}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => acknowledgeAlertMutation.mutate(alert.id)}
+                            disabled={acknowledgeAlertMutation.isPending || alert.isAcknowledged}
+                          >
+                            {alert.isAcknowledged ? 'Acknowledged' : 'Acknowledge'}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-500" />
+                  <p>No active alerts.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Completed Tab */}
         <TabsContent value="completed">
           <Card>
@@ -446,7 +708,7 @@ const ComplianceTrackerDashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {filteredItems.filter(item => item.status === 'completed').map((item) => (
+                {filteredItems.filter(item => item.statusEffective === 'completed').map((item) => (
                   <div key={item.id} className="border rounded-lg p-4 bg-green-50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -482,19 +744,19 @@ const ComplianceTrackerDashboard = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
                     <span>Completion Rate (This Month)</span>
-                    <span className="font-bold text-green-600">87%</span>
+                    <span className="font-bold text-green-600">{completionRateThisMonth}%</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                    <span>Average Response Time</span>
-                    <span className="font-bold">2.3 days</span>
+                    <span>Overdue Items</span>
+                    <span className="font-bold text-red-600">{overdueCount}</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                    <span>Cost Savings (YTD)</span>
-                    <span className="font-bold text-green-600">₹{(healthMetrics?.estimatedSavings || 125000).toLocaleString()}</span>
+                    <span>Open Penalty Exposure</span>
+                    <span className="font-bold text-orange-600">₹{penaltyRiskTotal.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded">
-                    <span>Penalty Avoided</span>
-                    <span className="font-bold text-green-600">₹45,000</span>
+                    <span>Penalty Avoided (Completed)</span>
+                    <span className="font-bold text-green-600">₹{penaltyAvoided.toLocaleString()}</span>
                   </div>
                 </div>
               </CardContent>
@@ -506,13 +768,10 @@ const ComplianceTrackerDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {[
-                    { name: 'GST Returns', count: 12, health: 92 },
-                    { name: 'Income Tax', count: 8, health: 88 },
-                    { name: 'TDS Returns', count: 15, health: 95 },
-                    { name: 'ROC Filings', count: 5, health: 78 },
-                    { name: 'Labour Law', count: 6, health: 85 }
-                  ].map((category) => (
+                  {categoryHealth.length === 0 && (
+                    <div className="text-sm text-gray-500">No category data available yet.</div>
+                  )}
+                  {categoryHealth.map((category) => (
                     <div key={category.name} className="flex items-center justify-between p-3 border rounded">
                       <div>
                         <h4 className="font-medium">{category.name}</h4>

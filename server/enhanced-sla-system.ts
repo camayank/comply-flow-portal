@@ -1,6 +1,6 @@
-import { eq, and, lt } from "drizzle-orm";
+import { eq, and, gte } from "drizzle-orm";
 import { db } from "./db";
-import { serviceRequests, slaTimers, slaExceptions, notifications } from "@shared/schema";
+import { serviceRequests, slaTimers, slaExceptions, slaSettings, systemNotifications, workItemQueue } from "@shared/schema";
 
 // Enhanced SLA System for DigiComply
 // Implements advanced timer management, escalations, and exceptions
@@ -30,10 +30,28 @@ export class EnhancedSlaTimer {
   private totalPausedMinutes: number = 0;
   private pauseReasons: string[] = [];
 
-  constructor(serviceRequestId: number, standardHours: number) {
+  constructor(
+    serviceRequestId: number,
+    standardHours: number,
+    options?: {
+      startTime?: Date;
+      pausedAt?: Date | null;
+      totalPausedMinutes?: number | null;
+      pauseReasons?: string[] | null;
+    }
+  ) {
     this.serviceRequestId = serviceRequestId;
     this.standardHours = standardHours;
-    this.startTime = new Date();
+    this.startTime = options?.startTime ? new Date(options.startTime) : new Date();
+    if (options?.pausedAt) {
+      this.pausedAt = new Date(options.pausedAt);
+    }
+    if (options?.totalPausedMinutes) {
+      this.totalPausedMinutes = options.totalPausedMinutes;
+    }
+    if (options?.pauseReasons && Array.isArray(options.pauseReasons)) {
+      this.pauseReasons = [...options.pauseReasons];
+    }
   }
 
   // Get current SLA status with enhanced logic
@@ -84,6 +102,13 @@ export class EnhancedSlaTimer {
     }
   }
 
+  // Extend SLA by additional hours
+  extendHours(additionalHours: number): void {
+    if (Number.isFinite(additionalHours) && additionalHours > 0) {
+      this.standardHours += additionalHours;
+    }
+  }
+
   // Resume SLA timer
   resumeTimer(reason: string): void {
     if (this.pausedAt) {
@@ -113,20 +138,112 @@ export class EnhancedSlaTimer {
       status: this.getCurrentStatus()
     };
   }
+
+  getPersistenceSnapshot() {
+    return {
+      startTime: this.startTime,
+      pausedAt: this.pausedAt || null,
+      totalPausedMinutes: this.totalPausedMinutes,
+      pauseReasons: this.pauseReasons,
+    };
+  }
 }
 
 // Enhanced SLA Management System
 export class EnhancedSlaSystem {
   private static activeTimers = new Map<number, EnhancedSlaTimer>();
 
+  private static async upsertTimerRecord(
+    serviceRequestId: number,
+    serviceCode: string | null | undefined,
+    standardHours: number,
+    updates: Partial<{
+      startTime: Date;
+      pausedAt: Date | null;
+      totalPausedMinutes: number;
+      pauseReasons: string[];
+      status: SlaStatus;
+      escalationLevel: EscalationLevel | null;
+      completedAt: Date | null;
+      isActive: boolean;
+    }>
+  ) {
+    const [existing] = await db
+      .select()
+      .from(slaTimers)
+      .where(and(eq(slaTimers.serviceRequestId, serviceRequestId), eq(slaTimers.isActive, true)))
+      .limit(1);
+
+    if (existing) {
+      await db
+        .update(slaTimers)
+        .set({
+          serviceCode: serviceCode || existing.serviceCode,
+          standardHours,
+          ...updates,
+          updatedAt: new Date()
+        })
+        .where(eq(slaTimers.id, existing.id));
+      return existing;
+    }
+
+    let resolvedServiceCode = serviceCode;
+    if (!resolvedServiceCode) {
+      const [serviceRequest] = await db
+        .select({ serviceId: serviceRequests.serviceId })
+        .from(serviceRequests)
+        .where(eq(serviceRequests.id, serviceRequestId))
+        .limit(1);
+      resolvedServiceCode = serviceRequest?.serviceId || 'unknown';
+    }
+
+    await db.insert(slaTimers).values({
+      serviceRequestId,
+      serviceCode: resolvedServiceCode || 'unknown',
+      standardHours,
+      startTime: updates.startTime || new Date(),
+      pausedAt: updates.pausedAt || null,
+      totalPausedMinutes: updates.totalPausedMinutes || 0,
+      pauseReasons: updates.pauseReasons || [],
+      status: updates.status || SlaStatus.ON_TRACK,
+      escalationLevel: updates.escalationLevel || null,
+      completedAt: updates.completedAt || null,
+      isActive: updates.isActive ?? true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    return null;
+  }
+
   // Initialize SLA timer for a service request
   static async initializeTimer(serviceRequestId: number, serviceCode: string): Promise<EnhancedSlaTimer> {
     try {
       // Get SLA configuration for service type
       const slaConfig = await this.getSlaConfiguration(serviceCode);
-      
-      const timer = new EnhancedSlaTimer(serviceRequestId, slaConfig.standardHours);
+
+      const [existing] = await db
+        .select()
+        .from(slaTimers)
+        .where(and(eq(slaTimers.serviceRequestId, serviceRequestId), eq(slaTimers.isActive, true)))
+        .limit(1);
+
+      const timer = new EnhancedSlaTimer(serviceRequestId, slaConfig.standardHours, {
+        startTime: existing?.startTime || undefined,
+        pausedAt: existing?.pausedAt || undefined,
+        totalPausedMinutes: existing?.totalPausedMinutes || 0,
+        pauseReasons: (existing?.pauseReasons as string[] | null) || []
+      });
+
       this.activeTimers.set(serviceRequestId, timer);
+
+      const snapshot = timer.getPersistenceSnapshot();
+      await this.upsertTimerRecord(serviceRequestId, serviceCode, slaConfig.standardHours, {
+        startTime: snapshot.startTime,
+        pausedAt: snapshot.pausedAt,
+        totalPausedMinutes: snapshot.totalPausedMinutes,
+        pauseReasons: snapshot.pauseReasons
+      });
 
       console.log(`SLA timer initialized for service ${serviceRequestId} with ${slaConfig.standardHours}h limit`);
       return timer;
@@ -135,13 +252,40 @@ export class EnhancedSlaSystem {
       // Create default timer with 48 hours if configuration not found
       const timer = new EnhancedSlaTimer(serviceRequestId, 48);
       this.activeTimers.set(serviceRequestId, timer);
+      const snapshot = timer.getPersistenceSnapshot();
+      await this.upsertTimerRecord(serviceRequestId, serviceCode, 48, {
+        startTime: snapshot.startTime,
+        pausedAt: snapshot.pausedAt,
+        totalPausedMinutes: snapshot.totalPausedMinutes,
+        pauseReasons: snapshot.pauseReasons
+      });
       return timer;
     }
   }
 
   // Get existing timer for a service request
   static async getTimer(serviceRequestId: number): Promise<EnhancedSlaTimer | null> {
-    return this.activeTimers.get(serviceRequestId) || null;
+    if (this.activeTimers.has(serviceRequestId)) {
+      return this.activeTimers.get(serviceRequestId) || null;
+    }
+
+    const [existing] = await db
+      .select()
+      .from(slaTimers)
+      .where(eq(slaTimers.serviceRequestId, serviceRequestId))
+      .limit(1);
+
+    if (!existing) return null;
+
+    const timer = new EnhancedSlaTimer(serviceRequestId, existing.standardHours, {
+      startTime: existing.startTime,
+      pausedAt: existing.pausedAt,
+      totalPausedMinutes: existing.totalPausedMinutes || 0,
+      pauseReasons: (existing.pauseReasons as string[] | null) || []
+    });
+
+    this.activeTimers.set(serviceRequestId, timer);
+    return timer;
   }
 
   // Get all active timers
@@ -211,6 +355,15 @@ export class EnhancedSlaSystem {
 
       const timerInfo = timer.getTimerInfo();
       const { status, escalationLevel } = timerInfo.status;
+
+      const snapshot = timer.getPersistenceSnapshot();
+      await this.upsertTimerRecord(serviceRequestId, serviceCode, timerInfo.standardHours, {
+        status,
+        escalationLevel: escalationLevel || null,
+        pausedAt: snapshot.pausedAt,
+        totalPausedMinutes: snapshot.totalPausedMinutes,
+        pauseReasons: snapshot.pauseReasons
+      });
 
       // Handle escalations
       if (escalationLevel) {
@@ -339,11 +492,23 @@ export class EnhancedSlaSystem {
     approvedBy: number
   ): Promise<void> {
     try {
-      const timer = this.activeTimers.get(serviceRequestId);
+      let timer = this.activeTimers.get(serviceRequestId);
+
+      if (!timer) {
+        const [serviceRequest] = await db
+          .select({ serviceId: serviceRequests.serviceId })
+          .from(serviceRequests)
+          .where(eq(serviceRequests.id, serviceRequestId))
+          .limit(1);
+
+        if (serviceRequest?.serviceId) {
+          timer = await this.initializeTimer(serviceRequestId, serviceRequest.serviceId);
+        }
+      }
       
       if (timer) {
-        // Extend the timer by pausing and adjusting
-        timer.pauseTimer(`SLA extension granted: ${reason} (${extensionHours}h extension)`);
+        // Extend the timer by adding hours
+        timer.extendHours(extensionHours);
         
         // In production, this would create a formal exception record
         console.log(`SLA exception granted for service ${serviceRequestId}: +${extensionHours}h - ${reason}`);
@@ -360,10 +525,54 @@ export class EnhancedSlaSystem {
 
         console.log("SLA Exception Record:", exceptionRecord);
         
-        // Resume with the extension
-        setTimeout(() => {
-          timer.resumeTimer(`Extension period started (${extensionHours}h granted)`);
-        }, 1000);
+        const [serviceRequest] = await db
+          .select({ slaDeadline: serviceRequests.slaDeadline })
+          .from(serviceRequests)
+          .where(eq(serviceRequests.id, serviceRequestId))
+          .limit(1);
+
+        const currentDeadline = serviceRequest?.slaDeadline ? new Date(serviceRequest.slaDeadline) : new Date();
+        const newDeadline = new Date(currentDeadline.getTime() + extensionHours * 60 * 60 * 1000);
+
+        await db
+          .update(serviceRequests)
+          .set({
+            slaDeadline: newDeadline,
+            updatedAt: new Date()
+          })
+          .where(eq(serviceRequests.id, serviceRequestId));
+
+        await db
+          .update(workItemQueue)
+          .set({
+            slaDeadline: newDeadline,
+            dueDate: newDeadline,
+            lastActivityAt: new Date()
+          })
+          .where(eq(workItemQueue.serviceRequestId, serviceRequestId));
+
+        await db.insert(slaExceptions).values({
+          serviceRequestId,
+          requestedBy: approvedBy,
+          approvedBy,
+          exceptionType: "manual_extension",
+          reason,
+          requestedExtensionHours: extensionHours,
+          approvedExtensionHours: extensionHours,
+          status: "approved",
+          validFrom: currentDeadline,
+          validUntil: newDeadline,
+          approvalNotes: reason,
+          createdAt: new Date(),
+          approvedAt: new Date()
+        });
+
+        const snapshot = timer.getPersistenceSnapshot();
+        await this.upsertTimerRecord(serviceRequestId, null, timer.getTimerInfo().standardHours, {
+          pausedAt: snapshot.pausedAt,
+          totalPausedMinutes: snapshot.totalPausedMinutes,
+          pauseReasons: snapshot.pauseReasons
+        });
 
       }
     } catch (error) {
@@ -382,7 +591,7 @@ export class EnhancedSlaSystem {
         .where(
           and(
             eq(serviceRequests.status, "completed"),
-            lt(fromDate, serviceRequests.createdAt || new Date())
+            gte(serviceRequests.createdAt, fromDate)
           )
         );
 
@@ -461,24 +670,37 @@ export class EnhancedSlaSystem {
   }
 
   // Pause SLA for external dependency (client/government waiting)
-  static pauseServiceSla(serviceRequestId: number, reason: string): void {
-    const timer = this.activeTimers.get(serviceRequestId);
+  static async pauseServiceSla(serviceRequestId: number, reason: string): Promise<void> {
+    const timer = await this.getTimer(serviceRequestId);
     if (timer) {
       timer.pauseTimer(reason);
+      const snapshot = timer.getPersistenceSnapshot();
+      await this.upsertTimerRecord(serviceRequestId, '', timer.getTimerInfo().standardHours, {
+        pausedAt: snapshot.pausedAt,
+        totalPausedMinutes: snapshot.totalPausedMinutes,
+        pauseReasons: snapshot.pauseReasons,
+        status: SlaStatus.PAUSED
+      });
     }
   }
 
   // Resume SLA when dependency is resolved
-  static resumeServiceSla(serviceRequestId: number, reason: string): void {
-    const timer = this.activeTimers.get(serviceRequestId);
+  static async resumeServiceSla(serviceRequestId: number, reason: string): Promise<void> {
+    const timer = await this.getTimer(serviceRequestId);
     if (timer) {
       timer.resumeTimer(reason);
+      const snapshot = timer.getPersistenceSnapshot();
+      await this.upsertTimerRecord(serviceRequestId, '', timer.getTimerInfo().standardHours, {
+        pausedAt: snapshot.pausedAt,
+        totalPausedMinutes: snapshot.totalPausedMinutes,
+        pauseReasons: snapshot.pauseReasons
+      });
     }
   }
 
   // Get timer status for specific service
-  static getServiceTimerStatus(serviceRequestId: number): any {
-    const timer = this.activeTimers.get(serviceRequestId);
+  static async getServiceTimerStatus(serviceRequestId: number): Promise<any> {
+    const timer = await this.getTimer(serviceRequestId);
     return timer ? timer.getTimerInfo() : null;
   }
 }

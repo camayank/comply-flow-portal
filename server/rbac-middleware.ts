@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 
 export const USER_ROLES = {
   SUPER_ADMIN: 'super_admin',
@@ -511,6 +512,24 @@ export async function sessionAuthMiddleware(req: AuthenticatedRequest, res: Resp
       return res.status(401).json({ error: 'Session expired' });
     }
 
+    // Validate session fingerprint to reduce hijack risk (match first 3 octets)
+    const userAgent = req.headers['user-agent'] || '';
+    const ipSubnet = (req.ip || '').split('.').slice(0, 3).join('.');
+    const fingerprint = crypto
+      .createHash('sha256')
+      .update(userAgent)
+      .update(ipSubnet)
+      .digest('hex');
+
+    if (session.fingerprint && session.fingerprint !== fingerprint) {
+      await db
+        .update(userSessions)
+        .set({ isActive: false })
+        .where(eq(userSessions.id, session.id));
+
+      return res.status(401).json({ error: 'Session validation failed' });
+    }
+
     // Get user
     const [user] = await db
       .select()
@@ -530,6 +549,12 @@ export async function sessionAuthMiddleware(req: AuthenticatedRequest, res: Resp
       role: user.role,
       isActive: user.isActive,
     };
+
+    // Update last activity (fire and forget)
+    db.update(userSessions)
+      .set({ lastActivity: new Date() })
+      .where(eq(userSessions.id, session.id))
+      .catch((err) => console.error('Failed to update session activity:', err));
 
     next();
   } catch (error) {

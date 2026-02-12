@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRoute, Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import {
   ArrowLeft,
@@ -27,25 +32,118 @@ const ServiceRequestDetail = () => {
   const [, params] = useRoute('/service-request/:id');
   const requestId = params?.id;
   const { toast } = useToast();
+  const { user } = useAuth();
   const [newComment, setNewComment] = useState('');
+  const [selectedAssignee, setSelectedAssignee] = useState('unassigned');
+  const [assignmentNotes, setAssignmentNotes] = useState('');
+  const [assignmentClientVisible, setAssignmentClientVisible] = useState(false);
+  const [slaExtensionHours, setSlaExtensionHours] = useState('');
+  const [slaExtensionReason, setSlaExtensionReason] = useState('');
+  const [slaExtensionNotes, setSlaExtensionNotes] = useState('');
+  const [slaExtensionClientVisible, setSlaExtensionClientVisible] = useState(false);
+
+  const canManageAssignment =
+    user?.role === 'ops_manager' ||
+    user?.role === 'admin' ||
+    user?.role === 'super_admin';
+  const canSelfAssign = user?.role === 'ops_executive';
+  const canManageSla = canManageAssignment;
 
   // Fetch service request details
   const { data: request, isLoading } = useQuery({
-    queryKey: ['/api/service-requests', requestId],
+    queryKey: ['service-request', requestId],
     enabled: !!requestId,
+    queryFn: async () => apiRequest('GET', `/api/service-requests/${requestId}`),
   });
 
   // Fetch request timeline/activity
-  const { data: timeline = [] } = useQuery({
-    queryKey: ['/api/service-requests', requestId, 'timeline'],
+  const { data: timelineResponse } = useQuery({
+    queryKey: ['service-request', requestId, 'timeline'],
     enabled: !!requestId,
+    queryFn: async () => apiRequest('GET', `/api/service-requests/${requestId}/timeline`),
   });
+  const timeline = (timelineResponse as any)?.timeline || timelineResponse || [];
 
   // Fetch documents
-  const { data: documents = [] } = useQuery({
-    queryKey: ['/api/service-requests', requestId, 'documents'],
+  const { data: documentsResponse } = useQuery({
+    queryKey: ['service-request', requestId, 'documents'],
     enabled: !!requestId,
+    queryFn: async () => apiRequest('GET', `/api/service-requests/${requestId}/documents`),
   });
+  const documents = (documentsResponse as any)?.documents || documentsResponse || [];
+
+  // Fetch team members for assignment
+  const { data: teamMembers = [], isLoading: isLoadingTeamMembers } = useQuery({
+    queryKey: ['/api/escalation/team-members'],
+    enabled: canManageAssignment || canSelfAssign,
+  });
+
+  const getHoursToDeadline = (deadline?: string | null) => {
+    if (!deadline) return null;
+    const diffMs = new Date(deadline).getTime() - Date.now();
+    return Math.round(diffMs / (1000 * 60 * 60));
+  };
+
+  const pickRecommendedAssignee = (deadline?: string | null) => {
+    if (!teamMembers.length) return null;
+    const hoursToDeadline = getHoursToDeadline(deadline);
+    const isUrgent = hoursToDeadline !== null && hoursToDeadline <= 24;
+    const candidates = isUrgent
+      ? teamMembers.filter((member: any) => member.available)
+      : teamMembers;
+    const pool = candidates.length > 0 ? candidates : teamMembers;
+
+    let best = pool[0];
+    let bestScore =
+      (best.activeWorkload || 0) / (best.maxCapacity || 1) +
+      (best.available ? 0 : 0.5);
+
+    for (const member of pool) {
+      const score =
+        (member.activeWorkload || 0) / (member.maxCapacity || 1) +
+        (member.available ? 0 : 0.5);
+      if (score < bestScore) {
+        best = member;
+        bestScore = score;
+      }
+    }
+
+    return { member: best, hoursToDeadline };
+  };
+
+  useEffect(() => {
+    const currentAssignee = (request as any)?.assignedTeamMember;
+    if (currentAssignee) {
+      setSelectedAssignee(String(currentAssignee));
+    } else {
+      setSelectedAssignee('unassigned');
+    }
+  }, [requestId, (request as any)?.assignedTeamMember]);
+
+  const assignedTeamMemberId = (request as any)?.assignedTeamMember as number | undefined;
+  const currentAssignee = teamMembers.find((member: any) => member.id === assignedTeamMemberId);
+  const currentAssigneeName =
+    currentAssignee?.name || (assignedTeamMemberId ? `User #${assignedTeamMemberId}` : 'Unassigned');
+  const slaDeadline = (request as any)?.slaDeadline || (request as any)?.expectedCompletionDate || null;
+  const assignmentRecommendation = pickRecommendedAssignee(slaDeadline);
+  const assignmentEvents = Array.isArray(timeline)
+    ? [...timeline]
+        .filter((event: any) => event.type === 'assignment' || event.status === 'assignment')
+        .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    : [];
+
+  const slaExtensionPreview = useMemo(() => {
+    const extensionHours = Number(slaExtensionHours);
+    if (!Number.isFinite(extensionHours) || extensionHours <= 0) return null;
+    const currentDeadline = slaDeadline ? new Date(slaDeadline) : null;
+    const baseDeadline = currentDeadline ?? new Date();
+    const newDeadline = new Date(baseDeadline.getTime() + extensionHours * 60 * 60 * 1000);
+    return {
+      currentDeadline,
+      newDeadline,
+      hasExistingDeadline: !!currentDeadline,
+    };
+  }, [slaDeadline, slaExtensionHours]);
 
   // Add comment mutation
   const addCommentMutation = useMutation({
@@ -60,7 +158,7 @@ const ServiceRequestDetail = () => {
         description: 'Your comment has been posted successfully.',
       });
       setNewComment('');
-      queryClient.invalidateQueries({ queryKey: ['/api/service-requests', requestId, 'timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['service-request', requestId, 'timeline'] });
     },
     onError: () => {
       toast({
@@ -71,10 +169,96 @@ const ServiceRequestDetail = () => {
     },
   });
 
+  const assignMutation = useMutation({
+    mutationFn: async (assigneeId: number | null) => {
+      return apiRequest('PATCH', `/api/service-requests/${requestId}`, {
+        assignedTeamMember: assigneeId,
+        assignmentNotes,
+        clientVisible: assignmentClientVisible,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Assignment updated',
+        description: 'Service request assignment has been updated.',
+      });
+      setAssignmentNotes('');
+      setAssignmentClientVisible(false);
+      queryClient.invalidateQueries({ queryKey: ['service-request', requestId] });
+      queryClient.invalidateQueries({ queryKey: ['service-request', requestId, 'timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['operations', 'work-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['operations', 'work-queue', 'stats'] });
+    },
+    onError: () => {
+      toast({
+        title: 'Assignment failed',
+        description: 'Unable to update assignment. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const slaExtensionMutation = useMutation({
+    mutationFn: async () => {
+      if (!requestId) throw new Error('Service request not found');
+      const extensionHours = Number(slaExtensionHours);
+      if (!Number.isFinite(extensionHours) || extensionHours <= 0) {
+        throw new Error('Enter a valid extension in hours');
+      }
+      if (!slaExtensionReason.trim()) {
+        throw new Error('Reason is required for SLA extension');
+      }
+      const parsedId = Number(requestId);
+      if (!Number.isFinite(parsedId)) {
+        throw new Error('Invalid service request id');
+      }
+
+      return apiRequest('POST', '/api/sla/exception/bulk', {
+        serviceRequestIds: [parsedId],
+        extensionHours,
+        reason: slaExtensionReason.trim(),
+        notes: slaExtensionNotes || undefined,
+        clientVisible: slaExtensionClientVisible,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: 'SLA extended',
+        description: 'SLA deadline has been updated.',
+      });
+      setSlaExtensionHours('');
+      setSlaExtensionReason('');
+      setSlaExtensionNotes('');
+      setSlaExtensionClientVisible(false);
+      queryClient.invalidateQueries({ queryKey: ['service-request', requestId] });
+      queryClient.invalidateQueries({ queryKey: ['service-request', requestId, 'timeline'] });
+      queryClient.invalidateQueries({ queryKey: ['operations', 'work-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['operations', 'work-queue', 'stats'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'SLA extension failed',
+        description: error.message || 'Unable to extend SLA',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handleAddComment = () => {
     if (newComment.trim()) {
       addCommentMutation.mutate(newComment);
     }
+  };
+
+  const handleAssignmentSave = () => {
+    const assigneeId =
+      selectedAssignee === 'unassigned' ? null : parseInt(selectedAssignee, 10);
+    assignMutation.mutate(assigneeId);
+  };
+
+  const handleSelfAssign = () => {
+    if (!user?.id) return;
+    assignMutation.mutate(user.id);
   };
 
   const getStatusColor = (status: string) => {
@@ -420,23 +604,197 @@ const ServiceRequestDetail = () => {
               </CardContent>
             </Card>
 
-            {/* Assigned Team */}
+            {/* Assignment */}
             <Card>
               <CardHeader>
-                <CardTitle>Assigned Team</CardTitle>
+                <CardTitle>Assignment</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                     <User className="h-5 w-5 text-blue-600" />
                   </div>
                   <div>
-                    <p className="font-medium text-sm">Operations Team</p>
-                    <p className="text-xs text-gray-600">Assigned</p>
+                    <p className="font-medium text-sm">{currentAssigneeName}</p>
+                    <p className="text-xs text-gray-600">
+                      {assignedTeamMemberId ? 'Assigned' : 'Unassigned'}
+                    </p>
                   </div>
                 </div>
+
+                {canManageAssignment && (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Assign to</Label>
+                      <Select
+                        value={selectedAssignee}
+                        onValueChange={setSelectedAssignee}
+                        disabled={isLoadingTeamMembers || assignMutation.isPending}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select team member" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
+                          {teamMembers.map((member: any) => (
+                            <SelectItem key={member.id} value={String(member.id)}>
+                              {member.name} • {member.role.replace(/_/g, ' ')} • {member.activeWorkload}/{member.maxCapacity}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {!isLoadingTeamMembers && teamMembers.length === 0 && (
+                        <p className="text-xs text-gray-500">No team members available for assignment.</p>
+                      )}
+                      {assignmentRecommendation?.member && (
+                        <p className="text-xs text-amber-700">
+                          Recommended: {assignmentRecommendation.member.name}
+                          {assignmentRecommendation.hoursToDeadline !== null && (
+                            <span className="ml-1 text-amber-600">
+                              (SLA {assignmentRecommendation.hoursToDeadline <= 0 ? 'overdue' : `in ${assignmentRecommendation.hoursToDeadline}h`})
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Notes (optional)</Label>
+                      <Textarea
+                        value={assignmentNotes}
+                        onChange={(e) => setAssignmentNotes(e.target.value)}
+                        rows={3}
+                        placeholder="Add assignment context"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="assignment-client-visible"
+                        checked={assignmentClientVisible}
+                        onCheckedChange={(checked) => setAssignmentClientVisible(checked === true)}
+                      />
+                      <Label htmlFor="assignment-client-visible" className="text-sm">
+                        Show assignment update on client timeline
+                      </Label>
+                    </div>
+                    <Button
+                      onClick={handleAssignmentSave}
+                      disabled={assignMutation.isPending || isLoadingTeamMembers}
+                    >
+                      {assignMutation.isPending ? 'Saving...' : 'Save Assignment'}
+                    </Button>
+                  </div>
+                )}
+
+                {!canManageAssignment && canSelfAssign && !assignedTeamMemberId && (
+                  <Button
+                    onClick={handleSelfAssign}
+                    disabled={assignMutation.isPending}
+                  >
+                    {assignMutation.isPending ? 'Assigning...' : 'Assign to me'}
+                  </Button>
+                )}
+                {!canManageAssignment && canSelfAssign && assignedTeamMemberId === user?.id && (
+                  <Badge variant="outline" className="text-green-600">
+                    Assigned to you
+                  </Badge>
+                )}
               </CardContent>
             </Card>
+
+            {/* Assignment History */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Assignment History</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {assignmentEvents.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No assignment updates yet.</p>
+                ) : (
+                  assignmentEvents.map((event: any) => (
+                    <div key={event.id} className="border-b last:border-b-0 pb-3 last:pb-0">
+                      <p className="text-sm font-medium">{event.title || 'Assignment Update'}</p>
+                      <p className="text-xs text-muted-foreground">{event.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(event.timestamp).toLocaleString()}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            {canManageSla && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>SLA Extension</CardTitle>
+                  <CardDescription>Extend the SLA deadline with audit trail.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-xs text-muted-foreground">
+                    Current SLA: {slaDeadline ? new Date(slaDeadline).toLocaleString() : 'Not set'}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Extension (hours)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={slaExtensionHours}
+                      onChange={(e) => setSlaExtensionHours(e.target.value)}
+                      placeholder="e.g., 24"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Reason</Label>
+                    <Input
+                      value={slaExtensionReason}
+                      onChange={(e) => setSlaExtensionReason(e.target.value)}
+                      placeholder="Reason for SLA extension"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Notes (optional)</Label>
+                    <Textarea
+                      value={slaExtensionNotes}
+                      onChange={(e) => setSlaExtensionNotes(e.target.value)}
+                      rows={3}
+                      placeholder="Additional context for audit logs"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="sla-client-visible"
+                      checked={slaExtensionClientVisible}
+                      onCheckedChange={(checked) => setSlaExtensionClientVisible(checked === true)}
+                    />
+                    <Label htmlFor="sla-client-visible" className="text-sm">
+                      Show SLA update on client timeline
+                    </Label>
+                  </div>
+                  {slaExtensionPreview && (
+                    <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
+                      <div className="font-medium text-slate-900">Preview</div>
+                      <div className="mt-1">
+                        {slaExtensionPreview.hasExistingDeadline
+                          ? slaExtensionPreview.currentDeadline?.toLocaleString()
+                          : 'No SLA'}
+                        {' → '}
+                        {slaExtensionPreview.newDeadline.toLocaleString()}
+                      </div>
+                    </div>
+                  )}
+                  <Button
+                    onClick={() => slaExtensionMutation.mutate()}
+                    disabled={
+                      slaExtensionMutation.isPending ||
+                      !slaExtensionHours ||
+                      !slaExtensionReason.trim()
+                    }
+                  >
+                    {slaExtensionMutation.isPending ? 'Applying...' : 'Extend SLA'}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Important Dates */}
             <Card>

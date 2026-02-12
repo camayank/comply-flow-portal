@@ -94,6 +94,7 @@ export const users = pgTable("users", {
   fullName: text("full_name"),
   role: text("role").notNull().default("client"), // super_admin, admin, ops_executive, customer_service, client, agent
   department: text("department"), // operations, sales, admin, etc.
+  businessEntityId: integer("business_entity_id"),
   isActive: boolean("is_active").default(true),
   lastLogin: timestamp("last_login"),
   twoFactorSecret: text("two_factor_secret"),
@@ -113,8 +114,12 @@ export const businessEntities = pgTable("business_entities", {
   cin: text("cin"),
   gstin: text("gstin"),
   pan: text("pan"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
   registrationDate: timestamp("registration_date"),
   complianceScore: integer("compliance_score").default(100),
+  annualTurnover: decimal("annual_turnover", { precision: 15, scale: 2 }),
+  employeeCount: integer("employee_count"),
   // Enhanced client master fields
   alternatePhone: text("alternate_phone"),
   state: text("state"),
@@ -122,11 +127,15 @@ export const businessEntities = pgTable("business_entities", {
   address: text("address"),
   industryType: text("industry_type"),
   leadSource: text("lead_source"),
+  referredBy: text("referred_by"),
+  onboardingStage: text("onboarding_stage"),
+  metadata: json("metadata"),
   acquisitionDate: timestamp("acquisition_date").defaultNow(),
   totalServicesAvailed: integer("total_services_availed").default(0),
   totalRevenue: decimal("total_revenue", { precision: 12, scale: 2 }).default("0.00"),
   lastServiceDate: timestamp("last_service_date"),
   clientStatus: text("client_status").default(CLIENT_STATUS.ACTIVE),
+  pincode: text("pincode"),
   relationshipManager: text("relationship_manager"),
   communicationPreference: json("communication_preference"), // {email: true, whatsapp: true, call: false}
   documents: json("documents"), // stored document references
@@ -170,8 +179,12 @@ export const serviceRequests = pgTable("service_requests", {
   requestId: text("request_id").unique(), // SR2600001 - human-readable ID
   userId: integer("user_id"),
   businessEntityId: integer("business_entity_id"),
+  entityId: integer("entity_id"), // legacy compatibility (maps to business_entity_id)
   serviceId: text("service_id").notNull(),
+  serviceType: text("service_type"), // legacy compatibility (maps to service_id)
   status: text("status").notNull().default("initiated"), // initiated, docs_uploaded, in_progress, ready_for_sign, completed, failed, on_hold
+  periodLabel: text("period_label"),
+  periodicity: text("periodicity"),
   progress: integer("progress").default(0), // 0-100
   currentMilestone: text("current_milestone"),
   milestoneHistory: json("milestone_history"), // [{milestone, date, status}]
@@ -181,13 +194,16 @@ export const serviceRequests = pgTable("service_requests", {
   paymentId: text("payment_id"),
   totalAmount: integer("total_amount").notNull(),
   slaDeadline: timestamp("sla_deadline"),
+  dueDate: timestamp("due_date"),
   expectedCompletion: timestamp("expected_completion"),
   actualCompletion: timestamp("actual_completion"),
   assignedTeamMember: integer("assigned_team_member"),
+  assignedAgentId: integer("assigned_agent_id"), // preferred agent for commission attribution
   dependsOnService: integer("depends_on_service"), // foreign key to other service
   priority: text("priority").default("medium"), // low, medium, high, urgent
   clientNotes: text("client_notes"),
   internalNotes: text("internal_notes"),
+  description: text("description"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -202,6 +218,55 @@ export const payments = pgTable("payments", {
   transactionId: text("transaction_id"),
   createdAt: timestamp("created_at").defaultNow(),
   completedAt: timestamp("completed_at"),
+});
+
+// Commission approvals and payouts
+export const commissions = pgTable("commissions", {
+  id: serial("id").primaryKey(),
+  agentId: integer("agent_id").notNull(), // earner user id / agent id
+  serviceOrderId: integer("service_order_id"), // legacy universal service order id
+  serviceRequestId: integer("service_request_id"), // core service request id
+  leadId: integer("lead_id"),
+  commissionType: text("commission_type").default("service"), // lead_conversion, referral, renewal, bonus
+  baseAmount: decimal("base_amount", { precision: 12, scale: 2 }),
+  commissionRate: decimal("commission_rate", { precision: 6, scale: 2 }),
+  commissionAmount: decimal("commission_amount", { precision: 12, scale: 2 }).notNull(),
+  status: text("status").notNull().default("pending"), // pending, pending_approval, approved, paid, rejected, disputed
+  payableOn: timestamp("payable_on"),
+  paidOn: timestamp("paid_on"),
+  paymentReference: text("payment_reference"),
+  notes: text("notes"),
+  approvedBy: integer("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  approvalNotes: text("approval_notes"),
+  adjustedAmount: decimal("adjusted_amount", { precision: 12, scale: 2 }),
+  rejectedBy: integer("rejected_by"),
+  rejectedAt: timestamp("rejected_at"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Commission dispute management
+export const commissionDisputes = pgTable("commission_disputes", {
+  id: serial("id").primaryKey(),
+  disputeNumber: text("dispute_number").notNull().unique(),
+  commissionId: integer("commission_id").notNull(),
+  status: text("status").notNull().default("submitted"), // submitted, under_review, approved, partially_approved, rejected
+  category: text("category").notNull(),
+  reason: text("reason").notNull(),
+  expectedAmount: decimal("expected_amount", { precision: 12, scale: 2 }),
+  evidence: json("evidence"),
+  disputedBy: integer("disputed_by").notNull(),
+  disputedAt: timestamp("disputed_at").defaultNow(),
+  resolvedBy: integer("resolved_by"),
+  resolvedAt: timestamp("resolved_at"),
+  resolution: text("resolution"),
+  action: text("action"), // approve, partial_approve, reject
+  adjustedAmount: decimal("adjusted_amount", { precision: 12, scale: 2 }),
+  timeline: json("timeline"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const complianceTracking = pgTable("compliance_tracking", {
@@ -974,6 +1039,24 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
   completedAt: true,
 });
 
+export const insertCommissionSchema = createInsertSchema(commissions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  approvedAt: true,
+  rejectedAt: true,
+  paidOn: true,
+  payableOn: true,
+});
+
+export const insertCommissionDisputeSchema = createInsertSchema(commissionDisputes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  disputedAt: true,
+  resolvedAt: true,
+});
+
 export const insertComplianceTrackingSchema = createInsertSchema(complianceTracking).omit({
   id: true,
   createdAt: true,
@@ -1030,6 +1113,10 @@ export type ServiceRequest = typeof serviceRequests.$inferSelect;
 export type InsertServiceRequest = z.infer<typeof insertServiceRequestSchema>;
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type Commission = typeof commissions.$inferSelect;
+export type InsertCommission = z.infer<typeof insertCommissionSchema>;
+export type CommissionDispute = typeof commissionDisputes.$inferSelect;
+export type InsertCommissionDispute = z.infer<typeof insertCommissionDisputeSchema>;
 export type ComplianceTracking = typeof complianceTracking.$inferSelect;
 export type InsertComplianceTracking = z.infer<typeof insertComplianceTrackingSchema>;
 export type ComplianceRule = typeof complianceRules.$inferSelect;
@@ -1481,6 +1568,31 @@ export const workflowTemplatesAdmin = pgTable("workflow_templates_admin", {
   createdBy: text("created_by"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Workflow Automation Rules (AutoComply)
+export const workflowAutomationRules = pgTable("workflow_automation_rules", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  trigger: text("trigger").notNull(),
+  conditions: json("conditions"), // array of condition objects
+  actions: json("actions").notNull(), // array of action objects
+  enabled: boolean("enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Workflow Automation Execution History
+export const workflowAutomationHistory = pgTable("workflow_automation_history", {
+  id: serial("id").primaryKey(),
+  workflowRuleId: integer("workflow_rule_id"),
+  workflowName: text("workflow_name"),
+  trigger: text("trigger").notNull(),
+  entityId: integer("entity_id"),
+  status: text("status").default("success"),
+  actionsExecuted: integer("actions_executed").default(0),
+  executedAt: timestamp("executed_at").defaultNow(),
+  details: json("details"),
 });
 
 export const serviceDocTypes = pgTable("service_doc_types", {
@@ -5019,7 +5131,9 @@ export const escalationRules = pgTable("escalation_rules", {
 export const escalationExecutions = pgTable("escalation_executions", {
   id: serial("id").primaryKey(),
   escalationRuleId: integer("escalation_rule_id").notNull(),
-  serviceRequestId: integer("service_request_id").notNull(),
+  serviceRequestId: integer("service_request_id"),
+  referenceType: text("reference_type"), // service_request | compliance_tracking | other
+  referenceId: integer("reference_id"),
 
   // Current tier executed
   tierExecuted: integer("tier_executed").notNull(),

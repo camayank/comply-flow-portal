@@ -301,6 +301,18 @@ export const operationsService = {
     return response.data;
   },
 
+  // Assign work item to an operations team member
+  assignWorkItem: async (workItemId: number, data: { assigneeId?: number | null; notes?: string }) => {
+    const response = await apiClient.patch(`/escalation/work-queue/${workItemId}/assign`, data);
+    return response.data;
+  },
+
+  // Get operations team members (for assignment)
+  getOpsTeamMembers: async () => {
+    const response = await apiClient.get('/escalation/team-members');
+    return response.data;
+  },
+
   // ============= ESCALATION METHODS =============
 
   // Get all escalation rules
