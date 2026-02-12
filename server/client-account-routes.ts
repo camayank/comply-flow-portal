@@ -16,6 +16,7 @@ import { eq, and, desc, sql, isNull } from 'drizzle-orm';
 import { sessionAuthMiddleware, type AuthenticatedRequest } from './rbac-middleware';
 import { storage } from './storage';
 import { syncComplianceTracking } from './compliance-tracking-sync';
+import { enable2FA, verify2FA, disable2FA, is2FAEnabled } from './services/twoFactorService';
 
 export function registerClientAccountRoutes(app: Express) {
 
@@ -480,28 +481,46 @@ export function registerClientAccountRoutes(app: Express) {
 
       const user = await storage.getUser(userId);
 
+      // Check real 2FA status
+      const twoFactorEnabled = await is2FAEnabled(userId);
+
+      // Calculate security score based on actual settings
+      let securityScore = 50; // Base score
+      const recommendations: { type: string; message: string }[] = [];
+
+      if (twoFactorEnabled) {
+        securityScore += 25;
+      } else {
+        recommendations.push({ type: 'enable_2fa', message: 'Enable two-factor authentication for added security' });
+      }
+
+      // Password age check (if we had lastPasswordChange field)
+      securityScore += 15; // Assume password is reasonably recent
+      recommendations.push({ type: 'strong_password', message: 'Consider updating your password regularly' });
+
+      // Account verification - check if user is active
+      if (user?.isActive) {
+        securityScore += 10;
+      }
+
       const security = {
-        passwordLastChanged: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
-        twoFactorEnabled: false,
-        twoFactorMethod: null,
+        passwordLastChanged: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // TODO: Track actual password change
+        twoFactorEnabled,
+        twoFactorMethod: twoFactorEnabled ? 'authenticator' : null,
         trustedDevices: [
           {
             id: 1,
-            name: 'Chrome on Windows',
+            name: 'Current Device',
             lastUsed: new Date(),
-            location: 'Mumbai, India',
+            location: 'Current Session',
             isCurrent: true,
           },
         ],
         loginHistory: [
-          { timestamp: new Date(), ip: '103.21.45.67', location: 'Mumbai, India', device: 'Chrome on Windows', status: 'success' },
-          { timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000), ip: '103.21.45.67', location: 'Mumbai, India', device: 'Mobile App', status: 'success' },
+          { timestamp: new Date(), ip: req.ip || 'Unknown', location: 'Current Session', device: req.get('User-Agent')?.substring(0, 50) || 'Unknown', status: 'success' },
         ],
-        securityScore: 75,
-        recommendations: [
-          { type: 'enable_2fa', message: 'Enable two-factor authentication for added security' },
-          { type: 'strong_password', message: 'Consider updating your password regularly' },
-        ],
+        securityScore: Math.min(100, securityScore),
+        recommendations,
       };
 
       res.json(security);
@@ -541,25 +560,101 @@ export function registerClientAccountRoutes(app: Express) {
 
   /**
    * POST /api/account/security/enable-2fa
-   * Enable two-factor authentication
+   * Enable two-factor authentication (initiates setup)
    */
   app.post('/api/account/security/enable-2fa', sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-      const { method } = req.body; // 'sms', 'email', 'authenticator'
+      const { method } = req.body; // 'authenticator' is the only supported method for TOTP
 
-      // In production, generate and send OTP
+      if (method !== 'authenticator') {
+        return res.status(400).json({ error: 'Only authenticator app method is currently supported' });
+      }
+
+      // Generate real TOTP secret and QR code
+      const { secret, uri, qrCode } = await enable2FA(userId);
+
       res.json({
-        message: '2FA setup initiated',
+        message: '2FA setup initiated. Scan the QR code with your authenticator app.',
         method,
         setupRequired: true,
-        qrCode: method === 'authenticator' ? 'otpauth://totp/DigiComply:user@example.com?secret=JBSWY3DPEHPK3PXP' : null,
+        secret, // For manual entry
+        uri, // Full TOTP URI
+        qrCode, // QR code image URL
       });
     } catch (error) {
       console.error('Error enabling 2FA:', error);
       res.status(500).json({ error: 'Failed to enable 2FA' });
+    }
+  });
+
+  /**
+   * POST /api/account/security/verify-2fa
+   * Verify 2FA code and activate
+   */
+  app.post('/api/account/security/verify-2fa', sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const { token } = req.body;
+
+      if (!token || typeof token !== 'string' || token.length !== 6) {
+        return res.status(400).json({ error: 'Invalid token format. Please enter a 6-digit code.' });
+      }
+
+      const verified = await verify2FA(userId, token);
+
+      if (!verified) {
+        return res.status(400).json({ error: 'Invalid verification code. Please try again.' });
+      }
+
+      res.json({
+        message: '2FA has been successfully enabled for your account.',
+        twoFactorEnabled: true,
+      });
+    } catch (error) {
+      console.error('Error verifying 2FA:', error);
+      res.status(500).json({ error: 'Failed to verify 2FA code' });
+    }
+  });
+
+  /**
+   * POST /api/account/security/disable-2fa
+   * Disable two-factor authentication
+   */
+  app.post('/api/account/security/disable-2fa', sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const { token } = req.body;
+
+      // Require valid 2FA code to disable
+      const isEnabled = await is2FAEnabled(userId);
+      if (isEnabled) {
+        if (!token) {
+          return res.status(400).json({ error: 'Please provide your 2FA code to disable' });
+        }
+
+        const { validate2FALogin } = await import('./services/twoFactorService');
+        const valid = await validate2FALogin(userId, token);
+        if (!valid) {
+          return res.status(400).json({ error: 'Invalid 2FA code' });
+        }
+      }
+
+      await disable2FA(userId);
+
+      res.json({
+        message: '2FA has been disabled for your account.',
+        twoFactorEnabled: false,
+      });
+    } catch (error) {
+      console.error('Error disabling 2FA:', error);
+      res.status(500).json({ error: 'Failed to disable 2FA' });
     }
   });
 
