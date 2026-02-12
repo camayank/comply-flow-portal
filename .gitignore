@@ -95,3 +95,6 @@ vite.config.ts.*
 
 # Separate project (not part of DigiComply)
 mkw-platform/
+
+# Legacy nested folder
+comply-flow-portal/
