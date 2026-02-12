@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import {
   FileText,
   Calculator,
@@ -21,8 +22,26 @@ import {
 } from "lucide-react";
 
 export default function TaxTracker() {
-  const [selectedClient, setSelectedClient] = useState("1");
+  const { user } = useAuth();
+  const [selectedClient, setSelectedClient] = useState<string>("");
   const [calcTab, setCalcTab] = useState<"gst" | "tds">("gst");
+
+  // Fetch user's business entities
+  const { data: businesses } = useQuery({
+    queryKey: ['/api/client/businesses'],
+    queryFn: () => fetch('/api/client/businesses', {
+      credentials: 'include',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(r => r.json()),
+    enabled: !!user,
+  });
+
+  // Set first business as default when loaded
+  useEffect(() => {
+    if (businesses?.length > 0 && !selectedClient) {
+      setSelectedClient(businesses[0].id.toString());
+    }
+  }, [businesses, selectedClient]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -82,11 +101,17 @@ export default function TaxTracker() {
           </div>
           <Select value={selectedClient} onValueChange={setSelectedClient}>
             <SelectTrigger className="w-[250px]">
-              <SelectValue />
+              <SelectValue placeholder="Select Business" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="1">Demo Startup Pvt Ltd</SelectItem>
-              <SelectItem value="2">Tech Innovations LLP</SelectItem>
+              {businesses?.map((business: any) => (
+                <SelectItem key={business.id} value={business.id.toString()}>
+                  {business.name}
+                </SelectItem>
+              ))}
+              {(!businesses || businesses.length === 0) && (
+                <SelectItem value="" disabled>No businesses found</SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>

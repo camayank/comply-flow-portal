@@ -74,6 +74,15 @@ const InvoiceManagement = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Fetch clients for dropdown
+  const { data: clients = [] } = useQuery<any[]>({
+    queryKey: ['/api/clients'],
+    queryFn: () => fetch('/api/clients', {
+      credentials: 'include',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(r => r.ok ? r.json() : []),
+  });
+
   // Fetch invoices
   const { data: invoices = [], isLoading } = useQuery<Invoice[]>({
     queryKey: ['/api/financial/invoices', { status: statusFilter, paymentStatus: paymentStatusFilter }],
@@ -361,9 +370,14 @@ const InvoiceManagement = () => {
                     <SelectValue placeholder="Select client" />
                   </SelectTrigger>
                   <SelectContent>
-                    {/* Client options will be populated from API */}
-                    <SelectItem value="1">Sample Client 1</SelectItem>
-                    <SelectItem value="2">Sample Client 2</SelectItem>
+                    {clients.map((client: any) => (
+                      <SelectItem key={client.id} value={client.id.toString()}>
+                        {client.name || client.companyName || `Client #${client.id}`}
+                      </SelectItem>
+                    ))}
+                    {clients.length === 0 && (
+                      <SelectItem value="" disabled>No clients found</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

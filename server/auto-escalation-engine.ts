@@ -23,10 +23,14 @@ import {
   users,
   businessEntities,
   serviceWorkflowStatuses,
-  statusTransitionHistory
+  statusTransitionHistory,
+  complianceTracking,
+  complianceRules,
+  notifications
 } from '@shared/schema';
-import { eq, and, lt, lte, gte, isNull, or, desc, sql } from 'drizzle-orm';
+import { eq, and, lt, lte, gte, isNull, or, desc, sql, inArray, notInArray, count, ne } from 'drizzle-orm';
 import { EventEmitter } from 'events';
+import { getEvidenceSummaries } from './compliance-evidence';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -188,29 +192,27 @@ class AutoEscalationEngine extends EventEmitter {
   async refreshWorkQueue(): Promise<void> {
     try {
       // Get all active service requests with their details
-      const activeRequests = await db.select({
-        id: serviceRequests.id,
-        serviceType: serviceRequests.serviceType,
-        status: serviceRequests.status,
-        priority: serviceRequests.priority,
-        entityId: serviceRequests.entityId,
-        dueDate: serviceRequests.dueDate,
-        periodLabel: serviceRequests.periodLabel,
-        createdAt: serviceRequests.createdAt,
-        updatedAt: serviceRequests.updatedAt,
-        entityName: businessEntities.name
-      })
-      .from(serviceRequests)
-      .leftJoin(businessEntities, eq(serviceRequests.entityId, businessEntities.id))
-      .where(
-        and(
-          sql`${serviceRequests.status} NOT IN ('completed', 'cancelled', 'Completed', 'Cancelled')`,
-          eq(serviceRequests.isActive, true)
-        )
-      );
+      // Using raw SQL to avoid ORM issues with complex joins
+      const activeRequests = await db.execute(sql`
+        SELECT
+          sr.id,
+          sr.service_type as "serviceType",
+          sr.status,
+          sr.priority,
+          sr.entity_id as "entityId",
+          sr.due_date as "dueDate",
+          sr.period_label as "periodLabel",
+          sr.created_at as "createdAt",
+          sr.updated_at as "updatedAt",
+          be.name as "entityName"
+        FROM service_requests sr
+        LEFT JOIN business_entities be ON sr.entity_id = be.id
+        WHERE sr.status NOT IN ('completed', 'cancelled', 'Completed', 'Cancelled')
+          AND sr.is_active = true
+      `) as { rows: any[] };
 
       // Upsert each request into work queue
-      for (const request of activeRequests) {
+      for (const request of activeRequests.rows) {
         await this.upsertWorkItem({
           workItemType: 'service_request',
           referenceId: request.id,
@@ -228,7 +230,49 @@ class AutoEscalationEngine extends EventEmitter {
         });
       }
 
-      console.log(`📋 Work queue refreshed with ${activeRequests.length} items`);
+      // Add compliance tracking items (India compliance obligations)
+      // Using raw SQL to avoid ORM issues with complex joins
+      const activeComplianceItems = await db.execute(sql`
+        SELECT
+          ct.id,
+          ct.status,
+          ct.priority,
+          ct.business_entity_id as "entityId",
+          be.name as "entityName",
+          ct.entity_name as "fallbackEntityName",
+          ct.due_date as "dueDate",
+          ct.compliance_type as "complianceType",
+          ct.service_id as "serviceId",
+          ct.service_type as "serviceType",
+          cr.rule_code as "ruleCode",
+          cr.compliance_name as "complianceName",
+          cr.periodicity,
+          ct.created_at as "createdAt",
+          ct.updated_at as "updatedAt"
+        FROM compliance_tracking ct
+        LEFT JOIN compliance_rules cr ON ct.compliance_rule_id = cr.id
+        LEFT JOIN business_entities be ON ct.business_entity_id = be.id
+        WHERE LOWER(ct.status) NOT IN ('completed', 'not_applicable')
+      `) as { rows: any[] };
+
+      for (const compliance of activeComplianceItems.rows) {
+        await this.upsertWorkItem({
+          workItemType: 'compliance',
+          referenceId: compliance.id,
+          serviceKey: compliance.ruleCode || compliance.serviceId,
+          entityId: compliance.entityId,
+          entityName: compliance.entityName || compliance.fallbackEntityName || 'Unknown',
+          currentStatus: compliance.status || 'pending',
+          priority: compliance.priority || 'medium',
+          dueDate: compliance.dueDate ? new Date(compliance.dueDate) : null,
+          periodLabel: compliance.periodicity || compliance.complianceType || null,
+          serviceTypeName: compliance.complianceName || compliance.serviceType || compliance.ruleCode || 'Compliance',
+          createdAt: compliance.createdAt ? new Date(compliance.createdAt) : new Date(),
+          lastActivityAt: compliance.updatedAt ? new Date(compliance.updatedAt) : new Date()
+        });
+      }
+
+      console.log(`📋 Work queue refreshed with ${activeRequests.rows.length + activeComplianceItems.rows.length} items`);
     } catch (error) {
       console.error('Error refreshing work queue:', error);
     }
@@ -319,16 +363,29 @@ class AutoEscalationEngine extends EventEmitter {
 
         const dueDate = new Date(item.dueDate);
         const hoursRemaining = (dueDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+        const daysRemaining = hoursRemaining / 24;
 
         let slaStatus: SlaStatus;
-        if (hoursRemaining < 0) {
-          slaStatus = SlaStatus.BREACHED;
-        } else if (hoursRemaining <= 4) {
-          slaStatus = SlaStatus.WARNING;
-        } else if (hoursRemaining <= 24) {
-          slaStatus = SlaStatus.AT_RISK;
+        if (item.workItemType === 'compliance') {
+          if (daysRemaining < 0) {
+            slaStatus = SlaStatus.BREACHED;
+          } else if (daysRemaining <= 3) {
+            slaStatus = SlaStatus.WARNING;
+          } else if (daysRemaining <= 7) {
+            slaStatus = SlaStatus.AT_RISK;
+          } else {
+            slaStatus = SlaStatus.ON_TRACK;
+          }
         } else {
-          slaStatus = SlaStatus.ON_TRACK;
+          if (hoursRemaining < 0) {
+            slaStatus = SlaStatus.BREACHED;
+          } else if (hoursRemaining <= 4) {
+            slaStatus = SlaStatus.WARNING;
+          } else if (hoursRemaining <= 24) {
+            slaStatus = SlaStatus.AT_RISK;
+          } else {
+            slaStatus = SlaStatus.ON_TRACK;
+          }
         }
 
         // Update work item SLA status
@@ -395,13 +452,21 @@ class AutoEscalationEngine extends EventEmitter {
    * Determine if an item should be escalated based on the rule
    */
   private async shouldEscalate(item: any, rule: any): Promise<boolean> {
+    const referenceType = item.workItemType === 'compliance' ? 'compliance_tracking' : 'service_request';
+    const referenceId = item.referenceId;
+
     // Check if already escalated by this rule recently
     const recentEscalation = await db.select()
       .from(escalationExecutions)
       .where(
         and(
           eq(escalationExecutions.escalationRuleId, rule.id),
-          eq(escalationExecutions.serviceRequestId, item.serviceRequestId || item.referenceId),
+          item.serviceRequestId
+            ? eq(escalationExecutions.serviceRequestId, item.serviceRequestId)
+            : and(
+                eq(escalationExecutions.referenceType, referenceType),
+                eq(escalationExecutions.referenceId, referenceId)
+              ),
           sql`${escalationExecutions.triggeredAt} > NOW() - INTERVAL '4 hours'`
         )
       )
@@ -506,9 +571,12 @@ class AutoEscalationEngine extends EventEmitter {
       }
 
       // Record escalation execution (immutable audit log)
+      const referenceType = item.workItemType === 'compliance' ? 'compliance_tracking' : 'service_request';
       await db.insert(escalationExecutions).values({
         escalationRuleId: rule.id,
-        serviceRequestId: item.serviceRequestId || item.referenceId,
+        serviceRequestId: item.serviceRequestId || null,
+        referenceType,
+        referenceId: item.referenceId,
         tierExecuted: nextTier.tier,
         severity: nextTier.severity,
         actionsExecuted: JSON.stringify(actionsExecuted),
@@ -588,12 +656,20 @@ class AutoEscalationEngine extends EventEmitter {
    */
   private async reassignWorkItem(item: any, targetRole: string): Promise<number | undefined> {
     try {
+      const roleAliases: Record<string, string> = {
+        ops_lead: 'ops_manager',
+        ops_exec: 'ops_executive',
+        ops_executive: 'ops_executive',
+        ops_manager: 'ops_manager'
+      };
+      const normalizedRole = roleAliases[targetRole] || targetRole;
+
       // Find available user with the target role
       const availableUsers = await db.select()
         .from(users)
         .where(
           and(
-            eq(users.role, targetRole),
+            eq(users.role, normalizedRole),
             eq(users.isActive, true)
           )
         );
@@ -603,21 +679,83 @@ class AutoEscalationEngine extends EventEmitter {
         return undefined;
       }
 
-      // Simple round-robin: pick user with least assignments
-      // In production, use more sophisticated load balancing
-      const selectedUser = availableUsers[0];
+      const candidates = availableUsers.filter(user => user.id !== item.assignedTo);
+      const eligibleUsers = candidates.length > 0 ? candidates : availableUsers;
+
+      const candidateIds = eligibleUsers.map(user => user.id);
+      const workloads = candidateIds.length > 0
+        ? await db.select({
+            assigneeId: workItemQueue.assignedTo,
+            count: count()
+          })
+            .from(workItemQueue)
+            .where(inArray(workItemQueue.assignedTo, candidateIds))
+            .groupBy(workItemQueue.assignedTo)
+        : [];
+
+      const workloadMap = new Map<number, number>();
+      workloads.forEach(entry => {
+        if (entry.assigneeId !== null && entry.assigneeId !== undefined) {
+          workloadMap.set(entry.assigneeId, Number(entry.count || 0));
+        }
+      });
+
+      let selectedUser = eligibleUsers[0];
+      let minLoad = workloadMap.get(selectedUser.id) || 0;
+
+      for (const user of eligibleUsers) {
+        const load = workloadMap.get(user.id) || 0;
+        if (load < minLoad) {
+          minLoad = load;
+          selectedUser = user;
+        }
+      }
 
       // Update service request assignment
       if (item.serviceRequestId) {
         await db.update(serviceRequests)
           .set({
-            assignedTo: selectedUser.id,
+            assignedTeamMember: selectedUser.id,
             updatedAt: new Date()
           })
           .where(eq(serviceRequests.id, item.serviceRequestId));
       }
 
-      console.log(`🔄 Reassigned work item ${item.id} to ${selectedUser.fullName || selectedUser.email} (${targetRole})`);
+      await db.update(workItemQueue)
+        .set({
+          assignedTo: selectedUser.id,
+          assignedToName: selectedUser.fullName || selectedUser.email,
+          assignedToRole: selectedUser.role,
+          lastActivityAt: new Date()
+        })
+        .where(eq(workItemQueue.id, item.id));
+
+      await this.logActivity({
+        workItemQueueId: item.id,
+        serviceRequestId: item.serviceRequestId,
+        activityType: 'assignment',
+        activityDescription: `Auto-reassigned to ${selectedUser.fullName || selectedUser.email}`,
+        previousValue: { assignedTo: item.assignedTo },
+        newValue: { assignedTo: selectedUser.id, assigneeName: selectedUser.fullName || selectedUser.email },
+        isSystemGenerated: true,
+        triggerSource: 'auto_escalation'
+      });
+
+      if (selectedUser.id) {
+        await db.insert(notifications).values({
+          userId: selectedUser.id,
+          title: 'Work Item Reassigned',
+          message: `A work item has been reassigned to you due to escalation.`,
+          type: 'task_assignment',
+          category: 'service',
+          priority: 'high',
+          actionUrl: item.serviceRequestId ? `/ops/service-requests/${item.serviceRequestId}` : undefined,
+          actionText: item.serviceRequestId ? 'View Service Request' : 'View Work Item',
+          createdAt: new Date()
+        });
+      }
+
+      console.log(`🔄 Reassigned work item ${item.id} to ${selectedUser.fullName || selectedUser.email} (${normalizedRole})`);
 
       return selectedUser.id;
     } catch (error) {
@@ -814,6 +952,67 @@ class AutoEscalationEngine extends EventEmitter {
 
     const items = await query;
 
+    // Enrich compliance items with evidence summary and rule metadata
+    let enrichedItems = items as any[];
+    const complianceItems = items.filter(item => item.workItemType === 'compliance');
+    if (complianceItems.length > 0) {
+      const complianceIds = complianceItems.map(item => item.referenceId);
+      const trackingRows = await db
+        .select({
+          id: complianceTracking.id,
+          complianceRuleId: complianceTracking.complianceRuleId,
+          complianceType: complianceTracking.complianceType,
+          serviceId: complianceTracking.serviceId,
+          serviceType: complianceTracking.serviceType,
+          ruleCode: complianceRules.ruleCode,
+          complianceName: complianceRules.complianceName,
+        })
+        .from(complianceTracking)
+        .leftJoin(complianceRules, eq(complianceTracking.complianceRuleId, complianceRules.id))
+        .where(inArray(complianceTracking.id, complianceIds));
+
+      const trackingById = new Map<number, typeof trackingRows[number]>();
+      trackingRows.forEach(row => trackingById.set(row.id, row));
+
+      const evidenceInputs = complianceItems
+        .map(item => {
+          const tracking = trackingById.get(item.referenceId);
+          return {
+            entityId: item.entityId ?? null,
+            complianceRuleId: tracking?.complianceRuleId ?? null
+          };
+        })
+        .filter(item => item.entityId && item.complianceRuleId);
+
+      const evidenceMap = await getEvidenceSummaries(evidenceInputs);
+      const now = new Date();
+
+      enrichedItems = items.map(item => {
+        if (item.workItemType !== 'compliance') return item;
+        const tracking = trackingById.get(item.referenceId);
+        const evidenceKey = tracking?.complianceRuleId && item.entityId
+          ? `${item.entityId}:${tracking.complianceRuleId}`
+          : null;
+        const evidence = evidenceKey ? evidenceMap.get(evidenceKey) : undefined;
+        const dueDate = item.dueDate ? new Date(item.dueDate) : null;
+        const daysRemaining = dueDate
+          ? Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+          : null;
+
+        return {
+          ...item,
+          complianceRuleId: tracking?.complianceRuleId ?? null,
+          complianceRuleCode: tracking?.ruleCode ?? null,
+          complianceName: tracking?.complianceName ?? item.serviceTypeName ?? null,
+          complianceType: tracking?.complianceType ?? item.periodLabel ?? null,
+          slaDaysRemaining: daysRemaining,
+          evidenceSummary: evidence?.evidenceSummary ?? null,
+          missingDocuments: evidence?.missingDocuments?.map(doc => doc.documentName) ?? [],
+          requiredDocuments: evidence?.requiredDocuments?.map(doc => doc.documentName) ?? []
+        };
+      });
+    }
+
     // Calculate stats
     const allItems = await db.select().from(workItemQueue);
     const stats: WorkItemStats = {
@@ -836,7 +1035,7 @@ class AutoEscalationEngine extends EventEmitter {
       }
     });
 
-    return { items, stats };
+    return { items: enrichedItems, stats };
   }
 
   /**
