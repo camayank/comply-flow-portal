@@ -92,3 +92,6 @@ vite.config.ts.*
 *credentials*
 !.env.example
 !client/.env.example
+
+# Separate project (not part of DigiComply)
+mkw-platform/
