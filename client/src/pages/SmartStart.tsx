@@ -564,18 +564,27 @@ const SmartStart = () => {
 
           {/* Action Tab */}
           <TabsContent value="action" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  Ready to Secure Your Compliance
-                </CardTitle>
-                <CardDescription>
-                  Your personalized action plan is ready. Let's get started with your priority services.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Summary Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    Your Compliance Summary
+                  </CardTitle>
+                  <CardDescription>
+                    Based on your business analysis
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h4 className="font-medium mb-2">Business Detected:</h4>
+                    <p className="text-lg font-bold text-blue-600">{businessData.companyName || 'Your Business'}</p>
+                    <p className="text-sm text-gray-600">{businessData.businessType?.replace('_', ' ').toUpperCase()}</p>
+                    {businessData.cin && <p className="text-xs text-gray-500">CIN: {businessData.cin}</p>}
+                    {businessData.gstin && <p className="text-xs text-gray-500">GSTIN: {businessData.gstin}</p>}
+                  </div>
+
                   <div>
                     <h4 className="font-medium mb-3">Immediate Actions Required:</h4>
                     <ul className="space-y-2">
@@ -587,7 +596,8 @@ const SmartStart = () => {
                       ))}
                     </ul>
                   </div>
-                  <div>
+
+                  <div className="border-t pt-4">
                     <h4 className="font-medium mb-3">Estimated Impact:</h4>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
@@ -604,28 +614,96 @@ const SmartStart = () => {
                       </div>
                     </div>
                   </div>
-                </div>
+                </CardContent>
+              </Card>
 
-                <div className="flex gap-4 justify-center">
-                  <Button 
-                    onClick={() => setLocation('/services')}
+              {/* Registration Card */}
+              <Card className="border-2 border-green-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-green-700">
+                    <Zap className="h-5 w-5" />
+                    Create Your Account
+                  </CardTitle>
+                  <CardDescription>
+                    Start your 14-day free trial - no credit card required
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="fullName">Full Name *</Label>
+                    <Input
+                      id="fullName"
+                      placeholder="Enter your full name"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email">Email Address *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="you@company.com"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Phone Number *</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="+91 98765 43210"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="password">Create Password *</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="Min 8 characters"
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <Alert className="border-green-200 bg-green-50">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-800 text-sm">
+                      Your business data will be pre-filled from our analysis. You can edit it later.
+                    </AlertDescription>
+                  </Alert>
+
+                  <Button
+                    onClick={() => {
+                      // Pass business data to registration via URL params
+                      const params = new URLSearchParams({
+                        businessName: businessData.companyName || '',
+                        entityType: businessData.businessType || '',
+                        cin: businessData.cin || '',
+                        gstin: businessData.gstin || '',
+                        pan: businessData.pan || '',
+                        fromSmartStart: 'true'
+                      });
+                      setLocation(`/register?${params.toString()}`);
+                    }}
                     size="lg"
-                    className="bg-blue-600 hover:bg-blue-700"
+                    className="w-full bg-green-600 hover:bg-green-700"
                   >
-                    Select Services
+                    Create Account & Start Free Trial
                     <ArrowRight className="h-4 w-4 ml-2" />
                   </Button>
-                  <Button 
-                    onClick={() => setLocation('/compliance-dashboard')}
-                    size="lg"
-                    variant="outline"
-                  >
-                    Go to Dashboard
-                    <BarChart3 className="h-4 w-4 ml-2" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+
+                  <div className="text-center text-sm text-gray-500">
+                    Already have an account?{' '}
+                    <button
+                      onClick={() => setLocation('/login')}
+                      className="text-blue-600 hover:underline"
+                    >
+                      Sign in here
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

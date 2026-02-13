@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,10 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Building, User, FileText, CheckCircle2, ArrowRight, ArrowLeft } from "lucide-react";
+import { Building, User, FileText, CheckCircle2, ArrowRight, ArrowLeft, Sparkles } from "lucide-react";
 
 const STEPS = [
   { id: 1, title: "Business Details", icon: Building },
@@ -22,7 +23,12 @@ const STEPS = [
 export default function ClientRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const { toast } = useToast();
+
+  // Parse URL params from SmartStart
+  const urlParams = new URLSearchParams(searchString);
+  const fromSmartStart = urlParams.get('fromSmartStart') === 'true';
 
   const [formData, setFormData] = useState({
     // Business Details
@@ -33,7 +39,7 @@ export default function ClientRegistration() {
     cin: "",
     industryType: "",
     registrationDate: "",
-    
+
     // Contact Information
     fullName: "",
     email: "",
@@ -42,18 +48,43 @@ export default function ClientRegistration() {
     address: "",
     city: "",
     state: "",
-    
+
     // KYC Documents (file references will be added after upload)
     panDocument: null as File | null,
     gstDocument: null as File | null,
     incorporationCertificate: null as File | null,
-    
+
     // Services Selection
     selectedServices: [] as string[],
-    
+
     // Terms
     agreedToTerms: false,
   });
+
+  // Pre-fill form data from SmartStart URL params
+  useEffect(() => {
+    if (fromSmartStart) {
+      const businessName = urlParams.get('businessName') || '';
+      const entityType = urlParams.get('entityType') || '';
+      const cin = urlParams.get('cin') || '';
+      const gstin = urlParams.get('gstin') || '';
+      const pan = urlParams.get('pan') || '';
+
+      setFormData(prev => ({
+        ...prev,
+        businessName,
+        entityType: entityType === 'private_limited' ? 'pvt_ltd' : entityType,
+        cin,
+        gstin,
+        pan,
+      }));
+
+      toast({
+        title: "Business Data Pre-filled!",
+        description: "We've pre-filled your business details from SmartStart analysis.",
+      });
+    }
+  }, [fromSmartStart]);
 
   const registrationMutation = useMutation({
     mutationFn: (data: any) => apiRequest('POST', '/api/client/register', data),
@@ -130,6 +161,16 @@ export default function ClientRegistration() {
           <h1 className="text-3xl md:text-4xl font-bold mb-2">Register Your Business</h1>
           <p className="text-muted-foreground">Complete your registration in 4 simple steps</p>
         </div>
+
+        {fromSmartStart && (
+          <Alert className="mb-6 border-green-200 bg-green-50 dark:bg-green-950/20">
+            <Sparkles className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-800 dark:text-green-200">
+              <strong>Smart Detection Complete!</strong> Your business details have been pre-filled from our compliance analysis.
+              Review and update if needed.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="mb-8">
           <Progress value={progress} className="h-2" />

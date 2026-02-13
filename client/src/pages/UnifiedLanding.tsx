@@ -44,7 +44,7 @@ const UnifiedLanding = () => {
                 <a href="#features" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer">Features</a>
                 <Link to="/select-role" className="text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Login</Link>
               </nav>
-              <Link to="/register">
+              <Link to="/smart-start">
                 <Button size="sm" className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">Start Free Trial</Button>
               </Link>
             </div>
@@ -89,7 +89,7 @@ const UnifiedLanding = () => {
                   Login
                 </Link>
                 <div className="px-3 pt-2">
-                  <Link to="/register">
+                  <Link to="/smart-start">
                     <Button size="sm" className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">Start Free Trial</Button>
                   </Link>
                 </div>
@@ -113,7 +113,7 @@ const UnifiedLanding = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-4 sm:mb-6 px-4">
-              <Link to="/register">
+              <Link to="/smart-start">
                 <Button size="lg" className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-4 text-base sm:text-lg" data-testid="button-start-trial">
                   Try Free for 14 Days →
                 </Button>
@@ -544,7 +544,7 @@ const UnifiedLanding = () => {
                       <span className="text-sm sm:text-base dark:text-gray-300">WhatsApp Support</span>
                     </li>
                   </ul>
-                  <Link to="/register">
+                  <Link to="/smart-start">
                     <Button className="w-full mt-6 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600" data-testid="button-starter-plan">
                       Start Free Trial
                     </Button>
@@ -581,7 +581,7 @@ const UnifiedLanding = () => {
                       <span className="text-sm sm:text-base dark:text-gray-300">Priority Support</span>
                     </li>
                   </ul>
-                  <Link to="/register">
+                  <Link to="/smart-start">
                     <Button className="w-full mt-6 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600" data-testid="button-growth-plan">
                       Start Free Trial
                     </Button>
@@ -609,7 +609,7 @@ const UnifiedLanding = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-              <Link to="/register">
+              <Link to="/smart-start">
                 <Button size="lg" className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold px-8 py-4 text-base sm:text-lg">
                   Try Free for 14 Days →
                 </Button>
