@@ -5455,3 +5455,8 @@ export type IdType = typeof ID_TYPES[keyof typeof ID_TYPES];
 // CREATE INDEX idx_transition_history_request ON status_transition_history(service_request_id, changed_at DESC);
 // CREATE INDEX idx_workflow_steps_service ON service_workflow_steps(service_key, status_code);
 // CREATE INDEX idx_request_steps_request ON service_request_steps(service_request_id, status);
+
+// ============================================================================
+// SUPER ADMIN SCHEMA EXPORTS
+// ============================================================================
+export * from "./super-admin-schema";
