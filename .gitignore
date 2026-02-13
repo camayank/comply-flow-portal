@@ -98,3 +98,6 @@ mkw-platform/
 
 # Legacy nested folder
 comply-flow-portal/
+
+# Git worktrees
+.worktrees/
