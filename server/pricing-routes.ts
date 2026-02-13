@@ -109,7 +109,7 @@ export function registerPricingRoutes(app: Express) {
         res.json({ rules });
       } catch (error: any) {
         console.error('Failed to fetch pricing rules:', error);
-        res.status(500).json({ error: error.message || "Failed to fetch pricing rules" });
+        res.status(500).json({ error: "Failed to fetch pricing rules" });
       }
     }
   );
@@ -175,7 +175,7 @@ export function registerPricingRoutes(app: Express) {
         res.status(201).json(createdRule);
       } catch (error: any) {
         console.error('Failed to create pricing rule:', error);
-        res.status(500).json({ error: error.message || "Failed to create pricing rule" });
+        res.status(500).json({ error: "Failed to create pricing rule" });
       }
     }
   );
@@ -238,7 +238,13 @@ export function registerPricingRoutes(app: Express) {
         if (name !== undefined) updateData.name = name;
         if (conditions !== undefined) updateData.conditions = conditions;
         if (adjustment !== undefined) updateData.adjustment = adjustment;
-        if (priority !== undefined) updateData.priority = parseInt(priority);
+        if (priority !== undefined) {
+          const parsedPriority = parseInt(priority, 10);
+          if (isNaN(parsedPriority)) {
+            return res.status(400).json({ error: "Invalid priority: must be an integer" });
+          }
+          updateData.priority = parsedPriority;
+        }
         if (effectiveFrom !== undefined) updateData.effectiveFrom = effectiveFrom ? new Date(effectiveFrom) : null;
         if (effectiveTo !== undefined) updateData.effectiveTo = effectiveTo ? new Date(effectiveTo) : null;
         if (isActive !== undefined) updateData.isActive = isActive;
@@ -252,7 +258,7 @@ export function registerPricingRoutes(app: Express) {
         res.json(updatedRule);
       } catch (error: any) {
         console.error('Failed to update pricing rule:', error);
-        res.status(500).json({ error: error.message || "Failed to update pricing rule" });
+        res.status(500).json({ error: "Failed to update pricing rule" });
       }
     }
   );
@@ -266,25 +272,19 @@ export function registerPricingRoutes(app: Express) {
       try {
         const ruleId = parseInt(req.params.id);
 
-        // Check if rule exists
-        const [existingRule] = await db
-          .select()
-          .from(pricingRules)
+        const [deletedRule] = await db
+          .delete(pricingRules)
           .where(eq(pricingRules.id, ruleId))
-          .limit(1);
+          .returning();
 
-        if (!existingRule) {
+        if (!deletedRule) {
           return res.status(404).json({ error: "Pricing rule not found" });
         }
 
-        await db
-          .delete(pricingRules)
-          .where(eq(pricingRules.id, ruleId));
-
-        res.json({ success: true });
+        res.json({ success: true, deletedId: deletedRule.id });
       } catch (error: any) {
         console.error('Failed to delete pricing rule:', error);
-        res.status(500).json({ error: error.message || "Failed to delete pricing rule" });
+        res.status(500).json({ error: "Failed to delete pricing rule" });
       }
     }
   );
@@ -393,10 +393,11 @@ export function registerPricingRoutes(app: Express) {
           subtotal,
           discounts,
           finalPrice,
+          calculatedAt: new Date().toISOString(),
         });
       } catch (error: any) {
         console.error('Failed to calculate price:', error);
-        res.status(500).json({ error: error.message || "Failed to calculate price" });
+        res.status(500).json({ error: "Failed to calculate price" });
       }
     }
   );
