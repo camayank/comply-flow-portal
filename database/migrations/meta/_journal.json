@@ -64,6 +64,20 @@
       "when": 1770470677775,
       "tag": "0008_glossy_the_fallen",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1770992333598,
+      "tag": "0009_gifted_demogoblin",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1771010927474,
+      "tag": "0010_powerful_omega_flight",
+      "breakpoints": true
     }
   ]
 }
