@@ -133,7 +133,7 @@ export const PRICING_RULE_TYPE = {
 export const pricingRules = pgTable("pricing_rules", {
   id: serial("id").primaryKey(),
   serviceId: integer("service_id"),
-  tenantId: integer("tenant_id"),
+  tenantId: integer("tenant_id").references(() => tenants.id),
   ruleType: text("rule_type").notNull(), // base, volume, promo, seasonal, loyalty
   name: text("name").notNull(),
   conditions: json("conditions").$type<PricingConditions>(),
@@ -143,7 +143,8 @@ export const pricingRules = pgTable("pricing_rules", {
   effectiveTo: timestamp("effective_to"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
-  createdBy: integer("created_by"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
 });
 
 // ============================================================================
@@ -169,7 +170,8 @@ export const commissionRules = pgTable("commission_rules", {
   effectiveTo: timestamp("effective_to"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
-  createdBy: integer("created_by"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdBy: integer("created_by").references(() => users.id),
 });
 
 // ============================================================================
@@ -185,7 +187,7 @@ export const PAYOUT_STATUS = {
 
 export const commissionPayouts = pgTable("commission_payouts", {
   id: serial("id").primaryKey(),
-  agentId: integer("agent_id").notNull(),
+  agentId: integer("agent_id").notNull().references(() => users.id),
   periodStart: timestamp("period_start").notNull(),
   periodEnd: timestamp("period_end").notNull(),
   totalSales: decimal("total_sales", { precision: 12, scale: 2 }),
@@ -196,8 +198,9 @@ export const commissionPayouts = pgTable("commission_payouts", {
   status: text("status").default(PAYOUT_STATUS.PENDING), // pending, approved, paid, disputed
   paymentReference: text("payment_reference"),
   paidAt: timestamp("paid_at"),
-  approvedBy: integer("approved_by"),
+  approvedBy: integer("approved_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // ============================================================================
@@ -241,9 +244,10 @@ export const securityIncidents = pgTable("security_incidents", {
   rootCause: text("root_cause"),
   resolution: text("resolution"),
   lessonsLearned: text("lessons_learned"),
-  reportedBy: integer("reported_by"),
-  assignedTo: integer("assigned_to"),
+  reportedBy: integer("reported_by").references(() => users.id),
+  assignedTo: integer("assigned_to").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
   resolvedAt: timestamp("resolved_at"),
   closedAt: timestamp("closed_at"),
 });
@@ -261,7 +265,7 @@ export const featureFlags = pgTable("feature_flags", {
   rolloutPercentage: integer("rollout_percentage").default(0), // 0-100
   conditions: json("conditions").$type<FeatureFlagConditions>(),
   metadata: json("metadata").$type<Record<string, unknown>>(),
-  createdBy: integer("created_by"),
+  createdBy: integer("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -280,8 +284,9 @@ export const scheduledReports = pgTable("scheduled_reports", {
   lastRunAt: timestamp("last_run_at"),
   nextRunAt: timestamp("next_run_at"),
   isActive: boolean("is_active").default(true),
-  createdBy: integer("created_by"),
+  createdBy: integer("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // ============================================================================
@@ -297,32 +302,44 @@ export const insertTenantSchema = createInsertSchema(tenants).omit({
 export const insertPricingRuleSchema = createInsertSchema(pricingRules).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+  createdBy: true,
 });
 
 export const insertCommissionRuleSchema = createInsertSchema(commissionRules).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+  createdBy: true,
 });
 
 export const insertCommissionPayoutSchema = createInsertSchema(commissionPayouts).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+  approvedBy: true,
 });
 
 export const insertSecurityIncidentSchema = createInsertSchema(securityIncidents).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+  reportedBy: true,
+  assignedTo: true,
 });
 
 export const insertFeatureFlagSchema = createInsertSchema(featureFlags).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  createdBy: true,
 });
 
 export const insertScheduledReportSchema = createInsertSchema(scheduledReports).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
+  createdBy: true,
 });
 
 // ============================================================================
