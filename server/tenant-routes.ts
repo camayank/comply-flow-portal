@@ -53,9 +53,19 @@ export function registerTenantRoutes(app: Express) {
           limit = '20'
         } = req.query;
 
-        const pageNum = parseInt(page as string);
-        const limitNum = Math.min(parseInt(limit as string), 100);
+        const pageNum = Math.max(1, parseInt(page as string) || 1);
+        const limitNum = Math.max(1, Math.min(parseInt(limit as string) || 20, 100));
         const offset = (pageNum - 1) * limitNum;
+
+        // Validate status and plan filters
+        const validStatuses = ['active', 'trial', 'suspended', 'churned'];
+        const validPlans = ['starter', 'professional', 'enterprise'];
+        if (status && !validStatuses.includes(status as string)) {
+          return res.status(400).json({ error: "Invalid status value" });
+        }
+        if (plan && !validPlans.includes(plan as string)) {
+          return res.status(400).json({ error: "Invalid plan value" });
+        }
 
         // Build query conditions
         const conditions = [];
@@ -104,7 +114,7 @@ export function registerTenantRoutes(app: Express) {
         });
       } catch (error: any) {
         console.error('Failed to fetch tenants:', error);
-        res.status(500).json({ error: error.message || "Failed to fetch tenants" });
+        res.status(500).json({ error: "Failed to fetch tenants" });
       }
     }
   );
@@ -118,12 +128,15 @@ export function registerTenantRoutes(app: Express) {
       try {
         const { name, plan, settings, limits, billingInfo } = req.body;
 
-        if (!name) {
-          return res.status(400).json({ error: "Tenant name is required" });
+        if (!name || typeof name !== 'string' || name.trim().length < 2) {
+          return res.status(400).json({ error: "Tenant name must be at least 2 characters" });
         }
 
         // Generate slug from name
         const slug = generateSlug(name);
+        if (!slug) {
+          return res.status(400).json({ error: "Tenant name must contain alphanumeric characters" });
+        }
 
         // Check if slug already exists
         const existingTenant = await db
@@ -164,7 +177,7 @@ export function registerTenantRoutes(app: Express) {
         res.status(201).json(newTenant);
       } catch (error: any) {
         console.error('Failed to create tenant:', error);
-        res.status(500).json({ error: error.message || "Failed to create tenant" });
+        res.status(500).json({ error: "Failed to create tenant" });
       }
     }
   );
@@ -209,7 +222,7 @@ export function registerTenantRoutes(app: Express) {
         });
       } catch (error: any) {
         console.error('Failed to fetch tenant:', error);
-        res.status(500).json({ error: error.message || "Failed to fetch tenant" });
+        res.status(500).json({ error: "Failed to fetch tenant" });
       }
     }
   );
@@ -255,7 +268,16 @@ export function registerTenantRoutes(app: Express) {
         if (name !== undefined) {
           updateData.name = name;
           // Update slug if name changes
-          updateData.slug = generateSlug(name);
+          if (name !== existingTenant.name) {
+            const newSlug = generateSlug(name);
+            const slugExists = await db.select().from(tenants)
+              .where(and(eq(tenants.slug, newSlug), sql`id != ${tenantId}`))
+              .limit(1);
+            if (slugExists.length > 0) {
+              return res.status(400).json({ error: "A tenant with this name already exists" });
+            }
+            updateData.slug = newSlug;
+          }
         }
         if (plan !== undefined) updateData.plan = plan;
         if (settings !== undefined) updateData.settings = settings;
@@ -289,7 +311,7 @@ export function registerTenantRoutes(app: Express) {
         res.json(updatedTenant);
       } catch (error: any) {
         console.error('Failed to update tenant:', error);
-        res.status(500).json({ error: error.message || "Failed to update tenant" });
+        res.status(500).json({ error: "Failed to update tenant" });
       }
     }
   );
@@ -352,7 +374,7 @@ export function registerTenantRoutes(app: Express) {
         });
       } catch (error: any) {
         console.error('Failed to suspend tenant:', error);
-        res.status(500).json({ error: error.message || "Failed to suspend tenant" });
+        res.status(500).json({ error: "Failed to suspend tenant" });
       }
     }
   );
@@ -414,7 +436,7 @@ export function registerTenantRoutes(app: Express) {
         });
       } catch (error: any) {
         console.error('Failed to activate tenant:', error);
-        res.status(500).json({ error: error.message || "Failed to activate tenant" });
+        res.status(500).json({ error: "Failed to activate tenant" });
       }
     }
   );
@@ -476,7 +498,7 @@ export function registerTenantRoutes(app: Express) {
         });
       } catch (error: any) {
         console.error('Failed to delete tenant:', error);
-        res.status(500).json({ error: error.message || "Failed to delete tenant" });
+        res.status(500).json({ error: "Failed to delete tenant" });
       }
     }
   );
@@ -537,7 +559,7 @@ export function registerTenantRoutes(app: Express) {
         });
       } catch (error: any) {
         console.error('Failed to fetch tenant usage:', error);
-        res.status(500).json({ error: error.message || "Failed to fetch tenant usage" });
+        res.status(500).json({ error: "Failed to fetch tenant usage" });
       }
     }
   );
