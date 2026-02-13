@@ -67,7 +67,7 @@ export function registerCommissionRoutes(app: Express) {
         res.json({ rules });
       } catch (error: any) {
         console.error('Failed to fetch commission rules:', error);
-        res.status(500).json({ error: error.message || "Failed to fetch commission rules" });
+        res.status(500).json({ error: "Failed to fetch commission rules" });
       }
     }
   );
@@ -114,6 +114,11 @@ export function registerCommissionRoutes(app: Express) {
           return res.status(400).json({ error: "basePercentage must be a valid numeric value between 0 and 100" });
         }
 
+        // Validate date range
+        if (effectiveTo && effectiveFrom && new Date(effectiveTo) <= new Date(effectiveFrom)) {
+          return res.status(400).json({ error: "effectiveTo must be after effectiveFrom" });
+        }
+
         // Validate volumeBonuses structure if provided
         if (volumeBonuses !== undefined && volumeBonuses !== null) {
           if (!Array.isArray(volumeBonuses)) {
@@ -122,6 +127,12 @@ export function registerCommissionRoutes(app: Express) {
           for (const bonus of volumeBonuses) {
             if (typeof bonus.threshold !== 'number' || typeof bonus.bonusPercentage !== 'number') {
               return res.status(400).json({ error: "Each volumeBonus must have numeric threshold and bonusPercentage" });
+            }
+            if (bonus.threshold <= 0) {
+              return res.status(400).json({ error: "Volume bonus threshold must be a positive number" });
+            }
+            if (bonus.bonusPercentage < 0 || bonus.bonusPercentage > 100) {
+              return res.status(400).json({ error: "Volume bonus percentage must be between 0 and 100" });
             }
           }
         }
@@ -146,7 +157,7 @@ export function registerCommissionRoutes(app: Express) {
         res.status(201).json(created);
       } catch (error: any) {
         console.error('Failed to create commission rule:', error);
-        res.status(500).json({ error: error.message || "Failed to create commission rule" });
+        res.status(500).json({ error: "Failed to create commission rule" });
       }
     }
   );
@@ -200,6 +211,13 @@ export function registerCommissionRoutes(app: Express) {
           return res.status(400).json({ error: "basePercentage must be a valid numeric value between 0 and 100" });
         }
 
+        // Validate date range - need to consider both provided and existing values
+        const finalEffectiveFrom = effectiveFrom !== undefined ? effectiveFrom : existing.effectiveFrom;
+        const finalEffectiveTo = effectiveTo !== undefined ? effectiveTo : existing.effectiveTo;
+        if (finalEffectiveTo && finalEffectiveFrom && new Date(finalEffectiveTo) <= new Date(finalEffectiveFrom)) {
+          return res.status(400).json({ error: "effectiveTo must be after effectiveFrom" });
+        }
+
         // Validate volumeBonuses structure if provided
         if (volumeBonuses !== undefined && volumeBonuses !== null) {
           if (!Array.isArray(volumeBonuses)) {
@@ -208,6 +226,12 @@ export function registerCommissionRoutes(app: Express) {
           for (const bonus of volumeBonuses) {
             if (typeof bonus.threshold !== 'number' || typeof bonus.bonusPercentage !== 'number') {
               return res.status(400).json({ error: "Each volumeBonus must have numeric threshold and bonusPercentage" });
+            }
+            if (bonus.threshold <= 0) {
+              return res.status(400).json({ error: "Volume bonus threshold must be a positive number" });
+            }
+            if (bonus.bonusPercentage < 0 || bonus.bonusPercentage > 100) {
+              return res.status(400).json({ error: "Volume bonus percentage must be between 0 and 100" });
             }
           }
         }
@@ -237,7 +261,7 @@ export function registerCommissionRoutes(app: Express) {
         res.json(updated);
       } catch (error: any) {
         console.error('Failed to update commission rule:', error);
-        res.status(500).json({ error: error.message || "Failed to update commission rule" });
+        res.status(500).json({ error: "Failed to update commission rule" });
       }
     }
   );
@@ -275,7 +299,7 @@ export function registerCommissionRoutes(app: Express) {
         res.json({ success: true });
       } catch (error: any) {
         console.error('Failed to delete commission rule:', error);
-        res.status(500).json({ error: error.message || "Failed to delete commission rule" });
+        res.status(500).json({ error: "Failed to delete commission rule" });
       }
     }
   );
@@ -343,10 +367,11 @@ export function registerCommissionRoutes(app: Express) {
           .limit(limitNum)
           .offset(offset);
 
-        // Get total count for pagination
+        // Get total count for pagination (match main query structure)
         const countResult = await db
           .select({ count: sql<number>`count(*)` })
           .from(commissionPayouts)
+          .leftJoin(users, eq(commissionPayouts.agentId, users.id))
           .where(conditions.length > 0 ? and(...conditions) : undefined);
 
         const total = Number(countResult[0]?.count || 0);
@@ -362,7 +387,7 @@ export function registerCommissionRoutes(app: Express) {
         });
       } catch (error: any) {
         console.error('Failed to fetch commission payouts:', error);
-        res.status(500).json({ error: error.message || "Failed to fetch commission payouts" });
+        res.status(500).json({ error: "Failed to fetch commission payouts" });
       }
     }
   );
@@ -396,6 +421,11 @@ export function registerCommissionRoutes(app: Express) {
 
         if (!periodStart || !periodEnd) {
           return res.status(400).json({ error: "periodStart and periodEnd are required" });
+        }
+
+        // Validate period date range
+        if (new Date(periodEnd) <= new Date(periodStart)) {
+          return res.status(400).json({ error: "periodEnd must be after periodStart" });
         }
 
         // Verify agent exists
@@ -433,7 +463,7 @@ export function registerCommissionRoutes(app: Express) {
         res.status(201).json(created);
       } catch (error: any) {
         console.error('Failed to create commission payout:', error);
-        res.status(500).json({ error: error.message || "Failed to create commission payout" });
+        res.status(500).json({ error: "Failed to create commission payout" });
       }
     }
   );
@@ -483,7 +513,7 @@ export function registerCommissionRoutes(app: Express) {
         res.json(updated);
       } catch (error: any) {
         console.error('Failed to approve commission payout:', error);
-        res.status(500).json({ error: error.message || "Failed to approve commission payout" });
+        res.status(500).json({ error: "Failed to approve commission payout" });
       }
     }
   );
@@ -537,7 +567,7 @@ export function registerCommissionRoutes(app: Express) {
         res.json(updated);
       } catch (error: any) {
         console.error('Failed to mark commission payout as paid:', error);
-        res.status(500).json({ error: error.message || "Failed to mark commission payout as paid" });
+        res.status(500).json({ error: "Failed to mark commission payout as paid" });
       }
     }
   );
