@@ -1151,5 +1151,203 @@ export function registerClientRoutes(app: Express) {
     }
   });
 
+  /**
+   * GET /api/client/profile
+   * Get authenticated client's profile information
+   * Requires: Client role
+   */
+  app.get('/api/client/profile', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      // Get user details
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Get associated business entity
+      const userEntityId = await getUserEntityId(userId);
+      let entity = null;
+      if (userEntityId) {
+        const [entityData] = await db
+          .select()
+          .from(businessEntities)
+          .where(eq(businessEntities.id, userEntityId));
+        entity = entityData;
+      }
+
+      res.json({
+        id: user.id,
+        email: user.email,
+        name: user.fullName || entity?.name || 'Client User',
+        phone: user.phone || entity?.contactPhone || '',
+        avatar: null,
+        role: user.role,
+        entityId: userEntityId,
+        entity: entity ? {
+          id: entity.id,
+          legalName: entity.name,
+          tradeName: entity.name,
+          entityType: entity.entityType,
+          gstNumber: entity.gstin,
+          panNumber: entity.pan,
+          incorporationDate: entity.registrationDate,
+          registeredAddress: entity.address,
+        } : null,
+        referralCode: `REF${userId.toString().padStart(6, '0')}`,
+        createdAt: user.createdAt,
+      });
+    } catch (error) {
+      console.error('Error fetching client profile:', error);
+      res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+  });
+
+  /**
+   * PATCH /api/client/profile
+   * Update authenticated client's profile
+   * Requires: Client role
+   */
+  app.patch('/api/client/profile', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { name, phone, notificationPreferences } = req.body;
+
+      // Update user record
+      const updateData: any = {};
+      if (name) updateData.name = name;
+      if (phone) updateData.phone = phone;
+
+      if (Object.keys(updateData).length > 0) {
+        await db
+          .update(users)
+          .set(updateData)
+          .where(eq(users.id, userId));
+      }
+
+      res.json({ success: true, message: 'Profile updated successfully' });
+    } catch (error) {
+      console.error('Error updating client profile:', error);
+      res.status(500).json({ error: 'Failed to update profile' });
+    }
+  });
+
+  /**
+   * GET /api/client/wallet
+   * Get client's wallet balance and transaction history
+   * Requires: Client role
+   */
+  app.get('/api/client/wallet', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      // For now, return mock wallet data
+      // TODO: Implement actual wallet table when required
+      res.json({
+        balance: 0,
+        currency: 'INR',
+        pendingCredits: 0,
+        totalEarned: 0,
+        totalRedeemed: 0,
+        transactions: [],
+        lastUpdated: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Error fetching wallet:', error);
+      res.status(500).json({ error: 'Failed to fetch wallet' });
+    }
+  });
+
+  /**
+   * GET /api/client/referrals/stats
+   * Get client's referral statistics
+   * Requires: Client role
+   */
+  app.get('/api/client/referrals/stats', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const referralCode = `REF${userId.toString().padStart(6, '0')}`;
+
+      // For now, return mock referral stats
+      // TODO: Implement actual referral tracking table
+      res.json({
+        referralCode,
+        totalReferrals: 0,
+        successfulReferrals: 0,
+        pendingReferrals: 0,
+        totalEarnings: 0,
+        rewardPerReferral: 500,
+        referralLink: `https://digicomply.in/register?ref=${referralCode}`,
+        recentReferrals: [],
+      });
+    } catch (error) {
+      console.error('Error fetching referral stats:', error);
+      res.status(500).json({ error: 'Failed to fetch referral stats' });
+    }
+  });
+
+  /**
+   * GET /api/client/businesses
+   * Get all businesses associated with the client
+   * Requires: Client role
+   */
+  app.get('/api/client/businesses', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      // Get all entities owned by this user
+      const entities = await db
+        .select()
+        .from(businessEntities)
+        .where(and(
+          eq(businessEntities.ownerId, userId),
+          eq(businessEntities.isActive, true)
+        ))
+        .orderBy(desc(businessEntities.createdAt));
+
+      const businesses = entities.map(entity => ({
+        id: entity.id,
+        name: entity.name,
+        tradeName: entity.name,
+        entityType: entity.entityType,
+        gstNumber: entity.gstin,
+        panNumber: entity.pan,
+        incorporationDate: entity.registrationDate,
+        registeredAddress: entity.address,
+        city: entity.city,
+        state: entity.state,
+        status: entity.isActive ? 'active' : 'inactive',
+        createdAt: entity.createdAt,
+      }));
+
+      res.json(businesses);
+    } catch (error) {
+      console.error('Error fetching businesses:', error);
+      res.status(500).json({ error: 'Failed to fetch businesses' });
+    }
+  });
+
   console.log('✅ Client routes registered');
 }

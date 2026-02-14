@@ -13,7 +13,7 @@
 
 import type { Express, Request, Response } from "express";
 import { db } from './db';
-import { leads, users, commissions, serviceRequests, services, businessEntities } from '@shared/schema';
+import { leads, users, commissions, serviceRequests, services, businessEntities, agentProfiles } from '@shared/schema';
 import { eq, and, desc, sql, gte, lte } from 'drizzle-orm';
 import { sessionAuthMiddleware, requireMinimumRole, requireRole, USER_ROLES, type AuthenticatedRequest } from './rbac-middleware';
 
@@ -1530,6 +1530,115 @@ export function registerAgentRoutes(app: Express) {
     } catch (error) {
       console.error('Error rejecting document:', error);
       res.status(500).json({ error: 'Failed to reject document' });
+    }
+  });
+
+  /**
+   * GET /api/agent/profile
+   * Get agent profile information
+   */
+  app.get('/api/agent/profile', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      // Get user info
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Get agent profile record if exists
+      const [agent] = await db
+        .select()
+        .from(agentProfiles)
+        .where(eq(agentProfiles.userId, userId));
+
+      res.json({
+        id: user.id,
+        email: user.email,
+        name: agent?.name || user.fullName || 'Agent User',
+        phone: agent?.phone || user.phone || '',
+        role: user.role,
+        agentCode: agent?.agentCode || `AG${userId.toString().padStart(4, '0')}`,
+        territory: agent?.assignedTerritory || null,
+        performanceRating: agent?.performanceRating || null,
+        totalCommissionEarned: agent?.totalCommissionEarned || '0.00',
+        pendingPayouts: agent?.pendingPayouts || '0.00',
+        clearedPayouts: agent?.clearedPayouts || '0.00',
+        isActive: agent?.isActive ?? true,
+        joiningDate: agent?.joiningDate || user.createdAt,
+        notificationPreferences: {
+          email: true,
+          sms: true,
+          push: true,
+          leadUpdates: true,
+          commissionAlerts: true,
+          announcements: true,
+        },
+        createdAt: user.createdAt,
+      });
+    } catch (error) {
+      console.error('Error fetching agent profile:', error);
+      res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+  });
+
+  /**
+   * PATCH /api/agent/profile
+   * Update agent profile
+   */
+  app.patch('/api/agent/profile', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const { name, phone, territory } = req.body;
+
+      // Update user record
+      const userUpdateData: any = {};
+      if (name) userUpdateData.fullName = name;
+      if (phone) userUpdateData.phone = phone;
+
+      if (Object.keys(userUpdateData).length > 0) {
+        await db
+          .update(users)
+          .set(userUpdateData)
+          .where(eq(users.id, userId));
+      }
+
+      // Update agent profile record if additional fields provided
+      const agentUpdateData: any = {};
+      if (name) agentUpdateData.name = name;
+      if (phone) agentUpdateData.phone = phone;
+      if (territory) agentUpdateData.assignedTerritory = territory;
+
+      if (Object.keys(agentUpdateData).length > 0) {
+        const [existingAgent] = await db
+          .select()
+          .from(agentProfiles)
+          .where(eq(agentProfiles.userId, userId));
+
+        if (existingAgent) {
+          await db
+            .update(agentProfiles)
+            .set(agentUpdateData)
+            .where(eq(agentProfiles.userId, userId));
+        }
+      }
+
+      res.json({ success: true, message: 'Profile updated successfully' });
+    } catch (error) {
+      console.error('Error updating agent profile:', error);
+      res.status(500).json({ error: 'Failed to update profile' });
     }
   });
 
