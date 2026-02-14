@@ -9,6 +9,19 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { DashboardLayout, PageShell } from '@/components/v3';
+import {
+  LayoutDashboard,
+  FileBarChart,
+  Users,
+  Building2,
+  ClipboardCheck,
+  Blocks,
+  Server,
+  FileText,
+  Webhook,
+  Key as KeyNavIcon,
+} from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -105,6 +118,44 @@ interface UsageLog {
   ipAddress: string;
   createdAt: string;
 }
+
+const adminNavigation = [
+  {
+    title: "Overview",
+    items: [
+      { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+      { label: "Reports", href: "/admin/reports", icon: FileBarChart },
+    ],
+  },
+  {
+    title: "Management",
+    items: [
+      { label: "Users", href: "/admin/users", icon: Users },
+      { label: "Clients", href: "/admin/clients", icon: Building2 },
+      { label: "Access Reviews", href: "/admin/access-reviews", icon: ClipboardCheck },
+    ],
+  },
+  {
+    title: "Configuration",
+    items: [
+      { label: "Blueprints", href: "/admin/blueprints", icon: Blocks },
+      { label: "Services", href: "/admin/services", icon: Server },
+      { label: "Documents", href: "/admin/documents", icon: FileText },
+    ],
+  },
+  {
+    title: "Developer",
+    items: [
+      { label: "Webhooks", href: "/admin/webhooks", icon: Webhook },
+      { label: "API Keys", href: "/admin/api-keys", icon: KeyNavIcon },
+    ],
+  },
+];
+
+const adminUser = {
+  name: "Admin",
+  email: "admin@digicomply.com",
+};
 
 export default function APIKeyManagement() {
   const { toast } = useToast();
@@ -244,24 +295,26 @@ export default function APIKeyManagement() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Key className="w-8 h-8" />
-            API Key Management
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Generate and manage API keys for external integrations
-          </p>
-        </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Generate New Key
-            </Button>
-          </DialogTrigger>
+    <DashboardLayout
+      navigation={adminNavigation}
+      user={adminUser}
+      logo={<span className="text-xl font-bold text-primary">DigiComply</span>}
+    >
+      <PageShell
+        title="API Key Management"
+        subtitle="Generate and manage API keys for external integrations"
+        breadcrumbs={[
+          { label: "Admin", href: "/admin/dashboard" },
+          { label: "API Keys" },
+        ]}
+        actions={
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Generate New Key
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Generate API Key</DialogTitle>
@@ -374,8 +427,8 @@ export default function APIKeyManagement() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-
+        }
+      >
       {/* New Key Dialog */}
       <Dialog open={!!showNewKey} onOpenChange={() => setShowNewKey(null)}>
         <DialogContent>
@@ -670,6 +723,7 @@ export default function APIKeyManagement() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </PageShell>
+    </DashboardLayout>
   );
 }

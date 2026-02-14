@@ -121,6 +121,7 @@ const CommissionConfig = lazy(() => import("./pages/super-admin/CommissionConfig
 const SecurityCenter = lazy(() => import("./pages/super-admin/SecurityCenter"));
 const Operations = lazy(() => import("./pages/super-admin/Operations"));
 const Analytics = lazy(() => import("./pages/super-admin/Analytics"));
+const SuperAdminServices = lazy(() => import("./pages/super-admin/SuperAdminServices"));
 const RoleSelection = lazy(() => import("./pages/RoleSelection"));
 const LifecycleDashboard = lazy(() => import("./pages/LifecycleDashboard"));
 const ComplianceDetail = lazy(() => import("./pages/ComplianceDetail"));
@@ -504,6 +505,7 @@ const AppContent = () => {
                 <Route path="/super-admin/security" component={SecurityCenter} />
                 <Route path="/super-admin/operations" component={Operations} />
                 <Route path="/super-admin/analytics" component={Analytics} />
+                <Route path="/super-admin/services" component={SuperAdminServices} />
                 {/* CONSOLIDATED: Single onboarding flow */}
                 <Route path="/onboarding" component={SmartStart} />
                 <Route path="/streamlined-onboarding" component={SmartStart} />

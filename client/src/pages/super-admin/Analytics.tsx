@@ -1,9 +1,18 @@
+/**
+ * Super Admin Analytics Dashboard
+ *
+ * Platform-wide analytics with real Recharts visualizations:
+ * - Revenue over time (Line Chart)
+ * - User growth (Bar Chart)
+ * - Service distribution (Pie Chart)
+ * - Top performing agents table
+ */
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DashboardLayout, PageShell, MetricCard } from "@/components/v3";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -11,6 +20,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { useToast } from "@/hooks/use-toast";
 import {
   BarChart3,
   TrendingUp,
@@ -27,22 +52,33 @@ import {
   ShieldCheck,
   Settings,
   FileText,
+  Link as LinkIcon,
 } from "lucide-react";
 
-// Mock data for display
-const mockAnalytics = {
-  totalRevenue: 1250000,
-  revenueChange: 12.5,
-  activeUsers: 1234,
-  userChange: 8.3,
-  newTenants: 15,
-  serviceRequests: 456,
-  topAgents: [
-    { name: "Agent 1", sales: 150000, commission: 15000 },
-    { name: "Agent 2", sales: 120000, commission: 12000 },
-    { name: "Agent 3", sales: 95000, commission: 9500 },
-  ],
-};
+// Chart data types
+interface RevenueDataPoint {
+  month: string;
+  revenue: number;
+  target: number;
+}
+
+interface UserGrowthDataPoint {
+  month: string;
+  newUsers: number;
+  activeUsers: number;
+}
+
+interface ServiceDistribution {
+  name: string;
+  value: number;
+  color: string;
+}
+
+interface TopAgent {
+  name: string;
+  sales: number;
+  commission: number;
+}
 
 interface AnalyticsData {
   totalRevenue: number;
@@ -50,13 +86,68 @@ interface AnalyticsData {
   activeUsers: number;
   userChange: number;
   newTenants: number;
+  tenantsChange: number;
   serviceRequests: number;
-  topAgents: {
-    name: string;
-    sales: number;
-    commission: number;
-  }[];
+  requestsChange: number;
+  revenueData: RevenueDataPoint[];
+  userGrowthData: UserGrowthDataPoint[];
+  serviceDistribution: ServiceDistribution[];
+  topAgents: TopAgent[];
 }
+
+// Mock data with realistic values
+const mockAnalytics: AnalyticsData = {
+  totalRevenue: 12500000,
+  revenueChange: 12.5,
+  activeUsers: 1234,
+  userChange: 8.3,
+  newTenants: 15,
+  tenantsChange: 25,
+  serviceRequests: 456,
+  requestsChange: -5.2,
+  revenueData: [
+    { month: "Jan", revenue: 850000, target: 800000 },
+    { month: "Feb", revenue: 920000, target: 850000 },
+    { month: "Mar", revenue: 1050000, target: 900000 },
+    { month: "Apr", revenue: 980000, target: 950000 },
+    { month: "May", revenue: 1150000, target: 1000000 },
+    { month: "Jun", revenue: 1280000, target: 1050000 },
+    { month: "Jul", revenue: 1350000, target: 1100000 },
+    { month: "Aug", revenue: 1420000, target: 1150000 },
+    { month: "Sep", revenue: 1380000, target: 1200000 },
+    { month: "Oct", revenue: 1520000, target: 1250000 },
+    { month: "Nov", revenue: 1650000, target: 1300000 },
+    { month: "Dec", revenue: 1450000, target: 1350000 },
+  ],
+  userGrowthData: [
+    { month: "Jan", newUsers: 45, activeUsers: 320 },
+    { month: "Feb", newUsers: 52, activeUsers: 358 },
+    { month: "Mar", newUsers: 68, activeUsers: 412 },
+    { month: "Apr", newUsers: 74, activeUsers: 465 },
+    { month: "May", newUsers: 89, activeUsers: 534 },
+    { month: "Jun", newUsers: 95, activeUsers: 612 },
+    { month: "Jul", newUsers: 112, activeUsers: 698 },
+    { month: "Aug", newUsers: 128, activeUsers: 802 },
+    { month: "Sep", newUsers: 135, activeUsers: 912 },
+    { month: "Oct", newUsers: 148, activeUsers: 1032 },
+    { month: "Nov", newUsers: 156, activeUsers: 1156 },
+    { month: "Dec", newUsers: 132, activeUsers: 1234 },
+  ],
+  serviceDistribution: [
+    { name: "GST Filing", value: 35, color: "#10b981" },
+    { name: "Company Registration", value: 25, color: "#3b82f6" },
+    { name: "Trademark", value: 15, color: "#8b5cf6" },
+    { name: "Compliance", value: 15, color: "#f59e0b" },
+    { name: "Other", value: 10, color: "#6b7280" },
+  ],
+  topAgents: [
+    { name: "Rajesh Kumar", sales: 1850000, commission: 185000 },
+    { name: "Priya Sharma", sales: 1520000, commission: 152000 },
+    { name: "Amit Patel", sales: 1340000, commission: 134000 },
+    { name: "Sneha Gupta", sales: 1180000, commission: 118000 },
+    { name: "Vikram Singh", sales: 980000, commission: 98000 },
+  ],
+};
 
 const navigation = [
   {
@@ -73,6 +164,7 @@ const navigation = [
       { label: "Services", href: "/super-admin/services", icon: Briefcase },
       { label: "Pricing", href: "/super-admin/pricing", icon: DollarSign },
       { label: "Commissions", href: "/super-admin/commissions", icon: Percent },
+      { label: "Integrations", href: "/super-admin/integrations", icon: LinkIcon },
     ],
   },
   {
@@ -86,48 +178,91 @@ const navigation = [
 ];
 
 export default function Analytics() {
+  const { toast } = useToast();
   const [dateRange, setDateRange] = useState("30d");
 
-  // Query for analytics data (using mock data for now)
+  // Query for analytics data
   const { data: analytics, isLoading } = useQuery<AnalyticsData>({
     queryKey: ["/api/super-admin/analytics", dateRange],
-    // Use mock data since API may not be ready
     placeholderData: mockAnalytics,
   });
 
+  const data = analytics || mockAnalytics;
+  const user = { name: "Super Admin", email: "superadmin@digicomply.com" };
+
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("en-IN", {
       style: "currency",
-      currency: "USD",
+      currency: "INR",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
   };
 
   const formatNumber = (num: number) => {
-    return new Intl.NumberFormat("en-US").format(num);
+    return new Intl.NumberFormat("en-IN").format(num);
   };
 
-  const getChangeColor = (change: number) => {
-    return change >= 0 ? "text-emerald-600" : "text-red-600";
-  };
-
-  const getChangeBgColor = (change: number) => {
-    return change >= 0 ? "bg-emerald-100" : "bg-red-100";
+  const formatCompactCurrency = (value: number) => {
+    if (value >= 10000000) return `${(value / 10000000).toFixed(1)}Cr`;
+    if (value >= 100000) return `${(value / 100000).toFixed(1)}L`;
+    if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+    return value.toString();
   };
 
   const handleExportCSV = () => {
-    // Placeholder for CSV export functionality
-    console.log("Exporting CSV...");
+    // Create CSV content
+    const csvRows = [
+      ["Metric", "Value"],
+      ["Total Revenue", data.totalRevenue],
+      ["Active Users", data.activeUsers],
+      ["New Tenants", data.newTenants],
+      ["Service Requests", data.serviceRequests],
+      [""],
+      ["Month", "Revenue", "Target"],
+      ...data.revenueData.map(r => [r.month, r.revenue, r.target]),
+      [""],
+      ["Agent", "Sales", "Commission"],
+      ...data.topAgents.map(a => [a.name, a.sales, a.commission]),
+    ];
+
+    const csvContent = csvRows.map(row => row.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `analytics-${dateRange}-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    toast({ title: "Export Complete", description: "CSV file downloaded successfully." });
   };
 
   const handleExportPDF = () => {
-    // Placeholder for PDF export functionality
-    console.log("Exporting PDF...");
+    // For PDF, we'd typically use a library like jsPDF or call a backend endpoint
+    // For now, trigger a print dialog which can save as PDF
+    window.print();
+    toast({ title: "Print Dialog", description: "Use 'Save as PDF' to export." });
   };
 
-  const data = analytics || mockAnalytics;
-  const user = { name: "Super Admin", email: "superadmin@digicomply.com" };
+  // Custom tooltip for charts
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-white border border-slate-200 rounded-lg shadow-lg p-3">
+          <p className="text-sm font-medium text-slate-900">{label}</p>
+          {payload.map((entry: any, index: number) => (
+            <p key={index} className="text-sm" style={{ color: entry.color }}>
+              {entry.name}: {entry.name.includes("revenue") || entry.name.includes("Revenue") || entry.name.includes("target") || entry.name.includes("Target")
+                ? formatCurrency(entry.value)
+                : formatNumber(entry.value)}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
 
   return (
     <DashboardLayout
@@ -142,7 +277,7 @@ export default function Analytics() {
     >
       <PageShell
         title="Platform Analytics"
-        subtitle="Insights and performance metrics"
+        subtitle="Insights and performance metrics across the platform"
         breadcrumbs={[{ label: "Super Admin", href: "/super-admin/dashboard" }, { label: "Analytics" }]}
         actions={
           <div className="flex items-center gap-3">
@@ -184,9 +319,9 @@ export default function Analytics() {
           </div>
         }
       >
-        <div className="space-y-8">
+        <div className="space-y-6">
           {/* Key Metrics Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <MetricCard
               label="Total Revenue"
               value={isLoading ? "..." : formatCurrency(data.totalRevenue)}
@@ -210,14 +345,20 @@ export default function Analytics() {
             <MetricCard
               label="New Tenants"
               value={isLoading ? "..." : formatNumber(data.newTenants)}
-              trend={{ value: "This month", direction: "neutral" }}
+              trend={{
+                value: `${data.tenantsChange > 0 ? "+" : ""}${data.tenantsChange}% this month`,
+                direction: data.tenantsChange >= 0 ? "up" : "down",
+              }}
               icon={Building2}
               accentColor="purple"
             />
             <MetricCard
               label="Service Requests"
               value={isLoading ? "..." : formatNumber(data.serviceRequests)}
-              trend={{ value: "This month", direction: "neutral" }}
+              trend={{
+                value: `${data.requestsChange > 0 ? "+" : ""}${data.requestsChange}% this month`,
+                direction: data.requestsChange >= 0 ? "up" : "down",
+              }}
               icon={Activity}
               accentColor="orange"
             />
@@ -225,7 +366,7 @@ export default function Analytics() {
 
           {/* Charts Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Revenue Over Time Chart Placeholder */}
+            {/* Revenue Over Time - Line Chart */}
             <Card className="bg-white border-slate-200">
               <CardHeader>
                 <CardTitle className="text-slate-900 flex items-center gap-2">
@@ -234,17 +375,45 @@ export default function Analytics() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-64 rounded-lg bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 flex items-center justify-center">
-                  <div className="text-center">
-                    <BarChart3 className="h-12 w-12 text-emerald-600 mx-auto mb-3" />
-                    <p className="text-slate-900 font-medium">Line Chart</p>
-                    <p className="text-sm text-slate-600">Revenue trends visualization</p>
-                  </div>
-                </div>
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={data.revenueData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis
+                      dataKey="month"
+                      tick={{ fill: "#64748b", fontSize: 12 }}
+                      axisLine={{ stroke: "#e2e8f0" }}
+                    />
+                    <YAxis
+                      tick={{ fill: "#64748b", fontSize: 12 }}
+                      axisLine={{ stroke: "#e2e8f0" }}
+                      tickFormatter={formatCompactCurrency}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="revenue"
+                      name="Revenue"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      dot={{ fill: "#10b981", strokeWidth: 2, r: 4 }}
+                      activeDot={{ r: 6 }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="target"
+                      name="Target"
+                      stroke="#94a3b8"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            {/* User Growth Chart Placeholder */}
+            {/* User Growth - Bar Chart */}
             <Card className="bg-white border-slate-200">
               <CardHeader>
                 <CardTitle className="text-slate-900 flex items-center gap-2">
@@ -253,17 +422,38 @@ export default function Analytics() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-64 rounded-lg bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 flex items-center justify-center">
-                  <div className="text-center">
-                    <BarChart3 className="h-12 w-12 text-blue-600 mx-auto mb-3" />
-                    <p className="text-slate-900 font-medium">Bar Chart</p>
-                    <p className="text-sm text-slate-600">User acquisition metrics</p>
-                  </div>
-                </div>
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={data.userGrowthData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis
+                      dataKey="month"
+                      tick={{ fill: "#64748b", fontSize: 12 }}
+                      axisLine={{ stroke: "#e2e8f0" }}
+                    />
+                    <YAxis
+                      tick={{ fill: "#64748b", fontSize: 12 }}
+                      axisLine={{ stroke: "#e2e8f0" }}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Legend />
+                    <Bar
+                      dataKey="newUsers"
+                      name="New Users"
+                      fill="#3b82f6"
+                      radius={[4, 4, 0, 0]}
+                    />
+                    <Bar
+                      dataKey="activeUsers"
+                      name="Active Users"
+                      fill="#93c5fd"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
 
-            {/* Service Distribution Chart Placeholder */}
+            {/* Service Distribution - Pie Chart */}
             <Card className="bg-white border-slate-200">
               <CardHeader>
                 <CardTitle className="text-slate-900 flex items-center gap-2">
@@ -272,13 +462,28 @@ export default function Analytics() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-64 rounded-lg bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="h-12 w-12 rounded-full border-4 border-purple-600 border-t-transparent mx-auto mb-3" />
-                    <p className="text-slate-900 font-medium">Pie Chart</p>
-                    <p className="text-sm text-slate-600">Service type breakdown</p>
-                  </div>
-                </div>
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={data.serviceDistribution}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      labelLine={{ stroke: "#64748b" }}
+                    >
+                      {data.serviceDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number) => [`${value}%`, "Share"]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
 
@@ -314,7 +519,7 @@ export default function Analytics() {
                       <span className="text-slate-900 text-right">
                         {formatCurrency(agent.sales)}
                       </span>
-                      <span className="text-emerald-600 text-right">
+                      <span className="text-emerald-600 text-right font-medium">
                         {formatCurrency(agent.commission)}
                       </span>
                     </div>

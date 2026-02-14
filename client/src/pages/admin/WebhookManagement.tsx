@@ -9,6 +9,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { DashboardLayout, PageShell } from '@/components/v3';
 import {
   Card,
   CardContent,
@@ -16,6 +17,20 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  LayoutDashboard,
+  FileBarChart,
+  Users,
+  Building2,
+  Shield,
+  Settings,
+  FileText,
+  Webhook as WebhookIcon,
+  Key as KeyIcon,
+  ClipboardCheck,
+  Blocks,
+  Server,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -95,6 +110,44 @@ interface WebhookEvent {
   type: string;
   category: string;
 }
+
+const adminNavigation = [
+  {
+    title: "Overview",
+    items: [
+      { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+      { label: "Reports", href: "/admin/reports", icon: FileBarChart },
+    ],
+  },
+  {
+    title: "Management",
+    items: [
+      { label: "Users", href: "/admin/users", icon: Users },
+      { label: "Clients", href: "/admin/clients", icon: Building2 },
+      { label: "Access Reviews", href: "/admin/access-reviews", icon: ClipboardCheck },
+    ],
+  },
+  {
+    title: "Configuration",
+    items: [
+      { label: "Blueprints", href: "/admin/blueprints", icon: Blocks },
+      { label: "Services", href: "/admin/services", icon: Server },
+      { label: "Documents", href: "/admin/documents", icon: FileText },
+    ],
+  },
+  {
+    title: "Developer",
+    items: [
+      { label: "Webhooks", href: "/admin/webhooks", icon: WebhookIcon },
+      { label: "API Keys", href: "/admin/api-keys", icon: KeyIcon },
+    ],
+  },
+];
+
+const adminUser = {
+  name: "Admin",
+  email: "admin@digicomply.com",
+};
 
 export default function WebhookManagement() {
   const { toast } = useToast();
@@ -275,95 +328,97 @@ export default function WebhookManagement() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Webhook className="w-8 h-8" />
-            Webhook Management
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Configure and monitor outbound webhooks for real-time event notifications
-          </p>
-        </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Create Webhook
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Create Webhook Endpoint</DialogTitle>
-              <DialogDescription>
-                Add a new endpoint to receive event notifications
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  placeholder="My Webhook"
-                  value={newEndpoint.name}
-                  onChange={(e) => setNewEndpoint({ ...newEndpoint, name: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="url">Endpoint URL</Label>
-                <Input
-                  id="url"
-                  placeholder="https://your-server.com/webhook"
-                  value={newEndpoint.url}
-                  onChange={(e) => setNewEndpoint({ ...newEndpoint, url: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>Events to Subscribe</Label>
-                <div className="mt-2 max-h-48 overflow-y-auto border rounded-md p-2">
-                  {events.map((event: WebhookEvent) => (
-                    <label key={event.key} className="flex items-center space-x-2 py-1">
-                      <input
-                        type="checkbox"
-                        checked={newEndpoint.events.includes(event.type)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setNewEndpoint({
-                              ...newEndpoint,
-                              events: [...newEndpoint.events, event.type],
-                            });
-                          } else {
-                            setNewEndpoint({
-                              ...newEndpoint,
-                              events: newEndpoint.events.filter((t) => t !== event.type),
-                            });
-                          }
-                        }}
-                        className="rounded"
-                      />
-                      <span className="text-sm">{event.type}</span>
-                    </label>
-                  ))}
+    <DashboardLayout
+      navigation={adminNavigation}
+      user={adminUser}
+      logo={<span className="text-xl font-bold text-primary">DigiComply</span>}
+    >
+      <PageShell
+        title="Webhook Management"
+        subtitle="Configure and monitor outbound webhooks for real-time event notifications"
+        breadcrumbs={[
+          { label: "Admin", href: "/admin/dashboard" },
+          { label: "Webhooks" },
+        ]}
+        actions={
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Create Webhook
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Create Webhook Endpoint</DialogTitle>
+                <DialogDescription>
+                  Add a new endpoint to receive event notifications
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="My Webhook"
+                    value={newEndpoint.name}
+                    onChange={(e) => setNewEndpoint({ ...newEndpoint, name: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="url">Endpoint URL</Label>
+                  <Input
+                    id="url"
+                    placeholder="https://your-server.com/webhook"
+                    value={newEndpoint.url}
+                    onChange={(e) => setNewEndpoint({ ...newEndpoint, url: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Events to Subscribe</Label>
+                  <div className="mt-2 max-h-48 overflow-y-auto border rounded-md p-2">
+                    {events.map((event: WebhookEvent) => (
+                      <label key={event.key} className="flex items-center space-x-2 py-1">
+                        <input
+                          type="checkbox"
+                          checked={newEndpoint.events.includes(event.type)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNewEndpoint({
+                                ...newEndpoint,
+                                events: [...newEndpoint.events, event.type],
+                              });
+                            } else {
+                              setNewEndpoint({
+                                ...newEndpoint,
+                                events: newEndpoint.events.filter((t) => t !== event.type),
+                              });
+                            }
+                          }}
+                          className="rounded"
+                        />
+                        <span className="text-sm">{event.type}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() => createMutation.mutate(newEndpoint)}
-                disabled={createMutation.isPending}
-              >
-                {createMutation.isPending ? 'Creating...' : 'Create Webhook'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Stats Cards */}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => createMutation.mutate(newEndpoint)}
+                  disabled={createMutation.isPending}
+                >
+                  {createMutation.isPending ? 'Creating...' : 'Create Webhook'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        }
+      >
+        {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
@@ -608,6 +663,7 @@ export default function WebhookManagement() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </PageShell>
+    </DashboardLayout>
   );
 }

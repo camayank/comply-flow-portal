@@ -9,6 +9,19 @@
  */
 
 import { useState } from 'react';
+import { DashboardLayout, PageShell } from '@/components/v3';
+import {
+  LayoutDashboard,
+  FileBarChart,
+  Users as UsersIcon,
+  Building2,
+  ClipboardCheck as ClipboardCheckNav,
+  Blocks,
+  Server,
+  FileText,
+  Webhook,
+  Key,
+} from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -82,6 +95,44 @@ import {
   ClipboardCheck,
   ArrowRight,
 } from 'lucide-react';
+
+const adminNavigation = [
+  {
+    title: "Overview",
+    items: [
+      { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+      { label: "Reports", href: "/admin/reports", icon: FileBarChart },
+    ],
+  },
+  {
+    title: "Management",
+    items: [
+      { label: "Users", href: "/admin/users", icon: UsersIcon },
+      { label: "Clients", href: "/admin/clients", icon: Building2 },
+      { label: "Access Reviews", href: "/admin/access-reviews", icon: ClipboardCheckNav },
+    ],
+  },
+  {
+    title: "Configuration",
+    items: [
+      { label: "Blueprints", href: "/admin/blueprints", icon: Blocks },
+      { label: "Services", href: "/admin/services", icon: Server },
+      { label: "Documents", href: "/admin/documents", icon: FileText },
+    ],
+  },
+  {
+    title: "Developer",
+    items: [
+      { label: "Webhooks", href: "/admin/webhooks", icon: Webhook },
+      { label: "API Keys", href: "/admin/api-keys", icon: Key },
+    ],
+  },
+];
+
+const adminUser = {
+  name: "Admin",
+  email: "admin@digicomply.com",
+};
 
 export default function AccessReviews() {
   const { toast } = useToast();
@@ -214,23 +265,25 @@ export default function AccessReviews() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ClipboardCheck className="h-6 w-6" />
-            Access Reviews
-          </h1>
-          <p className="text-muted-foreground">
-            Periodic access certification for DPDP/SOC2 compliance
-          </p>
-        </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Review Cycle
-        </Button>
-      </div>
+    <DashboardLayout
+      navigation={adminNavigation}
+      user={adminUser}
+      logo={<span className="text-xl font-bold text-primary">DigiComply</span>}
+    >
+      <PageShell
+        title="Access Reviews"
+        subtitle="Periodic access certification for DPDP/SOC2 compliance"
+        breadcrumbs={[
+          { label: "Admin", href: "/admin/dashboard" },
+          { label: "Access Reviews" },
+        ]}
+        actions={
+          <Button onClick={() => setIsCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Review Cycle
+          </Button>
+        }
+      >
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -516,7 +569,8 @@ export default function AccessReviews() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </PageShell>
+    </DashboardLayout>
   );
 }
 
