@@ -10,6 +10,7 @@
  */
 
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Card,
   CardContent,
@@ -111,27 +112,29 @@ interface TeamMember {
   target: number;
 }
 
-// Mock data for demo
-const mockLeads: Lead[] = [
-  { id: 1, name: 'Rajesh Kumar', company: 'Tech Solutions Pvt Ltd', email: 'rajesh@techsol.com', phone: '+91 98765 43210', source: 'Website', status: 'qualified', value: 150000, assignedTo: 'Sales Exec 1', createdAt: '2024-01-15', lastContact: '2024-01-20' },
-  { id: 2, name: 'Priya Sharma', company: 'StartupXYZ', email: 'priya@startupxyz.com', phone: '+91 87654 32109', source: 'Referral', status: 'proposal', value: 250000, assignedTo: 'Sales Exec 2', createdAt: '2024-01-10', lastContact: '2024-01-22' },
-  { id: 3, name: 'Amit Patel', company: 'Global Traders', email: 'amit@globaltraders.in', phone: '+91 76543 21098', source: 'Cold Call', status: 'new', value: 75000, assignedTo: 'Sales Exec 1', createdAt: '2024-01-22', lastContact: '2024-01-22' },
-  { id: 4, name: 'Sneha Gupta', company: 'FinServ India', email: 'sneha@finserv.in', phone: '+91 65432 10987', source: 'LinkedIn', status: 'negotiation', value: 500000, assignedTo: 'Sales Exec 2', createdAt: '2024-01-05', lastContact: '2024-01-21' },
-  { id: 5, name: 'Vikram Singh', company: 'Manufacturing Co', email: 'vikram@mfgco.com', phone: '+91 54321 09876', source: 'Event', status: 'contacted', value: 180000, assignedTo: 'Sales Exec 1', createdAt: '2024-01-18', lastContact: '2024-01-19' },
-];
+// API response interfaces
+interface LeadsResponse {
+  data: Lead[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
 
-const mockProposals: Proposal[] = [
-  { id: 1, title: 'Annual Compliance Package', client: 'Tech Solutions Pvt Ltd', value: 150000, status: 'sent', createdAt: '2024-01-18', validUntil: '2024-02-18' },
-  { id: 2, title: 'Company Registration + GST', client: 'StartupXYZ', value: 45000, status: 'viewed', createdAt: '2024-01-15', validUntil: '2024-02-15' },
-  { id: 3, title: 'Full Service Retainership', client: 'FinServ India', value: 500000, status: 'accepted', createdAt: '2024-01-10', validUntil: '2024-02-10' },
-  { id: 4, title: 'GST Filing Package', client: 'Global Traders', value: 36000, status: 'draft', createdAt: '2024-01-22', validUntil: '2024-02-22' },
-];
-
-const mockTeam: TeamMember[] = [
-  { id: 1, name: 'Rahul Verma', role: 'Sales Executive', leads: 25, conversions: 8, revenue: 450000, target: 500000 },
-  { id: 2, name: 'Anita Desai', role: 'Sales Executive', leads: 32, conversions: 12, revenue: 680000, target: 600000 },
-  { id: 3, name: 'Suresh Nair', role: 'Sales Executive', leads: 18, conversions: 5, revenue: 280000, target: 400000 },
-];
+interface SalesMetrics {
+  totalLeads: number;
+  qualifiedLeads: number;
+  pipelineValue: number;
+  wonDeals: number;
+  conversionRate: number;
+  totalRevenue: number;
+  totalTarget: number;
+  targetProgress: number;
+  activeProposals: number;
+  proposalValue: number;
+  teamSize: number;
+  avgRevenuePerRep: number;
+}
 
 // Pipeline stages
 const pipelineStages = [
@@ -168,6 +171,7 @@ const navigation = [
 export default function SalesDashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('overview');
   const [isCreateLeadOpen, setIsCreateLeadOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -175,20 +179,91 @@ export default function SalesDashboard() {
 
   const isManager = user?.role === 'sales_manager';
 
-  // Calculate metrics
-  const totalLeads = mockLeads.length;
-  const qualifiedLeads = mockLeads.filter(l => ['qualified', 'proposal', 'negotiation'].includes(l.status)).length;
-  const pipelineValue = mockLeads.filter(l => !['won', 'lost'].includes(l.status)).reduce((sum, l) => sum + l.value, 0);
-  const wonDeals = mockLeads.filter(l => l.status === 'won').length;
-  const conversionRate = totalLeads > 0 ? Math.round((wonDeals / totalLeads) * 100) : 0;
-
-  // Filter leads
-  const filteredLeads = mockLeads.filter(lead => {
-    const matchesSearch = lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         lead.company.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = !statusFilter || lead.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  // Fetch leads from API
+  const { data: leadsData, isLoading: leadsLoading } = useQuery<LeadsResponse>({
+    queryKey: ['/api/sales/leads', statusFilter, searchQuery],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (statusFilter) params.append('status', statusFilter);
+      if (searchQuery) params.append('search', searchQuery);
+      const response = await fetch(`/api/sales/leads?${params.toString()}`, { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch leads');
+      return response.json();
+    },
   });
+
+  // Fetch proposals from API
+  const { data: proposals = [], isLoading: proposalsLoading } = useQuery<Proposal[]>({
+    queryKey: ['/api/sales/proposals'],
+    queryFn: async () => {
+      const response = await fetch('/api/sales/proposals', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch proposals');
+      return response.json();
+    },
+  });
+
+  // Fetch team data from API
+  const { data: team = [], isLoading: teamLoading } = useQuery<TeamMember[]>({
+    queryKey: ['/api/sales/team'],
+    queryFn: async () => {
+      const response = await fetch('/api/sales/team', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch team');
+      return response.json();
+    },
+  });
+
+  // Fetch sales metrics from API
+  const { data: metrics, isLoading: metricsLoading } = useQuery<SalesMetrics>({
+    queryKey: ['/api/sales/metrics'],
+    queryFn: async () => {
+      const response = await fetch('/api/sales/metrics', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch metrics');
+      return response.json();
+    },
+  });
+
+  // Fetch pipeline data from API
+  const { data: pipeline = [], isLoading: pipelineLoading } = useQuery({
+    queryKey: ['/api/sales/pipeline'],
+    queryFn: async () => {
+      const response = await fetch('/api/sales/pipeline', { credentials: 'include' });
+      if (!response.ok) throw new Error('Failed to fetch pipeline');
+      return response.json();
+    },
+  });
+
+  // Create lead mutation
+  const createLeadMutation = useMutation({
+    mutationFn: async (leadData: Partial<Lead>) => {
+      const response = await fetch('/api/sales/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(leadData),
+      });
+      if (!response.ok) throw new Error('Failed to create lead');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/leads'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/metrics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sales/pipeline'] });
+      toast({ title: 'Lead created successfully' });
+      setIsCreateLeadOpen(false);
+    },
+    onError: () => {
+      toast({ title: 'Failed to create lead', variant: 'destructive' });
+    },
+  });
+
+  // Use API data
+  const leads = leadsData?.data || [];
+  const filteredLeads = leads;
+  const totalLeads = metrics?.totalLeads || 0;
+  const qualifiedLeads = metrics?.qualifiedLeads || 0;
+  const pipelineValue = metrics?.pipelineValue || 0;
+  const wonDeals = metrics?.wonDeals || 0;
+  const conversionRate = metrics?.conversionRate || 0;
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -301,9 +376,9 @@ export default function SalesDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {pipelineStages.slice(0, -1).map(stage => {
-                    const count = mockLeads.filter(l => l.status === stage.key).length;
-                    const value = mockLeads.filter(l => l.status === stage.key).reduce((sum, l) => sum + l.value, 0);
+                  {(pipeline.length > 0 ? pipeline.slice(0, -1) : pipelineStages.slice(0, -1)).map((stage: any) => {
+                    const count = stage.count ?? leads.filter((l: Lead) => l.status === stage.key).length;
+                    const value = stage.value ?? leads.filter((l: Lead) => l.status === stage.key).reduce((sum: number, l: Lead) => sum + l.value, 0);
                     const percentage = totalLeads > 0 ? (count / totalLeads) * 100 : 0;
 
                     return (
@@ -406,9 +481,9 @@ export default function SalesDashboard() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-6 gap-4 overflow-x-auto">
-                {pipelineStages.slice(0, -1).map(stage => {
-                  const stageLeads = mockLeads.filter(l => l.status === stage.key);
-                  const stageValue = stageLeads.reduce((sum, l) => sum + l.value, 0);
+                {(pipeline.length > 0 ? pipeline.slice(0, -1) : pipelineStages.slice(0, -1)).map((stage: any) => {
+                  const stageLeads = stage.leads ?? leads.filter((l: Lead) => l.status === stage.key);
+                  const stageValue = stage.value ?? stageLeads.reduce((sum: number, l: Lead) => sum + l.value, 0);
 
                   return (
                     <div key={stage.key} className="min-w-[200px]">
@@ -416,13 +491,13 @@ export default function SalesDashboard() {
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">{stage.label}</span>
                           <Badge variant="secondary" className="bg-white/20 text-white">
-                            {stageLeads.length}
+                            {stage.count ?? stageLeads.length}
                           </Badge>
                         </div>
                         <p className="text-xs opacity-80">{formatCurrency(stageValue)}</p>
                       </div>
                       <div className="border border-t-0 rounded-b-lg p-2 space-y-2 min-h-[300px] bg-muted/30">
-                        {stageLeads.map(lead => (
+                        {stageLeads.map((lead: Lead) => (
                           <div key={lead.id} className="bg-white border rounded-lg p-3 cursor-move hover:shadow-md transition-shadow">
                             <p className="font-medium text-sm">{lead.name}</p>
                             <p className="text-xs text-muted-foreground">{lead.company}</p>
@@ -558,7 +633,7 @@ export default function SalesDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockProposals.map(proposal => (
+                  {proposals.map(proposal => (
                     <TableRow key={proposal.id}>
                       <TableCell className="font-medium">{proposal.title}</TableCell>
                       <TableCell>{proposal.client}</TableCell>
@@ -583,7 +658,7 @@ export default function SalesDashboard() {
         {isManager && (
           <TabsContent value="team" className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {mockTeam.map(member => {
+              {team.map(member => {
                 const progress = (member.revenue / member.target) * 100;
                 const isOnTrack = progress >= 80;
 
@@ -657,7 +732,7 @@ export default function SalesDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mockTeam.map(member => {
+                    {team.map(member => {
                       const achievement = Math.round((member.revenue / member.target) * 100);
                       return (
                         <TableRow key={member.id}>

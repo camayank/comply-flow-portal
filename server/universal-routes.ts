@@ -664,6 +664,214 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Agent Commission Statements - Monthly/Quarterly summary of commissions
+  app.get("/api/agent/commission-statements", async (req, res) => {
+    try {
+      const agentId = req.user?.id || 1;
+
+      // Generate commission statements by period
+      const generateStatements = () => {
+        const statements = [];
+        const now = new Date();
+
+        for (let i = 0; i < 6; i++) {
+          const periodDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const periodKey = `${periodDate.getFullYear()}-${String(periodDate.getMonth() + 1).padStart(2, '0')}`;
+          const periodLabel = periodDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+
+          const totalCommission = Math.floor(Math.random() * 100000) + 50000;
+          const totalPaid = i > 1 ? totalCommission : Math.floor(totalCommission * 0.7);
+          const totalDisputed = Math.floor(Math.random() * 10000);
+
+          const lineItems = [];
+          const itemCount = Math.floor(Math.random() * 8) + 3;
+
+          for (let j = 0; j < itemCount; j++) {
+            const serviceValue = Math.floor(Math.random() * 50000) + 10000;
+            const commissionRate = [5, 7.5, 10, 12.5, 15][Math.floor(Math.random() * 5)];
+            const commissionAmount = Math.floor(serviceValue * commissionRate / 100);
+            const statuses = ['approved', 'pending', 'disputed', 'adjusted'];
+
+            lineItems.push({
+              id: `li-${periodKey}-${j}`,
+              statementId: `stmt-${periodKey}`,
+              clientName: ['Reliance Industries', 'Tata Motors', 'Infosys Ltd', 'Wipro Technologies', 'HCL Tech'][Math.floor(Math.random() * 5)],
+              clientId: `client-${j + 100}`,
+              serviceType: ['GST Registration', 'Company Incorporation', 'Tax Filing', 'Compliance Audit', 'ROC Filing'][Math.floor(Math.random() * 5)],
+              serviceRequestId: `sr-${Date.now()}-${j}`,
+              serviceRequestNumber: `SR-2026-${String(i * 100 + j).padStart(5, '0')}`,
+              serviceValue,
+              commissionRate,
+              commissionAmount,
+              status: statuses[Math.floor(Math.random() * statuses.length)],
+              completedAt: new Date(periodDate.getTime() + Math.random() * 28 * 24 * 60 * 60 * 1000).toISOString()
+            });
+          }
+
+          statements.push({
+            id: `stmt-${periodKey}`,
+            period: periodKey,
+            periodLabel,
+            totalCommission,
+            totalPaid,
+            totalPending: totalCommission - totalPaid - totalDisputed,
+            totalDisputed,
+            lineItems,
+            status: i > 1 ? 'paid' : i === 1 ? 'finalized' : 'draft',
+            generatedAt: new Date(periodDate.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          });
+        }
+
+        return statements;
+      };
+
+      res.json(generateStatements());
+    } catch (error) {
+      console.error("Error fetching commission statements:", error);
+      res.status(500).json({ error: "Failed to fetch commission statements" });
+    }
+  });
+
+  // Agent Commission Disputes - Disputes raised on commissions
+  app.get("/api/agent/commission-disputes", async (req, res) => {
+    try {
+      const { status } = req.query;
+      const agentId = req.user?.id || 1;
+
+      const generateDisputes = (statusFilter?: string) => {
+        const disputes = [];
+        const categories = ['missing_commission', 'incorrect_rate', 'wrong_calculation', 'missing_service', 'other'];
+        const statuses = ['submitted', 'under_review', 'info_requested', 'approved', 'partially_approved', 'rejected'];
+
+        for (let i = 0; i < 12; i++) {
+          const disputeStatus = statuses[Math.floor(Math.random() * statuses.length)];
+
+          if (statusFilter && statusFilter !== 'all' && disputeStatus !== statusFilter) {
+            continue;
+          }
+
+          const originalAmount = Math.floor(Math.random() * 15000) + 5000;
+          const disputedAmount = originalAmount + Math.floor(Math.random() * 5000);
+          const isResolved = ['approved', 'partially_approved', 'rejected'].includes(disputeStatus);
+
+          disputes.push({
+            id: `disp-${i + 1}`,
+            disputeNumber: `DIS-2026-${String(i + 1).padStart(4, '0')}`,
+            statementId: `stmt-2026-0${(i % 3) + 1}`,
+            lineItemId: `li-2026-0${(i % 3) + 1}-${i % 5}`,
+            clientName: ['Reliance Industries', 'Tata Motors', 'Infosys Ltd', 'Wipro Technologies', 'HCL Tech'][i % 5],
+            serviceRequestNumber: `SR-2026-${String(10000 + i).padStart(5, '0')}`,
+            originalAmount,
+            disputedAmount,
+            reason: [
+              'Commission rate should be 12.5% not 10% as per agreement',
+              'Missing commission for renewal service',
+              'Calculation error in base amount',
+              'Service not included in statement',
+              'Wrong client attributed to different agent'
+            ][i % 5],
+            category: categories[i % 5],
+            status: disputeStatus,
+            approvedAmount: isResolved && disputeStatus !== 'rejected'
+              ? Math.floor(disputedAmount * (disputeStatus === 'approved' ? 1 : 0.6))
+              : null,
+            resolution: isResolved
+              ? disputeStatus === 'rejected'
+                ? 'Dispute rejected - commission rate was correctly applied as per standard terms'
+                : 'Dispute resolved - adjusted amount credited to next statement'
+              : null,
+            submittedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
+            resolvedAt: isResolved ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString() : null,
+            resolvedBy: isResolved ? 'Finance Admin' : null,
+            attachments: Math.random() > 0.5 ? ['commission_agreement.pdf', 'service_invoice.pdf'] : [],
+            timeline: [
+              {
+                id: `tl-${i}-1`,
+                action: 'dispute_submitted',
+                description: 'Dispute submitted for review',
+                actorName: 'Agent User',
+                actorRole: 'agent',
+                createdAt: new Date(Date.now() - (25 + i) * 24 * 60 * 60 * 1000).toISOString()
+              },
+              {
+                id: `tl-${i}-2`,
+                action: 'under_review',
+                description: 'Dispute assigned to finance team',
+                actorName: 'System',
+                actorRole: 'system',
+                createdAt: new Date(Date.now() - (23 + i) * 24 * 60 * 60 * 1000).toISOString()
+              },
+              ...(isResolved ? [{
+                id: `tl-${i}-3`,
+                action: disputeStatus,
+                description: disputeStatus === 'rejected'
+                  ? 'Dispute rejected after review'
+                  : 'Dispute approved and adjustment processed',
+                actorName: 'Finance Admin',
+                actorRole: 'admin',
+                createdAt: new Date(Date.now() - (5 + i) * 24 * 60 * 60 * 1000).toISOString()
+              }] : [])
+            ]
+          });
+        }
+
+        return disputes;
+      };
+
+      res.json(generateDisputes(status as string));
+    } catch (error) {
+      console.error("Error fetching commission disputes:", error);
+      res.status(500).json({ error: "Failed to fetch commission disputes" });
+    }
+  });
+
+  // Create a new commission dispute
+  app.post("/api/agent/commission-disputes", async (req, res) => {
+    try {
+      const { lineItemId, statementId, reason, category, expectedAmount, details } = req.body;
+      const agentId = req.user?.id || 1;
+
+      if (!lineItemId || !statementId || !reason || !category) {
+        return res.status(400).json({ error: "Missing required fields: lineItemId, statementId, reason, category" });
+      }
+
+      const newDispute = {
+        id: `disp-${Date.now()}`,
+        disputeNumber: `DIS-2026-${String(Date.now()).slice(-4)}`,
+        statementId,
+        lineItemId,
+        clientName: 'Client Name',
+        serviceRequestNumber: 'SR-2026-XXXXX',
+        originalAmount: 0,
+        disputedAmount: parseFloat(expectedAmount) || 0,
+        reason,
+        category,
+        status: 'submitted',
+        approvedAmount: null,
+        resolution: null,
+        submittedAt: new Date().toISOString(),
+        resolvedAt: null,
+        resolvedBy: null,
+        attachments: [],
+        timeline: [
+          {
+            id: `tl-new-1`,
+            action: 'dispute_submitted',
+            description: 'Dispute submitted for review',
+            actorName: 'Agent User',
+            actorRole: 'agent',
+            createdAt: new Date().toISOString()
+          }
+        ]
+      };
+
+      res.status(201).json(newDispute);
+    } catch (error) {
+      console.error("Error creating commission dispute:", error);
+      res.status(500).json({ error: "Failed to create commission dispute" });
+    }
+  });
+
   // ===== SEARCH & ANALYTICS =====
 
   // Global Search

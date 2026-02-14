@@ -45,6 +45,7 @@ import { complianceStateRoutes } from "./compliance-state-routes"; // Compliance
 import { registerClientSupportRoutes } from "./client-support-routes"; // Client support ticket routes
 import { registerBulkImportRoutes } from "./bulk-import-routes"; // Bulk data import routes
 import { logWorkItemActivity } from "./auto-escalation-engine";
+import enterpriseEngineRoutes from "./enterprise-engine-routes"; // Enterprise Blueprints, Calendar, Jurisdictions, No-Code
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const requireAdminAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.ADMIN)] as const;
@@ -2382,6 +2383,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { registerSuperAdminRoutes } = await import('./super-admin-routes');
   registerSuperAdminRoutes(app);
 
+  // Register Super Admin Control Center routes
+  const { registerTenantRoutes } = await import('./tenant-routes');
+  registerTenantRoutes(app);
+
+  const { registerPricingRoutes } = await import('./pricing-routes');
+  registerPricingRoutes(app);
+
+  const { registerCommissionRoutes } = await import('./commission-routes');
+  registerCommissionRoutes(app);
+
+  const { registerSecurityIncidentsRoutes } = await import('./security-incidents-routes');
+  registerSecurityIncidentsRoutes(app);
+
+  const { registerFeatureFlagsRoutes } = await import('./feature-flags-routes');
+  registerFeatureFlagsRoutes(app);
+
+  // Register Admin Control Panel routes (tenant-scoped admin capabilities)
+  const { registerAdminUserManagementRoutes } = await import('./admin-user-management-routes');
+  registerAdminUserManagementRoutes(app);
+
+  const { registerAdminDashboardRoutes } = await import('./admin-dashboard-routes');
+  registerAdminDashboardRoutes(app);
+
+  const { registerAdminReportsRoutes } = await import('./admin-reports-routes');
+  registerAdminReportsRoutes(app);
+
   // Register Admin User Management routes (delegated from Super Admin)
   const { registerAdminUserRoutes } = await import('./admin-user-routes');
   registerAdminUserRoutes(app);
@@ -2617,6 +2644,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/customer-success', customerSuccessRoutes.default);
   app.use('/api/v2/customer-success', customerSuccessRoutes.default);
   console.log('✅ Customer Success Routes registered (Playbooks, Renewals, Health Scores)');
+
+  // Register Finance Routes (Financial Summary, KPIs, Invoices, Revenue, Budget Plans, Collection Metrics)
+  const financeRoutes = await import('./routes/finance');
+  app.use('/api/financial', financeRoutes.default);
+  app.use('/api/v1/financial', financeRoutes.default);
+  console.log('✅ Finance Routes registered (Summary, KPIs, Invoices, Revenue, Budget Plans, Collection Metrics)');
+
+  // Register Sales Dashboard Routes (Leads, Pipeline, Team, Proposals, Metrics, Forecasts)
+  const salesDashboardRoutes = await import('./routes/sales-dashboard');
+  app.use('/api/sales', salesDashboardRoutes.default);
+  app.use('/api/v1/sales-dashboard', salesDashboardRoutes.default);
+  console.log('✅ Sales Dashboard Routes registered (Leads, Pipeline, Team, Proposals, Metrics, Forecasts)');
+
+  // Register Enterprise Engine Routes (Service Blueprints, Compliance Calendar, Jurisdictions, No-Code Builder, AI Intelligence)
+  app.use('/api/enterprise', enterpriseEngineRoutes);
+  app.use('/api/v2/enterprise', enterpriseEngineRoutes);
+  console.log('✅ Enterprise Engine Routes registered (Blueprints, Calendar, Jurisdictions, Custom Fields, AI Intelligence)');
 
   const httpServer = createServer(app);
   return httpServer;
