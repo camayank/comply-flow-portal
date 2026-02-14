@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DashboardLayout, PageShell } from '@/components/v3';
 import {
-  Home,
   TrendingUp,
   Users,
   DollarSign,
@@ -17,54 +16,21 @@ import {
   Calendar,
   Bell,
   FileText,
-  UserPlus,
-  Briefcase,
-  Gift,
-  Settings,
-  BarChart3
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { EmptyList } from '@/components/ui/empty-state';
-
-// Navigation configuration for agent portal
-const agentNavigation = [
-  {
-    title: "Agent Portal",
-    items: [
-      { label: "Dashboard", href: "/agent", icon: Home },
-      { label: "My Leads", href: "/pre-sales", icon: Users },
-      { label: "Lead Management", href: "/agent/leads", icon: UserPlus },
-    ],
-  },
-  {
-    title: "Earnings",
-    items: [
-      { label: "Commissions", href: "/agent/commissions", icon: DollarSign },
-      { label: "Performance", href: "/agent/performance", icon: TrendingUp },
-    ],
-  },
-  {
-    title: "Tools",
-    items: [
-      { label: "Proposals", href: "/proposals", icon: Briefcase },
-      { label: "Referrals", href: "/referral-dashboard", icon: Gift },
-    ],
-  },
-  {
-    title: "Account",
-    items: [
-      { label: "Profile & Settings", href: "/agent/profile", icon: Settings },
-    ],
-  },
-];
-
-// User configuration
-const agentUser = {
-  name: "Agent",
-  email: "agent@digicomply.com",
-};
+import { useAuth } from '@/hooks/useAuth';
+import { AGENT_NAVIGATION } from '@/config/agent-navigation';
 
 export default function AgentDashboard() {
+  const { user: authUser } = useAuth();
+
+  // Use actual authenticated user data
+  const agentUser = {
+    name: authUser?.fullName || authUser?.username || 'Agent',
+    email: authUser?.email || '',
+  };
+
   const { data: agentStats, isLoading: loadingStats } = useQuery({
     queryKey: ['/api/agent/stats'],
   });
@@ -100,7 +66,7 @@ export default function AgentDashboard() {
 
   return (
     <DashboardLayout
-      navigation={agentNavigation}
+      navigation={AGENT_NAVIGATION}
       user={agentUser}
     >
       <PageShell

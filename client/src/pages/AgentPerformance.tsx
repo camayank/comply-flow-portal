@@ -20,40 +20,20 @@ import {
   Trophy,
   Star,
   Zap,
-  Home,
-  UserPlus,
-  Settings,
 } from 'lucide-react';
 import { DashboardLayout, PageShell } from '@/components/v3';
-
-// Navigation configuration for agent pages
-const agentNavigation = [
-  {
-    title: "Agent Portal",
-    items: [
-      { label: "Dashboard", href: "/agent", icon: Home },
-      { label: "My Clients", href: "/agent/clients", icon: Users },
-      { label: "Lead Management", href: "/agent/leads", icon: UserPlus },
-    ],
-  },
-  {
-    title: "Performance",
-    items: [
-      { label: "Commission", href: "/agent/commission", icon: DollarSign },
-      { label: "Performance", href: "/agent/performance", icon: TrendingUp },
-      { label: "Profile", href: "/agent/profile", icon: Settings },
-    ],
-  },
-];
-
-// User configuration
-const agentUser = {
-  name: "Agent User",
-  email: "agent@example.com",
-};
+import { useAuth } from '@/hooks/useAuth';
+import { AGENT_NAVIGATION } from '@/config/agent-navigation';
 
 export default function AgentPerformance() {
+  const { user: authUser } = useAuth();
   const [periodFilter, setPeriodFilter] = useState('this_month');
+
+  // Use actual authenticated user data
+  const agentUser = {
+    name: authUser?.fullName || authUser?.username || 'Agent User',
+    email: authUser?.email || '',
+  };
 
   const { data: performanceData, isLoading } = useQuery({
     queryKey: ['/api/agent/performance', { period: periodFilter }],
@@ -81,7 +61,7 @@ export default function AgentPerformance() {
   };
 
   return (
-    <DashboardLayout navigation={agentNavigation} user={agentUser}>
+    <DashboardLayout navigation={AGENT_NAVIGATION} user={agentUser}>
       <PageShell
         title="Performance Analytics"
         subtitle="Track your performance and rankings"

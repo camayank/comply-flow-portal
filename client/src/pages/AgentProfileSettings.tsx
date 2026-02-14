@@ -20,12 +20,6 @@ import {
 } from '@/components/ui/form';
 import { DashboardLayout, PageShell } from '@/components/v3';
 import {
-  Home,
-  Users,
-  UserPlus,
-  DollarSign,
-  TrendingUp,
-  Settings,
   User,
   Bell,
   Wallet,
@@ -38,30 +32,8 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
-
-const agentNavigation = [
-  {
-    title: "Agent Portal",
-    items: [
-      { label: "Dashboard", href: "/agent", icon: Home },
-      { label: "My Clients", href: "/agent/clients", icon: Users },
-      { label: "Lead Management", href: "/agent/leads", icon: UserPlus },
-    ],
-  },
-  {
-    title: "Performance",
-    items: [
-      { label: "Commission", href: "/agent/commission", icon: DollarSign },
-      { label: "Performance", href: "/agent/performance", icon: TrendingUp },
-      { label: "Profile", href: "/agent/profile", icon: Settings },
-    ],
-  },
-];
-
-const agentUser = {
-  name: "Agent User",
-  email: "agent@example.com",
-};
+import { useAuth } from '@/hooks/useAuth';
+import { AGENT_NAVIGATION } from '@/config/agent-navigation';
 
 const profileFormSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -78,8 +50,15 @@ const bankDetailsSchema = z.object({
 });
 
 export default function AgentProfileSettings() {
+  const { user: authUser } = useAuth();
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
+
+  // Use actual authenticated user data
+  const agentUser = {
+    name: authUser?.fullName || authUser?.username || 'Agent User',
+    email: authUser?.email || '',
+  };
   const [notificationPrefs, setNotificationPrefs] = useState<{
     emailNotifications: boolean;
     smsNotifications: boolean;
@@ -217,7 +196,7 @@ export default function AgentProfileSettings() {
 
   if (isLoading) {
     return (
-      <DashboardLayout navigation={agentNavigation} user={agentUser}>
+      <DashboardLayout navigation={AGENT_NAVIGATION} user={agentUser}>
         <PageShell
           title="Profile & Settings"
           subtitle="Manage your profile and preferences"
@@ -235,7 +214,7 @@ export default function AgentProfileSettings() {
 
   if (error) {
     return (
-      <DashboardLayout navigation={agentNavigation} user={agentUser}>
+      <DashboardLayout navigation={AGENT_NAVIGATION} user={agentUser}>
         <PageShell
           title="Profile & Settings"
           subtitle="Manage your profile and preferences"
@@ -262,7 +241,7 @@ export default function AgentProfileSettings() {
   }
 
   return (
-    <DashboardLayout navigation={agentNavigation} user={agentUser}>
+    <DashboardLayout navigation={AGENT_NAVIGATION} user={agentUser}>
       <PageShell
         title="Profile & Settings"
         subtitle="Manage your profile and preferences"

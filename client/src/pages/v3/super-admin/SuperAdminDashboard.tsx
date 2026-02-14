@@ -10,22 +10,20 @@ import {
 } from "@/components/v3";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/use-auth";
+import { SUPER_ADMIN_NAVIGATION } from "@/config/super-admin-navigation";
 import {
   Crown,
-  LayoutDashboard,
   Building2,
-  Briefcase,
   DollarSign,
-  Percent,
-  Link as LinkIcon,
   ShieldCheck,
-  Settings,
-  BarChart3,
-  FileText,
   Users,
   Activity,
   AlertTriangle,
   CheckCircle,
+  BarChart3,
+  Briefcase,
+  Settings,
 } from "lucide-react";
 
 interface SuperAdminStats {
@@ -46,34 +44,6 @@ interface SecurityIncident {
   tenantName?: string;
 }
 
-const navigation = [
-  {
-    title: "Overview",
-    items: [
-      { label: "Dashboard", href: "/super-admin/dashboard", icon: LayoutDashboard },
-      { label: "Analytics", href: "/super-admin/analytics", icon: BarChart3 },
-    ],
-  },
-  {
-    title: "Platform",
-    items: [
-      { label: "Tenants", href: "/super-admin/tenants", icon: Building2 },
-      { label: "Services", href: "/super-admin/services", icon: Briefcase },
-      { label: "Pricing", href: "/super-admin/pricing", icon: DollarSign },
-      { label: "Commissions", href: "/super-admin/commissions", icon: Percent },
-      { label: "Integrations", href: "/super-admin/integrations", icon: LinkIcon },
-    ],
-  },
-  {
-    title: "Security",
-    items: [
-      { label: "Security", href: "/super-admin/security", icon: ShieldCheck },
-      { label: "Operations", href: "/super-admin/operations", icon: Settings },
-      { label: "Audit Log", href: "/audit-log", icon: FileText },
-    ],
-  },
-];
-
 const severityColors = {
   critical: "bg-red-100 text-red-700",
   high: "bg-orange-100 text-orange-700",
@@ -82,6 +52,7 @@ const severityColors = {
 };
 
 export default function SuperAdminDashboard() {
+  const { user: authUser } = useAuth();
   const { data: stats, isLoading } = useQuery<SuperAdminStats>({
     queryKey: ["/api/super-admin/stats"],
   });
@@ -90,7 +61,11 @@ export default function SuperAdminDashboard() {
     queryKey: ["/api/super-admin/security/incidents", { status: "open", limit: 5 }],
   });
 
-  const user = { name: "Super Admin", email: "superadmin@digicomply.com" };
+  // Use actual authenticated user data
+  const user = {
+    name: authUser?.fullName || authUser?.username || "Super Admin",
+    email: authUser?.email || "",
+  };
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-IN", {
@@ -121,7 +96,7 @@ export default function SuperAdminDashboard() {
 
   return (
     <DashboardLayout
-      navigation={navigation}
+      navigation={SUPER_ADMIN_NAVIGATION}
       user={user}
       logo={
         <div className="flex items-center gap-2">

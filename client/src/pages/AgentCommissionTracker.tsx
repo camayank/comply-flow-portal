@@ -28,42 +28,23 @@ import {
   Download,
   Filter,
   Calendar,
-  Home,
-  Users,
-  UserPlus,
-  Settings,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { SkeletonTable } from '@/components/ui/skeleton-loader';
 import { EmptyList } from '@/components/ui/empty-state';
-
-const agentNavigation = [
-  {
-    title: "Agent Portal",
-    items: [
-      { label: "Dashboard", href: "/agent", icon: Home },
-      { label: "My Clients", href: "/agent/clients", icon: Users },
-      { label: "Lead Management", href: "/agent/leads", icon: UserPlus },
-    ],
-  },
-  {
-    title: "Performance",
-    items: [
-      { label: "Commission", href: "/agent/commission", icon: DollarSign },
-      { label: "Performance", href: "/agent/performance", icon: TrendingUp },
-      { label: "Profile", href: "/agent/profile", icon: Settings },
-    ],
-  },
-];
-
-const agentUser = {
-  name: "Agent User",
-  email: "agent@example.com",
-};
+import { useAuth } from '@/hooks/useAuth';
+import { AGENT_NAVIGATION } from '@/config/agent-navigation';
 
 export default function AgentCommissionTracker() {
+  const { user: authUser } = useAuth();
   const [statusFilter, setStatusFilter] = useState('all');
   const [periodFilter, setPeriodFilter] = useState('all');
+
+  // Use actual authenticated user data
+  const agentUser = {
+    name: authUser?.fullName || authUser?.username || 'Agent User',
+    email: authUser?.email || '',
+  };
 
   const { data: commissionsData, isLoading } = useQuery({
     queryKey: ['/api/agent/commissions', { status: statusFilter, period: periodFilter }],
@@ -120,7 +101,7 @@ export default function AgentCommissionTracker() {
   };
 
   return (
-    <DashboardLayout navigation={agentNavigation} user={agentUser}>
+    <DashboardLayout navigation={AGENT_NAVIGATION} user={agentUser}>
       <PageShell
         title="Commission Tracker"
         subtitle="Track your earnings and payouts"

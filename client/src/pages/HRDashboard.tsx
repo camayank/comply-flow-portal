@@ -11,6 +11,8 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { DashboardLayout, PageShell } from '@/components/v3';
+import { useAuth } from '@/hooks/use-auth';
+import { HR_NAVIGATION } from '@/config/hr-navigation';
 import {
   Users, UserPlus, Search, Filter, BarChart3, TrendingUp,
   Clock, Calendar, Trophy, BookOpen, Target, AlertTriangle,
@@ -18,42 +20,6 @@ import {
   Brain, Zap, PieChart, Activity, Coffee, Home, Settings,
   FileText, DollarSign, GraduationCap, ClipboardList
 } from 'lucide-react';
-
-// HR Navigation Configuration
-const hrNavigation = [
-  {
-    title: "HR Operations",
-    items: [
-      { label: "Dashboard", href: "/hr", icon: Home },
-      { label: "Employee Directory", href: "/hr/employees", icon: Users },
-      { label: "Attendance", href: "/hr/attendance", icon: Clock },
-      { label: "Leave Management", href: "/hr/leave", icon: Calendar },
-    ],
-  },
-  {
-    title: "Performance & Training",
-    items: [
-      { label: "Performance Reviews", href: "/hr/performance", icon: Trophy },
-      { label: "Training Programs", href: "/hr/training", icon: GraduationCap },
-      { label: "Goals & KPIs", href: "/hr/goals", icon: Target },
-    ],
-  },
-  {
-    title: "Reports & Settings",
-    items: [
-      { label: "HR Analytics", href: "/hr/analytics", icon: PieChart },
-      { label: "Payroll Reports", href: "/hr/payroll", icon: DollarSign },
-      { label: "Compliance", href: "/hr/compliance", icon: ClipboardList },
-      { label: "Settings", href: "/hr/settings", icon: Settings },
-    ],
-  },
-];
-
-// HR User Configuration
-const hrUser = {
-  name: "HR Manager",
-  email: "hr@digicomply.com",
-};
 import PerformanceManagement from '@/components/hr/PerformanceManagement';
 import TrainingManagement from '@/components/hr/TrainingManagement';
 import AttendanceManagement from '@/components/hr/AttendanceManagement';
@@ -65,9 +31,16 @@ import { EmptyList } from '@/components/ui/empty-state';
 // HR Dashboard Main Component
 export default function HRDashboard() {
   const [activeTab, setActiveTab] = useState('directory');
+  const { user: authUser } = useAuth();
+
+  // Use actual authenticated user data
+  const user = {
+    name: authUser?.fullName || authUser?.username || 'HR Manager',
+    email: authUser?.email || '',
+  };
 
   return (
-    <DashboardLayout navigation={hrNavigation} user={hrUser}>
+    <DashboardLayout navigation={HR_NAVIGATION} user={user}>
       <PageShell
         title="HR Management"
         subtitle="Manage employees, performance, training, and HR operations"

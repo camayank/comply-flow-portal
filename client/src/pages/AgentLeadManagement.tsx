@@ -25,25 +25,15 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Plus,
   Search,
-  Filter,
   Phone,
   Mail,
-  MapPin,
   Briefcase,
-  TrendingUp,
   CheckCircle,
   XCircle,
   Clock,
   Eye,
-  Edit,
-  ArrowLeft,
-  FileText,
   Upload,
-  Home,
-  Users,
   UserPlus,
-  DollarSign,
-  Settings,
 } from 'lucide-react';
 import { BulkUploadDialogEnhanced, ColumnDefinition, BulkUploadResult } from '@/components/BulkUploadDialogEnhanced';
 import { Link, useLocation } from 'wouter';
@@ -53,6 +43,7 @@ import { SkeletonList } from '@/components/ui/skeleton-loader';
 import { EmptyList, EmptySearchResults } from '@/components/ui/empty-state';
 import { DashboardLayout, PageShell } from '@/components/v3';
 import { useAuth } from '@/hooks/useAuth';
+import { AGENT_NAVIGATION } from '@/config/agent-navigation';
 
 const LEAD_STAGES = {
   NEW: 'new',
@@ -93,26 +84,6 @@ const leadBulkColumns: ColumnDefinition[] = [
   { key: 'city', label: 'City', type: 'text', placeholder: 'Mumbai' },
   { key: 'state', label: 'State', type: 'text', placeholder: 'Maharashtra' },
   { key: 'notes', label: 'Notes', type: 'text', placeholder: 'Additional notes' },
-];
-
-// Navigation configuration for agent pages
-const agentNavigation = [
-  {
-    title: "Agent Portal",
-    items: [
-      { label: "Dashboard", href: "/agent", icon: Home },
-      { label: "My Clients", href: "/agent/clients", icon: Users },
-      { label: "Lead Management", href: "/agent/leads", icon: UserPlus },
-    ],
-  },
-  {
-    title: "Performance",
-    items: [
-      { label: "Commission", href: "/agent/commission", icon: DollarSign },
-      { label: "Performance", href: "/agent/performance", icon: TrendingUp },
-      { label: "Profile", href: "/agent/profile", icon: Settings },
-    ],
-  },
 ];
 
 export default function AgentLeadManagement() {
@@ -279,7 +250,7 @@ export default function AgentLeadManagement() {
 
   return (
     <DashboardLayout
-      navigation={agentNavigation}
+      navigation={AGENT_NAVIGATION}
       user={agentUser}
       logo={
         <div className="flex items-center gap-2">

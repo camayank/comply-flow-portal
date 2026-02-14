@@ -10,13 +10,12 @@ import {
 } from "@/components/v3";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/use-auth";
+import { ADMIN_NAVIGATION } from "@/config/admin-navigation";
 import {
-  LayoutDashboard,
   Users,
-  Building2,
   Briefcase,
   FileBarChart,
-  Workflow,
   Settings,
   Activity,
   TrendingUp,
@@ -39,31 +38,6 @@ interface PendingAction {
   createdAt: string;
 }
 
-const navigation = [
-  {
-    title: "Overview",
-    items: [
-      { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
-      { label: "Reports", href: "/admin/reports", icon: FileBarChart },
-    ],
-  },
-  {
-    title: "Management",
-    items: [
-      { label: "Users", href: "/admin/users", icon: Users },
-      { label: "Clients", href: "/admin/clients", icon: Building2 },
-      { label: "Services", href: "/admin/services", icon: Briefcase },
-      { label: "Blueprints", href: "/admin/blueprints", icon: Workflow },
-    ],
-  },
-  {
-    title: "System",
-    items: [
-      { label: "Configuration", href: "/config", icon: Settings },
-    ],
-  },
-];
-
 const priorityColors = {
   high: "bg-red-100 text-red-700",
   medium: "bg-amber-100 text-amber-700",
@@ -71,6 +45,7 @@ const priorityColors = {
 };
 
 export default function AdminDashboard() {
+  const { user: authUser } = useAuth();
   const { data: stats, isLoading: statsLoading } = useQuery<AdminStats>({
     queryKey: ["/api/admin/dashboard/stats"],
   });
@@ -79,7 +54,11 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/dashboard/pending"],
   });
 
-  const user = { name: "Admin User", email: "admin@digicomply.com" };
+  // Use actual authenticated user data
+  const user = {
+    name: authUser?.fullName || authUser?.username || "Admin User",
+    email: authUser?.email || "",
+  };
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-IN", {
@@ -108,7 +87,7 @@ export default function AdminDashboard() {
 
   return (
     <DashboardLayout
-      navigation={navigation}
+      navigation={ADMIN_NAVIGATION}
       user={user}
       logo={<span className="text-lg font-bold text-slate-900">DigiComply</span>}
     >
