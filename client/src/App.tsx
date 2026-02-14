@@ -42,7 +42,7 @@ const BusinessType = lazy(() => import("./pages/BusinessType"));
 const PackageSelection = lazy(() => import("./pages/PackageSelection"));
 const FounderDetails = lazy(() => import("./pages/FounderDetails"));
 const IndustryClassification = lazy(() => import("./pages/IndustryClassification"));
-const ServiceSelection = lazy(() => import("./pages/ServiceSelection"));
+// DEPRECATED: ServiceSelection - no longer used
 const ServiceFlowDashboard = lazy(() => import("./pages/ServiceFlowDashboard"));
 const DocumentUpload = lazy(() => import("./pages/DocumentUpload"));
 const ESignAgreements = lazy(() => import("./pages/ESignAgreements"));
@@ -71,7 +71,7 @@ const ClientProfile = lazy(() => import("./pages/ClientProfile"));
 const MobileAgentPortal = lazy(() => import("./pages/MobileAgentPortal"));
 const MasterBlueprintDashboard = lazy(() => import("./pages/MasterBlueprintDashboard"));
 // DEPRECATED: UniversalAdminPanel, UniversalOperationsPanel - Merged into refactored panels
-const UniversalLandingPage = lazy(() => import("./pages/UniversalLandingPage"));
+// DEPRECATED: UniversalLandingPage - replaced by v3 LandingPage
 const WorkflowImport = lazy(() => import("./pages/WorkflowImport"));
 const AdminServiceConfig = lazy(() => import("./pages/AdminServiceConfig"));
 const StatusManagement = lazy(() => import("./pages/StatusManagement"));
@@ -112,7 +112,7 @@ const AgentProfileSettings = lazy(() => import("./pages/AgentProfileSettings"));
 const CustomerServiceDashboard = lazy(() => import("./pages/CustomerServiceDashboard"));
 const ClientSupport = lazy(() => import("./pages/ClientSupport"));
 const SuperAdminPortal = lazy(() => import("./pages/SuperAdminPortal"));
-const SuperAdminDashboard = lazy(() => import("./pages/super-admin/SuperAdminDashboard"));
+const SuperAdminDashboardV3 = lazy(() => import("@/pages/v3/super-admin/SuperAdminDashboard"));
 const TenantManagement = lazy(() => import("./pages/super-admin/TenantManagement"));
 const PricingEngine = lazy(() => import("./pages/super-admin/PricingEngine"));
 const CommissionConfig = lazy(() => import("./pages/super-admin/CommissionConfig"));
@@ -495,7 +495,7 @@ const AppContent = () => {
                 <Route path="/help" component={ClientSupport} />
                 <Route path="/tickets" component={ClientSupport} />
                 <Route path="/super-admin" component={SuperAdminPortal} />
-                <Route path="/super-admin/dashboard" component={SuperAdminDashboard} />
+                <Route path="/super-admin/dashboard" component={SuperAdminDashboardV3} />
                 <Route path="/super-admin/tenants" component={TenantManagement} />
                 <Route path="/super-admin/pricing" component={PricingEngine} />
                 <Route path="/super-admin/commissions" component={CommissionConfig} />
