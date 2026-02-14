@@ -437,10 +437,10 @@ export function registerQCRoutes(app: Application) {
           email: users.email,
           activeReviews: sql<number>`
             COALESCE((
-              SELECT COUNT(*) 
-              FROM ${qualityReviews} 
-              WHERE ${qualityReviews.reviewerId} = ${users.id} 
-              AND ${qualityReviews.status} = '${QC_REVIEW_STATUS.IN_PROGRESS}'
+              SELECT COUNT(*)
+              FROM ${qualityReviews}
+              WHERE ${qualityReviews.reviewerId} = ${users.id}
+              AND ${qualityReviews.status} = ${QC_REVIEW_STATUS.IN_PROGRESS}
             ), 0)
           `
         })
@@ -732,10 +732,10 @@ export function registerQCRoutes(app: Application) {
           id: users.id,
           activeReviews: sql<number>`
             COALESCE((
-              SELECT COUNT(*) 
-              FROM ${qualityReviews} 
-              WHERE ${qualityReviews.reviewerId} = ${users.id} 
-              AND ${qualityReviews.status} = '${QC_REVIEW_STATUS.IN_PROGRESS}'
+              SELECT COUNT(*)
+              FROM ${qualityReviews}
+              WHERE ${qualityReviews.reviewerId} = ${users.id}
+              AND ${qualityReviews.status} = ${QC_REVIEW_STATUS.IN_PROGRESS}
             ), 0)
           `
         })

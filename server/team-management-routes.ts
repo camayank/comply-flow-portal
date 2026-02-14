@@ -223,8 +223,20 @@ export function registerTeamManagementRoutes(app: any) {
   // ========== TEAM PERFORMANCE ANALYTICS ==========
   app.get('/api/ops/team-analytics', async (req: Request, res: Response) => {
     try {
-      const { timeframe = '7' } = req.query; // days
-      
+      // Validate and sanitize timeframe to prevent SQL injection
+      const rawTimeframe = req.query.timeframe;
+      const validTimeframes = [7, 14, 30, 60, 90];
+      const timeframeDays = parseInt(String(rawTimeframe || '7'), 10);
+
+      // Validate: must be a positive integer within valid range
+      if (isNaN(timeframeDays) || timeframeDays <= 0 || timeframeDays > 365) {
+        return res.status(400).json({ error: 'Invalid timeframe. Must be a number between 1 and 365.' });
+      }
+
+      // Calculate the start date instead of using string interpolation
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - timeframeDays);
+
       // Overall team metrics
       const [overallMetrics] = await db.select({
         totalTasks: sql<number>`count(*)::int`,
@@ -233,7 +245,7 @@ export function registerTeamManagementRoutes(app: any) {
         slaBreaches: sql<number>`count(case when completed_at > due_at then 1 end)::int`
       })
         .from(tasks)
-        .where(sql`created_at >= CURRENT_DATE - INTERVAL '${timeframe} days'`);
+        .where(gte(tasks.created_at, startDate));
 
       // Task distribution by status
       const statusDistribution = await db.select({
@@ -241,7 +253,7 @@ export function registerTeamManagementRoutes(app: any) {
         count: sql<number>`count(*)::int`
       })
         .from(tasks)
-        .where(sql`created_at >= CURRENT_DATE - INTERVAL '${timeframe} days'`)
+        .where(gte(tasks.created_at, startDate))
         .groupBy(tasks.status);
 
       // Priority distribution
@@ -251,7 +263,7 @@ export function registerTeamManagementRoutes(app: any) {
         avgHours: sql<number>`AVG(actual_hours)`
       })
         .from(tasks)
-        .where(sql`created_at >= CURRENT_DATE - INTERVAL '${timeframe} days'`)
+        .where(gte(tasks.created_at, startDate))
         .groupBy(tasks.priority);
 
       // Daily completion trend
@@ -262,7 +274,7 @@ export function registerTeamManagementRoutes(app: any) {
         .from(tasks)
         .where(and(
           eq(tasks.status, 'completed'),
-          sql`completed_at >= CURRENT_DATE - INTERVAL '${timeframe} days'`
+          gte(tasks.completed_at, startDate)
         ))
         .groupBy(sql`DATE(completed_at)`)
         .orderBy(sql`DATE(completed_at)`);
@@ -283,7 +295,7 @@ export function registerTeamManagementRoutes(app: any) {
         status_distribution: statusDistribution,
         priority_distribution: priorityDistribution,
         completion_trend: completionTrend,
-        timeframe: `${timeframe} days`
+        timeframe: `${timeframeDays} days`
       };
 
       res.json(analytics);

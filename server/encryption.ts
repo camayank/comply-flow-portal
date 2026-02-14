@@ -1,22 +1,31 @@
 import _sodium from 'libsodium-wrappers';
+import { logger } from './logger';
 
 // Encryption key from environment (must be 32 bytes base64)
 const ENCRYPTION_KEY_BASE64 = process.env.CREDENTIAL_ENCRYPTION_KEY || '';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 let encryptionKey: Uint8Array | null = null;
 
 // Initialize encryption
 export async function initializeEncryption(): Promise<void> {
   await _sodium.ready;
-  
+
   if (!ENCRYPTION_KEY_BASE64) {
-    console.warn('⚠️  CREDENTIAL_ENCRYPTION_KEY not set - using development key');
-    // Generate a random key for development (NOT production!)
+    // CRITICAL: Fail fast in production - encryption key is mandatory
+    if (IS_PRODUCTION) {
+      logger.error('CRITICAL: CREDENTIAL_ENCRYPTION_KEY is required in production');
+      throw new Error('CREDENTIAL_ENCRYPTION_KEY environment variable is required in production. Generate one using: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64\'))"');
+    }
+
+    // Development only: Generate temporary key with clear warning
+    logger.warn('CREDENTIAL_ENCRYPTION_KEY not set - using development key (NOT FOR PRODUCTION)');
     encryptionKey = _sodium.crypto_secretbox_keygen();
-    console.warn('⚠️  Development encryption key generated - DO NOT USE IN PRODUCTION');
+    logger.warn('Development encryption key generated - data will be lost on restart');
   } else {
     // Decode base64 key from environment
     encryptionKey = _sodium.from_base64(ENCRYPTION_KEY_BASE64, _sodium.base64_variants.ORIGINAL);
+    logger.info('Encryption initialized with configured key');
   }
 }
 

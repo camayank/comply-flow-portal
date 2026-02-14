@@ -6,7 +6,7 @@ import { workflowEngine } from './workflow-engine';
 import { storage } from './storage';
 
 export interface SyncEvent {
-  type: 'service_update' | 'workflow_progress' | 'combo_trigger' | 'quality_audit' | 'pricing_change' | 'client_action';
+  type: 'service_update' | 'workflow_progress' | 'combo_trigger' | 'quality_audit' | 'pricing_change' | 'client_action' | 'compliance_update' | 'deadline_approaching' | 'action_completed' | 'document_update';
   payload: any;
   timestamp: Date;
   userId?: number;
@@ -308,6 +308,69 @@ export class MiddlewareSyncEngine {
     if (client && client.ws.readyState === WebSocket.OPEN) {
       client.ws.send(JSON.stringify(message));
     }
+  }
+
+  // Public methods for external event broadcasting
+  public broadcastComplianceUpdate(payload: {
+    clientId: number;
+    type: 'status_change' | 'deadline_updated' | 'action_required';
+    message: string;
+    data?: any;
+  }) {
+    this.broadcastEvent({
+      type: 'compliance_update',
+      payload,
+      timestamp: new Date()
+    });
+  }
+
+  public broadcastDeadlineAlert(payload: {
+    clientId: number;
+    deadlineId: number;
+    title: string;
+    dueDate: string;
+    daysLeft: number;
+    priority: 'high' | 'medium' | 'low';
+  }) {
+    this.broadcastEvent({
+      type: 'deadline_approaching',
+      payload,
+      timestamp: new Date()
+    });
+  }
+
+  public broadcastActionCompleted(payload: {
+    clientId: number;
+    actionId: number;
+    title: string;
+    completedBy: string;
+  }) {
+    this.broadcastEvent({
+      type: 'action_completed',
+      payload,
+      timestamp: new Date()
+    });
+  }
+
+  public broadcastDocumentUpdate(payload: {
+    clientId: number;
+    documentId: number;
+    status: 'uploaded' | 'verified' | 'rejected';
+    filename: string;
+  }) {
+    this.broadcastEvent({
+      type: 'document_update',
+      payload,
+      timestamp: new Date()
+    });
+  }
+
+  public sendToUser(userId: number, message: any) {
+    this.clients.forEach((client) => {
+      if (client.state.userId === userId && client.ws.readyState === WebSocket.OPEN) {
+        client.ws.send(JSON.stringify(message));
+      }
+    });
   }
 
   private async startSyncProcesses() {
