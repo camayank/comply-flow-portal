@@ -102,7 +102,7 @@ const ClientMasterDashboard = lazy(() => import("./pages/ClientMasterDashboard")
 const FinancialManagementDashboard = lazy(() => import("./pages/FinancialManagementDashboard"));
 const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
 const BusinessIntelligence = lazy(() => import("./pages/BusinessIntelligence"));
-// DEPRECATED: Consolidated into ClientPortalV2
+// DEPRECATED: Consolidated into ClientDashboardV3
 // const MobileDashboard = lazy(() => import("./pages/MobileDashboard"));
 const AgentDashboard = lazy(() => import("./pages/AgentDashboard"));
 const AgentLeadManagement = lazy(() => import("./pages/AgentLeadManagement"));
@@ -132,7 +132,7 @@ const DigiComplyWorkflowDashboard = lazy(() => import("./components/DigiComplyWo
 const Footer = lazy(() => import("./components/Footer"));
 const FounderLiteDashboard = lazy(() => import("./pages/FounderLiteDashboard"));
 const MobileClientPortalRefactored = lazy(() => import("./pages/MobileClientPortalRefactored"));
-const ClientPortalV2 = lazy(() => import("./pages/ClientPortalV2"));
+const ClientDashboardV3 = lazy(() => import("@/pages/v3/client/ClientDashboard"));
 const MobileOperationsPanelRefactored = lazy(() => import("./pages/MobileOperationsPanelRefactored"));
 const MobileAdminPanelRefactored = lazy(() => import("./pages/MobileAdminPanelRefactored"));
 const SalesProposalManagerRefactored = lazy(() => import("./pages/SalesProposalManagerRefactored"));
@@ -321,7 +321,7 @@ const AppContent = () => {
                 <Route path="/lifecycle/timeline" component={Timeline} />
                 <Route path="/lifecycle/compliance" component={ComplianceDetail} />
                 <Route path="/lifecycle/services" component={ServicesDetail} />
-                <Route path="/portal-v2" component={ClientPortalV2} />
+                <Route path="/portal-v2" component={ClientDashboardV3} />
                 <Route path="/portal-v2/account" component={AccountIndex} />
                 <Route path="/portal-v2/account/businesses" component={AccountBusinesses} />
                 <Route path="/portal-v2/account/billing" component={AccountBilling} />
@@ -466,9 +466,9 @@ const AppContent = () => {
                 <Route path="/bi" component={BusinessIntelligence} />
                 <Route path="/insights" component={BusinessIntelligence} />
                 {/* CONSOLIDATED: Mobile routes redirect to responsive portal-v2 */}
-                <Route path="/mobile-dashboard" component={ClientPortalV2} />
-                <Route path="/mobile" component={ClientPortalV2} />
-                <Route path="/command-center" component={ClientPortalV2} />
+                <Route path="/mobile-dashboard" component={ClientDashboardV3} />
+                <Route path="/mobile" component={ClientDashboardV3} />
+                <Route path="/command-center" component={ClientDashboardV3} />
                 <Route path="/founder" component={FounderLiteDashboard} />
                 <Route path="/compliance-state" component={FounderLiteDashboard} />
                 <Route path="/executive-summary" component={ExecutiveSummary} />
