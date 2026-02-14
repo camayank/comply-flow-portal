@@ -15,45 +15,12 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
-  Home,
-  Briefcase,
-  FileText,
-  Shield,
-  HelpCircle,
-  Settings,
 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { CLIENT_NAVIGATION } from '@/config/client-navigation';
 
-// Navigation configuration for client portal
-const clientNavigation = [
-  {
-    title: "Client Portal",
-    items: [
-      { label: "Dashboard", href: "/client", icon: Home },
-      { label: "My Services", href: "/client/services", icon: Briefcase },
-      { label: "Documents", href: "/client/documents", icon: FileText },
-      { label: "Compliance Calendar", href: "/client/calendar", icon: CalendarIcon },
-    ],
-  },
-  {
-    title: "Compliance",
-    items: [
-      { label: "Compliance Status", href: "/client/compliance", icon: Shield },
-    ],
-  },
-  {
-    title: "Support",
-    items: [
-      { label: "Help & Support", href: "/client/support", icon: HelpCircle },
-      { label: "Settings", href: "/client/settings", icon: Settings },
-    ],
-  },
-];
-
-// User configuration
-const clientUser = {
-  name: "Client",
-  email: "client@digicomply.com",
-};
+// Use shared navigation configuration
+const clientNavigation = CLIENT_NAVIGATION;
 
 interface ComplianceItem {
   id: number;
@@ -67,9 +34,16 @@ interface ComplianceItem {
 }
 
 const ClientComplianceCalendar = () => {
+  const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'list'>('month');
   const [filterCategory, setFilterCategory] = useState<string>('all');
+
+  // Use actual authenticated user data
+  const clientUser = {
+    name: user?.fullName || user?.username || 'Client User',
+    email: user?.email || '',
+  };
 
   // Fetch compliance items from authenticated API
   const { data: complianceItems = [], isLoading, error } = useQuery<ComplianceItem[]>({

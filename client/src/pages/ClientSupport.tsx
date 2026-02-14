@@ -5,7 +5,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   Plus,
-  MessageSquare,
   Clock,
   CheckCircle,
   AlertCircle,
@@ -14,15 +13,10 @@ import {
   Headphones,
   Search,
   ChevronRight,
-  FileText,
   Phone,
-  Home,
-  Briefcase,
-  Calendar,
-  Shield,
-  HelpCircle,
-  Settings
 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { CLIENT_NAVIGATION } from '@/config/client-navigation';
 import { DashboardLayout, PageShell } from '@/components/v3';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,26 +46,8 @@ const ticketFormSchema = z.object({
 
 type TicketFormData = z.infer<typeof ticketFormSchema>;
 
-// Client navigation configuration for v3 design system
-const clientNavigation = [
-  {
-    items: [
-      { label: 'Dashboard', href: '/portal-v2', icon: Home },
-      { label: 'My Services', href: '/portal-v2/services', icon: Briefcase },
-      { label: 'Documents', href: '/vault', icon: FileText },
-      { label: 'Calendar', href: '/compliance-calendar', icon: Calendar },
-      { label: 'Compliance', href: '/portal-v2/compliance', icon: Shield },
-      { label: 'Support', href: '/support', icon: HelpCircle },
-      { label: 'Settings', href: '/portal-v2/settings', icon: Settings },
-    ],
-  },
-];
-
-// Client user configuration
-const clientUser = {
-  name: 'Client User',
-  email: 'client@company.com',
-};
+// Use shared navigation configuration
+const clientNavigation = CLIENT_NAVIGATION;
 
 interface Ticket {
   id: number;
@@ -102,6 +78,7 @@ interface TicketDetails extends Ticket {
 }
 
 export default function ClientSupport() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -112,6 +89,12 @@ export default function ClientSupport() {
   const [satisfactionDialogOpen, setSatisfactionDialogOpen] = useState(false);
   const [selectedRating, setSelectedRating] = useState<number>(0);
   const [satisfactionComment, setSatisfactionComment] = useState('');
+
+  // Use actual authenticated user data
+  const clientUser = {
+    name: user?.fullName || user?.username || 'Client User',
+    email: user?.email || '',
+  };
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });

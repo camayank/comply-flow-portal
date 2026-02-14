@@ -10,18 +10,10 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { DashboardLayout, PageShell } from '@/components/v3';
 import {
-  Home,
-  Briefcase,
-  FileText,
-  Calendar,
-  Shield,
-  HelpCircle,
-  Settings,
   Search,
   ShoppingCart,
   Filter,
   TrendingUp,
-  Building,
   Star,
   Check,
   ArrowRight,
@@ -29,38 +21,10 @@ import {
 import { useCurrentUser } from '@/components/ProtectedRoute';
 import { SkeletonCard } from '@/components/ui/skeleton-loader';
 import { EmptySearchResults } from '@/components/ui/empty-state';
+import { CLIENT_NAVIGATION } from '@/config/client-navigation';
 
-// Navigation configuration for client portal
-const clientNavigation = [
-  {
-    title: "Client Portal",
-    items: [
-      { label: "Dashboard", href: "/client-dashboard", icon: Home },
-      { label: "My Services", href: "/client-services", icon: Briefcase },
-      { label: "Documents", href: "/documents", icon: FileText },
-    ],
-  },
-  {
-    title: "Compliance",
-    items: [
-      { label: "Calendar", href: "/compliance-calendar", icon: Calendar },
-      { label: "Compliance Status", href: "/compliance-status", icon: Shield },
-    ],
-  },
-  {
-    title: "Support",
-    items: [
-      { label: "Help Center", href: "/help", icon: HelpCircle },
-      { label: "Settings", href: "/settings", icon: Settings },
-    ],
-  },
-];
-
-// User configuration
-const clientUser = {
-  name: "Client",
-  email: "client@company.com",
-};
+// Use shared navigation configuration
+const clientNavigation = CLIENT_NAVIGATION;
 
 interface Service {
   id: string;
@@ -78,10 +42,16 @@ interface Service {
 export default function ClientServiceCatalog() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const user = useCurrentUser();
+  const currentUser = useCurrentUser();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+
+  // Use actual authenticated user data
+  const clientUser = {
+    name: currentUser?.fullName || currentUser?.username || 'Client User',
+    email: currentUser?.email || '',
+  };
 
   // Fetch services from API
   const { data: services = [], isLoading } = useQuery<Service[]>({

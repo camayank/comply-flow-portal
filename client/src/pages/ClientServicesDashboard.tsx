@@ -49,13 +49,8 @@ import {
 } from "@/components/ui/select";
 import { DashboardLayout, PageShell } from '@/components/v3';
 import {
-  Home,
-  Briefcase,
   FileText,
   Calendar,
-  Shield,
-  HelpCircle,
-  Settings,
   CheckCircle2,
   Clock,
   AlertCircle,
@@ -63,9 +58,7 @@ import {
   Activity,
   Plus,
   Search,
-  Filter,
   ChevronRight,
-  Building2,
   RefreshCw,
   Bell,
   Eye,
@@ -73,38 +66,10 @@ import {
   Upload
 } from "lucide-react";
 import { format, formatDistanceToNow, isAfter, isBefore, addDays } from "date-fns";
+import { CLIENT_NAVIGATION } from '@/config/client-navigation';
 
-// Navigation configuration for client portal
-const clientNavigation = [
-  {
-    title: "Client Portal",
-    items: [
-      { label: "Dashboard", href: "/client-dashboard", icon: Home },
-      { label: "My Services", href: "/client-services", icon: Briefcase },
-      { label: "Documents", href: "/documents", icon: FileText },
-    ],
-  },
-  {
-    title: "Compliance",
-    items: [
-      { label: "Calendar", href: "/compliance-calendar", icon: Calendar },
-      { label: "Compliance Status", href: "/compliance-status", icon: Shield },
-    ],
-  },
-  {
-    title: "Support",
-    items: [
-      { label: "Help Center", href: "/help", icon: HelpCircle },
-      { label: "Settings", href: "/settings", icon: Settings },
-    ],
-  },
-];
-
-// User configuration
-const clientUser = {
-  name: "Client",
-  email: "client@company.com",
-};
+// Use shared navigation configuration
+const clientNavigation = CLIENT_NAVIGATION;
 
 // Types
 interface ServiceRequest {
@@ -442,6 +407,12 @@ export default function ClientServicesDashboard() {
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRequest, setSelectedRequest] = useState<number | null>(null);
+
+  // Use actual authenticated user data
+  const clientUser = {
+    name: user?.fullName || user?.username || 'Client User',
+    email: user?.email || '',
+  };
 
   // Fetch dashboard data
   const { data: dashboardData, isLoading, refetch } = useQuery({

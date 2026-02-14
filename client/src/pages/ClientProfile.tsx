@@ -29,44 +29,34 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/components/ProtectedRoute';
+import { CLIENT_NAVIGATION } from '@/config/client-navigation';
 
-// Navigation configuration for client portal
-const clientNavigation = [
-  {
-    title: "Client Portal",
-    items: [
-      { label: "Dashboard", href: "/client", icon: Home },
-      { label: "My Services", href: "/client/services", icon: Briefcase },
-      { label: "Documents", href: "/client/documents", icon: FileText },
-    ],
-  },
-  {
-    title: "Compliance",
-    items: [
-      { label: "Calendar", href: "/client/calendar", icon: Calendar },
-      { label: "Compliance Status", href: "/client/compliance", icon: Shield },
-    ],
-  },
-  {
-    title: "Support",
-    items: [
-      { label: "Help Center", href: "/client/help", icon: HelpCircle },
-      { label: "Profile & Settings", href: "/client/profile", icon: Settings },
-    ],
-  },
-];
-
-// User configuration
-const clientUser = {
-  name: "Client",
-  email: "client@digicomply.com",
-};
+// Use shared navigation configuration
+const clientNavigation = CLIENT_NAVIGATION;
 
 const ClientProfile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [copiedReferral, setCopiedReferral] = useState(false);
+
+  // Notification preferences state
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    email: true,
+    sms: false,
+    whatsapp: true,
+    serviceUpdates: true,
+    complianceAlerts: true,
+    paymentReminders: true,
+    marketing: false,
+  });
+
+  // Dynamic user config from auth
+  const clientUser = {
+    name: user?.fullName || user?.username || 'Client User',
+    email: user?.email || '',
+  };
 
   // Fetch user profile
   const { data: profile, isLoading } = useQuery({
@@ -316,7 +306,13 @@ const ClientProfile = () => {
                         <p className="font-medium">Email Notifications</p>
                         <p className="text-sm text-gray-600">Receive updates via email</p>
                       </div>
-                      <input type="checkbox" className="toggle" defaultChecked />
+                      <Switch
+                        checked={notificationPrefs.email}
+                        onCheckedChange={(checked) =>
+                          setNotificationPrefs((prev) => ({ ...prev, email: checked }))
+                        }
+                        data-testid="switch-email"
+                      />
                     </div>
 
                     <div className="flex items-center justify-between">
@@ -324,7 +320,13 @@ const ClientProfile = () => {
                         <p className="font-medium">SMS Notifications</p>
                         <p className="text-sm text-gray-600">Get text messages for important updates</p>
                       </div>
-                      <input type="checkbox" className="toggle" />
+                      <Switch
+                        checked={notificationPrefs.sms}
+                        onCheckedChange={(checked) =>
+                          setNotificationPrefs((prev) => ({ ...prev, sms: checked }))
+                        }
+                        data-testid="switch-sms"
+                      />
                     </div>
 
                     <div className="flex items-center justify-between">
@@ -332,30 +334,85 @@ const ClientProfile = () => {
                         <p className="font-medium">WhatsApp Notifications</p>
                         <p className="text-sm text-gray-600">Updates via WhatsApp</p>
                       </div>
-                      <input type="checkbox" className="toggle" defaultChecked />
+                      <Switch
+                        checked={notificationPrefs.whatsapp}
+                        onCheckedChange={(checked) =>
+                          setNotificationPrefs((prev) => ({ ...prev, whatsapp: checked }))
+                        }
+                        data-testid="switch-whatsapp"
+                      />
                     </div>
 
                     <div className="border-t pt-4">
                       <h4 className="font-medium mb-3">Notification Types</h4>
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" id="service-updates" defaultChecked />
-                          <Label htmlFor="service-updates">Service Request Updates</Label>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="service-updates" className="cursor-pointer">
+                            Service Request Updates
+                          </Label>
+                          <Switch
+                            id="service-updates"
+                            checked={notificationPrefs.serviceUpdates}
+                            onCheckedChange={(checked) =>
+                              setNotificationPrefs((prev) => ({ ...prev, serviceUpdates: checked }))
+                            }
+                            data-testid="switch-service-updates"
+                          />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" id="compliance-alerts" defaultChecked />
-                          <Label htmlFor="compliance-alerts">Compliance Deadline Alerts</Label>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="compliance-alerts" className="cursor-pointer">
+                            Compliance Deadline Alerts
+                          </Label>
+                          <Switch
+                            id="compliance-alerts"
+                            checked={notificationPrefs.complianceAlerts}
+                            onCheckedChange={(checked) =>
+                              setNotificationPrefs((prev) => ({ ...prev, complianceAlerts: checked }))
+                            }
+                            data-testid="switch-compliance-alerts"
+                          />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" id="payment-reminders" defaultChecked />
-                          <Label htmlFor="payment-reminders">Payment Reminders</Label>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="payment-reminders" className="cursor-pointer">
+                            Payment Reminders
+                          </Label>
+                          <Switch
+                            id="payment-reminders"
+                            checked={notificationPrefs.paymentReminders}
+                            onCheckedChange={(checked) =>
+                              setNotificationPrefs((prev) => ({ ...prev, paymentReminders: checked }))
+                            }
+                            data-testid="switch-payment-reminders"
+                          />
                         </div>
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" id="marketing" />
-                          <Label htmlFor="marketing">Marketing & Promotions</Label>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="marketing" className="cursor-pointer">
+                            Marketing & Promotions
+                          </Label>
+                          <Switch
+                            id="marketing"
+                            checked={notificationPrefs.marketing}
+                            onCheckedChange={(checked) =>
+                              setNotificationPrefs((prev) => ({ ...prev, marketing: checked }))
+                            }
+                            data-testid="switch-marketing"
+                          />
                         </div>
                       </div>
                     </div>
+
+                    <Button
+                      onClick={() => {
+                        toast({
+                          title: 'Preferences Saved',
+                          description: 'Your notification preferences have been updated.',
+                        });
+                      }}
+                      className="w-full mt-4"
+                      data-testid="button-save-notifications"
+                    >
+                      Save Notification Preferences
+                    </Button>
                   </CardContent>
                 </Card>
               </TabsContent>

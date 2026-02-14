@@ -22,6 +22,8 @@ import {
   AlertTriangle,
   TrendingUp,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { CLIENT_NAVIGATION } from "@/config/client-navigation";
 
 interface ComplianceStatus {
   state: "GREEN" | "AMBER" | "RED";
@@ -43,17 +45,8 @@ interface ComplianceStatus {
   }>;
 }
 
-const navigation = [
-  {
-    items: [
-      { label: "Dashboard", href: "/portal-v2", icon: LayoutDashboard },
-      { label: "Executive Summary", href: "/executive-summary", icon: BarChart3 },
-      { label: "Compliance Calendar", href: "/compliance-calendar", icon: Calendar },
-      { label: "Documents", href: "/vault", icon: FolderOpen },
-      { label: "Support", href: "/support", icon: HelpCircle },
-    ],
-  },
-];
+// Use shared navigation configuration
+const navigation = CLIENT_NAVIGATION;
 
 const statusColors = {
   GREEN: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700" },
@@ -68,11 +61,16 @@ const priorityColors = {
 };
 
 export default function ClientDashboard() {
+  const { user: authUser } = useAuth();
   const { data, isLoading } = useQuery<ComplianceStatus>({
     queryKey: ["/api/v2/client/status"],
   });
 
-  const user = { name: "John Doe", email: "john@example.com" };
+  // Use actual authenticated user data
+  const user = {
+    name: authUser?.fullName || authUser?.username || "Client User",
+    email: authUser?.email || "",
+  };
 
   const deadlineColumns = [
     { key: "title", header: "Task", sortable: true },
