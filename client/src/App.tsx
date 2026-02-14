@@ -17,7 +17,7 @@ import { canAccessRoute, getRoleDashboardRoute } from "@/utils/roleBasedRouting"
 const PageLoader = () => <SkeletonPage />;
 
 // Lazy load all pages for code splitting
-const UnifiedLanding = lazy(() => import("./pages/UnifiedLanding"));
+const LandingPageV3 = lazy(() => import("@/pages/v3/LandingPage"));
 const UnifiedDashboard = lazy(() => import("./pages/UnifiedDashboard"));
 const MobileResponsiveLanding = lazy(() => import("./pages/MobileResponsiveLanding"));
 const Login = lazy(() => import("./pages/Login"));
@@ -112,6 +112,13 @@ const AgentProfileSettings = lazy(() => import("./pages/AgentProfileSettings"));
 const CustomerServiceDashboard = lazy(() => import("./pages/CustomerServiceDashboard"));
 const ClientSupport = lazy(() => import("./pages/ClientSupport"));
 const SuperAdminPortal = lazy(() => import("./pages/SuperAdminPortal"));
+const SuperAdminDashboard = lazy(() => import("./pages/super-admin/SuperAdminDashboard"));
+const TenantManagement = lazy(() => import("./pages/super-admin/TenantManagement"));
+const PricingEngine = lazy(() => import("./pages/super-admin/PricingEngine"));
+const CommissionConfig = lazy(() => import("./pages/super-admin/CommissionConfig"));
+const SecurityCenter = lazy(() => import("./pages/super-admin/SecurityCenter"));
+const Operations = lazy(() => import("./pages/super-admin/Operations"));
+const Analytics = lazy(() => import("./pages/super-admin/Analytics"));
 const RoleSelection = lazy(() => import("./pages/RoleSelection"));
 const LifecycleDashboard = lazy(() => import("./pages/LifecycleDashboard"));
 const ComplianceDetail = lazy(() => import("./pages/ComplianceDetail"));
@@ -136,6 +143,10 @@ const SalesDashboard = lazy(() => import("./pages/sales/SalesDashboard"));
 const AuditLogViewer = lazy(() => import("./pages/compliance/AuditLogViewer"));
 const DataDeletionRequests = lazy(() => import("./pages/compliance/DataDeletionRequests"));
 const AccessReviews = lazy(() => import("./pages/admin/AccessReviews"));
+const BlueprintManagement = lazy(() => import("./pages/admin/BlueprintManagement"));
+const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminUserManagement = lazy(() => import("./pages/admin/AdminUserManagement"));
+const AdminReports = lazy(() => import("./pages/admin/AdminReports"));
 const SecurityIncidents = lazy(() => import("./pages/security/SecurityIncidents"));
 const EscalationDashboard = lazy(() => import("./pages/operations/EscalationDashboard"));
 const NotificationCenter = lazy(() => import("./pages/notifications/NotificationCenter"));
@@ -143,6 +154,7 @@ const MessageCenter = lazy(() => import("./pages/messaging/MessageCenter"));
 const CommissionDisputes = lazy(() => import("./pages/agent/CommissionDisputes"));
 const AgentKYC = lazy(() => import("./pages/agent/AgentKYC"));
 const ComplianceAlertPreferences = lazy(() => import("./pages/client/ComplianceAlertPreferences"));
+const ExecutiveSummary = lazy(() => import("./pages/ExecutiveSummary"));
 
 const publicRoutePrefixes = [
   '/',
@@ -237,10 +249,10 @@ const AppContent = () => {
               <main id="main-content" className="flex-grow focus:outline-none" tabIndex={-1}>
                 <Suspense fallback={<PageLoader />}>
                   <Switch>
-                <Route path="/" component={UnifiedLanding} />
+                <Route path="/" component={LandingPageV3} />
                 <Route path="/hub" component={DevHub} />
                 <Route path="/dev" component={DevHub} />
-                <Route path="/landing" component={UnifiedLanding} />
+                <Route path="/landing" component={LandingPageV3} />
                 <Route path="/dashboard" component={UnifiedDashboard} />
                 <Route path="/my-dashboard" component={RoleBasedDashboard} />
                 <Route path="/role-dashboard" component={RoleBasedDashboard} />
@@ -322,7 +334,9 @@ const AppContent = () => {
                 <Route path="/admin/api-keys" component={APIKeyManagement} />
                 <Route path="/developer/api-keys" component={APIKeyManagement} />
                 <Route path="/admin/clients" component={ClientMasterDashboard} />
-                <Route path="/admin/users" component={MobileAdminPanelRefactored} />
+                <Route path="/admin/users" component={AdminUserManagement} />
+                <Route path="/admin/dashboard" component={AdminDashboard} />
+                <Route path="/admin/reports" component={AdminReports} />
                 <Route path="/admin/workflow-import" component={WorkflowImport} />
 
                 {/* Customer Success Routes */}
@@ -347,6 +361,9 @@ const AppContent = () => {
                 <Route path="/data-requests" component={DataDeletionRequests} />
                 <Route path="/admin/access-reviews" component={AccessReviews} />
                 <Route path="/access-reviews" component={AccessReviews} />
+                <Route path="/admin/blueprints" component={BlueprintManagement} />
+                <Route path="/admin/enterprise" component={BlueprintManagement} />
+                <Route path="/enterprise-config" component={BlueprintManagement} />
 
                 {/* Security Incidents Routes */}
                 <Route path="/security/incidents" component={SecurityIncidents} />
@@ -454,6 +471,9 @@ const AppContent = () => {
                 <Route path="/command-center" component={ClientPortalV2} />
                 <Route path="/founder" component={FounderLiteDashboard} />
                 <Route path="/compliance-state" component={FounderLiteDashboard} />
+                <Route path="/executive-summary" component={ExecutiveSummary} />
+                <Route path="/investor-summary" component={ExecutiveSummary} />
+                <Route path="/compliance-report" component={ExecutiveSummary} />
                 <Route path="/agent" component={MobileAgentPortal} />
                 <Route path="/agent/dashboard" component={AgentDashboard} />
                 <Route path="/agent/leads" component={AgentLeadManagement} />
@@ -475,6 +495,13 @@ const AppContent = () => {
                 <Route path="/help" component={ClientSupport} />
                 <Route path="/tickets" component={ClientSupport} />
                 <Route path="/super-admin" component={SuperAdminPortal} />
+                <Route path="/super-admin/dashboard" component={SuperAdminDashboard} />
+                <Route path="/super-admin/tenants" component={TenantManagement} />
+                <Route path="/super-admin/pricing" component={PricingEngine} />
+                <Route path="/super-admin/commissions" component={CommissionConfig} />
+                <Route path="/super-admin/security" component={SecurityCenter} />
+                <Route path="/super-admin/operations" component={Operations} />
+                <Route path="/super-admin/analytics" component={Analytics} />
                 {/* CONSOLIDATED: Single onboarding flow */}
                 <Route path="/onboarding" component={SmartStart} />
                 <Route path="/streamlined-onboarding" component={SmartStart} />
