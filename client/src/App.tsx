@@ -144,7 +144,7 @@ const AuditLogViewer = lazy(() => import("./pages/compliance/AuditLogViewer"));
 const DataDeletionRequests = lazy(() => import("./pages/compliance/DataDeletionRequests"));
 const AccessReviews = lazy(() => import("./pages/admin/AccessReviews"));
 const BlueprintManagement = lazy(() => import("./pages/admin/BlueprintManagement"));
-const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
+const AdminDashboardV3 = lazy(() => import("@/pages/v3/admin/AdminDashboard"));
 const AdminUserManagement = lazy(() => import("./pages/admin/AdminUserManagement"));
 const AdminReports = lazy(() => import("./pages/admin/AdminReports"));
 const SecurityIncidents = lazy(() => import("./pages/security/SecurityIncidents"));
@@ -335,7 +335,7 @@ const AppContent = () => {
                 <Route path="/developer/api-keys" component={APIKeyManagement} />
                 <Route path="/admin/clients" component={ClientMasterDashboard} />
                 <Route path="/admin/users" component={AdminUserManagement} />
-                <Route path="/admin/dashboard" component={AdminDashboard} />
+                <Route path="/admin/dashboard" component={AdminDashboardV3} />
                 <Route path="/admin/reports" component={AdminReports} />
                 <Route path="/admin/workflow-import" component={WorkflowImport} />
 
