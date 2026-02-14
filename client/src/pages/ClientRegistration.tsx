@@ -11,7 +11,22 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Building, User, FileText, CheckCircle2, ArrowRight, ArrowLeft, Sparkles } from "lucide-react";
+import { DashboardLayout, PageShell } from '@/components/v3';
+import {
+  Building,
+  User,
+  FileText,
+  CheckCircle2,
+  ArrowRight,
+  ArrowLeft,
+  Sparkles,
+  Home,
+  Briefcase,
+  Calendar,
+  Shield,
+  HelpCircle,
+  Settings
+} from "lucide-react";
 
 const STEPS = [
   { id: 1, title: "Business Details", icon: Building },
@@ -19,6 +34,37 @@ const STEPS = [
   { id: 3, title: "KYC Documents", icon: FileText },
   { id: 4, title: "Services Selection", icon: CheckCircle2 },
 ];
+
+// V3 Navigation Configuration
+const clientNavigation = [
+  {
+    title: "Client Portal",
+    items: [
+      { label: "Dashboard", href: "/client", icon: Home },
+      { label: "My Services", href: "/client/services", icon: Briefcase },
+      { label: "Documents", href: "/client/documents", icon: FileText },
+    ],
+  },
+  {
+    title: "Compliance",
+    items: [
+      { label: "Calendar", href: "/client/calendar", icon: Calendar },
+      { label: "Compliance Status", href: "/client/compliance", icon: Shield },
+    ],
+  },
+  {
+    title: "Support",
+    items: [
+      { label: "Help & Support", href: "/client/support", icon: HelpCircle },
+      { label: "Settings", href: "/client/profile", icon: Settings },
+    ],
+  },
+];
+
+const clientUser = {
+  name: "New Client",
+  email: "registration@complyflow.com",
+};
 
 export default function ClientRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -155,58 +201,65 @@ export default function ClientRegistration() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">Register Your Business</h1>
-          <p className="text-muted-foreground">Complete your registration in 4 simple steps</p>
-        </div>
+    <DashboardLayout
+      navigation={clientNavigation}
+      user={clientUser}
+      logo={<Building className="h-8 w-8 text-blue-600" />}
+    >
+      <PageShell
+        title="Register Your Business"
+        subtitle="Complete your registration in 4 simple steps"
+        breadcrumbs={[
+          { label: "Home", href: "/" },
+          { label: "Registration" },
+        ]}
+      >
+        <div className="max-w-4xl mx-auto">
+          {fromSmartStart && (
+            <Alert className="mb-6 border-green-200 bg-green-50 dark:bg-green-950/20">
+              <Sparkles className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800 dark:text-green-200">
+                <strong>Smart Detection Complete!</strong> Your business details have been pre-filled from our compliance analysis.
+                Review and update if needed.
+              </AlertDescription>
+            </Alert>
+          )}
 
-        {fromSmartStart && (
-          <Alert className="mb-6 border-green-200 bg-green-50 dark:bg-green-950/20">
-            <Sparkles className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800 dark:text-green-200">
-              <strong>Smart Detection Complete!</strong> Your business details have been pre-filled from our compliance analysis.
-              Review and update if needed.
-            </AlertDescription>
-          </Alert>
-        )}
+          <div className="mb-8">
+            <Progress value={progress} className="h-2" />
+            <div className="grid grid-cols-4 gap-2 mt-4">
+              {STEPS.map((step) => {
+                const Icon = step.icon;
+                const isActive = currentStep === step.id;
+                const isCompleted = currentStep > step.id;
 
-        <div className="mb-8">
-          <Progress value={progress} className="h-2" />
-          <div className="grid grid-cols-4 gap-2 mt-4">
-            {STEPS.map((step) => {
-              const Icon = step.icon;
-              const isActive = currentStep === step.id;
-              const isCompleted = currentStep > step.id;
-              
-              return (
-                <div
-                  key={step.id}
-                  className={`flex flex-col items-center gap-2 p-2 rounded-lg ${
-                    isActive
-                      ? "bg-primary/10 text-primary"
-                      : isCompleted
-                      ? "bg-green-50 text-green-600 dark:bg-green-900/20"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="text-xs text-center hidden sm:block">{step.title}</span>
-                </div>
-              );
-            })}
+                return (
+                  <div
+                    key={step.id}
+                    className={`flex flex-col items-center gap-2 p-2 rounded-lg ${
+                      isActive
+                        ? "bg-primary/10 text-primary"
+                        : isCompleted
+                        ? "bg-green-50 text-green-600 dark:bg-green-900/20"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="text-xs text-center hidden sm:block">{step.title}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{STEPS[currentStep - 1].title}</CardTitle>
-            <CardDescription>
-              Step {currentStep} of {STEPS.length}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>{STEPS[currentStep - 1].title}</CardTitle>
+              <CardDescription>
+                Step {currentStep} of {STEPS.length}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
             {currentStep === 1 && (
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -474,10 +527,11 @@ export default function ClientRegistration() {
                   </>
                 )}
               </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </PageShell>
+    </DashboardLayout>
   );
 }

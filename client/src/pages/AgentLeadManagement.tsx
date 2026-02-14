@@ -38,7 +38,12 @@ import {
   Edit,
   ArrowLeft,
   FileText,
-  Upload
+  Upload,
+  Home,
+  Users,
+  UserPlus,
+  DollarSign,
+  Settings,
 } from 'lucide-react';
 import { BulkUploadDialogEnhanced, ColumnDefinition, BulkUploadResult } from '@/components/BulkUploadDialogEnhanced';
 import { Link, useLocation } from 'wouter';
@@ -46,6 +51,8 @@ import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { SkeletonList } from '@/components/ui/skeleton-loader';
 import { EmptyList, EmptySearchResults } from '@/components/ui/empty-state';
+import { DashboardLayout, PageShell } from '@/components/v3';
+import { useAuth } from '@/hooks/useAuth';
 
 const LEAD_STAGES = {
   NEW: 'new',
@@ -88,9 +95,30 @@ const leadBulkColumns: ColumnDefinition[] = [
   { key: 'notes', label: 'Notes', type: 'text', placeholder: 'Additional notes' },
 ];
 
+// Navigation configuration for agent pages
+const agentNavigation = [
+  {
+    title: "Agent Portal",
+    items: [
+      { label: "Dashboard", href: "/agent", icon: Home },
+      { label: "My Clients", href: "/agent/clients", icon: Users },
+      { label: "Lead Management", href: "/agent/leads", icon: UserPlus },
+    ],
+  },
+  {
+    title: "Performance",
+    items: [
+      { label: "Commission", href: "/agent/commission", icon: DollarSign },
+      { label: "Performance", href: "/agent/performance", icon: TrendingUp },
+      { label: "Profile", href: "/agent/profile", icon: Settings },
+    ],
+  },
+];
+
 export default function AgentLeadManagement() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [stageFilter, setStageFilter] = useState('all');
   const [sourceFilter, setSourceFilter] = useState('all');
@@ -109,6 +137,12 @@ export default function AgentLeadManagement() {
     city: '',
     state: '',
   });
+
+  // User config for DashboardLayout
+  const agentUser = user ? {
+    name: user.email || 'Agent User',
+    email: user.email || '',
+  } : undefined;
 
   // Use agent-specific API endpoints
   const { data: leadsData, isLoading } = useQuery({
@@ -244,390 +278,391 @@ export default function AgentLeadManagement() {
   const totalLeads = (agentStats as any)?.totalLeads || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6 lg:p-8">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Link href="/agent/dashboard">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Lead Management
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Track and convert your leads
-            </p>
-          </div>
+    <DashboardLayout
+      navigation={agentNavigation}
+      user={agentUser}
+      logo={
+        <div className="flex items-center gap-2">
+          <UserPlus className="h-6 w-6 text-blue-600" />
+          <span className="text-lg font-bold text-slate-900">Agent</span>
+        </div>
+      }
+    >
+      <PageShell
+        title="Lead Management"
+        subtitle="Track and convert your leads"
+        breadcrumbs={[
+          { label: "Agent Portal", href: "/agent" },
+          { label: "Lead Management" },
+        ]}
+        actions={
           <div className="flex gap-2">
-          <Button variant="outline" size="lg" onClick={() => setBulkUploadOpen(true)} data-testid="button-bulk-upload-leads">
-            <Upload className="h-5 w-5 mr-2" />
-            Bulk Import
-          </Button>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="lg" data-testid="button-add-lead">
-                <Plus className="h-5 w-5 mr-2" />
-                Add Lead
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Create New Lead</DialogTitle>
-                <DialogDescription>
-                  Add a new lead to your pipeline
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="contactName">
-                      Contact Name <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="contactName"
-                      data-testid="input-contact-name"
-                      value={newLead.contactName}
-                      onChange={(e) => setNewLead({ ...newLead, contactName: e.target.value })}
-                      placeholder="John Doe"
-                    />
+            <Button variant="outline" onClick={() => setBulkUploadOpen(true)} data-testid="button-bulk-upload-leads">
+              <Upload className="h-4 w-4 mr-2" />
+              Bulk Import
+            </Button>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-add-lead">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Lead
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create New Lead</DialogTitle>
+                  <DialogDescription>
+                    Add a new lead to your pipeline
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="contactName">
+                        Contact Name <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="contactName"
+                        data-testid="input-contact-name"
+                        value={newLead.contactName}
+                        onChange={(e) => setNewLead({ ...newLead, contactName: e.target.value })}
+                        placeholder="John Doe"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="companyName">Company Name</Label>
+                      <Input
+                        id="companyName"
+                        data-testid="input-company-name"
+                        value={newLead.companyName}
+                        onChange={(e) => setNewLead({ ...newLead, companyName: e.target.value })}
+                        placeholder="Acme Corp"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName">Company Name</Label>
-                    <Input
-                      id="companyName"
-                      data-testid="input-company-name"
-                      value={newLead.companyName}
-                      onChange={(e) => setNewLead({ ...newLead, companyName: e.target.value })}
-                      placeholder="Acme Corp"
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      data-testid="input-email"
-                      value={newLead.email}
-                      onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
-                      placeholder="john@example.com"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        data-testid="input-email"
+                        value={newLead.email}
+                        onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
+                        placeholder="john@example.com"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">
+                        Phone <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="phone"
+                        data-testid="input-phone"
+                        value={newLead.phone}
+                        onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
+                        placeholder="+91 9876543210"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">
-                      Phone <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="phone"
-                      data-testid="input-phone"
-                      value={newLead.phone}
-                      onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
-                      placeholder="+91 9876543210"
-                    />
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="serviceInterested">
-                      Service Interested <span className="text-red-500">*</span>
-                    </Label>
-                    <Input
-                      id="serviceInterested"
-                      data-testid="input-service-interested"
-                      value={newLead.serviceInterested}
-                      onChange={(e) => setNewLead({ ...newLead, serviceInterested: e.target.value })}
-                      placeholder="GST Registration"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="serviceInterested">
+                        Service Interested <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="serviceInterested"
+                        data-testid="input-service-interested"
+                        value={newLead.serviceInterested}
+                        onChange={(e) => setNewLead({ ...newLead, serviceInterested: e.target.value })}
+                        placeholder="GST Registration"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="leadSource">Lead Source</Label>
+                      <Select
+                        value={newLead.leadSource}
+                        onValueChange={(value) => setNewLead({ ...newLead, leadSource: value })}
+                      >
+                        <SelectTrigger data-testid="select-lead-source">
+                          <SelectValue placeholder="Select source" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LEAD_SOURCES.map((source) => (
+                            <SelectItem key={source} value={source}>
+                              {source}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        data-testid="input-city"
+                        value={newLead.city}
+                        onChange={(e) => setNewLead({ ...newLead, city: e.target.value })}
+                        placeholder="Mumbai"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state">State</Label>
+                      <Input
+                        id="state"
+                        data-testid="input-state"
+                        value={newLead.state}
+                        onChange={(e) => setNewLead({ ...newLead, state: e.target.value })}
+                        placeholder="Maharashtra"
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-2">
-                    <Label htmlFor="leadSource">Lead Source</Label>
+                    <Label htmlFor="leadStage">Lead Stage</Label>
                     <Select
-                      value={newLead.leadSource}
-                      onValueChange={(value) => setNewLead({ ...newLead, leadSource: value })}
+                      value={newLead.leadStage}
+                      onValueChange={(value) => setNewLead({ ...newLead, leadStage: value })}
                     >
-                      <SelectTrigger data-testid="select-lead-source">
-                        <SelectValue placeholder="Select source" />
+                      <SelectTrigger data-testid="select-lead-stage">
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {LEAD_SOURCES.map((source) => (
-                          <SelectItem key={source} value={source}>
-                            {source}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value={LEAD_STAGES.NEW}>New</SelectItem>
+                        <SelectItem value={LEAD_STAGES.HOT_LEAD}>Hot Lead</SelectItem>
+                        <SelectItem value={LEAD_STAGES.WARM_LEAD}>Warm Lead</SelectItem>
+                        <SelectItem value={LEAD_STAGES.COLD_LEAD}>Cold Lead</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                      id="city"
-                      data-testid="input-city"
-                      value={newLead.city}
-                      onChange={(e) => setNewLead({ ...newLead, city: e.target.value })}
-                      placeholder="Mumbai"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="state">State</Label>
-                    <Input
-                      id="state"
-                      data-testid="input-state"
-                      value={newLead.state}
-                      onChange={(e) => setNewLead({ ...newLead, state: e.target.value })}
-                      placeholder="Maharashtra"
+                    <Label htmlFor="notes">Notes</Label>
+                    <Textarea
+                      id="notes"
+                      data-testid="textarea-notes"
+                      value={newLead.notes}
+                      onChange={(e) => setNewLead({ ...newLead, notes: e.target.value })}
+                      placeholder="Additional details about the lead..."
+                      rows={3}
                     />
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="leadStage">Lead Stage</Label>
-                  <Select
-                    value={newLead.leadStage}
-                    onValueChange={(value) => setNewLead({ ...newLead, leadStage: value })}
+                <div className="flex justify-end gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsCreateDialogOpen(false)}
+                    data-testid="button-cancel"
                   >
-                    <SelectTrigger data-testid="select-lead-stage">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={LEAD_STAGES.NEW}>New</SelectItem>
-                      <SelectItem value={LEAD_STAGES.HOT_LEAD}>Hot Lead</SelectItem>
-                      <SelectItem value={LEAD_STAGES.WARM_LEAD}>Warm Lead</SelectItem>
-                      <SelectItem value={LEAD_STAGES.COLD_LEAD}>Cold Lead</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleCreateLead}
+                    disabled={createLeadMutation.isPending}
+                    data-testid="button-save-lead"
+                  >
+                    {createLeadMutation.isPending ? 'Creating...' : 'Create Lead'}
+                  </Button>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    data-testid="textarea-notes"
-                    value={newLead.notes}
-                    onChange={(e) => setNewLead({ ...newLead, notes: e.target.value })}
-                    placeholder="Additional details about the lead..."
-                    rows={3}
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsCreateDialogOpen(false)}
-                  data-testid="button-cancel"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleCreateLead}
-                  disabled={createLeadMutation.isPending}
-                  data-testid="button-save-lead"
-                >
-                  {createLeadMutation.isPending ? 'Creating...' : 'Create Lead'}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
           </div>
+        }
+      >
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Total Leads</CardDescription>
+              <CardTitle className="text-2xl">{totalLeads}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>New Leads</CardDescription>
+              <CardTitle className="text-2xl text-blue-600">{stats.new || 0}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Contacted</CardDescription>
+              <CardTitle className="text-2xl text-purple-600">{stats.contacted || 0}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardDescription>Converted</CardDescription>
+              <CardTitle className="text-2xl text-green-600">{stats.converted || 0}</CardTitle>
+            </CardHeader>
+          </Card>
         </div>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Total Leads</CardDescription>
-            <CardTitle className="text-2xl">{totalLeads}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>New Leads</CardDescription>
-            <CardTitle className="text-2xl text-blue-600">{stats.new || 0}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Contacted</CardDescription>
-            <CardTitle className="text-2xl text-purple-600">{stats.contacted || 0}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardDescription>Converted</CardDescription>
-            <CardTitle className="text-2xl text-green-600">{stats.converted || 0}</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
-
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search leads..."
-                data-testid="input-search-leads"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+        {/* Filters */}
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search leads..."
+                  data-testid="input-search-leads"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={stageFilter} onValueChange={setStageFilter}>
+                <SelectTrigger data-testid="select-stage-filter">
+                  <SelectValue placeholder="Filter by stage" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Stages</SelectItem>
+                  <SelectItem value={LEAD_STAGES.HOT_LEAD}>Hot Leads</SelectItem>
+                  <SelectItem value={LEAD_STAGES.WARM_LEAD}>Warm Leads</SelectItem>
+                  <SelectItem value={LEAD_STAGES.COLD_LEAD}>Cold Leads</SelectItem>
+                  <SelectItem value={LEAD_STAGES.CONTACTED}>Contacted</SelectItem>
+                  <SelectItem value={LEAD_STAGES.CONVERTED}>Converted</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger data-testid="select-source-filter">
+                  <SelectValue placeholder="Filter by source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  {LEAD_SOURCES.map((source) => (
+                    <SelectItem key={source} value={source}>
+                      {source}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={stageFilter} onValueChange={setStageFilter}>
-              <SelectTrigger data-testid="select-stage-filter">
-                <SelectValue placeholder="Filter by stage" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Stages</SelectItem>
-                <SelectItem value={LEAD_STAGES.HOT_LEAD}>Hot Leads</SelectItem>
-                <SelectItem value={LEAD_STAGES.WARM_LEAD}>Warm Leads</SelectItem>
-                <SelectItem value={LEAD_STAGES.COLD_LEAD}>Cold Leads</SelectItem>
-                <SelectItem value={LEAD_STAGES.CONTACTED}>Contacted</SelectItem>
-                <SelectItem value={LEAD_STAGES.CONVERTED}>Converted</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={sourceFilter} onValueChange={setSourceFilter}>
-              <SelectTrigger data-testid="select-source-filter">
-                <SelectValue placeholder="Filter by source" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Sources</SelectItem>
-                {LEAD_SOURCES.map((source) => (
-                  <SelectItem key={source} value={source}>
-                    {source}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Leads List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Leads</CardTitle>
-          <CardDescription>
-            {leads.length} lead{leads.length !== 1 ? 's' : ''} found
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <SkeletonList items={4} />
-          ) : leads.length === 0 ? (
-            searchQuery || stageFilter !== 'all' || sourceFilter !== 'all' ? (
-              <EmptySearchResults
-                searchTerm={searchQuery}
-                onClearSearch={() => {
-                  setSearchQuery('');
-                  setStageFilter('all');
-                  setSourceFilter('all');
-                }}
-              />
+        {/* Leads List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>All Leads</CardTitle>
+            <CardDescription>
+              {leads.length} lead{leads.length !== 1 ? 's' : ''} found
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <SkeletonList items={4} />
+            ) : leads.length === 0 ? (
+              searchQuery || stageFilter !== 'all' || sourceFilter !== 'all' ? (
+                <EmptySearchResults
+                  searchTerm={searchQuery}
+                  onClearSearch={() => {
+                    setSearchQuery('');
+                    setStageFilter('all');
+                    setSourceFilter('all');
+                  }}
+                />
+              ) : (
+                <EmptyList
+                  title="No leads found"
+                  description="Start by adding your first lead to the pipeline and track your conversion progress"
+                  actionLabel="Add Your First Lead"
+                  onAction={() => setIsCreateDialogOpen(true)}
+                />
+              )
             ) : (
-              <EmptyList
-                title="No leads found"
-                description="Start by adding your first lead to the pipeline and track your conversion progress"
-                actionLabel="Add Your First Lead"
-                onAction={() => setIsCreateDialogOpen(true)}
-              />
-            )
-          ) : (
-            <div className="space-y-3">
-              {leads.map((lead: any) => (
-                <div
-                  key={lead.id}
-                  className="p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                  data-testid={`lead-card-${lead.id}`}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-semibold text-gray-900 dark:text-white">
-                          {lead.companyName || lead.contactName}
-                        </h3>
-                        <Badge className={getStageColor(lead.stage || lead.leadStage)} variant="secondary">
-                          {getStageIcon(lead.stage || lead.leadStage)}
-                          <span className="ml-1">
-                            {(lead.stage || lead.leadStage)?.replace('_', ' ').toUpperCase()}
-                          </span>
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4" />
-                          {lead.phone}
+              <div className="space-y-3">
+                {leads.map((lead: any) => (
+                  <div
+                    key={lead.id}
+                    className="p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    data-testid={`lead-card-${lead.id}`}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="font-semibold text-gray-900 dark:text-white">
+                            {lead.companyName || lead.contactName}
+                          </h3>
+                          <Badge className={getStageColor(lead.stage || lead.leadStage)} variant="secondary">
+                            {getStageIcon(lead.stage || lead.leadStage)}
+                            <span className="ml-1">
+                              {(lead.stage || lead.leadStage)?.replace('_', ' ').toUpperCase()}
+                            </span>
+                          </Badge>
                         </div>
-                        {lead.email && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm text-gray-600 dark:text-gray-400">
                           <div className="flex items-center gap-2">
-                            <Mail className="h-4 w-4" />
-                            {lead.email}
+                            <Phone className="h-4 w-4" />
+                            {lead.phone}
                           </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <Briefcase className="h-4 w-4" />
-                          {lead.serviceInterested || 'Multiple services'}
+                          {lead.email && (
+                            <div className="flex items-center gap-2">
+                              <Mail className="h-4 w-4" />
+                              {lead.email}
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <Briefcase className="h-4 w-4" />
+                            {lead.serviceInterested || 'Multiple services'}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex gap-2 ml-4">
-                      <Select
-                        value={lead.stage || lead.leadStage}
-                        onValueChange={(value) =>
-                          updateLeadStageMutation.mutate({ leadId: lead.id, stage: value })
-                        }
-                      >
-                        <SelectTrigger className="w-[140px]" data-testid={`select-stage-${lead.id}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={LEAD_STAGES.HOT_LEAD}>Hot Lead</SelectItem>
-                          <SelectItem value={LEAD_STAGES.WARM_LEAD}>Warm Lead</SelectItem>
-                          <SelectItem value={LEAD_STAGES.COLD_LEAD}>Cold Lead</SelectItem>
-                          <SelectItem value={LEAD_STAGES.CONTACTED}>Contacted</SelectItem>
-                          <SelectItem value={LEAD_STAGES.CONVERTED}>Converted</SelectItem>
-                          <SelectItem value={LEAD_STAGES.LOST}>Lost</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        data-testid={`button-view-${lead.id}`}
-                        onClick={() => navigate(`/agent/leads/${lead.id}`)}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-2 ml-4">
+                        <Select
+                          value={lead.stage || lead.leadStage}
+                          onValueChange={(value) =>
+                            updateLeadStageMutation.mutate({ leadId: lead.id, stage: value })
+                          }
+                        >
+                          <SelectTrigger className="w-[140px]" data-testid={`select-stage-${lead.id}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={LEAD_STAGES.HOT_LEAD}>Hot Lead</SelectItem>
+                            <SelectItem value={LEAD_STAGES.WARM_LEAD}>Warm Lead</SelectItem>
+                            <SelectItem value={LEAD_STAGES.COLD_LEAD}>Cold Lead</SelectItem>
+                            <SelectItem value={LEAD_STAGES.CONTACTED}>Contacted</SelectItem>
+                            <SelectItem value={LEAD_STAGES.CONVERTED}>Converted</SelectItem>
+                            <SelectItem value={LEAD_STAGES.LOST}>Lost</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          data-testid={`button-view-${lead.id}`}
+                          onClick={() => navigate(`/agent/leads/${lead.id}`)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-      {/* Bulk Upload Dialog */}
-      <BulkUploadDialogEnhanced
-        open={bulkUploadOpen}
-        onOpenChange={setBulkUploadOpen}
-        title="Bulk Import Leads"
-        description="Upload multiple leads at once using Excel or CSV file"
-        columns={leadBulkColumns}
-        onUpload={handleBulkUpload}
-        sampleData={[
-          { contactName: 'John Doe', companyName: 'ABC Corp', email: 'john@abc.com', phone: '+91 9876543210', serviceInterested: 'GST Registration', leadSource: 'Website', leadStage: 'hot_lead', city: 'Mumbai', state: 'Maharashtra', notes: 'Interested in premium plan' },
-          { contactName: 'Jane Smith', companyName: 'XYZ Ltd', email: 'jane@xyz.com', phone: '+91 8765432109', serviceInterested: 'Company Incorporation', leadSource: 'Referral', leadStage: 'warm_lead', city: 'Delhi', state: 'Delhi', notes: 'Referred by existing client' },
-        ]}
-      />
-    </div>
+        {/* Bulk Upload Dialog */}
+        <BulkUploadDialogEnhanced
+          open={bulkUploadOpen}
+          onOpenChange={setBulkUploadOpen}
+          title="Bulk Import Leads"
+          description="Upload multiple leads at once using Excel or CSV file"
+          columns={leadBulkColumns}
+          onUpload={handleBulkUpload}
+          sampleData={[
+            { contactName: 'John Doe', companyName: 'ABC Corp', email: 'john@abc.com', phone: '+91 9876543210', serviceInterested: 'GST Registration', leadSource: 'Website', leadStage: 'hot_lead', city: 'Mumbai', state: 'Maharashtra', notes: 'Interested in premium plan' },
+            { contactName: 'Jane Smith', companyName: 'XYZ Ltd', email: 'jane@xyz.com', phone: '+91 8765432109', serviceInterested: 'Company Incorporation', leadSource: 'Referral', leadStage: 'warm_lead', city: 'Delhi', state: 'Delhi', notes: 'Referred by existing client' },
+          ]}
+        />
+      </PageShell>
+    </DashboardLayout>
   );
 }

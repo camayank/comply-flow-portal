@@ -47,12 +47,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DashboardLayout, PageShell } from '@/components/v3';
 import {
+  Home,
+  Briefcase,
+  FileText,
+  Calendar,
+  Shield,
+  HelpCircle,
+  Settings,
   CheckCircle2,
   Clock,
   AlertCircle,
-  FileText,
-  Calendar,
   TrendingUp,
   Activity,
   Plus,
@@ -67,6 +73,38 @@ import {
   Upload
 } from "lucide-react";
 import { format, formatDistanceToNow, isAfter, isBefore, addDays } from "date-fns";
+
+// Navigation configuration for client portal
+const clientNavigation = [
+  {
+    title: "Client Portal",
+    items: [
+      { label: "Dashboard", href: "/client-dashboard", icon: Home },
+      { label: "My Services", href: "/client-services", icon: Briefcase },
+      { label: "Documents", href: "/documents", icon: FileText },
+    ],
+  },
+  {
+    title: "Compliance",
+    items: [
+      { label: "Calendar", href: "/compliance-calendar", icon: Calendar },
+      { label: "Compliance Status", href: "/compliance-status", icon: Shield },
+    ],
+  },
+  {
+    title: "Support",
+    items: [
+      { label: "Help Center", href: "/help", icon: HelpCircle },
+      { label: "Settings", href: "/settings", icon: Settings },
+    ],
+  },
+];
+
+// User configuration
+const clientUser = {
+  name: "Client",
+  email: "client@company.com",
+};
 
 // Types
 interface ServiceRequest {
@@ -435,229 +473,237 @@ export default function ClientServicesDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <DashboardLayout navigation={clientNavigation} user={clientUser}>
+        <PageShell
+          title="My Services"
+          subtitle="Loading your compliance services..."
+        >
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        </PageShell>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">My Services</h1>
-          <p className="text-muted-foreground">
-            {entity?.name || 'Welcome'} • Track all your compliance services
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
-          <Link href="/services">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              New Service Request
+    <DashboardLayout navigation={clientNavigation} user={clientUser}>
+      <PageShell
+        title="My Services"
+        subtitle={`${entity?.name || 'Welcome'} - Track all your compliance services`}
+        breadcrumbs={[
+          { label: "Client Portal", href: "/client-dashboard" },
+          { label: "My Services" },
+        ]}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => refetch()}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
             </Button>
-          </Link>
+            <Link href="/services">
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                New Service Request
+              </Button>
+            </Link>
+          </div>
+        }
+      >
+        {/* Stats Overview */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <StatsCard
+            title="Total Services"
+            value={stats?.total || 0}
+            icon={FileText}
+            color="text-gray-900"
+            bgColor="bg-gray-50"
+            onClick={() => setActiveTab("all")}
+          />
+          <StatsCard
+            title="Active"
+            value={stats?.active || 0}
+            icon={Activity}
+            color="text-blue-600"
+            bgColor="bg-blue-50"
+            onClick={() => setActiveTab("active")}
+          />
+          <StatsCard
+            title="In Progress"
+            value={stats?.inProgress || 0}
+            icon={TrendingUp}
+            color="text-purple-600"
+            bgColor="bg-purple-50"
+            onClick={() => setActiveTab("active")}
+          />
+          <StatsCard
+            title="Pending Action"
+            value={stats?.pending || 0}
+            icon={Clock}
+            color="text-orange-600"
+            bgColor="bg-orange-50"
+            onClick={() => setActiveTab("pending")}
+          />
+          <StatsCard
+            title="Completed"
+            value={stats?.completed || 0}
+            icon={CheckCircle2}
+            color="text-green-600"
+            bgColor="bg-green-50"
+            onClick={() => setActiveTab("completed")}
+          />
         </div>
-      </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <StatsCard
-          title="Total Services"
-          value={stats?.total || 0}
-          icon={FileText}
-          color="text-gray-900"
-          bgColor="bg-gray-50"
-          onClick={() => setActiveTab("all")}
-        />
-        <StatsCard
-          title="Active"
-          value={stats?.active || 0}
-          icon={Activity}
-          color="text-blue-600"
-          bgColor="bg-blue-50"
-          onClick={() => setActiveTab("active")}
-        />
-        <StatsCard
-          title="In Progress"
-          value={stats?.inProgress || 0}
-          icon={TrendingUp}
-          color="text-purple-600"
-          bgColor="bg-purple-50"
-          onClick={() => setActiveTab("active")}
-        />
-        <StatsCard
-          title="Pending Action"
-          value={stats?.pending || 0}
-          icon={Clock}
-          color="text-orange-600"
-          bgColor="bg-orange-50"
-          onClick={() => setActiveTab("pending")}
-        />
-        <StatsCard
-          title="Completed"
-          value={stats?.completed || 0}
-          icon={CheckCircle2}
-          color="text-green-600"
-          bgColor="bg-green-50"
-          onClick={() => setActiveTab("completed")}
-        />
-      </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content - Service List */}
+          <div className="lg:col-span-2 space-y-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <Tabs value={activeTab} onValueChange={setActiveTab}>
+                    <TabsList>
+                      <TabsTrigger value="all">All ({requests?.length || 0})</TabsTrigger>
+                      <TabsTrigger value="active">Active ({stats?.active || 0})</TabsTrigger>
+                      <TabsTrigger value="pending">Pending ({stats?.pending || 0})</TabsTrigger>
+                      <TabsTrigger value="completed">Completed ({stats?.completed || 0})</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* Search */}
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search services..."
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content - Service List */}
-        <div className="lg:col-span-2 space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList>
-                    <TabsTrigger value="all">All ({requests?.length || 0})</TabsTrigger>
-                    <TabsTrigger value="active">Active ({stats?.active || 0})</TabsTrigger>
-                    <TabsTrigger value="pending">Pending ({stats?.pending || 0})</TabsTrigger>
-                    <TabsTrigger value="completed">Completed ({stats?.completed || 0})</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {/* Search */}
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search services..."
-                  className="pl-10"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+                {/* Service Cards Grid */}
+                {filteredRequests.length === 0 ? (
+                  <div className="text-center py-12">
+                    <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="font-medium">No services found</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {searchQuery ? 'Try a different search term' : 'Get started by requesting a new service'}
+                    </p>
+                    <Link href="/services">
+                      <Button>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Browse Services
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredRequests.map((request: ServiceRequest) => (
+                      <Dialog key={request.id}>
+                        <DialogTrigger asChild>
+                          <div>
+                            <ServiceCard
+                              request={request}
+                              onClick={() => setSelectedRequest(request.id)}
+                            />
+                          </div>
+                        </DialogTrigger>
+                        <ServiceDetailDialog
+                          requestId={request.id}
+                          onClose={() => setSelectedRequest(null)}
+                        />
+                      </Dialog>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
-              {/* Service Cards Grid */}
-              {filteredRequests.length === 0 ? (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="font-medium">No services found</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {searchQuery ? 'Try a different search term' : 'Get started by requesting a new service'}
+          {/* Sidebar - Deadlines & Activity */}
+          <div className="space-y-4">
+            {/* Upcoming Deadlines */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Upcoming Deadlines
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {upcomingDeadlines && upcomingDeadlines.length > 0 ? (
+                  <div className="space-y-2">
+                    {upcomingDeadlines.slice(0, 5).map((item: any) => (
+                      <DeadlineItem key={item.id} request={item} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No upcoming deadlines
                   </p>
-                  <Link href="/services">
-                    <Button>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Browse Services
-                    </Button>
-                  </Link>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {filteredRequests.map((request: ServiceRequest) => (
-                    <Dialog key={request.id}>
-                      <DialogTrigger asChild>
-                        <div>
-                          <ServiceCard
-                            request={request}
-                            onClick={() => setSelectedRequest(request.id)}
-                          />
-                        </div>
-                      </DialogTrigger>
-                      <ServiceDetailDialog
-                        requestId={request.id}
-                        onClose={() => setSelectedRequest(null)}
-                      />
-                    </Dialog>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Recent Activity */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Recent Updates
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {recentActivity && recentActivity.length > 0 ? (
+                  <div className="space-y-1">
+                    {recentActivity.slice(0, 5).map((item: any) => (
+                      <ActivityItem key={item.id} activity={item} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No recent activity
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Link href="/services" className="block">
+                  <Button variant="outline" className="w-full justify-start">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Request New Service
+                  </Button>
+                </Link>
+                <Link href="/documents" className="block">
+                  <Button variant="outline" className="w-full justify-start">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Upload Documents
+                  </Button>
+                </Link>
+                <Link href="/compliance-calendar" className="block">
+                  <Button variant="outline" className="w-full justify-start">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    View Compliance Calendar
+                  </Button>
+                </Link>
+                <Link href="/support" className="block">
+                  <Button variant="outline" className="w-full justify-start">
+                    <Bell className="h-4 w-4 mr-2" />
+                    Contact Support
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-
-        {/* Sidebar - Deadlines & Activity */}
-        <div className="space-y-4">
-          {/* Upcoming Deadlines */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Upcoming Deadlines
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {upcomingDeadlines && upcomingDeadlines.length > 0 ? (
-                <div className="space-y-2">
-                  {upcomingDeadlines.slice(0, 5).map((item: any) => (
-                    <DeadlineItem key={item.id} request={item} />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No upcoming deadlines
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Recent Activity */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Activity className="h-5 w-5" />
-                Recent Updates
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {recentActivity && recentActivity.length > 0 ? (
-                <div className="space-y-1">
-                  {recentActivity.slice(0, 5).map((item: any) => (
-                    <ActivityItem key={item.id} activity={item} />
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No recent activity
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Link href="/services" className="block">
-                <Button variant="outline" className="w-full justify-start">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Request New Service
-                </Button>
-              </Link>
-              <Link href="/documents" className="block">
-                <Button variant="outline" className="w-full justify-start">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload Documents
-                </Button>
-              </Link>
-              <Link href="/compliance-calendar" className="block">
-                <Button variant="outline" className="w-full justify-start">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  View Compliance Calendar
-                </Button>
-              </Link>
-              <Link href="/support" className="block">
-                <Button variant="outline" className="w-full justify-start">
-                  <Bell className="h-4 w-4 mr-2" />
-                  Contact Support
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
+      </PageShell>
+    </DashboardLayout>
   );
 }

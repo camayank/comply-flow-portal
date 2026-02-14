@@ -15,8 +15,15 @@ import {
   Search,
   ChevronRight,
   FileText,
-  Phone
+  Phone,
+  Home,
+  Briefcase,
+  Calendar,
+  Shield,
+  HelpCircle,
+  Settings
 } from 'lucide-react';
+import { DashboardLayout, PageShell } from '@/components/v3';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -44,6 +51,27 @@ const ticketFormSchema = z.object({
 });
 
 type TicketFormData = z.infer<typeof ticketFormSchema>;
+
+// Client navigation configuration for v3 design system
+const clientNavigation = [
+  {
+    items: [
+      { label: 'Dashboard', href: '/portal-v2', icon: Home },
+      { label: 'My Services', href: '/portal-v2/services', icon: Briefcase },
+      { label: 'Documents', href: '/vault', icon: FileText },
+      { label: 'Calendar', href: '/compliance-calendar', icon: Calendar },
+      { label: 'Compliance', href: '/portal-v2/compliance', icon: Shield },
+      { label: 'Support', href: '/support', icon: HelpCircle },
+      { label: 'Settings', href: '/portal-v2/settings', icon: Settings },
+    ],
+  },
+];
+
+// Client user configuration
+const clientUser = {
+  name: 'Client User',
+  email: 'client@company.com',
+};
 
 interface Ticket {
   id: number;
@@ -320,149 +348,149 @@ export default function ClientSupport() {
   );
 
   return (
-    <div className="container mx-auto py-6 px-4 max-w-5xl">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl">
-            <Headphones className="h-6 w-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Support Center</h1>
-            <p className="text-muted-foreground">Get help with your compliance needs</p>
-          </div>
-        </div>
+    <DashboardLayout
+      navigation={clientNavigation}
+      user={clientUser}
+      logo={<span className="text-lg font-bold text-slate-900">DigiComply</span>}
+    >
+      <PageShell
+        title="Support Center"
+        subtitle="Get help with your compliance needs"
+        breadcrumbs={[
+          { label: 'Dashboard', href: '/portal-v2' },
+          { label: 'Support' },
+        ]}
+        actions={
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-new-ticket">
+                <Plus className="w-4 h-4 mr-2" />
+                New Support Request
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Create Support Request</DialogTitle>
+                <DialogDescription>
+                  Tell us how we can help you. Our team will respond within 24 hours.
+                </DialogDescription>
+              </DialogHeader>
 
-        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-new-ticket">
-              <Plus className="w-4 h-4 mr-2" />
-              New Support Request
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Create Support Request</DialogTitle>
-              <DialogDescription>
-                Tell us how we can help you. Our team will respond within 24 hours.
-              </DialogDescription>
-            </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-category">
+                              <SelectValue placeholder="Select category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="billing">Billing & Payments</SelectItem>
+                            <SelectItem value="service">Service Requests</SelectItem>
+                            <SelectItem value="compliance">Compliance Issues</SelectItem>
+                            <SelectItem value="technical">Technical Support</SelectItem>
+                            <SelectItem value="general">General Inquiry</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormField
+                    control={form.control}
+                    name="subject"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Subject</FormLabel>
                         <FormControl>
-                          <SelectTrigger data-testid="select-category">
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
+                          <Input
+                            placeholder="Brief description of your issue"
+                            {...field}
+                            data-testid="input-subject"
+                          />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="billing">💰 Billing & Payments</SelectItem>
-                          <SelectItem value="service">📋 Service Requests</SelectItem>
-                          <SelectItem value="compliance">✅ Compliance Issues</SelectItem>
-                          <SelectItem value="technical">🔧 Technical Support</SelectItem>
-                          <SelectItem value="general">📌 General Inquiry</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="subject"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Subject</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Brief description of your issue"
-                          {...field}
-                          data-testid="input-subject"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="Please provide details about your issue or question..."
-                          rows={5}
-                          {...field}
-                          data-testid="input-description"
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Include any relevant details like order numbers, dates, or error messages.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="priority"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Priority</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
                         <FormControl>
-                          <SelectTrigger data-testid="select-priority">
-                            <SelectValue placeholder="Select priority" />
-                          </SelectTrigger>
+                          <Textarea
+                            placeholder="Please provide details about your issue or question..."
+                            rows={5}
+                            {...field}
+                            data-testid="input-description"
+                          />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="low">Low - General inquiry</SelectItem>
-                          <SelectItem value="medium">Medium - Need help soon</SelectItem>
-                          <SelectItem value="high">High - Affecting my work</SelectItem>
-                          <SelectItem value="urgent">Urgent - Critical issue</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormDescription>
+                          Include any relevant details like order numbers, dates, or error messages.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setCreateDialogOpen(false)}
-                    data-testid="button-cancel"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={createTicketMutation.isPending}
-                    data-testid="button-submit-ticket"
-                  >
-                    {createTicketMutation.isPending ? 'Submitting...' : 'Submit Request'}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-      </div>
+                  <FormField
+                    control={form.control}
+                    name="priority"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Priority</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-priority">
+                              <SelectValue placeholder="Select priority" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="low">Low - General inquiry</SelectItem>
+                            <SelectItem value="medium">Medium - Need help soon</SelectItem>
+                            <SelectItem value="high">High - Affecting my work</SelectItem>
+                            <SelectItem value="urgent">Urgent - Critical issue</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-      {/* Quick Stats */}
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setCreateDialogOpen(false)}
+                      data-testid="button-cancel"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={createTicketMutation.isPending}
+                      data-testid="button-submit-ticket"
+                    >
+                      {createTicketMutation.isPending ? 'Submitting...' : 'Submit Request'}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        }
+      >
+        {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
@@ -779,6 +807,7 @@ export default function ClientSupport() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </PageShell>
+    </DashboardLayout>
   );
 }

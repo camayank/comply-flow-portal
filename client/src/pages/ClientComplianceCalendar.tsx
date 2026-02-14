@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DashboardLayout, PageShell } from '@/components/v3';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -14,7 +15,45 @@ import {
   Bell,
   ChevronLeft,
   ChevronRight,
+  Home,
+  Briefcase,
+  FileText,
+  Shield,
+  HelpCircle,
+  Settings,
 } from 'lucide-react';
+
+// Navigation configuration for client portal
+const clientNavigation = [
+  {
+    title: "Client Portal",
+    items: [
+      { label: "Dashboard", href: "/client", icon: Home },
+      { label: "My Services", href: "/client/services", icon: Briefcase },
+      { label: "Documents", href: "/client/documents", icon: FileText },
+      { label: "Compliance Calendar", href: "/client/calendar", icon: CalendarIcon },
+    ],
+  },
+  {
+    title: "Compliance",
+    items: [
+      { label: "Compliance Status", href: "/client/compliance", icon: Shield },
+    ],
+  },
+  {
+    title: "Support",
+    items: [
+      { label: "Help & Support", href: "/client/support", icon: HelpCircle },
+      { label: "Settings", href: "/client/settings", icon: Settings },
+    ],
+  },
+];
+
+// User configuration
+const clientUser = {
+  name: "Client",
+  email: "client@digicomply.com",
+};
 
 interface ComplianceItem {
   id: number;
@@ -97,33 +136,31 @@ const ClientComplianceCalendar = () => {
     : upcomingItems.filter((item) => item.category === filterCategory);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <CalendarIcon className="h-6 w-6 text-blue-600" />
-                Compliance Calendar
-              </h1>
-              <p className="text-sm text-gray-600 mt-1">Track all your compliance deadlines in one place</p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" data-testid="button-set-reminder">
-                <Bell className="h-4 w-4 mr-2" />
-                Set Reminders
-              </Button>
-              <Button variant="outline" size="sm" data-testid="button-download-calendar">
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
-            </div>
+    <DashboardLayout
+      navigation={clientNavigation}
+      user={clientUser}
+    >
+      <PageShell
+        title="Compliance Calendar"
+        subtitle="Track all your compliance deadlines in one place"
+        breadcrumbs={[
+          { label: "Client Portal", href: "/client" },
+          { label: "Compliance Calendar" },
+        ]}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" data-testid="button-set-reminder">
+              <Bell className="h-4 w-4 mr-2" />
+              Set Reminders
+            </Button>
+            <Button variant="outline" size="sm" data-testid="button-download-calendar">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
           </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        }
+      >
+        <div className="space-y-6">
         {/* Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card>
@@ -471,8 +508,9 @@ const ClientComplianceCalendar = () => {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
-    </div>
+        </div>
+      </PageShell>
+    </DashboardLayout>
   );
 };
 

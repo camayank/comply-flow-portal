@@ -1,15 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { getStatusColor, chartColors } from '@/lib/design-system-utils';
+import { DashboardLayout, PageShell } from '@/components/v3';
 import {
   DollarSign,
   TrendingUp,
@@ -17,26 +16,27 @@ import {
   Calculator,
   FileText,
   AlertTriangle,
-  CheckCircle,
   Clock,
   BarChart3,
   PieChart,
   Target,
   Wallet,
-  CreditCard,
   Receipt,
   Plus,
-  Filter,
   Download,
   Eye,
   Edit,
   RefreshCw,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  LayoutDashboard,
+  CreditCard,
+  Building2,
+  Users
 } from 'lucide-react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { LineChart, Line, AreaChart, Area, BarChart, Bar, PieChart as RechartsPieChart, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface FinancialSummary {
   totalRevenue: number;
@@ -95,6 +95,38 @@ interface BudgetPlan {
   status: string;
 }
 
+// Finance navigation configuration
+const financeNavigation = [
+  {
+    title: "Financial Overview",
+    items: [
+      { label: "Dashboard", href: "/financial-management", icon: LayoutDashboard },
+      { label: "Revenue Analytics", href: "/revenue-analytics", icon: TrendingUp },
+      { label: "Invoices", href: "/financial-management?tab=invoices", icon: Receipt },
+    ],
+  },
+  {
+    title: "Management",
+    items: [
+      { label: "Budget Planning", href: "/financial-management?tab=budgeting", icon: Target },
+      { label: "Reports", href: "/financial-management?tab=reports", icon: BarChart3 },
+      { label: "Clients", href: "/clients", icon: Building2 },
+    ],
+  },
+  {
+    title: "Settings",
+    items: [
+      { label: "Payment Methods", href: "/settings/payments", icon: CreditCard },
+      { label: "Team", href: "/settings/team", icon: Users },
+    ],
+  },
+];
+
+const financeUser = {
+  name: "Finance Manager",
+  email: "finance@digicomply.com",
+};
+
 const FinancialManagementDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [dateRange, setDateRange] = useState('monthly');
@@ -146,43 +178,39 @@ const FinancialManagementDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <DollarSign className="h-8 w-8 text-success" aria-hidden="true" />
-              <div>
-                <h1 className="text-xl font-bold text-foreground">Financial Management</h1>
-                <p className="text-sm text-muted-foreground">Revenue analytics, invoicing, and financial planning</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger className="w-32" data-testid="select-date-range">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="quarterly">Quarterly</SelectItem>
-                  <SelectItem value="yearly">Yearly</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                variant="success"
-                data-testid="button-create-invoice"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Invoice
-              </Button>
-            </div>
+    <DashboardLayout
+      navigation={financeNavigation}
+      user={financeUser}
+      logo={<span className="text-xl font-bold text-primary">DigiComply</span>}
+    >
+      <PageShell
+        title="Financial Management"
+        subtitle="Revenue analytics, invoicing, and financial planning"
+        breadcrumbs={[
+          { label: "Finance", href: "/financial-management" },
+          { label: "Dashboard" },
+        ]}
+        actions={
+          <div className="flex gap-2">
+            <Select value={dateRange} onValueChange={setDateRange}>
+              <SelectTrigger className="w-32" data-testid="select-date-range">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="quarterly">Quarterly</SelectItem>
+                <SelectItem value="yearly">Yearly</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button data-testid="button-create-invoice">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Invoice
+            </Button>
           </div>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        }
+      >
+        <div className="space-y-6">
         {/* Financial Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card data-testid="card-total-revenue">
@@ -665,7 +693,8 @@ const FinancialManagementDashboard = () => {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
+  </DashboardLayout>
   );
 };
 

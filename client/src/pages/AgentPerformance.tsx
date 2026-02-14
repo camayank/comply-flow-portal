@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,18 +12,45 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  ArrowLeft,
   TrendingUp,
-  TrendingDown,
   Award,
   Target,
   Users,
   DollarSign,
   Trophy,
   Star,
-  Zap
+  Zap,
+  Home,
+  UserPlus,
+  Settings,
 } from 'lucide-react';
-import { Link } from 'wouter';
+import { DashboardLayout, PageShell } from '@/components/v3';
+
+// Navigation configuration for agent pages
+const agentNavigation = [
+  {
+    title: "Agent Portal",
+    items: [
+      { label: "Dashboard", href: "/agent", icon: Home },
+      { label: "My Clients", href: "/agent/clients", icon: Users },
+      { label: "Lead Management", href: "/agent/leads", icon: UserPlus },
+    ],
+  },
+  {
+    title: "Performance",
+    items: [
+      { label: "Commission", href: "/agent/commission", icon: DollarSign },
+      { label: "Performance", href: "/agent/performance", icon: TrendingUp },
+      { label: "Profile", href: "/agent/profile", icon: Settings },
+    ],
+  },
+];
+
+// User configuration
+const agentUser = {
+  name: "Agent User",
+  email: "agent@example.com",
+};
 
 export default function AgentPerformance() {
   const [periodFilter, setPeriodFilter] = useState('this_month');
@@ -55,23 +81,15 @@ export default function AgentPerformance() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6 lg:p-8">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-4">
-          <Link href="/agent/dashboard">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Performance Analytics
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Track your performance and rankings
-            </p>
-          </div>
+    <DashboardLayout navigation={agentNavigation} user={agentUser}>
+      <PageShell
+        title="Performance Analytics"
+        subtitle="Track your performance and rankings"
+        breadcrumbs={[
+          { label: "Agent Portal", href: "/agent" },
+          { label: "Performance" },
+        ]}
+        actions={
           <Select value={periodFilter} onValueChange={setPeriodFilter}>
             <SelectTrigger className="w-[180px]" data-testid="select-period-filter">
               <SelectValue />
@@ -83,10 +101,9 @@ export default function AgentPerformance() {
               <SelectItem value="this_year">This Year</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-      </div>
-
-      {/* Performance Score Card */}
+        }
+      >
+        {/* Performance Score Card */}
       {isLoading ? (
         <Skeleton className="h-32 w-full mb-6" />
       ) : performance ? (
@@ -339,6 +356,7 @@ export default function AgentPerformance() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </PageShell>
+    </DashboardLayout>
   );
 }

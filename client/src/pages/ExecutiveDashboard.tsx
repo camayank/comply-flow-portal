@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DashboardLayout, PageShell } from '@/components/v3';
 import {
   BarChart,
   Bar,
@@ -48,11 +49,55 @@ import {
   Eye,
   Settings,
   Bell,
-  Globe
+  Globe,
+  Home,
+  FileText,
+  UserCheck,
+  TrendingUp as TrendIcon,
+  ShieldCheck
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { chartColors } from '@/lib/design-system-utils';
+
+// Navigation configuration for Executive Dashboard
+const executiveNavigation = [
+  {
+    title: "Overview",
+    items: [
+      { label: "Dashboard", href: "/executive", icon: Home },
+      { label: "Reports", href: "/executive/reports", icon: FileText },
+    ],
+  },
+  {
+    title: "Analytics",
+    items: [
+      { label: "Financial", href: "/executive/financial", icon: DollarSign },
+      { label: "Operations", href: "/executive/operations", icon: Activity },
+      { label: "Performance", href: "/executive/performance", icon: TrendIcon },
+    ],
+  },
+  {
+    title: "Management",
+    items: [
+      { label: "Clients", href: "/clients", icon: Users },
+      { label: "Team", href: "/employees", icon: UserCheck },
+      { label: "Compliance", href: "/compliances", icon: ShieldCheck },
+    ],
+  },
+  {
+    title: "System",
+    items: [
+      { label: "Settings", href: "/settings", icon: Settings },
+    ],
+  },
+];
+
+// User configuration for Executive Dashboard
+const executiveUser = {
+  name: "Executive",
+  email: "exec@digicomply.com",
+};
 
 interface ExecutiveDashboardData {
   overview: {
@@ -225,139 +270,140 @@ const ExecutiveDashboard = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
-          <p className="text-gray-600 dark:text-gray-400">Loading executive dashboard...</p>
-        </div>
-      </div>
+      <DashboardLayout navigation={executiveNavigation} user={executiveUser}>
+        <PageShell
+          title="Executive Dashboard"
+          subtitle="Unified business intelligence & real-time analytics"
+          breadcrumbs={[{ label: "Executive Dashboard" }]}
+        >
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+              <p className="text-gray-600 dark:text-gray-400">Loading executive dashboard...</p>
+            </div>
+          </div>
+        </PageShell>
+      </DashboardLayout>
     );
   }
 
   if (isError) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-red-500" />
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Dashboard Error</h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">Failed to load dashboard data. Please try again.</p>
-          <Button onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Retry
-          </Button>
-        </div>
-      </div>
+      <DashboardLayout navigation={executiveNavigation} user={executiveUser}>
+        <PageShell
+          title="Executive Dashboard"
+          subtitle="Unified business intelligence & real-time analytics"
+          breadcrumbs={[{ label: "Executive Dashboard" }]}
+        >
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center max-w-md">
+              <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-red-500" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Dashboard Error</h2>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">Failed to load dashboard data. Please try again.</p>
+              <Button onClick={handleRefresh}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          </div>
+        </PageShell>
+      </DashboardLayout>
     );
   }
 
+  // Header actions for PageShell
+  const headerActions = (
+    <>
+      <div className="flex items-center gap-2">
+        <Badge
+          variant={isRealTime ? "default" : "secondary"}
+          className="text-xs"
+          data-testid="badge-realtime"
+        >
+          <Zap className="h-3 w-3 mr-1" />
+          {isRealTime ? 'Live' : 'Static'}
+        </Badge>
+        {realTimeData?.systemHealth && (
+          <Badge
+            variant="outline"
+            className="text-xs text-green-600 border-green-600"
+            data-testid="badge-system-health"
+          >
+            <Activity className="h-3 w-3 mr-1" />
+            System Healthy
+          </Badge>
+        )}
+      </div>
+      <div className="text-xs text-gray-500 dark:text-gray-400">
+        Last updated: {lastRefresh.toLocaleTimeString()}
+      </div>
+      <Select value={dateRange} onValueChange={setDateRange}>
+        <SelectTrigger className="w-32" data-testid="select-date-range">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="7">Last 7 days</SelectItem>
+          <SelectItem value="30">Last 30 days</SelectItem>
+          <SelectItem value="90">Last 90 days</SelectItem>
+          <SelectItem value="365">Last year</SelectItem>
+        </SelectContent>
+      </Select>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setIsRealTime(!isRealTime)}
+        data-testid="button-toggle-realtime"
+      >
+        <Zap className="h-4 w-4 mr-2" />
+        {isRealTime ? 'Disable' : 'Enable'} Live
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleRefresh}
+        data-testid="button-refresh"
+      >
+        <RefreshCw className="h-4 w-4 mr-2" />
+        Refresh
+      </Button>
+      <Button size="sm" data-testid="button-export">
+        <Download className="h-4 w-4 mr-2" />
+        Export
+      </Button>
+    </>
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
+    <DashboardLayout navigation={executiveNavigation} user={executiveUser}>
+      <PageShell
+        title="Executive Dashboard"
+        subtitle="Unified business intelligence & real-time analytics"
+        breadcrumbs={[{ label: "Executive Dashboard" }]}
+        actions={headerActions}
+      >
+        {/* Critical Alerts */}
+        {dashboardData?.alerts && dashboardData.alerts.length > 0 && (
+          <div className="mb-6 px-4 py-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg">
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="h-8 w-8 text-blue-600" />
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Executive Dashboard</h1>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Unified business intelligence & real-time analytics
-                  </p>
+              <Bell className="h-5 w-5 text-amber-600" />
+              <div className="flex-1">
+                <h3 className="font-medium text-amber-800 dark:text-amber-200">Critical Alerts</h3>
+                <div className="flex gap-4 mt-1">
+                  {dashboardData.alerts.map((alert, index) => (
+                    <span key={index} className="text-sm text-amber-700 dark:text-amber-300">
+                      {alert.title}: {alert.count} items
+                    </span>
+                  ))}
                 </div>
               </div>
-              
-              <div className="flex items-center gap-2">
-                <Badge 
-                  variant={isRealTime ? "default" : "secondary"} 
-                  className="text-xs"
-                  data-testid="badge-realtime"
-                >
-                  <Zap className="h-3 w-3 mr-1" />
-                  {isRealTime ? 'Live' : 'Static'}
-                </Badge>
-                {realTimeData?.systemHealth && (
-                  <Badge 
-                    variant="outline" 
-                    className="text-xs text-green-600 border-green-600"
-                    data-testid="badge-system-health"
-                  >
-                    <Activity className="h-3 w-3 mr-1" />
-                    System Healthy
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                Last updated: {lastRefresh.toLocaleTimeString()}
-              </div>
-              
-              <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger className="w-32" data-testid="select-date-range">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">Last 7 days</SelectItem>
-                  <SelectItem value="30">Last 30 days</SelectItem>
-                  <SelectItem value="90">Last 90 days</SelectItem>
-                  <SelectItem value="365">Last year</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsRealTime(!isRealTime)}
-                data-testid="button-toggle-realtime"
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                {isRealTime ? 'Disable' : 'Enable'} Live
-              </Button>
-
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleRefresh}
-                data-testid="button-refresh"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </Button>
-
-              <Button size="sm" data-testid="button-export">
-                <Download className="h-4 w-4 mr-2" />
-                Export
+              <Button variant="outline" size="sm" className="border-amber-300 text-amber-700">
+                View All
               </Button>
             </div>
           </div>
-        </div>
-      </header>
+        )}
 
-      {/* Critical Alerts */}
-      {dashboardData?.alerts && dashboardData.alerts.length > 0 && (
-        <div className="px-6 py-4 bg-amber-50 dark:bg-amber-900/10 border-b border-amber-200 dark:border-amber-800">
-          <div className="flex items-center gap-4">
-            <Bell className="h-5 w-5 text-amber-600" />
-            <div className="flex-1">
-              <h3 className="font-medium text-amber-800 dark:text-amber-200">Critical Alerts</h3>
-              <div className="flex gap-4 mt-1">
-                {dashboardData.alerts.map((alert, index) => (
-                  <span key={index} className="text-sm text-amber-700 dark:text-amber-300">
-                    {alert.title}: {alert.count} items
-                  </span>
-                ))}
-              </div>
-            </div>
-            <Button variant="outline" size="sm" className="border-amber-300 text-amber-700">
-              View All
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <div className="px-6 py-6">
+        <div className="space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview" data-testid="tab-overview">
@@ -797,8 +843,9 @@ const ExecutiveDashboard = () => {
             </div>
           </TabsContent>
         </Tabs>
-      </div>
-    </div>
+        </div>
+      </PageShell>
+    </DashboardLayout>
   );
 };
 

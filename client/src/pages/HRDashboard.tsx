@@ -10,12 +10,50 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { 
+import { DashboardLayout, PageShell } from '@/components/v3';
+import {
   Users, UserPlus, Search, Filter, BarChart3, TrendingUp,
   Clock, Calendar, Trophy, BookOpen, Target, AlertTriangle,
   CheckCircle, XCircle, Plus, Edit, Eye, Star, Award,
-  Brain, Zap, PieChart, Activity, Coffee, Home
+  Brain, Zap, PieChart, Activity, Coffee, Home, Settings,
+  FileText, DollarSign, GraduationCap, ClipboardList
 } from 'lucide-react';
+
+// HR Navigation Configuration
+const hrNavigation = [
+  {
+    title: "HR Operations",
+    items: [
+      { label: "Dashboard", href: "/hr", icon: Home },
+      { label: "Employee Directory", href: "/hr/employees", icon: Users },
+      { label: "Attendance", href: "/hr/attendance", icon: Clock },
+      { label: "Leave Management", href: "/hr/leave", icon: Calendar },
+    ],
+  },
+  {
+    title: "Performance & Training",
+    items: [
+      { label: "Performance Reviews", href: "/hr/performance", icon: Trophy },
+      { label: "Training Programs", href: "/hr/training", icon: GraduationCap },
+      { label: "Goals & KPIs", href: "/hr/goals", icon: Target },
+    ],
+  },
+  {
+    title: "Reports & Settings",
+    items: [
+      { label: "HR Analytics", href: "/hr/analytics", icon: PieChart },
+      { label: "Payroll Reports", href: "/hr/payroll", icon: DollarSign },
+      { label: "Compliance", href: "/hr/compliance", icon: ClipboardList },
+      { label: "Settings", href: "/hr/settings", icon: Settings },
+    ],
+  },
+];
+
+// HR User Configuration
+const hrUser = {
+  name: "HR Manager",
+  email: "hr@digicomply.com",
+};
 import PerformanceManagement from '@/components/hr/PerformanceManagement';
 import TrainingManagement from '@/components/hr/TrainingManagement';
 import AttendanceManagement from '@/components/hr/AttendanceManagement';
@@ -27,44 +65,36 @@ import { EmptyList } from '@/components/ui/empty-state';
 // HR Dashboard Main Component
 export default function HRDashboard() {
   const [activeTab, setActiveTab] = useState('directory');
-  
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Users className="h-8 w-8 text-blue-600" />
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">HR Management</h1>
-              </div>
-              <Badge variant="outline" className="text-sm">
-                <Activity className="h-3 w-3 mr-1" />
-                Live System
-              </Badge>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Reports
-              </Button>
-              <Button size="sm">
-                <UserPlus className="h-4 w-4 mr-2" />
-                Add Employee
-              </Button>
-            </div>
+    <DashboardLayout navigation={hrNavigation} user={hrUser}>
+      <PageShell
+        title="HR Management"
+        subtitle="Manage employees, performance, training, and HR operations"
+        badge={{ label: "Live System", variant: "outline" }}
+        actions={
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" size="sm">
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Reports
+            </Button>
+            <Button size="sm">
+              <UserPlus className="h-4 w-4 mr-2" />
+              Add Employee
+            </Button>
           </div>
+        }
+        breadcrumbs={[
+          { label: "Home", href: "/" },
+          { label: "HR Management" },
+        ]}
+      >
+        {/* Quick Stats Overview */}
+        <div className="mb-6">
+          <HROverviewStats />
         </div>
-      </div>
 
-      {/* Quick Stats Overview */}
-      <div className="px-6 py-6">
-        <HROverviewStats />
-      </div>
-
-      {/* Main Content */}
-      <div className="px-6 pb-6">
+        {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="directory" data-testid="tab-directory">
@@ -117,8 +147,8 @@ export default function HRDashboard() {
             <HRAnalytics />
           </TabsContent>
         </Tabs>
-      </div>
-    </div>
+      </PageShell>
+    </DashboardLayout>
   );
 }
 

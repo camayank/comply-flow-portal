@@ -13,14 +13,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { DashboardLayout, PageShell } from '@/components/v3';
 import {
-  ArrowLeft,
+  Home,
+  Users,
+  UserPlus,
+  DollarSign,
+  TrendingUp,
+  Settings,
   User,
   Bell,
   Wallet,
@@ -31,9 +36,32 @@ import {
   Copy,
   Check
 } from 'lucide-react';
-import { Link } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
+
+const agentNavigation = [
+  {
+    title: "Agent Portal",
+    items: [
+      { label: "Dashboard", href: "/agent", icon: Home },
+      { label: "My Clients", href: "/agent/clients", icon: Users },
+      { label: "Lead Management", href: "/agent/leads", icon: UserPlus },
+    ],
+  },
+  {
+    title: "Performance",
+    items: [
+      { label: "Commission", href: "/agent/commission", icon: DollarSign },
+      { label: "Performance", href: "/agent/performance", icon: TrendingUp },
+      { label: "Profile", href: "/agent/profile", icon: Settings },
+    ],
+  },
+];
+
+const agentUser = {
+  name: "Agent User",
+  email: "agent@example.com",
+};
 
 const profileFormSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -189,56 +217,43 @@ export default function AgentProfileSettings() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6 lg:p-8">
-        <div className="mb-6">
-          <div className="flex items-center gap-3">
-            <Link href="/agent/dashboard">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Profile & Settings
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400">
-                Manage your profile and preferences
-              </p>
-            </div>
-          </div>
-        </div>
-        <Skeleton className="h-12 w-full mb-6" />
-        <Skeleton className="h-96 w-full" />
-      </div>
+      <DashboardLayout navigation={agentNavigation} user={agentUser}>
+        <PageShell
+          title="Profile & Settings"
+          subtitle="Manage your profile and preferences"
+          breadcrumbs={[
+            { label: "Agent Portal", href: "/agent" },
+            { label: "Profile & Settings" },
+          ]}
+        >
+          <Skeleton className="h-12 w-full mb-6" />
+          <Skeleton className="h-96 w-full" />
+        </PageShell>
+      </DashboardLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6 lg:p-8">
-        <div className="mb-6">
-          <div className="flex items-center gap-3">
-            <Link href="/agent/dashboard">
-              <Button variant="ghost" size="icon" data-testid="button-back">
-                <ArrowLeft className="h-5 w-5" />
+      <DashboardLayout navigation={agentNavigation} user={agentUser}>
+        <PageShell
+          title="Profile & Settings"
+          subtitle="Manage your profile and preferences"
+          breadcrumbs={[
+            { label: "Agent Portal", href: "/agent" },
+            { label: "Profile & Settings" },
+          ]}
+        >
+          <Card>
+            <CardContent className="p-6 text-center">
+              <p className="text-gray-500 mb-4">Unable to load profile data. Please try again later.</p>
+              <Button onClick={() => window.location.reload()} data-testid="button-retry">
+                Retry
               </Button>
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                Profile & Settings
-              </h1>
-            </div>
-          </div>
-        </div>
-        <Card>
-          <CardContent className="p-6 text-center">
-            <p className="text-gray-500 mb-4">Unable to load profile data. Please try again later.</p>
-            <Button onClick={() => window.location.reload()} data-testid="button-retry">
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </PageShell>
+      </DashboardLayout>
     );
   }
 
@@ -247,27 +262,16 @@ export default function AgentProfileSettings() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6 lg:p-8">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <Link href="/agent/dashboard">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Profile & Settings
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Manage your profile and preferences
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <Tabs defaultValue="profile" className="space-y-6">
+    <DashboardLayout navigation={agentNavigation} user={agentUser}>
+      <PageShell
+        title="Profile & Settings"
+        subtitle="Manage your profile and preferences"
+        breadcrumbs={[
+          { label: "Agent Portal", href: "/agent" },
+          { label: "Profile & Settings" },
+        ]}
+      >
+        <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
           <TabsTrigger value="profile" data-testid="tab-profile">
             <User className="h-4 w-4 mr-2" />
@@ -684,6 +688,7 @@ export default function AgentProfileSettings() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+      </PageShell>
+    </DashboardLayout>
   );
 }

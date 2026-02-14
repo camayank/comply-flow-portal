@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
+import { DashboardLayout, PageShell } from '@/components/v3';
 import {
   Building2,
   Users,
@@ -35,7 +36,12 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
-  Upload
+  Upload,
+  Home,
+  Briefcase,
+  Shield,
+  HelpCircle,
+  Settings
 } from 'lucide-react';
 import { BulkUploadDialogEnhanced, ColumnDefinition, BulkUploadResult } from '@/components/BulkUploadDialogEnhanced';
 import { apiRequest } from '@/lib/queryClient';
@@ -144,6 +150,37 @@ const clientBulkColumns: ColumnDefinition[] = [
 const clientBulkSampleData = [
   { name: 'ABC Enterprises', entityType: 'private_limited', email: 'info@abc.com', phone: '+919876543210', city: 'Mumbai', state: 'MH', industry: 'technology', pan: 'ABCDE1234F', gstin: '27ABCDE1234F1Z5', relationshipManager: 'John Doe' },
 ];
+
+// V3 Navigation Configuration
+const clientNavigation = [
+  {
+    title: "Client Portal",
+    items: [
+      { label: "Dashboard", href: "/client", icon: Home },
+      { label: "My Services", href: "/client/services", icon: Briefcase },
+      { label: "Documents", href: "/client/documents", icon: FileText },
+    ],
+  },
+  {
+    title: "Compliance",
+    items: [
+      { label: "Calendar", href: "/client/calendar", icon: Calendar },
+      { label: "Compliance Status", href: "/client/compliance", icon: Shield },
+    ],
+  },
+  {
+    title: "Support",
+    items: [
+      { label: "Help & Support", href: "/client/support", icon: HelpCircle },
+      { label: "Profile", href: "/client/profile", icon: Settings },
+    ],
+  },
+];
+
+const clientUser = {
+  name: "Client User",
+  email: "client@example.com",
+};
 
 const ClientMasterDashboard = () => {
   const [activeTab, setActiveTab] = useState('directory');
@@ -314,53 +351,52 @@ const ClientMasterDashboard = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Building2 className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">Client Master</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Comprehensive client relationship management</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowBulkUpload(true)}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Bulk Import
-              </Button>
-              <Button
-                onClick={() => setAddClientDialog(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-                data-testid="button-add-client"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Client
-              </Button>
-            </div>
+    <DashboardLayout
+      navigation={clientNavigation}
+      user={clientUser}
+      logo={<Building2 className="h-8 w-8 text-blue-600" />}
+    >
+      <PageShell
+        title="Client Master"
+        subtitle="Comprehensive client relationship management"
+        breadcrumbs={[
+          { label: "Client Portal", href: "/client" },
+          { label: "Client Master" },
+        ]}
+        actions={
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowBulkUpload(true)}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Bulk Import
+            </Button>
+            <Button
+              onClick={() => setAddClientDialog(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              data-testid="button-add-client"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Client
+            </Button>
           </div>
-        </div>
-      </header>
+        }
+      >
+        {/* Bulk Upload Dialog */}
+        <BulkUploadDialogEnhanced
+          open={showBulkUpload}
+          onOpenChange={setShowBulkUpload}
+          title="Bulk Import Clients"
+          description="Import multiple clients from Excel or CSV file"
+          columns={clientBulkColumns}
+          entityName="Clients"
+          onUpload={handleBulkUpload}
+          sampleData={clientBulkSampleData}
+          allowManualEntry={true}
+        />
 
-      {/* Bulk Upload Dialog */}
-      <BulkUploadDialogEnhanced
-        open={showBulkUpload}
-        onOpenChange={setShowBulkUpload}
-        title="Bulk Import Clients"
-        description="Import multiple clients from Excel or CSV file"
-        columns={clientBulkColumns}
-        entityName="Clients"
-        onUpload={handleBulkUpload}
-        sampleData={clientBulkSampleData}
-        allowManualEntry={true}
-      />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card data-testid="card-total-clients">
@@ -862,10 +898,10 @@ const ClientMasterDashboard = () => {
             </Card>
           </TabsContent>
         </Tabs>
-      </div>
+        </div>
 
-      {/* Client Profile Dialog */}
-      <Dialog open={viewProfileDialog} onOpenChange={setViewProfileDialog}>
+        {/* Client Profile Dialog */}
+        <Dialog open={viewProfileDialog} onOpenChange={setViewProfileDialog}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
           <DialogHeader>
             <DialogTitle>Client Profile - {selectedClient?.name}</DialogTitle>
@@ -1070,7 +1106,8 @@ const ClientMasterDashboard = () => {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </PageShell>
+    </DashboardLayout>
   );
 };
 

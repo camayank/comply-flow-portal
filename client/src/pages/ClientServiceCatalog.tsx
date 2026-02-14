@@ -8,15 +8,20 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { DashboardLayout, PageShell } from '@/components/v3';
 import {
+  Home,
+  Briefcase,
+  FileText,
+  Calendar,
+  Shield,
+  HelpCircle,
+  Settings,
   Search,
   ShoppingCart,
   Filter,
   TrendingUp,
-  Shield,
-  FileText,
   Building,
-  Briefcase,
   Star,
   Check,
   ArrowRight,
@@ -24,6 +29,38 @@ import {
 import { useCurrentUser } from '@/components/ProtectedRoute';
 import { SkeletonCard } from '@/components/ui/skeleton-loader';
 import { EmptySearchResults } from '@/components/ui/empty-state';
+
+// Navigation configuration for client portal
+const clientNavigation = [
+  {
+    title: "Client Portal",
+    items: [
+      { label: "Dashboard", href: "/client-dashboard", icon: Home },
+      { label: "My Services", href: "/client-services", icon: Briefcase },
+      { label: "Documents", href: "/documents", icon: FileText },
+    ],
+  },
+  {
+    title: "Compliance",
+    items: [
+      { label: "Calendar", href: "/compliance-calendar", icon: Calendar },
+      { label: "Compliance Status", href: "/compliance-status", icon: Shield },
+    ],
+  },
+  {
+    title: "Support",
+    items: [
+      { label: "Help Center", href: "/help", icon: HelpCircle },
+      { label: "Settings", href: "/settings", icon: Settings },
+    ],
+  },
+];
+
+// User configuration
+const clientUser = {
+  name: "Client",
+  email: "client@company.com",
+};
 
 interface Service {
   id: string;
@@ -97,13 +134,11 @@ export default function ClientServiceCatalog() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="bg-white border-b sticky top-0 z-40">
-          <div className="max-w-7xl mx-auto px-4 py-4">
-            <h1 className="text-2xl font-bold">Service Catalog</h1>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 py-6">
+      <DashboardLayout navigation={clientNavigation} user={clientUser}>
+        <PageShell
+          title="Service Catalog"
+          subtitle="Loading available services..."
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <SkeletonCard />
             <SkeletonCard />
@@ -112,161 +147,158 @@ export default function ClientServiceCatalog() {
             <SkeletonCard />
             <SkeletonCard />
           </div>
-        </div>
-      </div>
+        </PageShell>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold">Service Catalog</h1>
-              <p className="text-sm text-muted-foreground">
-                Browse and select services for your business
-              </p>
-            </div>
-            {selectedServices.length > 0 && (
-              <Button
-                onClick={handleProceedToRequest}
-                className="gap-2"
-                data-testid="button-proceed-to-request"
-              >
-                <ShoppingCart className="h-4 w-4" />
-                Proceed ({selectedServices.length})
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-8">
-        {/* Search and Filter */}
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search services..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                  data-testid="input-search-services"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" className="gap-2">
-                  <Filter className="h-4 w-4" />
-                  Filters
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Popular Services */}
-        {popularServices.length > 0 && searchQuery === '' && selectedCategory === 'all' && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-orange-600" />
-              <h2 className="text-xl font-bold">Popular Services</h2>
-              <Badge variant="secondary">Most Requested</Badge>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {popularServices.map((service) => (
-                <ServiceCard
-                  key={service.id}
-                  service={service}
-                  isSelected={selectedServices.includes(service.id)}
-                  onToggle={() => toggleService(service.id)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Category Tabs */}
-        <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
-          <TabsList className="w-full justify-start overflow-x-auto">
-            {categories.map((category) => (
-              <TabsTrigger
-                key={category}
-                value={category}
-                className="capitalize"
-                data-testid={`tab-category-${category}`}
-              >
-                {category === 'all' ? 'All Services' : category}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          {categories.map((category) => (
-            <TabsContent key={category} value={category} className="space-y-4 mt-6">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  {filteredServices.length} service(s) found
-                </p>
-              </div>
-
-              {filteredServices.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredServices.map((service) => (
-                    <ServiceCard
-                      key={service.id}
-                      service={service}
-                      isSelected={selectedServices.includes(service.id)}
-                      onToggle={() => toggleService(service.id)}
-                    />
-                  ))}
+    <DashboardLayout navigation={clientNavigation} user={clientUser}>
+      <PageShell
+        title="Service Catalog"
+        subtitle="Browse and select services for your business"
+        breadcrumbs={[
+          { label: "Client Portal", href: "/client-dashboard" },
+          { label: "Service Catalog" },
+        ]}
+        actions={
+          selectedServices.length > 0 ? (
+            <Button
+              onClick={handleProceedToRequest}
+              className="gap-2"
+              data-testid="button-proceed-to-request"
+            >
+              <ShoppingCart className="h-4 w-4" />
+              Proceed ({selectedServices.length})
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          ) : undefined
+        }
+      >
+        <div className="space-y-8">
+          {/* Search and Filter */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search services..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-search-services"
+                  />
                 </div>
-              ) : (
-                <EmptySearchResults
-                  searchTerm={searchQuery}
-                  onClearSearch={() => {
-                    setSearchQuery('');
-                    setSelectedCategory('all');
-                  }}
-                />
-              )}
-            </TabsContent>
-          ))}
-        </Tabs>
-
-        {/* Selected Services Summary */}
-        {selectedServices.length > 0 && (
-          <Card className="sticky bottom-4 shadow-lg">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold">{selectedServices.length} service(s) selected</p>
-                  <p className="text-sm text-muted-foreground">
-                    Total: ₹
-                    {services
-                      .filter((s) => selectedServices.includes(s.id))
-                      .reduce((sum, s) => sum + s.price, 0)
-                      .toLocaleString()}
-                  </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" className="gap-2">
+                    <Filter className="h-4 w-4" />
+                    Filters
+                  </Button>
                 </div>
-                <Button
-                  onClick={handleProceedToRequest}
-                  size="lg"
-                  className="gap-2"
-                  data-testid="button-proceed-bottom"
-                >
-                  Proceed to Request
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
               </div>
             </CardContent>
           </Card>
-        )}
-      </div>
-    </div>
+
+          {/* Popular Services */}
+          {popularServices.length > 0 && searchQuery === '' && selectedCategory === 'all' && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-orange-600" />
+                <h2 className="text-xl font-bold">Popular Services</h2>
+                <Badge variant="secondary">Most Requested</Badge>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {popularServices.map((service) => (
+                  <ServiceCard
+                    key={service.id}
+                    service={service}
+                    isSelected={selectedServices.includes(service.id)}
+                    onToggle={() => toggleService(service.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Category Tabs */}
+          <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
+            <TabsList className="w-full justify-start overflow-x-auto">
+              {categories.map((category) => (
+                <TabsTrigger
+                  key={category}
+                  value={category}
+                  className="capitalize"
+                  data-testid={`tab-category-${category}`}
+                >
+                  {category === 'all' ? 'All Services' : category}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            {categories.map((category) => (
+              <TabsContent key={category} value={category} className="space-y-4 mt-6">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {filteredServices.length} service(s) found
+                  </p>
+                </div>
+
+                {filteredServices.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredServices.map((service) => (
+                      <ServiceCard
+                        key={service.id}
+                        service={service}
+                        isSelected={selectedServices.includes(service.id)}
+                        onToggle={() => toggleService(service.id)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <EmptySearchResults
+                    searchTerm={searchQuery}
+                    onClearSearch={() => {
+                      setSearchQuery('');
+                      setSelectedCategory('all');
+                    }}
+                  />
+                )}
+              </TabsContent>
+            ))}
+          </Tabs>
+
+          {/* Selected Services Summary */}
+          {selectedServices.length > 0 && (
+            <Card className="sticky bottom-4 shadow-lg">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold">{selectedServices.length} service(s) selected</p>
+                    <p className="text-sm text-muted-foreground">
+                      Total: ₹
+                      {services
+                        .filter((s) => selectedServices.includes(s.id))
+                        .reduce((sum, s) => sum + s.price, 0)
+                        .toLocaleString()}
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleProceedToRequest}
+                    size="lg"
+                    className="gap-2"
+                    data-testid="button-proceed-bottom"
+                  >
+                    Proceed to Request
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </PageShell>
+    </DashboardLayout>
   );
 }
 

@@ -9,12 +9,19 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { DashboardLayout, PageShell } from '@/components/v3';
 import {
+  Home,
+  Briefcase,
+  FileText,
+  Calendar,
+  Shield,
+  HelpCircle,
+  Settings,
   User,
   Mail,
   Phone,
   MapPin,
-  Shield,
   Key,
   Bell,
   CreditCard,
@@ -23,6 +30,38 @@ import {
   Check,
 } from 'lucide-react';
 import { useAuth } from '@/components/ProtectedRoute';
+
+// Navigation configuration for client portal
+const clientNavigation = [
+  {
+    title: "Client Portal",
+    items: [
+      { label: "Dashboard", href: "/client", icon: Home },
+      { label: "My Services", href: "/client/services", icon: Briefcase },
+      { label: "Documents", href: "/client/documents", icon: FileText },
+    ],
+  },
+  {
+    title: "Compliance",
+    items: [
+      { label: "Calendar", href: "/client/calendar", icon: Calendar },
+      { label: "Compliance Status", href: "/client/compliance", icon: Shield },
+    ],
+  },
+  {
+    title: "Support",
+    items: [
+      { label: "Help Center", href: "/client/help", icon: HelpCircle },
+      { label: "Profile & Settings", href: "/client/profile", icon: Settings },
+    ],
+  },
+];
+
+// User configuration
+const clientUser = {
+  name: "Client",
+  email: "client@digicomply.com",
+};
 
 const ClientProfile = () => {
   const { user } = useAuth();
@@ -98,25 +137,31 @@ const ClientProfile = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <DashboardLayout
+      navigation={clientNavigation}
+      user={clientUser}
+    >
+      <PageShell
+        title="My Profile"
+        subtitle="Manage your account settings and preferences"
+        breadcrumbs={[
+          { label: "Client Portal", href: "/client" },
+          { label: "Profile" },
+        ]}
+        actions={
           <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16">
-              <AvatarFallback className="bg-blue-600 text-white text-xl">
+            <Avatar className="h-12 w-12">
+              <AvatarFallback className="bg-blue-600 text-white text-lg">
                 {getInitials((profile as any)?.name || user?.name || 'User')}
               </AvatarFallback>
             </Avatar>
-            <div>
-              <h1 className="text-2xl font-bold">{(profile as any)?.name || user?.name || 'User'}</h1>
-              <p className="text-sm text-gray-600">{(profile as any)?.email || user?.email}</p>
+            <div className="hidden sm:block">
+              <p className="text-sm font-medium">{(profile as any)?.name || user?.name || 'User'}</p>
+              <p className="text-xs text-gray-500">{(profile as any)?.email || user?.email}</p>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        }
+      >
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Profile Settings */}
           <div className="lg:col-span-2">
@@ -412,8 +457,8 @@ const ClientProfile = () => {
             </Card>
           </div>
         </div>
-      </div>
-    </div>
+      </PageShell>
+    </DashboardLayout>
   );
 };
 
