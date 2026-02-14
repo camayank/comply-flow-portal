@@ -1,5 +1,5 @@
 /**
- * Sales Dashboard
+ * Sales Dashboard (v3 Redesign)
  *
  * Comprehensive sales management dashboard for Sales Manager and Sales Executive roles:
  * - Pipeline overview with deal stages
@@ -54,12 +54,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { DashboardLayout, PageShell, MetricCard } from '@/components/v3';
 import {
   TrendingUp,
-  TrendingDown,
   Users,
   Target,
-  DollarSign,
   FileText,
   UserPlus,
   Phone,
@@ -67,17 +66,14 @@ import {
   Calendar,
   MoreVertical,
   Plus,
-  Filter,
   Search,
   ArrowRight,
   CheckCircle,
-  Clock,
-  AlertTriangle,
   BarChart3,
-  PieChart,
-  Loader2,
   Building2,
   IndianRupee,
+  LayoutDashboard,
+  Briefcase,
 } from 'lucide-react';
 
 // Types
@@ -148,6 +144,27 @@ const pipelineStages = [
   { key: 'lost', label: 'Lost', color: 'bg-red-500' },
 ];
 
+// Navigation configuration
+const navigation = [
+  {
+    title: "Sales",
+    items: [
+      { label: "Dashboard", href: "/sales", icon: LayoutDashboard },
+      { label: "Pipeline", href: "/sales/pipeline", icon: TrendingUp },
+      { label: "Leads", href: "/lead-pipeline", icon: UserPlus },
+      { label: "Proposals", href: "/proposals", icon: FileText },
+    ],
+  },
+  {
+    title: "Management",
+    items: [
+      { label: "Pre-Sales", href: "/pre-sales", icon: Briefcase },
+      { label: "Forecasts", href: "/sales/forecasts", icon: BarChart3 },
+      { label: "Targets", href: "/sales/targets", icon: Target },
+    ],
+  },
+];
+
 export default function SalesDashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -208,96 +225,60 @@ export default function SalesDashboard() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <TrendingUp className="h-6 w-6" />
-            Sales Dashboard
-          </h1>
-          <p className="text-muted-foreground">
-            {isManager ? 'Manage your sales team and pipeline' : 'Track your leads and deals'}
-          </p>
+    <DashboardLayout
+      navigation={navigation}
+      user={user ? {
+        name: user.email || 'Sales User',
+        email: user.email || '',
+      } : undefined}
+      logo={
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-6 w-6 text-blue-600" />
+          <span className="text-lg font-bold text-slate-900">Sales</span>
         </div>
-        <Button onClick={() => setIsCreateLeadOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Lead
-        </Button>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Leads</p>
-                <p className="text-2xl font-bold">{totalLeads}</p>
-                <p className="text-xs text-green-600 flex items-center mt-1">
-                  <TrendingUp className="h-3 w-3 mr-1" />
-                  +12% this month
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
-                <UserPlus className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Qualified Leads</p>
-                <p className="text-2xl font-bold">{qualifiedLeads}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {Math.round((qualifiedLeads / totalLeads) * 100)}% qualification rate
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-yellow-100 rounded-full flex items-center justify-center">
-                <Target className="h-6 w-6 text-yellow-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Pipeline Value</p>
-                <p className="text-2xl font-bold">{formatCurrency(pipelineValue)}</p>
-                <p className="text-xs text-green-600 flex items-center mt-1">
-                  <TrendingUp className="h-3 w-3 mr-1" />
-                  +8% vs last month
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-green-100 rounded-full flex items-center justify-center">
-                <IndianRupee className="h-6 w-6 text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Conversion Rate</p>
-                <p className="text-2xl font-bold">{conversionRate}%</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {wonDeals} deals closed
-                </p>
-              </div>
-              <div className="h-12 w-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <BarChart3 className="h-6 w-6 text-purple-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      }
+    >
+      <PageShell
+        title="Sales Dashboard"
+        subtitle={isManager ? 'Manage your sales team and pipeline' : 'Track your leads and deals'}
+        actions={
+          <Button onClick={() => setIsCreateLeadOpen(true)} className="bg-navy-800 hover:bg-navy-900 text-white">
+            <Plus className="h-4 w-4 mr-2" />
+            New Lead
+          </Button>
+        }
+      >
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <MetricCard
+            label="Total Leads"
+            value={totalLeads.toString()}
+            trend={{ value: "+12% this month", direction: 'up' }}
+            icon={UserPlus}
+            accentColor="blue"
+          />
+          <MetricCard
+            label="Qualified Leads"
+            value={qualifiedLeads.toString()}
+            trend={{ value: `${Math.round((qualifiedLeads / totalLeads) * 100)}% qualification rate`, direction: 'up' }}
+            icon={Target}
+            accentColor="orange"
+          />
+          <MetricCard
+            label="Pipeline Value"
+            value={formatCurrency(pipelineValue)}
+            trend={{ value: "+8% vs last month", direction: 'up' }}
+            icon={IndianRupee}
+            accentColor="green"
+          />
+          <MetricCard
+            label="Conversion Rate"
+            value={`${conversionRate}%`}
+            trend={{ value: `${wonDeals} deals closed`, direction: 'neutral' }}
+            icon={BarChart3}
+            accentColor="purple"
+          />
+        </div>
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -775,6 +756,7 @@ export default function SalesDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </PageShell>
+    </DashboardLayout>
   );
 }

@@ -19,7 +19,8 @@ const PageLoader = () => <SkeletonPage />;
 // Lazy load all pages for code splitting
 const LandingPageV3 = lazy(() => import("@/pages/v3/LandingPage"));
 const UnifiedDashboard = lazy(() => import("./pages/UnifiedDashboard"));
-const MobileResponsiveLanding = lazy(() => import("./pages/MobileResponsiveLanding"));
+// DEPRECATED: MobileResponsiveLanding - now redirects to v3 landing
+// const MobileResponsiveLanding = lazy(() => import("./pages/MobileResponsiveLanding"));
 const Login = lazy(() => import("./pages/Login"));
 const ClientRegistration = lazy(() => import("./pages/ClientRegistration"));
 const LeadManagement = lazy(() => import("./pages/LeadManagement"));
@@ -33,7 +34,8 @@ const DigiScore = lazy(() => import("./pages/DigiScore"));
 const TaskManagement = lazy(() => import("./pages/TaskManagement"));
 const AiDocumentPreparation = lazy(() => import("./pages/AiDocumentPreparation"));
 const DesignSystemShowcase = lazy(() => import("./components/DesignSystemShowcase"));
-const LandingPage = lazy(() => import("./pages/LandingPage"));
+// DEPRECATED: LandingPage - replaced by v3 LandingPage
+// const LandingPage = lazy(() => import("./pages/LandingPage"));
 const OnboardingFlow = lazy(() => import("./pages/OnboardingFlow"));
 const PlatformDemo = lazy(() => import("./pages/PlatformDemo"));
 // DEPRECATED: Consolidated into SmartStart
@@ -258,7 +260,7 @@ const AppContent = () => {
                 <Route path="/role-dashboard" component={RoleBasedDashboard} />
                 <Route path="/select-role" component={RoleSelection} />
                 <Route path="/role-selection" component={RoleSelection} />
-                <Route path="/mobile-landing" component={MobileResponsiveLanding} />
+                <Route path="/mobile-landing" component={LandingPageV3} />
                 <Route path="/login" component={Login} />
                 <Route path="/signin" component={Login} />
                 <Route path="/register" component={ClientRegistration} />
@@ -522,10 +524,10 @@ const AppContent = () => {
                 <Route path="/suggestions" component={SmartSuggestionsEngine} />
                 <Route path="/vault" component={DocumentVault} />
 
-                {/* Legal/Policy Pages - placeholder routes */}
-                <Route path="/privacy-policy" component={LandingPage} />
-                <Route path="/terms-of-service" component={LandingPage} />
-                <Route path="/refund-policy" component={LandingPage} />
+                {/* Legal/Policy Pages - placeholder routes (redirect to landing for now) */}
+                <Route path="/privacy-policy" component={LandingPageV3} />
+                <Route path="/terms-of-service" component={LandingPageV3} />
+                <Route path="/refund-policy" component={LandingPageV3} />
 
                 <Route component={NotFound} />
               </Switch>
