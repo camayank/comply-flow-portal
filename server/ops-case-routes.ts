@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { db } from './db';
-import { serviceRequests, businessEntities, leads, caseNotes, users } from '@shared/schema';
+import { serviceRequests, businessEntities, leads, caseNotes, users, clientActivities } from '@shared/schema';
 import { eq, desc, and } from 'drizzle-orm';
 import { requireAuth } from './auth-middleware';
 import { requireRole } from './rbac-middleware';
@@ -192,6 +192,114 @@ router.patch('/cases/:id/filing', requireAuth, requireRole(...opsRoles), async (
   } catch (error) {
     console.error('Error updating filing status:', error);
     res.status(500).json({ error: 'Failed to update filing status' });
+  }
+});
+
+// GET /api/ops/clients/:clientId - Full client detail with all work items
+router.get('/clients/:clientId', requireAuth, requireRole(...opsRoles), async (req: Request, res: Response) => {
+  try {
+    const { clientId } = req.params;
+
+    // Fetch client (business entity)
+    const [client] = await db
+      .select()
+      .from(businessEntities)
+      .leftJoin(leads, eq(businessEntities.leadId, leads.id))
+      .where(
+        /^\d+$/.test(clientId)
+          ? eq(businessEntities.id, parseInt(clientId))
+          : eq(businessEntities.clientId, clientId)
+      )
+      .limit(1);
+
+    if (!client) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    // Fetch all service requests for this client
+    const workItems = await db
+      .select()
+      .from(serviceRequests)
+      .where(eq(serviceRequests.businessEntityId, client.business_entities.id))
+      .orderBy(desc(serviceRequests.createdAt));
+
+    // Fetch unified timeline
+    const timeline = await db
+      .select()
+      .from(clientActivities)
+      .where(eq(clientActivities.clientId, client.business_entities.id))
+      .orderBy(desc(clientActivities.createdAt))
+      .limit(50);
+
+    // Calculate summary stats
+    const stats = {
+      totalCases: workItems.length,
+      activeCases: workItems.filter(w => !['completed', 'failed'].includes(w.status || '')).length,
+      completedCases: workItems.filter(w => w.status === 'completed').length,
+      totalRevenue: workItems.reduce((sum, w) => sum + (w.totalAmount || 0), 0),
+    };
+
+    res.json({
+      client: client.business_entities,
+      lead: client.leads,
+      workItems,
+      timeline,
+      stats,
+    });
+  } catch (error) {
+    console.error('Error fetching client:', error);
+    res.status(500).json({ error: 'Failed to fetch client details' });
+  }
+});
+
+// GET /api/ops/clients/:clientId/timeline - Unified timeline
+router.get('/clients/:clientId/timeline', requireAuth, requireRole(...opsRoles), async (req: Request, res: Response) => {
+  try {
+    const { clientId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const timeline = await db
+      .select()
+      .from(clientActivities)
+      .where(eq(clientActivities.clientId, parseInt(clientId)))
+      .orderBy(desc(clientActivities.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    res.json({ timeline });
+  } catch (error) {
+    console.error('Error fetching timeline:', error);
+    res.status(500).json({ error: 'Failed to fetch timeline' });
+  }
+});
+
+// POST /api/ops/clients/:clientId/activities - Log activity
+router.post('/clients/:clientId/activities', requireAuth, requireRole(...opsRoles), async (req: Request, res: Response) => {
+  try {
+    const { clientId } = req.params;
+    const { activityType, title, description, serviceRequestId, isClientVisible, metadata } = req.body;
+    const user = (req as any).user;
+
+    const [activity] = await db
+      .insert(clientActivities)
+      .values({
+        clientId: parseInt(clientId),
+        serviceRequestId,
+        activityType,
+        title,
+        description,
+        performedBy: user?.id,
+        performedByName: user?.fullName || user?.username,
+        isClientVisible: isClientVisible || false,
+        metadata,
+      })
+      .returning();
+
+    res.status(201).json(activity);
+  } catch (error) {
+    console.error('Error logging activity:', error);
+    res.status(500).json({ error: 'Failed to log activity' });
   }
 });
 
