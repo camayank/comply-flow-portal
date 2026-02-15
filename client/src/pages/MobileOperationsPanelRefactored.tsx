@@ -23,8 +23,13 @@ import { get } from '@/lib/api';
 interface DashboardStats {
   totalActiveOrders: number;
   pendingOrders: number;
+  inProgressOrders: number;
   completedOrders: number;
+  atRiskOrders: number;
+  breachedOrders: number;
   teamUtilization: number;
+  opsTeamSize: number;
+  unassignedOrders: number;
 }
 
 const MobileOperationsPanelRefactored = () => {
@@ -144,35 +149,105 @@ const MobileOperationsPanelRefactored = () => {
           </CardContent>
         </Card>
 
-        {/* Performance Overview */}
-        <Card>
-          <CardContent className="p-4">
-            <h3 className="font-semibold mb-4 text-sm lg:text-base">Today's Performance</h3>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-600">Order Completion</span>
-                  <span className="font-semibold">75%</span>
-                </div>
-                <Progress value={75} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-600">Team Productivity</span>
-                  <span className="font-semibold">82%</span>
-                </div>
-                <Progress value={82} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-600">Client Satisfaction</span>
-                  <span className="font-semibold">92%</span>
-                </div>
-                <Progress value={92} className="h-2" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* SLA Status Overview */}
+        {statsQuery.render((data) => {
+          const total = (data?.totalActiveOrders || 0);
+          const atRisk = (data?.atRiskOrders || 0);
+          const breached = (data?.breachedOrders || 0);
+          const onTrack = total - atRisk - breached;
+          const slaRate = total > 0 ? Math.round((onTrack / total) * 100) : 100;
+          const completionRate = (data?.completedOrders || 0) > 0 && total > 0
+            ? Math.round(((data?.completedOrders || 0) / (total + (data?.completedOrders || 0))) * 100)
+            : 0;
+
+          return (
+            <>
+              {/* Alert for breached items */}
+              {breached > 0 && (
+                <Card className="border-red-200 bg-red-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle className="h-5 w-5 text-red-600" />
+                      <div>
+                        <p className="font-semibold text-red-800">{breached} SLA Breached</p>
+                        <p className="text-sm text-red-600">Immediate attention required</p>
+                      </div>
+                      <Button variant="destructive" size="sm" className="ml-auto" onClick={() => window.location.href = '/escalations'}>
+                        View
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* At-risk alert */}
+              {atRisk > 0 && (
+                <Card className="border-orange-200 bg-orange-50">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <Clock className="h-5 w-5 text-orange-600" />
+                      <div>
+                        <p className="font-semibold text-orange-800">{atRisk} At Risk</p>
+                        <p className="text-sm text-orange-600">Due within 4 hours</p>
+                      </div>
+                      <Button variant="outline" size="sm" className="ml-auto border-orange-300" onClick={() => window.location.href = '/work-queue'}>
+                        View
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Performance Overview */}
+              <Card>
+                <CardContent className="p-4">
+                  <h3 className="font-semibold mb-4 text-sm lg:text-base">Performance Metrics</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-gray-600">SLA Compliance</span>
+                        <span className={`font-semibold ${slaRate >= 90 ? 'text-green-600' : slaRate >= 70 ? 'text-orange-600' : 'text-red-600'}`}>
+                          {slaRate}%
+                        </span>
+                      </div>
+                      <Progress value={slaRate} className={`h-2 ${slaRate >= 90 ? '' : slaRate >= 70 ? '[&>div]:bg-orange-500' : '[&>div]:bg-red-500'}`} />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-gray-600">Team Utilization</span>
+                        <span className="font-semibold">{data?.teamUtilization || 0}%</span>
+                      </div>
+                      <Progress value={data?.teamUtilization || 0} className="h-2" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-gray-600">Completion Rate</span>
+                        <span className="font-semibold">{completionRate}%</span>
+                      </div>
+                      <Progress value={completionRate} className="h-2" />
+                    </div>
+                  </div>
+
+                  {/* Quick stats */}
+                  <div className="mt-4 pt-4 border-t grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-lg font-bold text-green-600">{onTrack}</p>
+                      <p className="text-xs text-gray-500">On Track</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-orange-600">{atRisk}</p>
+                      <p className="text-xs text-gray-500">At Risk</p>
+                    </div>
+                    <div>
+                      <p className="text-lg font-bold text-gray-600">{data?.unassignedOrders || 0}</p>
+                      <p className="text-xs text-gray-500">Unassigned</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          );
+        })}
       </div>
     </DashboardLayout>
   );

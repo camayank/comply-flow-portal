@@ -130,33 +130,73 @@ export function registerOperationsRoutes(app: Express) {
   // Requires: ops_executive or higher
   app.get('/api/ops/dashboard-stats', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const stats = {
-        totalActiveOrders: await db
-          .select({ count: sql`count(*)` })
-          .from(serviceRequests)
-          .where(sql`${serviceRequests.status} not in ('completed', 'delivered', 'cancelled')`),
-        
-        pendingOrders: await db
-          .select({ count: sql`count(*)` })
-          .from(serviceRequests)
-          .where(eq(serviceRequests.status, 'initiated')),
-        
-        inProgressOrders: await db
-          .select({ count: sql`count(*)` })
-          .from(serviceRequests)
-          .where(eq(serviceRequests.status, 'in_progress')),
-        
-        completedOrders: await db
-          .select({ count: sql`count(*)` })
-          .from(serviceRequests)
-          .where(eq(serviceRequests.status, 'completed'))
-      };
+      // Get order counts
+      const totalActiveResult = await db
+        .select({ count: sql`count(*)` })
+        .from(serviceRequests)
+        .where(sql`${serviceRequests.status} not in ('completed', 'delivered', 'cancelled')`);
+
+      const pendingResult = await db
+        .select({ count: sql`count(*)` })
+        .from(serviceRequests)
+        .where(eq(serviceRequests.status, 'initiated'));
+
+      const inProgressResult = await db
+        .select({ count: sql`count(*)` })
+        .from(serviceRequests)
+        .where(eq(serviceRequests.status, 'in_progress'));
+
+      const completedResult = await db
+        .select({ count: sql`count(*)` })
+        .from(serviceRequests)
+        .where(eq(serviceRequests.status, 'completed'));
+
+      // Get SLA stats
+      const atRiskResult = await db
+        .select({ count: sql`count(*)` })
+        .from(serviceRequests)
+        .where(sql`${serviceRequests.slaDeadline} IS NOT NULL
+          AND ${serviceRequests.slaDeadline} <= NOW() + INTERVAL '4 hours'
+          AND ${serviceRequests.status} NOT IN ('completed', 'delivered', 'cancelled')`);
+
+      const breachedResult = await db
+        .select({ count: sql`count(*)` })
+        .from(serviceRequests)
+        .where(sql`${serviceRequests.slaDeadline} IS NOT NULL
+          AND ${serviceRequests.slaDeadline} < NOW()
+          AND ${serviceRequests.status} NOT IN ('completed', 'delivered', 'cancelled')`);
+
+      // Calculate team utilization (assigned items / ops team members)
+      const opsTeamResult = await db
+        .select({ count: sql`count(*)` })
+        .from(users)
+        .where(sql`${users.role} IN ('ops_executive', 'ops_manager', 'ops_exec', 'ops_lead')`);
+
+      const assignedResult = await db
+        .select({ count: sql`count(*)` })
+        .from(serviceRequests)
+        .where(sql`${serviceRequests.assignedTo} IS NOT NULL
+          AND ${serviceRequests.status} NOT IN ('completed', 'delivered', 'cancelled')`);
+
+      const opsTeamCount = Number(opsTeamResult[0]?.count || 1);
+      const assignedCount = Number(assignedResult[0]?.count || 0);
+      const totalActive = Number(totalActiveResult[0]?.count || 0);
+
+      // Calculate utilization: target 10 items per person
+      const targetPerPerson = 10;
+      const teamCapacity = opsTeamCount * targetPerPerson;
+      const teamUtilization = teamCapacity > 0 ? Math.min(100, Math.round((assignedCount / teamCapacity) * 100)) : 0;
 
       res.json({
-        totalActiveOrders: Number(stats.totalActiveOrders[0]?.count || 0),
-        pendingOrders: Number(stats.pendingOrders[0]?.count || 0),
-        inProgressOrders: Number(stats.inProgressOrders[0]?.count || 0),
-        completedOrders: Number(stats.completedOrders[0]?.count || 0)
+        totalActiveOrders: totalActive,
+        pendingOrders: Number(pendingResult[0]?.count || 0),
+        inProgressOrders: Number(inProgressResult[0]?.count || 0),
+        completedOrders: Number(completedResult[0]?.count || 0),
+        atRiskOrders: Number(atRiskResult[0]?.count || 0),
+        breachedOrders: Number(breachedResult[0]?.count || 0),
+        teamUtilization,
+        opsTeamSize: opsTeamCount,
+        unassignedOrders: totalActive - assignedCount,
       });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
