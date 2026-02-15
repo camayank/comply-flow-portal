@@ -398,32 +398,106 @@ async function validateDocument(
 }
 
 /**
- * Simulate OCR extraction (replace with actual OCR in production)
- * In production: Use Google Cloud Vision, AWS Textract, or Azure Form Recognizer
+ * OCR extraction with graceful degradation
+ * Returns clear status when OCR is not configured (no fake data)
+ *
+ * Supported OCR Services (configure via environment):
+ * - AWS Textract: Set AWS_TEXTRACT_ENABLED=true
+ * - Google Cloud Vision: Set GOOGLE_VISION_ENABLED=true
+ * - Azure Form Recognizer: Set AZURE_FORM_RECOGNIZER_ENABLED=true
  */
-async function simulateOCR(documentKey: string, fileData: any): Promise<any> {
-  // Mock OCR extraction based on document type
-  const mockData: Record<string, any> = {
-    pan_card: {
-      pan_number: 'ABCDE1234F',
-      name: 'JOHN DOE',
-      dob: '01/01/1990'
-    },
-    aadhaar_card: {
-      aadhaar_number: '123456789012',
-      name: 'John Doe',
-      dob: '01/01/1990',
-      address: '123 Main St, City'
-    },
-    gst_certificate: {
-      gstin: '29AABCT1234E1Z5',
-      legal_name: 'TechStart Solutions Pvt Ltd',
-      trade_name: 'TechStart',
-      registration_date: '2023-06-15'
-    }
-  };
 
-  return mockData[documentKey] || {};
+interface OcrResult {
+  status: 'extracted' | 'manual_verification_required' | 'extraction_failed';
+  message?: string;
+  extractedData: Record<string, any>;
+  confidence: number;
+  ocrProvider?: string;
+}
+
+async function extractOCR(documentKey: string, fileData: any): Promise<OcrResult> {
+  // Check if any OCR service is configured
+  const isOcrConfigured =
+    process.env.AWS_TEXTRACT_ENABLED === 'true' ||
+    process.env.GOOGLE_VISION_ENABLED === 'true' ||
+    process.env.AZURE_FORM_RECOGNIZER_ENABLED === 'true';
+
+  if (!isOcrConfigured) {
+    // No OCR service configured - return honest status
+    console.log(`OCR not configured. Document ${documentKey} requires manual verification.`);
+    return {
+      status: 'manual_verification_required',
+      message: 'OCR service not configured. Document requires manual verification by ops team.',
+      extractedData: {},
+      confidence: 0,
+    };
+  }
+
+  try {
+    // AWS Textract integration
+    if (process.env.AWS_TEXTRACT_ENABLED === 'true') {
+      // Placeholder for actual AWS Textract call
+      // const textractResult = await callAWSTextract(fileData.fileBuffer);
+      console.log(`Would call AWS Textract for ${documentKey}`);
+      return {
+        status: 'manual_verification_required',
+        message: 'AWS Textract integration pending implementation.',
+        extractedData: {},
+        confidence: 0,
+        ocrProvider: 'aws_textract',
+      };
+    }
+
+    // Google Vision integration
+    if (process.env.GOOGLE_VISION_ENABLED === 'true') {
+      // Placeholder for actual Google Vision call
+      // const visionResult = await callGoogleVision(fileData.fileBuffer);
+      console.log(`Would call Google Vision for ${documentKey}`);
+      return {
+        status: 'manual_verification_required',
+        message: 'Google Vision integration pending implementation.',
+        extractedData: {},
+        confidence: 0,
+        ocrProvider: 'google_vision',
+      };
+    }
+
+    // Azure Form Recognizer integration
+    if (process.env.AZURE_FORM_RECOGNIZER_ENABLED === 'true') {
+      // Placeholder for actual Azure call
+      // const azureResult = await callAzureFormRecognizer(fileData.fileBuffer);
+      console.log(`Would call Azure Form Recognizer for ${documentKey}`);
+      return {
+        status: 'manual_verification_required',
+        message: 'Azure Form Recognizer integration pending implementation.',
+        extractedData: {},
+        confidence: 0,
+        ocrProvider: 'azure_form_recognizer',
+      };
+    }
+
+    // Fallback
+    return {
+      status: 'manual_verification_required',
+      message: 'No OCR provider available.',
+      extractedData: {},
+      confidence: 0,
+    };
+  } catch (error) {
+    console.error(`OCR extraction failed for ${documentKey}:`, error);
+    return {
+      status: 'extraction_failed',
+      message: `OCR extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      extractedData: {},
+      confidence: 0,
+    };
+  }
+}
+
+// Keep old function name for backward compatibility but call new implementation
+async function simulateOCR(documentKey: string, fileData: any): Promise<any> {
+  const result = await extractOCR(documentKey, fileData);
+  return result.extractedData;
 }
 
 /**

@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import { logEmail } from './services/communication-logger';
 
 interface EmailOptions {
   to: string;
@@ -7,6 +8,11 @@ interface EmailOptions {
   html?: string;
   text?: string;
   from?: string;
+  // For logging
+  clientId?: number;
+  businessEntityId?: number;
+  serviceRequestId?: number;
+  purpose?: 'follow_up' | 'issue_resolution' | 'service_discussion' | 'payment_reminder' | 'relationship_building' | 'notification' | 'otp' | 'welcome' | 'invoice';
 }
 
 interface OTPEmailData {
@@ -82,13 +88,21 @@ class EmailService {
           expiryMinutes,
         });
         console.log(`🔐 OTP for ${email}: ${otp} (expires in ${expiryMinutes} minutes)`);
-        return true;
+      } else {
+        await this.send({
+          to: email,
+          subject,
+          html,
+        });
       }
 
-      await this.send({
+      // Log communication (always, even in dev mode)
+      await logEmail({
         to: email,
         subject,
-        html,
+        body: `OTP sent to ${userName || email}. Expires in ${expiryMinutes} minutes.`,
+        purpose: 'otp',
+        templateId: 'otp_email',
       });
 
       console.log(`✅ OTP email sent to ${email}`);
@@ -102,20 +116,29 @@ class EmailService {
   /**
    * Send welcome email to new user
    */
-  async sendWelcomeEmail(email: string, fullName: string): Promise<boolean> {
+  async sendWelcomeEmail(email: string, fullName: string, clientId?: number): Promise<boolean> {
     const subject = 'Welcome to DigiComply!';
     const html = this.getWelcomeEmailTemplate(fullName);
 
     try {
       if (!this.isConfigured) {
         console.log(`📧 [DEV MODE] Welcome email to ${email}`);
-        return true;
+      } else {
+        await this.send({
+          to: email,
+          subject,
+          html,
+        });
       }
 
-      await this.send({
+      // Log communication
+      await logEmail({
         to: email,
         subject,
-        html,
+        body: `Welcome email sent to ${fullName}`,
+        clientId,
+        purpose: 'welcome',
+        templateId: 'welcome_email',
       });
 
       console.log(`✅ Welcome email sent to ${email}`);
@@ -129,7 +152,7 @@ class EmailService {
   /**
    * Send password reset email
    */
-  async sendPasswordReset(email: string, resetToken: string): Promise<boolean> {
+  async sendPasswordReset(email: string, resetToken: string, clientId?: number): Promise<boolean> {
     const subject = 'Reset Your Password - DigiComply';
     const resetLink = `${process.env.APP_URL || 'http://localhost:5000'}/reset-password?token=${resetToken}`;
     const html = this.getPasswordResetTemplate(resetLink);
@@ -138,13 +161,22 @@ class EmailService {
       if (!this.isConfigured) {
         console.log(`📧 [DEV MODE] Password reset email to ${email}`);
         console.log(`🔗 Reset link: ${resetLink}`);
-        return true;
+      } else {
+        await this.send({
+          to: email,
+          subject,
+          html,
+        });
       }
 
-      await this.send({
+      // Log communication
+      await logEmail({
         to: email,
         subject,
-        html,
+        body: 'Password reset link sent',
+        clientId,
+        purpose: 'notification',
+        templateId: 'password_reset',
       });
 
       console.log(`✅ Password reset email sent to ${email}`);
@@ -158,34 +190,49 @@ class EmailService {
   /**
    * Send invoice email
    */
-  async sendInvoice(email: string, invoiceNumber: string, pdfBuffer?: Buffer): Promise<boolean> {
+  async sendInvoice(
+    email: string,
+    invoiceNumber: string,
+    pdfBuffer?: Buffer,
+    options?: { clientId?: number; businessEntityId?: number }
+  ): Promise<boolean> {
     const subject = `Invoice ${invoiceNumber} - DigiComply`;
     const html = this.getInvoiceEmailTemplate(invoiceNumber);
 
     try {
       if (!this.isConfigured) {
         console.log(`📧 [DEV MODE] Invoice email to ${email} (Invoice: ${invoiceNumber})`);
-        return true;
+      } else {
+        const emailOptions: any = {
+          to: email,
+          subject,
+          html,
+        };
+
+        // Attach PDF if provided
+        if (pdfBuffer) {
+          emailOptions.attachments = [
+            {
+              filename: `invoice-${invoiceNumber}.pdf`,
+              content: pdfBuffer,
+              contentType: 'application/pdf',
+            },
+          ];
+        }
+
+        await this.send(emailOptions);
       }
 
-      const emailOptions: any = {
+      // Log communication
+      await logEmail({
         to: email,
         subject,
-        html,
-      };
-
-      // Attach PDF if provided
-      if (pdfBuffer) {
-        emailOptions.attachments = [
-          {
-            filename: `invoice-${invoiceNumber}.pdf`,
-            content: pdfBuffer,
-            contentType: 'application/pdf',
-          },
-        ];
-      }
-
-      await this.send(emailOptions);
+        body: `Invoice ${invoiceNumber} sent`,
+        clientId: options?.clientId,
+        businessEntityId: options?.businessEntityId,
+        purpose: 'invoice',
+        templateId: 'invoice_email',
+      });
 
       console.log(`✅ Invoice email sent to ${email}`);
       return true;
