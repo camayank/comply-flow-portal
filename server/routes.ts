@@ -2548,6 +2548,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/ops/work-queue', workQueueRoutes.default);
   console.log('✅ Work Queue & Escalation routes registered');
 
+  // Register Ops Case Dashboard routes (Case detail, notes, filing status)
+  const opsCaseRoutes = await import('./ops-case-routes');
+  app.use('/api/ops', opsCaseRoutes.default);
+  console.log('✅ Ops Case Dashboard routes registered (Case detail, notes, filing status)');
+
   // Register Escalation routes (Auto-escalation engine API)
   const { registerEscalationRoutes } = await import('./escalation-routes');
   registerEscalationRoutes(app);
