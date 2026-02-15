@@ -34,8 +34,33 @@ exports.seed = async function(knex) {
     },
     {
       id: knex.raw('uuid_generate_v4()'),
-      name: 'operations_manager',
-      description: 'Operations Manager with operations portal access'
+      name: 'sales_executive',
+      description: 'Sales Executive with lead management access'
+    },
+    {
+      id: knex.raw('uuid_generate_v4()'),
+      name: 'ops_manager',
+      description: 'Operations Manager with full ops access'
+    },
+    {
+      id: knex.raw('uuid_generate_v4()'),
+      name: 'ops_executive',
+      description: 'Operations Executive with task management access'
+    },
+    {
+      id: knex.raw('uuid_generate_v4()'),
+      name: 'customer_service',
+      description: 'Customer Service with support access'
+    },
+    {
+      id: knex.raw('uuid_generate_v4()'),
+      name: 'qc_executive',
+      description: 'QC Executive with quality control access'
+    },
+    {
+      id: knex.raw('uuid_generate_v4()'),
+      name: 'accountant',
+      description: 'Accountant with financial access'
     },
     {
       id: knex.raw('uuid_generate_v4()'),
@@ -162,16 +187,95 @@ exports.seed = async function(knex) {
   });
 
   // Operations Manager permissions
-  const opsPermissions = [
+  const opsManagerPermissions = [
     'clients.view', 'clients.update',
     'tasks.view', 'tasks.create', 'tasks.update', 'tasks.delete',
     'workflows.view', 'workflows.create', 'workflows.update',
-    'reports.view'
+    'reports.view', 'analytics.view'
   ];
-  opsPermissions.forEach(permName => {
+  opsManagerPermissions.forEach(permName => {
     if (permissionMap[permName]) {
       rolePermissions.push({
-        role_id: roleMap['operations_manager'],
+        role_id: roleMap['ops_manager'],
+        permission_id: permissionMap[permName]
+      });
+    }
+  });
+
+  // Sales Executive permissions
+  const salesExecPermissions = [
+    'clients.view', 'clients.create',
+    'leads.view', 'leads.create', 'leads.update',
+    'proposals.view', 'proposals.create', 'proposals.update',
+    'reports.view'
+  ];
+  salesExecPermissions.forEach(permName => {
+    if (permissionMap[permName]) {
+      rolePermissions.push({
+        role_id: roleMap['sales_executive'],
+        permission_id: permissionMap[permName]
+      });
+    }
+  });
+
+  // Operations Executive permissions
+  const opsExecPermissions = [
+    'clients.view',
+    'tasks.view', 'tasks.create', 'tasks.update',
+    'workflows.view',
+    'reports.view'
+  ];
+  opsExecPermissions.forEach(permName => {
+    if (permissionMap[permName]) {
+      rolePermissions.push({
+        role_id: roleMap['ops_executive'],
+        permission_id: permissionMap[permName]
+      });
+    }
+  });
+
+  // Customer Service permissions
+  const customerServicePermissions = [
+    'clients.view', 'clients.update',
+    'tasks.view', 'tasks.create', 'tasks.update',
+    'reports.view'
+  ];
+  customerServicePermissions.forEach(permName => {
+    if (permissionMap[permName]) {
+      rolePermissions.push({
+        role_id: roleMap['customer_service'],
+        permission_id: permissionMap[permName]
+      });
+    }
+  });
+
+  // QC Executive permissions
+  const qcPermissions = [
+    'clients.view',
+    'tasks.view', 'tasks.create', 'tasks.update',
+    'workflows.view',
+    'reports.view'
+  ];
+  qcPermissions.forEach(permName => {
+    if (permissionMap[permName]) {
+      rolePermissions.push({
+        role_id: roleMap['qc_executive'],
+        permission_id: permissionMap[permName]
+      });
+    }
+  });
+
+  // Accountant permissions
+  const accountantPermissions = [
+    'clients.view',
+    'invoices.view', 'invoices.create',
+    'payments.view', 'payments.create',
+    'reports.view', 'analytics.view'
+  ];
+  accountantPermissions.forEach(permName => {
+    if (permissionMap[permName]) {
+      rolePermissions.push({
+        role_id: roleMap['accountant'],
         permission_id: permissionMap[permName]
       });
     }
@@ -195,6 +299,7 @@ exports.seed = async function(knex) {
   // Agent permissions
   const agentPermissions = [
     'leads.view', 'leads.create',
+    'proposals.view', 'proposals.create',
     'reports.view'
   ];
   agentPermissions.forEach(permName => {
@@ -209,21 +314,21 @@ exports.seed = async function(knex) {
   await knex('role_permissions').insert(rolePermissions);
 
   // =====================================================
-  // 5. CREATE DEFAULT USERS
+  // 5. CREATE DEFAULT USERS FOR ALL ROLES
   // =====================================================
-  const passwordHash = await bcrypt.hash('Admin@123', 10);
-
   const users = [
+    // Super Admin
     {
       id: knex.raw('uuid_generate_v4()'),
       email: 'admin@complyflow.com',
-      password_hash: passwordHash,
+      password_hash: await bcrypt.hash('Admin@123', 10),
       first_name: 'System',
       last_name: 'Administrator',
       phone: '+919876543210',
       is_active: true,
       email_verified: true
     },
+    // Sales Manager
     {
       id: knex.raw('uuid_generate_v4()'),
       email: 'sales@complyflow.com',
@@ -234,6 +339,18 @@ exports.seed = async function(knex) {
       is_active: true,
       email_verified: true
     },
+    // Sales Executive
+    {
+      id: knex.raw('uuid_generate_v4()'),
+      email: 'salesexec@complyflow.com',
+      password_hash: await bcrypt.hash('SalesExec@123', 10),
+      first_name: 'Rahul',
+      last_name: 'Sharma',
+      phone: '+919876543220',
+      is_active: true,
+      email_verified: true
+    },
+    // Operations Manager
     {
       id: knex.raw('uuid_generate_v4()'),
       email: 'ops@complyflow.com',
@@ -241,6 +358,72 @@ exports.seed = async function(knex) {
       first_name: 'Operations',
       last_name: 'Manager',
       phone: '+919876543212',
+      is_active: true,
+      email_verified: true
+    },
+    // Operations Executive
+    {
+      id: knex.raw('uuid_generate_v4()'),
+      email: 'opsexec@complyflow.com',
+      password_hash: await bcrypt.hash('OpsExec@123', 10),
+      first_name: 'Priya',
+      last_name: 'Verma',
+      phone: '+919876543221',
+      is_active: true,
+      email_verified: true
+    },
+    // Customer Service
+    {
+      id: knex.raw('uuid_generate_v4()'),
+      email: 'support@complyflow.com',
+      password_hash: await bcrypt.hash('Support@123', 10),
+      first_name: 'Support',
+      last_name: 'Team',
+      phone: '+919876543222',
+      is_active: true,
+      email_verified: true
+    },
+    // QC Executive
+    {
+      id: knex.raw('uuid_generate_v4()'),
+      email: 'qc@complyflow.com',
+      password_hash: await bcrypt.hash('Qc@123', 10),
+      first_name: 'Quality',
+      last_name: 'Controller',
+      phone: '+919876543223',
+      is_active: true,
+      email_verified: true
+    },
+    // Accountant
+    {
+      id: knex.raw('uuid_generate_v4()'),
+      email: 'accounts@complyflow.com',
+      password_hash: await bcrypt.hash('Accounts@123', 10),
+      first_name: 'Finance',
+      last_name: 'Team',
+      phone: '+919876543224',
+      is_active: true,
+      email_verified: true
+    },
+    // Client
+    {
+      id: knex.raw('uuid_generate_v4()'),
+      email: 'client@complyflow.com',
+      password_hash: await bcrypt.hash('Client@123', 10),
+      first_name: 'Demo',
+      last_name: 'Client',
+      phone: '+919876543225',
+      is_active: true,
+      email_verified: true
+    },
+    // Agent
+    {
+      id: knex.raw('uuid_generate_v4()'),
+      email: 'agent@complyflow.com',
+      password_hash: await bcrypt.hash('Agent@123', 10),
+      first_name: 'Partner',
+      last_name: 'Agent',
+      phone: '+919876543226',
       is_active: true,
       email_verified: true
     }
@@ -267,12 +450,40 @@ exports.seed = async function(knex) {
       role_id: roleMap['sales_manager']
     },
     {
+      user_id: userMap['salesexec@complyflow.com'],
+      role_id: roleMap['sales_executive']
+    },
+    {
       user_id: userMap['ops@complyflow.com'],
-      role_id: roleMap['operations_manager']
+      role_id: roleMap['ops_manager']
+    },
+    {
+      user_id: userMap['opsexec@complyflow.com'],
+      role_id: roleMap['ops_executive']
+    },
+    {
+      user_id: userMap['support@complyflow.com'],
+      role_id: roleMap['customer_service']
+    },
+    {
+      user_id: userMap['qc@complyflow.com'],
+      role_id: roleMap['qc_executive']
+    },
+    {
+      user_id: userMap['accounts@complyflow.com'],
+      role_id: roleMap['accountant']
+    },
+    {
+      user_id: userMap['client@complyflow.com'],
+      role_id: roleMap['client']
+    },
+    {
+      user_id: userMap['agent@complyflow.com'],
+      role_id: roleMap['agent']
     }
   ];
 
   await knex('user_roles').insert(userRoles);
 
-  console.log('✓ Users seed completed: 6 roles, 35 permissions, 3 default users');
+  console.log('✓ Users seed completed: 11 roles, 35 permissions, 10 default users');
 };
