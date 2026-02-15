@@ -10,6 +10,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Shield, Mail, Lock, Smartphone } from "lucide-react";
 import { canAccessRoute, getRoleDashboardRoute } from "@/utils/roleBasedRouting";
+import { PublicLayout } from '@/layouts';
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -41,45 +42,47 @@ export default function Login() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-            <Shield className="h-8 w-8 text-primary" />
+    <PublicLayout>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+              <Shield className="h-8 w-8 text-primary" />
+            </div>
+            <h1 className="text-3xl font-bold">Welcome Back</h1>
+            <p className="text-muted-foreground mt-2">Sign in to your account</p>
           </div>
-          <h1 className="text-3xl font-bold">Welcome Back</h1>
-          <p className="text-muted-foreground mt-2">Sign in to your account</p>
-        </div>
 
-        <Card>
-          <CardHeader>
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "client" | "staff")} className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="client">Client Login</TabsTrigger>
-                <TabsTrigger value="staff">Staff Login</TabsTrigger>
-              </TabsList>
+          <Card>
+            <CardHeader>
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "client" | "staff")} className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="client">Client Login</TabsTrigger>
+                  <TabsTrigger value="staff">Staff Login</TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="client" className="space-y-4 mt-4">
-                <ClientLogin />
-              </TabsContent>
+                <TabsContent value="client" className="space-y-4 mt-4">
+                  <ClientLogin />
+                </TabsContent>
 
-              <TabsContent value="staff" className="space-y-4 mt-4">
-                <StaffLogin />
-              </TabsContent>
-            </Tabs>
-          </CardHeader>
-        </Card>
+                <TabsContent value="staff" className="space-y-4 mt-4">
+                  <StaffLogin />
+                </TabsContent>
+              </Tabs>
+            </CardHeader>
+          </Card>
 
-        <div className="mt-6 text-center text-sm text-muted-foreground">
-          <p>
-            New client?{" "}
-            <a href="/register" className="text-primary hover:underline font-medium">
-              Register here
-            </a>
-          </p>
+          <div className="mt-6 text-center text-sm text-muted-foreground">
+            <p>
+              New client?{" "}
+              <a href="/register" className="text-primary hover:underline font-medium">
+                Register here
+              </a>
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </PublicLayout>
   );
 }
 

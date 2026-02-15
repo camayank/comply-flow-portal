@@ -12,10 +12,12 @@ import {
   TrendingUp,
   Star,
 } from "lucide-react";
+import { PublicLayout } from '@/layouts';
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-white">
+    <PublicLayout showHeader={false} showFooter={false}>
+      <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b border-slate-200">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -313,6 +315,7 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </PublicLayout>
   );
 }

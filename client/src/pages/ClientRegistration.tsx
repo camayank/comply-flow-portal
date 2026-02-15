@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { DashboardLayout, PageShell } from '@/components/v3';
+import { PublicLayout } from '@/layouts';
 import {
   Building,
   User,
@@ -20,12 +20,6 @@ import {
   ArrowRight,
   ArrowLeft,
   Sparkles,
-  Home,
-  Briefcase,
-  Calendar,
-  Shield,
-  HelpCircle,
-  Settings
 } from "lucide-react";
 
 const STEPS = [
@@ -34,37 +28,6 @@ const STEPS = [
   { id: 3, title: "KYC Documents", icon: FileText },
   { id: 4, title: "Services Selection", icon: CheckCircle2 },
 ];
-
-// V3 Navigation Configuration
-const clientNavigation = [
-  {
-    title: "Client Portal",
-    items: [
-      { label: "Dashboard", href: "/client", icon: Home },
-      { label: "My Services", href: "/client/services", icon: Briefcase },
-      { label: "Documents", href: "/client/documents", icon: FileText },
-    ],
-  },
-  {
-    title: "Compliance",
-    items: [
-      { label: "Calendar", href: "/client/calendar", icon: Calendar },
-      { label: "Compliance Status", href: "/client/compliance", icon: Shield },
-    ],
-  },
-  {
-    title: "Support",
-    items: [
-      { label: "Help & Support", href: "/client/support", icon: HelpCircle },
-      { label: "Settings", href: "/client/profile", icon: Settings },
-    ],
-  },
-];
-
-const clientUser = {
-  name: "New Client",
-  email: "registration@complyflow.com",
-};
 
 export default function ClientRegistration() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -201,20 +164,13 @@ export default function ClientRegistration() {
   };
 
   return (
-    <DashboardLayout
-      navigation={clientNavigation}
-      user={clientUser}
-      logo={<Building className="h-8 w-8 text-blue-600" />}
-    >
-      <PageShell
-        title="Register Your Business"
-        subtitle="Complete your registration in 4 simple steps"
-        breadcrumbs={[
-          { label: "Home", href: "/" },
-          { label: "Registration" },
-        ]}
-      >
+    <PublicLayout>
+      <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold">Register Your Business</h1>
+            <p className="text-muted-foreground mt-2">Complete your registration in 4 simple steps</p>
+          </div>
           {fromSmartStart && (
             <Alert className="mb-6 border-green-200 bg-green-50 dark:bg-green-950/20">
               <Sparkles className="h-4 w-4 text-green-600" />
@@ -531,7 +487,7 @@ export default function ClientRegistration() {
             </CardContent>
           </Card>
         </div>
-      </PageShell>
-    </DashboardLayout>
+      </div>
+    </PublicLayout>
   );
 }
