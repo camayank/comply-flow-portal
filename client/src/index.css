@@ -165,6 +165,26 @@ html {
     --chart-6: 158 64% 52%;  /* Teal */
     --chart-7: 45 93% 47%;   /* Amber */
     --chart-8: 340 82% 52%;  /* Pink */
+
+    /* V3 Surface tokens */
+    --surface: 210 40% 98%;
+    --surface-raised: 0 0% 100%;
+    --surface-overlay: 222 47% 11%;
+    --surface-sunken: 210 40% 96%;
+
+    /* V3 Border tokens */
+    --border-subtle: 214 32% 91%;
+    --border-strong: 215 20% 65%;
+
+    /* V3 Text tokens */
+    --text-primary: 222 47% 11%;
+    --text-secondary: 215 16% 47%;
+    --text-muted: 215 20% 65%;
+    --text-disabled: 215 20% 75%;
+
+    /* Interactive tokens */
+    --interactive-hover: 210 40% 96%;
+    --interactive-active: 222 47% 11%;
   }
 
   .dark {
@@ -259,6 +279,26 @@ html {
     --chart-6: 158 64% 62%;  /* Teal (lighter for dark mode) */
     --chart-7: 45 93% 57%;   /* Amber (lighter for dark mode) */
     --chart-8: 340 82% 62%;  /* Pink (lighter for dark mode) */
+
+    /* V3 Surface tokens - dark */
+    --surface: 222 47% 11%;
+    --surface-raised: 223 47% 14%;
+    --surface-overlay: 0 0% 100%;
+    --surface-sunken: 223 47% 8%;
+
+    /* V3 Border tokens - dark */
+    --border-subtle: 217 19% 27%;
+    --border-strong: 215 20% 50%;
+
+    /* V3 Text tokens - dark */
+    --text-primary: 210 40% 98%;
+    --text-secondary: 215 20% 65%;
+    --text-muted: 215 16% 47%;
+    --text-disabled: 217 19% 35%;
+
+    /* Interactive tokens - dark */
+    --interactive-hover: 223 47% 14%;
+    --interactive-active: 210 40% 98%;
   }
 }
 
