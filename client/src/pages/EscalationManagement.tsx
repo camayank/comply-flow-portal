@@ -395,7 +395,7 @@ export default function EscalationManagement() {
                           <SelectValue placeholder="Any priority" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Any</SelectItem>
+                          <SelectItem value="any">Any</SelectItem>
                           <SelectItem value="LOW">Low</SelectItem>
                           <SelectItem value="MEDIUM">Medium</SelectItem>
                           <SelectItem value="HIGH">High</SelectItem>

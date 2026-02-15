@@ -70,8 +70,8 @@ import {
 export default function AuditLogViewer() {
   const { toast } = useToast();
   const [filters, setFilters] = useState({
-    entityType: '',
-    action: '',
+    entityType: 'all',
+    action: 'all',
     startDate: '',
     endDate: '',
     limit: 50,
@@ -262,7 +262,7 @@ export default function AuditLogViewer() {
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All types</SelectItem>
+                  <SelectItem value="all">All types</SelectItem>
                   <SelectItem value="user">User</SelectItem>
                   <SelectItem value="client">Client</SelectItem>
                   <SelectItem value="document">Document</SelectItem>
@@ -284,7 +284,7 @@ export default function AuditLogViewer() {
                   <SelectValue placeholder="All actions" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All actions</SelectItem>
+                  <SelectItem value="all">All actions</SelectItem>
                   <SelectItem value="create">Create</SelectItem>
                   <SelectItem value="update">Update</SelectItem>
                   <SelectItem value="delete">Delete</SelectItem>
@@ -321,8 +321,8 @@ export default function AuditLogViewer() {
                 className="w-full"
                 onClick={() =>
                   setFilters({
-                    entityType: '',
-                    action: '',
+                    entityType: 'all',
+                    action: 'all',
                     startDate: '',
                     endDate: '',
                     limit: 50,

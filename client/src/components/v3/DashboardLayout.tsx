@@ -44,7 +44,7 @@ export function DashboardLayout({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className={cn("flex h-screen bg-slate-50", className)}>
+    <div className={cn("flex min-h-screen bg-slate-50", className)}>
       <div className="hidden lg:block">
         <AppSidebar
           sections={navigation}

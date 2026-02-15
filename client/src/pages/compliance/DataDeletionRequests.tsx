@@ -70,8 +70,8 @@ import {
 export default function DataDeletionRequests() {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [typeFilter, setTypeFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
 
   const [newRequest, setNewRequest] = useState({
     subjectEmail: '',
@@ -81,8 +81,8 @@ export default function DataDeletionRequests() {
 
   // Fetch requests
   const { data: requestsData, isLoading } = useDataRequests({
-    status: statusFilter || undefined,
-    requestType: typeFilter || undefined,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    requestType: typeFilter !== 'all' ? typeFilter : undefined,
   });
 
   // Mutations
@@ -309,7 +309,7 @@ export default function DataDeletionRequests() {
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Status</SelectItem>
+                  <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="verified">Verified</SelectItem>
                   <SelectItem value="processing">Processing</SelectItem>
@@ -322,7 +322,7 @@ export default function DataDeletionRequests() {
                   <SelectValue placeholder="All Types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Types</SelectItem>
+                  <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="erasure">Erasure</SelectItem>
                   <SelectItem value="portability">Portability</SelectItem>
                   <SelectItem value="rectification">Rectification</SelectItem>

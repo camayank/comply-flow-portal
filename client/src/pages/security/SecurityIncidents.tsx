@@ -82,8 +82,8 @@ export default function SecurityIncidents() {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<SecurityIncident | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [severityFilter, setSeverityFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   const [newIncident, setNewIncident] = useState({
@@ -97,8 +97,8 @@ export default function SecurityIncidents() {
 
   // Fetch incidents
   const { data: incidentsData, isLoading } = useSecurityIncidents({
-    status: statusFilter || undefined,
-    severity: severityFilter || undefined,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    severity: severityFilter !== 'all' ? severityFilter : undefined,
   });
 
   // Mutations
@@ -338,7 +338,7 @@ export default function SecurityIncidents() {
                   <SelectValue placeholder="Severity" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Severity</SelectItem>
+                  <SelectItem value="all">All Severity</SelectItem>
                   <SelectItem value="critical">Critical</SelectItem>
                   <SelectItem value="high">High</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
@@ -350,7 +350,7 @@ export default function SecurityIncidents() {
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Status</SelectItem>
+                  <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="reported">Reported</SelectItem>
                   <SelectItem value="investigating">Investigating</SelectItem>
                   <SelectItem value="contained">Contained</SelectItem>

@@ -119,9 +119,9 @@ const serviceBulkColumns: ColumnDefinition[] = [
 
 export default function ServiceManagement() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedComplexity, setSelectedComplexity] = useState('');
-  const [selectedServiceType, setSelectedServiceType] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedComplexity, setSelectedComplexity] = useState('all');
+  const [selectedServiceType, setSelectedServiceType] = useState('all');
   const [activeTab, setActiveTab] = useState('services');
   const [bulkUploadOpen, setBulkUploadOpen] = useState(false);
   const { toast } = useToast();
@@ -133,9 +133,9 @@ export default function ServiceManagement() {
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchQuery) params.append('search', searchQuery);
-      if (selectedCategory) params.append('category', selectedCategory);
-      if (selectedComplexity) params.append('complexityLevel', selectedComplexity);
-      if (selectedServiceType) params.append('serviceType', selectedServiceType);
+      if (selectedCategory !== 'all') params.append('category', selectedCategory);
+      if (selectedComplexity !== 'all') params.append('complexityLevel', selectedComplexity);
+      if (selectedServiceType !== 'all') params.append('serviceType', selectedServiceType);
       
       const response = await fetch(`/api/services/definitions?${params}`);
       if (!response.ok) throw new Error('Failed to fetch services');
@@ -314,7 +314,7 @@ export default function ServiceManagement() {
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="all">All Categories</SelectItem>
                   <SelectItem value="incorporation">Incorporation</SelectItem>
                   <SelectItem value="compliance">Compliance</SelectItem>
                   <SelectItem value="tax">Tax</SelectItem>
@@ -326,7 +326,7 @@ export default function ServiceManagement() {
                   <SelectValue placeholder="Complexity" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Levels</SelectItem>
+                  <SelectItem value="all">All Levels</SelectItem>
                   <SelectItem value="low">Low</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="high">High</SelectItem>
@@ -338,7 +338,7 @@ export default function ServiceManagement() {
                   <SelectValue placeholder="Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Types</SelectItem>
+                  <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="standard">Standard</SelectItem>
                   <SelectItem value="premium">Premium</SelectItem>
                   <SelectItem value="enterprise">Enterprise</SelectItem>

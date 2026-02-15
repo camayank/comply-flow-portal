@@ -138,9 +138,9 @@ export default function OperationsServiceRequests() {
   const canManagePriority = canManageAssignment;
 
   const [filters, setFilters] = useState({
-    status: '',
-    priority: '',
-    assignedTo: '',
+    status: 'all',
+    priority: 'all',
+    assignedTo: 'all',
     search: '',
   });
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -565,7 +565,7 @@ export default function OperationsServiceRequests() {
                 <SelectValue placeholder="All statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="initiated">Initiated</SelectItem>
                 <SelectItem value="docs_uploaded">Docs Uploaded</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
@@ -589,7 +589,7 @@ export default function OperationsServiceRequests() {
                 <SelectValue placeholder="All priorities" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="urgent">Urgent</SelectItem>
                 <SelectItem value="high">High</SelectItem>
                 <SelectItem value="medium">Medium</SelectItem>
@@ -611,7 +611,7 @@ export default function OperationsServiceRequests() {
                 <SelectValue placeholder="All assignees" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="unassigned">Unassigned</SelectItem>
                 {teamMembers.map((member) => (
                   <SelectItem key={member.id} value={String(member.id)}>

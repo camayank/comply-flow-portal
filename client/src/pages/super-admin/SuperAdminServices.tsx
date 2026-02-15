@@ -241,8 +241,8 @@ export default function SuperAdminServices() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<string>("");
-  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedService, setSelectedService] = useState<PlatformService | null>(null);
@@ -553,7 +553,7 @@ export default function SuperAdminServices() {
                     <SelectValue placeholder="All Categories" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Categories</SelectItem>
+                    <SelectItem value="all">All Categories</SelectItem>
                     {categories.map((cat) => (
                       <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                     ))}
@@ -564,7 +564,7 @@ export default function SuperAdminServices() {
                     <SelectValue placeholder="All Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Status</SelectItem>
+                    <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="inactive">Inactive</SelectItem>
                   </SelectContent>
@@ -592,7 +592,7 @@ export default function SuperAdminServices() {
               title="No Services Found"
               description="No services match your search criteria."
               action={
-                <Button variant="outline" onClick={() => { setSearchQuery(""); setCategoryFilter(""); setStatusFilter(""); }}>
+                <Button variant="outline" onClick={() => { setSearchQuery(""); setCategoryFilter("all"); setStatusFilter("all"); }}>
                   Clear Filters
                 </Button>
               }

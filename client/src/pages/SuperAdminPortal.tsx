@@ -112,7 +112,7 @@ export default function SuperAdminPortal() {
   const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('users');
   const [showPassword, setShowPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -125,7 +125,7 @@ export default function SuperAdminPortal() {
 
   // Fetch all users
   const { data: users = [], isLoading } = useQuery<User[]>({
-    queryKey: ['/api/super-admin/users', { search: searchTerm, role: roleFilter }],
+    queryKey: ['/api/super-admin/users', { search: searchTerm, role: roleFilter === 'all' ? '' : roleFilter }],
   });
 
   // Fetch audit logs with pagination
@@ -347,7 +347,7 @@ export default function SuperAdminPortal() {
     const matchesSearch = user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.username?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = !roleFilter || user.role === roleFilter;
+    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     return matchesSearch && matchesRole;
   });
 
@@ -472,7 +472,7 @@ export default function SuperAdminPortal() {
                         <SelectValue placeholder="All roles" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All roles</SelectItem>
+                        <SelectItem value="all">All roles</SelectItem>
                         {Object.entries(USER_ROLES).map(([key, role]) => (
                           <SelectItem key={key} value={key}>
                             {role.label}

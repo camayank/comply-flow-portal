@@ -365,7 +365,7 @@ function RequestServiceDialog({
 // Main Component
 export default function ServiceCatalogBrowser() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedService, setSelectedService] = useState<any>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [showRequestDialog, setShowRequestDialog] = useState(false);
@@ -441,7 +441,7 @@ export default function ServiceCatalogBrowser() {
             <SelectValue placeholder="All Categories" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Categories</SelectItem>
+            <SelectItem value="all">All Categories</SelectItem>
             {(categories || []).map((cat: string) => (
               <SelectItem key={cat} value={cat}>{cat}</SelectItem>
             ))}
@@ -455,7 +455,7 @@ export default function ServiceCatalogBrowser() {
       </div>
 
       {/* Services by Category */}
-      {selectedCategory ? (
+      {selectedCategory !== 'all' ? (
         // Show flat grid when category is selected
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredServices.map((service: any) => (

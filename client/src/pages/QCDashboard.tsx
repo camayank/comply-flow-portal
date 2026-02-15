@@ -117,8 +117,8 @@ const formatTimeAgo = (date: string) => {
 export default function QCDashboard() {
   const [selectedTab, setSelectedTab] = useState('pending');
   const [searchTerm, setSearchTerm] = useState('');
-  const [priorityFilter, setPriorityFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('assignedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedReview, setSelectedReview] = useState<ServiceWithReview | null>(null);
@@ -399,7 +399,7 @@ export default function QCDashboard() {
                   <SelectValue placeholder="Priority" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Priorities</SelectItem>
+                  <SelectItem value="all">All Priorities</SelectItem>
                   <SelectItem value="low">Low</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="high">High</SelectItem>
@@ -412,7 +412,7 @@ export default function QCDashboard() {
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Statuses</SelectItem>
+                  <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
@@ -424,8 +424,8 @@ export default function QCDashboard() {
                 variant="outline"
                 onClick={() => {
                   setSearchTerm('');
-                  setPriorityFilter('');
-                  setStatusFilter('');
+                  setPriorityFilter('all');
+                  setStatusFilter('all');
                 }}
                 data-testid="button-clear-filters"
               >

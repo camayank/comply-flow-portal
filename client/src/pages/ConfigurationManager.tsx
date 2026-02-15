@@ -468,7 +468,7 @@ function ServicesTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [showServiceForm, setShowServiceForm] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
 
@@ -562,7 +562,7 @@ function ServicesTab() {
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Categories</SelectItem>
+              <SelectItem value="all">All Categories</SelectItem>
               {(data?.categories || []).map(cat => (
                 <SelectItem key={cat} value={cat}>{cat}</SelectItem>
               ))}
@@ -734,7 +734,7 @@ function ClientsTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedEntityType, setSelectedEntityType] = useState<string>('');
+  const [selectedEntityType, setSelectedEntityType] = useState<string>('all');
   const [showClientForm, setShowClientForm] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
@@ -819,7 +819,7 @@ function ClientsTab() {
               <SelectValue placeholder="All Entity Types" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Types</SelectItem>
+              <SelectItem value="all">All Types</SelectItem>
               {ENTITY_TYPES.map(et => (
                 <SelectItem key={et.value} value={et.value}>{et.label}</SelectItem>
               ))}

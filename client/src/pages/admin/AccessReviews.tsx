@@ -138,7 +138,7 @@ export default function AccessReviews() {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedReview, setSelectedReview] = useState<AccessReview | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const [newReview, setNewReview] = useState({
     name: '',
@@ -148,7 +148,7 @@ export default function AccessReviews() {
 
   // Fetch reviews
   const { data: reviewsData, isLoading } = useAccessReviews({
-    status: statusFilter || undefined,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
   });
 
   // Fetch items for selected review
@@ -358,7 +358,7 @@ export default function AccessReviews() {
                     <SelectValue placeholder="All Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Status</SelectItem>
+                    <SelectItem value="all">All Status</SelectItem>
                     <SelectItem value="draft">Draft</SelectItem>
                     <SelectItem value="active">Active</SelectItem>
                     <SelectItem value="completed">Completed</SelectItem>

@@ -2776,7 +2776,7 @@ export default function BlueprintManagement() {
                   <SelectValue placeholder="All entity types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Types</SelectItem>
+                  <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="PRIVATE_LIMITED">Private Limited</SelectItem>
                   <SelectItem value="PUBLIC_LIMITED">Public Limited</SelectItem>
                   <SelectItem value="LLP">LLP</SelectItem>

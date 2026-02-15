@@ -59,9 +59,9 @@ const PRIORITY_ORDER = { critical: 5, urgent: 4, high: 3, medium: 2, low: 1 };
 export default function QCReviewQueue({ onItemSelect, showAssignmentControls = true }: QCReviewQueueProps) {
   const [sortBy, setSortBy] = useState('priority');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterPriority, setFilterPriority] = useState('');
-  const [filterAssignee, setFilterAssignee] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterPriority, setFilterPriority] = useState('all');
+  const [filterAssignee, setFilterAssignee] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
   const queryClient = useQueryClient();
@@ -73,9 +73,9 @@ export default function QCReviewQueue({ onItemSelect, showAssignmentControls = t
       const params = new URLSearchParams({
         sort: sortBy,
         order: sortOrder,
-        ...(filterStatus && { status: filterStatus }),
-        ...(filterPriority && { priority: filterPriority }),
-        ...(filterAssignee && { assignee: filterAssignee }),
+        ...(filterStatus !== 'all' && { status: filterStatus }),
+        ...(filterPriority !== 'all' && { priority: filterPriority }),
+        ...(filterAssignee !== 'all' && { assignee: filterAssignee }),
         ...(searchTerm && { search: searchTerm })
       });
       const response = await fetch(`/api/qc/queue?${params.toString()}`);
@@ -302,7 +302,7 @@ export default function QCReviewQueue({ onItemSelect, showAssignmentControls = t
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="escalated">Escalated</SelectItem>
@@ -313,7 +313,7 @@ export default function QCReviewQueue({ onItemSelect, showAssignmentControls = t
                 <SelectValue placeholder="Priority" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="all">All</SelectItem>
                 <SelectItem value="critical">Critical</SelectItem>
                 <SelectItem value="urgent">Urgent</SelectItem>
                 <SelectItem value="high">High</SelectItem>
@@ -327,7 +327,7 @@ export default function QCReviewQueue({ onItemSelect, showAssignmentControls = t
                   <SelectValue placeholder="Assignee" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
                   {qcTeam?.map((member: any) => (
                     <SelectItem key={member.id} value={member.id.toString()}>
@@ -341,9 +341,9 @@ export default function QCReviewQueue({ onItemSelect, showAssignmentControls = t
               variant="outline"
               onClick={() => {
                 setSearchTerm('');
-                setFilterStatus('');
-                setFilterPriority('');
-                setFilterAssignee('');
+                setFilterStatus('all');
+                setFilterPriority('all');
+                setFilterAssignee('all');
               }}
               data-testid="button-clear-queue-filters"
             >

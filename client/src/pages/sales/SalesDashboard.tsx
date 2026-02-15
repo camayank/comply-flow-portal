@@ -175,7 +175,7 @@ export default function SalesDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isCreateLeadOpen, setIsCreateLeadOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const isManager = user?.role === 'sales_manager';
 
@@ -184,7 +184,7 @@ export default function SalesDashboard() {
     queryKey: ['/api/sales/leads', statusFilter, searchQuery],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (statusFilter) params.append('status', statusFilter);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
       if (searchQuery) params.append('search', searchQuery);
       const response = await fetch(`/api/sales/leads?${params.toString()}`, { credentials: 'include' });
       if (!response.ok) throw new Error('Failed to fetch leads');
@@ -540,7 +540,7 @@ export default function SalesDashboard() {
                       <SelectValue placeholder="All Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Status</SelectItem>
+                      <SelectItem value="all">All Status</SelectItem>
                       {pipelineStages.map(stage => (
                         <SelectItem key={stage.key} value={stage.key}>{stage.label}</SelectItem>
                       ))}

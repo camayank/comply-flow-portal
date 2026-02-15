@@ -230,7 +230,7 @@ export default function AdminServicesOverview() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [editingService, setEditingService] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("all");
 
@@ -275,7 +275,7 @@ export default function AdminServicesOverview() {
       service.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       service.serviceKey?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesCategory = !selectedCategory || service.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'all' || service.category === selectedCategory;
 
     const matchesTab =
       activeTab === "all" ||
@@ -419,7 +419,7 @@ export default function AdminServicesOverview() {
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="all">All Categories</SelectItem>
                 {Object.keys(byCategory || {}).map((cat) => (
                   <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                 ))}

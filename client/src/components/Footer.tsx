@@ -14,7 +14,12 @@ const DASHBOARD_ROUTES = [
   '/tasks', '/leads', '/compliance', '/services', '/clients',
   '/executive-dashboard', '/financials', '/crm', '/hr',
   '/sales', '/qc', '/customer-success', '/security', '/messaging',
-  '/notifications', '/bulk-upload', '/universal', '/workflow'
+  '/notifications', '/bulk-upload', '/universal', '/workflow',
+  '/super-admin', '/my-dashboard', '/role-dashboard', '/work-queue',
+  '/compliance-dashboard', '/compliance-calendar', '/compliance-management',
+  '/service-requests', '/proposals', '/referrals', '/autocomply',
+  '/taxtracker', '/digiscore', '/ai-documents', '/vault', '/config',
+  '/escalations', '/messages', '/inbox', '/blueprint', '/pre-sales',
 ];
 
 const Footer = () => {
@@ -75,7 +80,7 @@ const Footer = () => {
   ];
 
   return (
-    <footer className={`bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white ${isDashboardRoute ? 'lg:ml-64' : ''}`} tabIndex={-1}>
+    <footer className={`bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white ${isDashboardRoute ? 'lg:ml-60' : ''}`} tabIndex={-1}>
       {/* CTA Banner */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
