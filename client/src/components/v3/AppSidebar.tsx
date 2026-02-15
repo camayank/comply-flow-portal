@@ -78,6 +78,7 @@ export function AppSidebar({
                           : "text-slate-700 hover:bg-slate-100"
                       )}
                       title={collapsed ? item.label : undefined}
+                      aria-current={isActive ? 'page' : undefined}
                     >
                       <Icon className="h-5 w-5 flex-shrink-0" />
                       {!collapsed && (
