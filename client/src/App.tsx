@@ -12,6 +12,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { SkeletonPage } from "./components/ui/skeleton-loader";
 import { useAuth } from "@/hooks/use-auth";
 import { canAccessRoute, getRoleDashboardRoute } from "@/utils/roleBasedRouting";
+import { UnifiedLayoutProvider } from "@/layouts";
 
 // Loading component for lazy routes
 const PageLoader = () => <SkeletonPage />;
@@ -132,7 +133,6 @@ const Timeline = lazy(() => import("./pages/Timeline"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const BulkUploadCenter = lazy(() => import("./pages/BulkUploadCenter"));
 const DigiComplyWorkflowDashboard = lazy(() => import("./components/DigiComplyWorkflowDashboard"));
-const Footer = lazy(() => import("./components/Footer"));
 const FounderLiteDashboard = lazy(() => import("./pages/FounderLiteDashboard"));
 const MobileClientPortalRefactored = lazy(() => import("./pages/MobileClientPortalRefactored"));
 const ClientDashboardV3 = lazy(() => import("@/pages/v3/client/ClientDashboard"));
@@ -245,7 +245,8 @@ const AppContent = () => {
           <Sonner />
           <CommandPalette />
           <Router>
-            <div className="min-h-screen flex flex-col">
+            <UnifiedLayoutProvider isAuthenticated={!!user}>
+              <div className="min-h-screen flex flex-col">
               <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-blue-600 focus:text-white focus:px-4 focus:py-2 focus:rounded">
                 Skip to main content
               </a>
@@ -535,12 +536,10 @@ const AppContent = () => {
               </Switch>
               </Suspense>
             </main>
-            <Suspense fallback={null}>
-              <Footer />
-            </Suspense>
-            <ChatWidget />
-          </div>
-        </Router>
+              <ChatWidget />
+              </div>
+            </UnifiedLayoutProvider>
+          </Router>
       </TooltipProvider>
     </ErrorBoundary>
   );
