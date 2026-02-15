@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { DashboardLayout } from '@/layouts';
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -133,9 +134,10 @@ export default function OperationsDocumentReview() {
   const documents = data?.data || [];
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Document Review Queue</h1>
+    <DashboardLayout>
+      <div className="p-6 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Document Review Queue</h1>
         <p className="text-muted-foreground">
           Review and approve evidence uploaded by clients across compliance checkpoints.
         </p>
@@ -291,6 +293,7 @@ export default function OperationsDocumentReview() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

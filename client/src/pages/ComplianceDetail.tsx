@@ -11,6 +11,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useMutation } from '@tanstack/react-query';
 import { lifecycleService, type ComplianceDetail } from '@/services/lifecycleService';
 import { apiRequest, queryClient } from '@/lib/queryClient';

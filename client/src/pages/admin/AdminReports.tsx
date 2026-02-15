@@ -11,6 +11,7 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { DashboardLayout } from '@/layouts';
 import {
   Card,
   CardContent,
@@ -282,7 +283,7 @@ export default function AdminReports() {
   const totalPages = currentData?.totalPages || 1;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <DashboardLayout>
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -1002,6 +1003,6 @@ export default function AdminReports() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

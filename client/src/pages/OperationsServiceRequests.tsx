@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { DashboardLayout } from '@/layouts';
 import { Link } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
@@ -529,8 +530,9 @@ export default function OperationsServiceRequests() {
   });
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-start justify-between gap-4">
+    <DashboardLayout>
+      <div className="p-6 space-y-6">
+        <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Service Requests</h1>
           <p className="text-muted-foreground">
@@ -1136,6 +1138,7 @@ export default function OperationsServiceRequests() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

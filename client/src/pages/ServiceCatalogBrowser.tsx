@@ -11,6 +11,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { DashboardLayout } from '@/layouts';
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
 import {
@@ -408,14 +409,17 @@ export default function ServiceCatalogBrowser() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-      </div>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <DashboardLayout>
+      <div className="p-6 space-y-6">
       {/* Header */}
       <div className="text-center max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-2">Service Catalog</h1>
@@ -543,6 +547,7 @@ export default function ServiceCatalogBrowser() {
         onClose={() => setShowRequestDialog(false)}
         onSuccess={handleRequestSuccess}
       />
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

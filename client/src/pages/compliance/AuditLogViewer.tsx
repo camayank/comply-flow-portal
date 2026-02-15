@@ -9,6 +9,7 @@
  */
 
 import { useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import {
   Card,
   CardContent,
@@ -183,8 +184,9 @@ export default function AuditLogViewer() {
   const currentPage = pagination ? Math.floor(pagination.offset / pagination.limit) + 1 : 1;
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
+    <DashboardLayout>
+      <div className="p-6 space-y-6">
+        {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -543,6 +545,7 @@ export default function AuditLogViewer() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

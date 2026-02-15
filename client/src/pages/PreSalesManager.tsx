@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { DashboardLayout } from '@/layouts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -194,7 +195,8 @@ export default function PreSalesManager() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6" data-testid="presales-manager">
+    <DashboardLayout>
+      <div className="p-6 space-y-6" data-testid="presales-manager">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
@@ -448,6 +450,7 @@ export default function PreSalesManager() {
           contactName: (value) => value ? true : 'Contact name is required'
         }}
       />
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

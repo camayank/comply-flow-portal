@@ -11,6 +11,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { DashboardLayout } from '@/layouts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -666,10 +667,11 @@ export default function AgentKYC() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">KYC Verification</h1>
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold">KYC Verification</h1>
         <p className="text-muted-foreground">
           Complete your KYC verification to unlock all agent features and benefits.
         </p>
@@ -850,14 +852,15 @@ export default function AgentKYC() {
         </div>
       </div>
 
-      {/* Upload Dialog */}
-      <UploadDialog
-        open={uploadDialogOpen}
-        onOpenChange={setUploadDialogOpen}
-        documentType={selectedDocumentType}
-        onUpload={handleFileUpload}
-        isUploading={uploadMutation.isPending}
-      />
-    </div>
+        {/* Upload Dialog */}
+        <UploadDialog
+          open={uploadDialogOpen}
+          onOpenChange={setUploadDialogOpen}
+          documentType={selectedDocumentType}
+          onUpload={handleFileUpload}
+          isUploading={uploadMutation.isPending}
+        />
+      </div>
+    </DashboardLayout>
   );
 }

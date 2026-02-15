@@ -10,6 +10,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { lifecycleService, type ServicesDetail } from '@/services/lifecycleService';
 import { 
   Briefcase, 
@@ -69,32 +70,36 @@ export default function ServicesDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading service catalog...</p>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading service catalog...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   if (error || !detail) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-sm p-8 max-w-md">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2 text-center">
-            Unable to Load Services
-          </h3>
-          <p className="text-gray-600 text-center mb-4">{error}</p>
-          <button
-            onClick={loadDetail}
-            className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
-          >
-            Retry
-          </button>
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="bg-white rounded-lg shadow-sm p-8 max-w-md">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2 text-center">
+              Unable to Load Services
+            </h3>
+            <p className="text-gray-600 text-center mb-4">{error}</p>
+            <button
+              onClick={loadDetail}
+              className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
+            >
+              Retry
+            </button>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
@@ -112,7 +117,7 @@ export default function ServicesDetailPage() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <DashboardLayout>
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -446,6 +451,6 @@ export default function ServicesDetailPage() {
           </button>
         </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

@@ -16,6 +16,7 @@
 
 import { useState } from "react";
 import { Link } from "wouter";
+import { DashboardLayout } from '@/layouts';
 import {
   useWorkQueue,
   useAtRiskItems,
@@ -592,8 +593,9 @@ export default function OperationsWorkQueue() {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
+    <DashboardLayout>
+      <div className="p-6 space-y-6">
+        {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Operations Work Queue</h1>
@@ -970,6 +972,7 @@ export default function OperationsWorkQueue() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

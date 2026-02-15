@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { DashboardLayout } from '@/layouts';
 import {
   Settings, Plus, Package, Wrench, BarChart3, Copy, Edit3, Trash2,
   Clock, DollarSign, Users, TrendingUp, CheckCircle, AlertCircle,
@@ -263,8 +264,8 @@ export default function ServiceManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-4 py-8">
+    <DashboardLayout>
+      <div className="px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -833,6 +834,6 @@ export default function ServiceManagement() {
           { serviceCode: 'PVT-INC', name: 'Private Limited Incorporation', description: 'Company registration with MCA', category: 'incorporation', serviceType: 'premium', basePrice: 9999, slaHours: 168, complexityLevel: 'medium' },
         ]}
       />
-    </div>
+    </DashboardLayout>
   );
 }

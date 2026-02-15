@@ -1,4 +1,5 @@
 import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -135,8 +136,9 @@ export default function ProposalManagement() {
   const totalProposalValue = proposals.reduce((sum, proposal) => sum + (Number.parseFloat(proposal.totalAmount) || 0), 0);
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <DashboardLayout>
+      <div className="p-4 md:p-8">
+        <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Proposals</h1>
@@ -247,8 +249,9 @@ export default function ProposalManagement() {
             )}
           </CardContent>
         </Card>
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }
 

@@ -9,6 +9,7 @@
  */
 
 import { useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import {
   Card,
   CardContent,
@@ -216,8 +217,9 @@ export default function DataDeletionRequests() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
+    <DashboardLayout>
+      <div className="p-6 space-y-6">
+        {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -492,6 +494,7 @@ export default function DataDeletionRequests() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

@@ -12,6 +12,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { DashboardLayout } from '@/layouts';
 import { Link } from "wouter";
 import {
   Card,
@@ -295,8 +296,9 @@ export default function AdminServicesOverview() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
+    <DashboardLayout>
+      <div className="p-6 space-y-6">
+        {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Services Management</h1>
@@ -521,15 +523,16 @@ export default function AdminServicesOverview() {
         </CardContent>
       </Card>
 
-      {/* Edit Dialog */}
-      {editingService !== null && (
-        <ServiceEditDialog
-          service={editingService}
-          open={true}
-          onClose={() => setEditingService(null)}
-          onSave={(data) => saveMutation.mutate(data)}
-        />
-      )}
-    </div>
+        {/* Edit Dialog */}
+        {editingService !== null && (
+          <ServiceEditDialog
+            service={editingService}
+            open={true}
+            onClose={() => setEditingService(null)}
+            onSave={(data) => saveMutation.mutate(data)}
+          />
+        )}
+      </div>
+    </DashboardLayout>
   );
 }

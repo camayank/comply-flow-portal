@@ -1,4 +1,5 @@
 import { useAuth } from '@/hooks/use-auth';
+import { DashboardLayout } from '@/layouts';
 import ServiceRequestUI from './ServiceRequestUI';
 import OperationsServiceRequests from './OperationsServiceRequests';
 
@@ -16,8 +17,16 @@ export default function ServiceRequestsHub() {
   ]);
 
   if (opsRoles.has(role)) {
-    return <OperationsServiceRequests />;
+    return (
+      <DashboardLayout>
+        <OperationsServiceRequests />
+      </DashboardLayout>
+    );
   }
 
-  return <ServiceRequestUI />;
+  return (
+    <DashboardLayout>
+      <ServiceRequestUI />
+    </DashboardLayout>
+  );
 }
