@@ -2,16 +2,9 @@ import { useState } from 'react';
 import { DashboardLayoutProps } from './types';
 import { AppSidebar } from '@/components/v3/AppSidebar';
 import { AppHeader } from '@/components/v3/AppHeader';
+import { MobileBottomNav } from '@/components/navigation/MobileBottomNav';
+import { getNavigationForRole } from '@/config/navigation';
 import { useAuth } from '@/hooks/use-auth';
-
-// Default navigation - will be replaced with dynamic navigation in Task 14
-const DEFAULT_NAVIGATION = [
-  {
-    items: [
-      { label: 'Dashboard', href: '/portal-v2', icon: () => null },
-    ],
-  },
-];
 
 export function DashboardLayout({
   children,
@@ -23,8 +16,7 @@ export function DashboardLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Will be replaced with getNavigationForRole(user?.role) in Task 16
-  const navigation = DEFAULT_NAVIGATION;
+  const navigation = getNavigationForRole(user?.role);
 
   // Map auth user to AppHeader user format
   const headerUser = user ? {
@@ -88,10 +80,16 @@ export function DashboardLayout({
 
         <main
           id="main-content"
-          className="flex-1 overflow-y-auto p-4 lg:p-6"
+          className="flex-1 overflow-y-auto p-4 lg:p-6 pb-20 lg:pb-6"
         >
           {children}
         </main>
+
+        {/* Mobile Bottom Navigation */}
+        <MobileBottomNav
+          role={user?.role}
+          className="lg:hidden"
+        />
 
         {/* NO Footer - clean dashboard experience */}
       </div>
