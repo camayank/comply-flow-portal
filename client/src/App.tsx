@@ -159,6 +159,7 @@ const AgentKYC = lazy(() => import("./pages/agent/AgentKYC"));
 const ComplianceAlertPreferences = lazy(() => import("./pages/client/ComplianceAlertPreferences"));
 const ExecutiveSummary = lazy(() => import("./pages/ExecutiveSummary"));
 const OpsCaseDashboard = lazy(() => import("./pages/ops/CaseDashboard"));
+const OpsClientDashboard = lazy(() => import("./pages/ops/ClientDashboard"));
 
 const publicRoutePrefixes = [
   '/',
@@ -416,6 +417,7 @@ const AppContent = () => {
                 <Route path="/operations/document-review" component={OperationsDocumentReview} />
                 <Route path="/document-review" component={OperationsDocumentReview} />
                 <Route path="/ops/case/:id" component={OpsCaseDashboard} />
+                <Route path="/ops/client/:clientId" component={OpsClientDashboard} />
 
                 {/* Client Service Tracking */}
                 <Route path="/my-services" component={ClientServicesDashboard} />
