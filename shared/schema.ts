@@ -100,6 +100,17 @@ export const ACTIVITY_TYPES = {
   CASE_COMPLETED: 'case_completed',
 } as const;
 
+export const FILING_STAGES = {
+  NOT_FILED: 'not_filed',
+  FILED: 'filed',
+  ACKNOWLEDGED: 'acknowledged',
+  QUERY_RAISED: 'query_raised',
+  RESPONSE_SUBMITTED: 'response_submitted',
+  UNDER_PROCESSING: 'under_processing',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+} as const;
+
 // Enhanced user system with multi-business support and security
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -5434,6 +5445,27 @@ export const insertClientActivitySchema = createInsertSchema(clientActivities).o
 
 export type ClientActivity = typeof clientActivities.$inferSelect;
 export type InsertClientActivity = z.infer<typeof insertClientActivitySchema>;
+
+// Internal notes for ops team collaboration on cases
+export const caseNotes = pgTable("case_notes", {
+  id: serial("id").primaryKey(),
+  serviceRequestId: integer("service_request_id").notNull(),
+  authorId: integer("author_id").notNull(),
+  content: text("content").notNull(),
+  isClientVisible: boolean("is_client_visible").default(false),
+  isDeleted: boolean("is_deleted").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCaseNoteSchema = createInsertSchema(caseNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type CaseNote = typeof caseNotes.$inferSelect;
+export type InsertCaseNote = z.infer<typeof insertCaseNoteSchema>;
 
 // ============================================================================
 // ID TYPE CONSTANTS
