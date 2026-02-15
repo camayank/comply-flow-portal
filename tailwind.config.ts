@@ -133,8 +133,36 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+
+        /* === V3 SEMANTIC SURFACE COLORS === */
+        surface: {
+          DEFAULT: 'hsl(var(--surface))',
+          raised: 'hsl(var(--surface-raised))',
+          overlay: 'hsl(var(--surface-overlay))',
+          sunken: 'hsl(var(--surface-sunken))',
+        },
+
+        /* === V3 SEMANTIC TEXT COLORS === */
+        'text-color': {
+          primary: 'hsl(var(--text-primary))',
+          secondary: 'hsl(var(--text-secondary))',
+          muted: 'hsl(var(--text-muted))',
+          disabled: 'hsl(var(--text-disabled))',
+        },
+
+        /* === V3 INTERACTIVE STATES === */
+        interactive: {
+          hover: 'hsl(var(--interactive-hover))',
+          active: 'hsl(var(--interactive-active))',
+        },
       },
-      
+
+      /* === V3 SEMANTIC BORDER COLORS === */
+      borderColor: {
+        subtle: 'hsl(var(--border-subtle))',
+        strong: 'hsl(var(--border-strong))',
+      },
+
       /* === ENHANCED SPACING SYSTEM === */
       spacing: {
         "xs": "var(--spacing-xs)",
