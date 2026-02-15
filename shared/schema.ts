@@ -116,6 +116,7 @@ export const users = pgTable("users", {
   twoFactorSecret: text("two_factor_secret"),
   isTwoFactorEnabled: boolean("is_two_factor_enabled").default(false),
   createdBy: integer("created_by"), // User ID of creator (for audit trail)
+  leadId: integer("lead_id"), // FK to leads.id - tracks original lead source
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -156,6 +157,7 @@ export const businessEntities = pgTable("business_entities", {
   communicationPreference: json("communication_preference"), // {email: true, whatsapp: true, call: false}
   documents: json("documents"), // stored document references
   notes: text("notes"),
+  leadId: integer("lead_id"), // FK to leads.id - tracks conversion source
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -220,6 +222,18 @@ export const serviceRequests = pgTable("service_requests", {
   clientNotes: text("client_notes"),
   internalNotes: text("internal_notes"),
   description: text("description"),
+  leadId: integer("lead_id"), // FK to leads.id - tracks original lead
+  // Filing status tracking
+  filingStage: text("filing_stage").default("not_filed"), // not_filed, filed, acknowledged, query_raised, response_submitted, under_processing, approved, rejected
+  filingDate: timestamp("filing_date"),
+  filingPortal: text("filing_portal"), // GST Portal, MCA, FSSAI, ITR, etc.
+  arnNumber: text("arn_number"), // Application Reference Number
+  queryDetails: text("query_details"),
+  queryRaisedAt: timestamp("query_raised_at"),
+  responseSubmittedAt: timestamp("response_submitted_at"),
+  finalStatus: text("final_status"), // approved, rejected
+  finalStatusDate: timestamp("final_status_date"),
+  certificateUrl: text("certificate_url"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -232,6 +246,7 @@ export const payments = pgTable("payments", {
   status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
   paymentMethod: text("payment_method"),
   transactionId: text("transaction_id"),
+  leadId: integer("lead_id"), // FK to leads.id - tracks revenue attribution
   createdAt: timestamp("created_at").defaultNow(),
   completedAt: timestamp("completed_at"),
 });
