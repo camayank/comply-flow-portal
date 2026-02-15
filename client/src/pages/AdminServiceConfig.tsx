@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { DashboardLayout, PageShell } from '@/components/v3';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,26 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, Plus, FileText, Calendar, Users, Workflow, Target, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import {
+  Settings,
+  Plus,
+  FileText,
+  Calendar,
+  Users,
+  Workflow,
+  Target,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  LayoutDashboard,
+  FileBarChart,
+  Building2,
+  ClipboardCheck,
+  Blocks,
+  Server,
+  Webhook as WebhookIcon,
+  Key as KeyIcon,
+} from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
 interface Service {
@@ -48,6 +68,45 @@ interface DueDateRule {
   effectiveFrom: string;
   isActive: boolean;
 }
+
+const adminNavigation = [
+  {
+    title: "Overview",
+    items: [
+      { label: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
+      { label: "Reports", href: "/admin/reports", icon: FileBarChart },
+    ],
+  },
+  {
+    title: "Management",
+    items: [
+      { label: "Users", href: "/admin/users", icon: Users },
+      { label: "Clients", href: "/admin/clients", icon: Building2 },
+      { label: "Access Reviews", href: "/admin/access-reviews", icon: ClipboardCheck },
+    ],
+  },
+  {
+    title: "Configuration",
+    items: [
+      { label: "Blueprints", href: "/admin/blueprints", icon: Blocks },
+      { label: "Services", href: "/admin/services", icon: Server },
+      { label: "Service Config", href: "/admin/service-config", icon: Settings },
+      { label: "Documents", href: "/admin/documents", icon: FileText },
+    ],
+  },
+  {
+    title: "Developer",
+    items: [
+      { label: "Webhooks", href: "/admin/webhooks", icon: WebhookIcon },
+      { label: "API Keys", href: "/admin/api-keys", icon: KeyIcon },
+    ],
+  },
+];
+
+const adminUser = {
+  name: "Admin",
+  email: "admin@digicomply.com",
+};
 
 export default function AdminServiceConfig() {
   const [services, setServices] = useState<Service[]>([]);
@@ -271,20 +330,27 @@ export default function AdminServiceConfig() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <Settings className="h-8 w-8 text-blue-600" />
-            Admin Service Configuration
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Configure services, workflows, documents, and due date rules for your platform
-          </p>
-        </div>
-
+    <DashboardLayout
+      navigation={adminNavigation}
+      user={adminUser}
+      logo={<span className="text-xl font-bold text-primary">DigiComply</span>}
+    >
+      <PageShell
+        title="Service Configuration"
+        subtitle="Configure services, workflows, documents, and due date rules for your platform"
+        breadcrumbs={[
+          { label: "Admin", href: "/admin/dashboard" },
+          { label: "Service Config" },
+        ]}
+        actions={
+          <Button onClick={seedAllServices} disabled={loading} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Seed All Default Services
+          </Button>
+        }
+      >
         {/* Configuration Statistics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -332,14 +398,6 @@ export default function AdminServiceConfig() {
               </div>
             </CardContent>
           </Card>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="flex gap-4 mb-8">
-          <Button onClick={seedAllServices} disabled={loading} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Seed All Default Services
-          </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -709,7 +767,7 @@ export default function AdminServiceConfig() {
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </PageShell>
+    </DashboardLayout>
   );
 }
