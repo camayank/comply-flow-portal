@@ -19,9 +19,8 @@ const PageLoader = () => <SkeletonPage />;
 
 // Lazy load all pages for code splitting
 const LandingPageV3 = lazy(() => import("@/pages/v3/LandingPage"));
-const UnifiedDashboard = lazy(() => import("./pages/UnifiedDashboard"));
-// DEPRECATED: MobileResponsiveLanding - now redirects to v3 landing
-// const MobileResponsiveLanding = lazy(() => import("./pages/MobileResponsiveLanding"));
+// REMOVED: UnifiedDashboard - consolidated into RoleBasedDashboard
+// REMOVED: MobileResponsiveLanding - replaced by v3 LandingPage
 const Login = lazy(() => import("./pages/Login"));
 const ClientRegistration = lazy(() => import("./pages/ClientRegistration"));
 const LeadManagement = lazy(() => import("./pages/LeadManagement"));
@@ -50,7 +49,7 @@ const ServiceFlowDashboard = lazy(() => import("./pages/ServiceFlowDashboard"));
 const DocumentUpload = lazy(() => import("./pages/DocumentUpload"));
 const ESignAgreements = lazy(() => import("./pages/ESignAgreements"));
 const PaymentGateway = lazy(() => import("./pages/PaymentGateway"));
-const ComplianceTracker = lazy(() => import("./pages/ComplianceTracker"));
+// REMOVED: ComplianceTracker - consolidated into ComplianceTrackerDashboard
 const Confirmation = lazy(() => import("./pages/Confirmation"));
 // DEPRECATED: AdminPanel, MobileOperationsPanel, MobileAdminPanel - Using refactored versions instead
 const SyncDashboard = lazy(() => import("./pages/SyncDashboard"));
@@ -59,9 +58,7 @@ const ComplianceTrackerDashboard = lazy(() => import("./pages/ComplianceTrackerD
 const RetainershipPlans = lazy(() => import("./pages/RetainershipPlans"));
 const SmartSuggestionsEngine = lazy(() => import("./pages/SmartSuggestionsEngine"));
 const DocumentVault = lazy(() => import("./pages/DocumentVault"));
-// DEPRECATED: Consolidated into SmartStart
-// const StreamlinedOnboarding = lazy(() => import("./pages/StreamlinedOnboarding"));
-const SmartStart = lazy(() => import("./pages/SmartStart"));
+// REMOVED: SmartStart, StreamlinedOnboarding - consolidated into OnboardingFlow
 const WhatsAppOnboarding = lazy(() => import("./pages/WhatsAppOnboarding"));
 const ComplianceScorecard = lazy(() => import("./pages/ComplianceScorecard"));
 const ClientServiceCatalog = lazy(() => import("./pages/ClientServiceCatalog"));
@@ -114,7 +111,7 @@ const AgentPerformance = lazy(() => import("./pages/AgentPerformance"));
 const AgentProfileSettings = lazy(() => import("./pages/AgentProfileSettings"));
 const CustomerServiceDashboard = lazy(() => import("./pages/CustomerServiceDashboard"));
 const ClientSupport = lazy(() => import("./pages/ClientSupport"));
-const SuperAdminPortal = lazy(() => import("./pages/SuperAdminPortal"));
+// REMOVED: SuperAdminPortal - replaced by v3 SuperAdminDashboard
 const SuperAdminDashboardV3 = lazy(() => import("@/pages/v3/super-admin/SuperAdminDashboard"));
 const TenantManagement = lazy(() => import("./pages/super-admin/TenantManagement"));
 const PricingEngine = lazy(() => import("./pages/super-admin/PricingEngine"));
@@ -138,7 +135,7 @@ const MobileClientPortalRefactored = lazy(() => import("./pages/MobileClientPort
 const ClientDashboardV3 = lazy(() => import("@/pages/v3/client/ClientDashboard"));
 const MobileOperationsPanelRefactored = lazy(() => import("./pages/MobileOperationsPanelRefactored"));
 const MobileAdminPanelRefactored = lazy(() => import("./pages/MobileAdminPanelRefactored"));
-const SalesProposalManagerRefactored = lazy(() => import("./pages/SalesProposalManagerRefactored"));
+// REMOVED: SalesProposalManagerRefactored - consolidated into ProposalManagement
 const DevHub = lazy(() => import("./pages/DevHub"));
 const PlaybookManagement = lazy(() => import("./pages/customer-success/PlaybookManagement"));
 const RenewalPipeline = lazy(() => import("./pages/customer-success/RenewalPipeline"));
@@ -262,7 +259,7 @@ const AppContent = () => {
                 <Route path="/hub" component={DevHub} />
                 <Route path="/dev" component={DevHub} />
                 <Route path="/landing" component={LandingPageV3} />
-                <Route path="/dashboard" component={UnifiedDashboard} />
+                <Route path="/dashboard" component={RoleBasedDashboard} />
                 <Route path="/my-dashboard" component={RoleBasedDashboard} />
                 <Route path="/role-dashboard" component={RoleBasedDashboard} />
                 <Route path="/select-role" component={RoleSelection} />
@@ -458,7 +455,7 @@ const AppContent = () => {
                 <Route path="/admin/bulk-upload" component={BulkUploadCenter} />
 
                 <Route path="/pre-sales" component={PreSalesManager} />
-                <Route path="/sales-proposals" component={SalesProposalManagerRefactored} />
+                <Route path="/sales-proposals" component={ProposalManagement} />
                 <Route path="/qc" component={QCDashboard} />
                 <Route path="/qc/queue" component={QCDashboard} />
                 <Route path="/qc-dashboard" component={QCDashboard} />
@@ -511,7 +508,7 @@ const AppContent = () => {
                 <Route path="/support" component={ClientSupport} />
                 <Route path="/help" component={ClientSupport} />
                 <Route path="/tickets" component={ClientSupport} />
-                <Route path="/super-admin" component={SuperAdminPortal} />
+                <Route path="/super-admin" component={SuperAdminDashboardV3} />
                 <Route path="/super-admin/dashboard" component={SuperAdminDashboardV3} />
                 <Route path="/super-admin/tenants" component={TenantManagement} />
                 <Route path="/super-admin/pricing" component={PricingEngine} />
@@ -532,7 +529,7 @@ const AppContent = () => {
                 <Route path="/document-upload" component={DocumentUpload} />
                 <Route path="/esign-agreements" component={ESignAgreements} />
                 <Route path="/payment-gateway" component={PaymentGateway} />
-                <Route path="/tracker" component={ComplianceTracker} />
+                <Route path="/tracker" component={ComplianceTrackerDashboard} />
                 <Route path="/confirmation" component={Confirmation} />
                 <Route path="/sync" component={SyncDashboard} />
                 <Route path="/excellence" component={PlatformShowcase} />
