@@ -4,6 +4,7 @@
  */
 
 import { useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useLocation } from 'wouter';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -417,7 +418,8 @@ export default function BulkUploadCenter() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <DashboardLayout>
+      <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -653,6 +655,7 @@ export default function BulkUploadCenter() {
           allowManualEntry={true}
         />
       )}
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

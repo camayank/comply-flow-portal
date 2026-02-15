@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PublicLayout } from '@/layouts';
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,9 +30,10 @@ const MobileResponsiveLanding = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Mobile-First Header */}
-      <header className="border-b bg-white/90 backdrop-blur-sm sticky top-0 z-50">
+    <PublicLayout>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+        {/* Mobile-First Header */}
+        <header className="border-b bg-white/90 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo - Responsive */}
@@ -1605,7 +1607,8 @@ const MobileResponsiveLanding = () => {
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </PublicLayout>
   );
 };
 

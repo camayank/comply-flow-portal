@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -287,7 +288,8 @@ export default function AiDocumentPreparation() {
   };
 
   return (
-    <div className="container mx-auto py-6 px-4 max-w-7xl">
+    <DashboardLayout>
+      <div className="container mx-auto py-6 px-4 max-w-7xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -720,6 +722,7 @@ export default function AiDocumentPreparation() {
           </Tabs>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

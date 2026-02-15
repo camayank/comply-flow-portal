@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -275,7 +276,8 @@ const BusinessIntelligence = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <DashboardLayout>
+    <div className="bg-gray-50 dark:bg-gray-900">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4">
@@ -860,6 +862,7 @@ const BusinessIntelligence = () => {
         </Tabs>
       </div>
     </div>
+    </DashboardLayout>
   );
 };
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -125,8 +126,9 @@ const RetainershipPlans = () => {
 
   if (plansLoading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <DashboardLayout>
+        <div className="container mx-auto p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[...Array(3)].map((_, i) => (
             <Card key={i}>
               <CardContent className="p-6">
@@ -142,13 +144,15 @@ const RetainershipPlans = () => {
               </CardContent>
             </Card>
           ))}
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <DashboardLayout>
+      <div className="container mx-auto p-6 max-w-7xl">
       <div className="text-center mb-8">
         <h1 className="text-4xl font-bold mb-4">Retainership Plans</h1>
         <p className="text-xl text-gray-600 max-w-3xl mx-auto">
@@ -615,7 +619,8 @@ const RetainershipPlans = () => {
           )}
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };
 

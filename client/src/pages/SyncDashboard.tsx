@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -168,6 +169,7 @@ const SyncDashboard = () => {
   };
 
   return (
+    <DashboardLayout>
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">Synchronization Dashboard</h1>
@@ -488,6 +490,7 @@ const SyncDashboard = () => {
         </TabsContent>
       </Tabs>
     </div>
+    </DashboardLayout>
   );
 };
 

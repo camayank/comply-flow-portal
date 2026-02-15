@@ -1,8 +1,8 @@
 import * as React from "react";
+import { DashboardLayout } from '@/layouts';
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
-  DashboardLayout,
   MetricCard,
   PageShell,
   DataTable,

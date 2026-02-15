@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -285,6 +286,7 @@ export default function NotificationCenter() {
   const groupedNotifications = groupNotificationsByDate(filteredNotifications);
 
   return (
+    <DashboardLayout>
     <div className="container mx-auto py-6 px-4 max-w-4xl">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
@@ -561,6 +563,7 @@ export default function NotificationCenter() {
         </TabsContent>
       </Tabs>
     </div>
+    </DashboardLayout>
   );
 }
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -235,6 +236,7 @@ export default function MessageCenter() {
   const unreadCount = threads.filter((t) => t.unreadCount > 0).length;
 
   return (
+    <DashboardLayout>
     <div className="h-[calc(100vh-100px)] flex flex-col">
       {/* Header */}
       <div className="px-6 py-4 border-b bg-background">
@@ -630,6 +632,7 @@ export default function MessageCenter() {
         </div>
       </div>
     </div>
+    </DashboardLayout>
   );
 }
 

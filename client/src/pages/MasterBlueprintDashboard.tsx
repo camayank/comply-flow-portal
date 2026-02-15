@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { DashboardLayout } from '@/layouts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -148,6 +149,7 @@ export default function MasterBlueprintDashboard() {
   };
 
   return (
+    <DashboardLayout>
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="text-center mb-8">
@@ -587,5 +589,6 @@ export default function MasterBlueprintDashboard() {
         </TabsContent>
       </Tabs>
     </div>
+    </DashboardLayout>
   );
 }

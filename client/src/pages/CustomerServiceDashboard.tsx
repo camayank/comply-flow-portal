@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -220,7 +221,8 @@ export default function CustomerServiceDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <DashboardLayout>
+    <div className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       <header className="bg-white dark:bg-gray-800 border-b sticky top-0 z-50">
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
@@ -732,5 +734,6 @@ export default function CustomerServiceDashboard() {
         </DialogContent>
       </Dialog>
     </div>
+    </DashboardLayout>
   );
 }

@@ -15,6 +15,7 @@
  */
 
 import { useState } from "react";
+import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Card,
@@ -1106,7 +1107,8 @@ export default function ConfigurationManager() {
   const [activeTab, setActiveTab] = useState('services');
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <DashboardLayout>
+      <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -1150,6 +1152,7 @@ export default function ConfigurationManager() {
           <SystemTab />
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

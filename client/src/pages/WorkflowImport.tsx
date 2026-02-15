@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DashboardLayout } from '@/layouts';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -106,6 +107,7 @@ export default function WorkflowImport() {
   };
 
   return (
+    <DashboardLayout>
     <div className="container mx-auto px-4 py-8 max-w-6xl" data-testid="workflow-import-page">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Import Service Workflows</h1>
@@ -356,5 +358,6 @@ export default function WorkflowImport() {
         </CardContent>
       </Card>
     </div>
+    </DashboardLayout>
   );
 }

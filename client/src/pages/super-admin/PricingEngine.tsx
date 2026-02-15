@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { DashboardLayout, PageShell, MetricCard } from "@/components/v3";
+import { DashboardLayout } from "@/layouts";
+import { PageShell, MetricCard } from "@/components/v3";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,16 +38,7 @@ import {
   Percent,
   Tag,
   Calendar,
-  Crown,
-  LayoutDashboard,
-  Building2,
-  Briefcase,
-  ShieldCheck,
-  Settings,
-  BarChart3,
-  FileText,
   CheckCircle,
-  Clock,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -91,33 +83,6 @@ const emptyRule: Omit<PricingRule, "id"> = {
   effectiveTo: null,
   isActive: true,
 };
-
-const navigation = [
-  {
-    title: "Overview",
-    items: [
-      { label: "Dashboard", href: "/super-admin/dashboard", icon: LayoutDashboard },
-      { label: "Analytics", href: "/super-admin/analytics", icon: BarChart3 },
-    ],
-  },
-  {
-    title: "Platform",
-    items: [
-      { label: "Tenants", href: "/super-admin/tenants", icon: Building2 },
-      { label: "Services", href: "/super-admin/services", icon: Briefcase },
-      { label: "Pricing", href: "/super-admin/pricing", icon: DollarSign },
-      { label: "Commissions", href: "/super-admin/commissions", icon: Percent },
-    ],
-  },
-  {
-    title: "Security",
-    items: [
-      { label: "Security", href: "/super-admin/security", icon: ShieldCheck },
-      { label: "Operations", href: "/super-admin/operations", icon: Settings },
-      { label: "Audit Log", href: "/audit-log", icon: FileText },
-    ],
-  },
-];
 
 export default function PricingEngine() {
   const { toast } = useToast();
@@ -303,19 +268,8 @@ export default function PricingEngine() {
     promoRules: rules.filter((r) => r.ruleType === "promo").length,
   };
 
-  const user = { name: "Super Admin", email: "superadmin@digicomply.com" };
-
   return (
-    <DashboardLayout
-      navigation={navigation}
-      user={user}
-      logo={
-        <div className="flex items-center gap-2">
-          <Crown className="h-5 w-5 text-purple-600" />
-          <span className="text-lg font-bold text-slate-900">DigiComply</span>
-        </div>
-      }
-    >
+    <DashboardLayout>
       <PageShell
         title="Pricing Engine"
         subtitle="Manage pricing rules and discounts"

@@ -10,7 +10,8 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { DashboardLayout, PageShell, MetricCard } from "@/components/v3";
+import { DashboardLayout } from "@/layouts";
+import { PageShell, MetricCard } from "@/components/v3";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {

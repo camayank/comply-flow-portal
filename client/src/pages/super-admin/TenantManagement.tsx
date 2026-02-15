@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -254,8 +255,9 @@ export default function TenantManagement() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Building2 className="h-8 w-8 text-primary" />
@@ -615,6 +617,7 @@ export default function TenantManagement() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

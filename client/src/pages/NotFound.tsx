@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Home, ArrowLeft, Search } from 'lucide-react';
 import { Link } from 'wouter';
+import { MinimalLayout } from "@/layouts";
 
 const NotFound = () => {
   const [location] = useLocation();
@@ -16,7 +17,8 @@ const NotFound = () => {
   }, [location]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <MinimalLayout showHeader={false}>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <Card className="max-w-md w-full">
         <CardContent className="pt-8 pb-8">
           <div className="text-center space-y-6">
@@ -82,6 +84,7 @@ const NotFound = () => {
         </CardContent>
       </Card>
     </div>
+    </MinimalLayout>
   );
 };
 

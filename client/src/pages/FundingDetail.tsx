@@ -11,6 +11,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { lifecycleService, type FundingDetail } from '@/services/lifecycleService';
 import { 
   DollarSign, 
@@ -69,7 +70,7 @@ export default function FundingDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="bg-gray-50 flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading funding readiness...</p>
@@ -80,7 +81,7 @@ export default function FundingDetailPage() {
 
   if (error || !detail) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="bg-gray-50 flex items-center justify-center min-h-[50vh]">
         <div className="bg-white rounded-lg shadow-sm p-8 max-w-md">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2 text-center">
@@ -107,7 +108,8 @@ export default function FundingDetailPage() {
   const currentSection = detail.dueDiligenceChecklist[activeSection];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <DashboardLayout>
+    <div className="bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -345,5 +347,6 @@ export default function FundingDetailPage() {
         </div>
       </div>
     </div>
+    </DashboardLayout>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { MinimalLayout } from '@/layouts';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useLocation } from 'wouter';
 import { 
@@ -216,38 +217,43 @@ export default function DeliveryConfirmation() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-64"></div>
-            <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+      <MinimalLayout>
+        <div className="bg-gray-50 dark:bg-gray-900 p-6">
+          <div className="max-w-4xl mx-auto">
+            <div className="animate-pulse space-y-6">
+              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-64"></div>
+              <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            </div>
           </div>
         </div>
-      </div>
+      </MinimalLayout>
     );
   }
 
   if (!deliveryDetails) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-        <div className="max-w-4xl mx-auto text-center py-16">
-          <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Delivery Not Found
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            The delivery confirmation link is invalid or has expired.
-          </p>
+      <MinimalLayout>
+        <div className="bg-gray-50 dark:bg-gray-900 p-6">
+          <div className="max-w-4xl mx-auto text-center py-16">
+            <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              Delivery Not Found
+            </h1>
+            <p className="text-gray-600 dark:text-gray-300">
+              The delivery confirmation link is invalid or has expired.
+            </p>
+          </div>
         </div>
-      </div>
+      </MinimalLayout>
     );
   }
 
   const isAlreadyConfirmed = deliveryDetails.deliveryConfirmation.clientConfirmedAt;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <MinimalLayout>
+      <div className="bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-4xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2 text-green-600 mb-4">
@@ -628,7 +634,8 @@ export default function DeliveryConfirmation() {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
-    </div>
+    </MinimalLayout>
   );
 }

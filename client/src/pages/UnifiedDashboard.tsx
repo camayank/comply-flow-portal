@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useLocation } from 'wouter';
 import AgentDashboard from './AgentDashboard';
 import MobileClientPortal from './MobileClientPortalRefactored';
@@ -38,12 +39,14 @@ export default function UnifiedDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading your dashboard...</p>
+      <DashboardLayout>
+        <div className="flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Loading your dashboard...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
@@ -68,27 +71,29 @@ export default function UnifiedDashboard() {
       
       default:
         return (
-          <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-8">
-            <Card className="max-w-2xl mx-auto border-red-200">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                  <AlertCircle className="h-6 w-6" />
-                  Invalid User Type
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Unable to load dashboard. Please select your user type.
-                </p>
-                <Link to="/select-role">
-                  <Button>
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Select User Type
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          </div>
+          <DashboardLayout>
+            <div className="bg-gray-50 dark:bg-gray-900 p-8">
+              <Card className="max-w-2xl mx-auto border-red-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                    <AlertCircle className="h-6 w-6" />
+                    Invalid User Type
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Unable to load dashboard. Please select your user type.
+                  </p>
+                  <Link to="/select-role">
+                    <Button>
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Select User Type
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            </div>
+          </DashboardLayout>
         );
     }
   };

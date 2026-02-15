@@ -1,6 +1,6 @@
 /**
  * Documents Detail Page
- * 
+ *
  * Complete document management with:
  * - Category-wise organization (7 categories)
  * - Upload with drag-and-drop
@@ -11,6 +11,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { lifecycleService, type DocumentsDetail } from '@/services/lifecycleService';
 import { 
   FileText, 
@@ -76,18 +77,21 @@ export default function DocumentsDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <DashboardLayout>
+        <div className="bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading documents...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   if (error || !detail) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <DashboardLayout>
+        <div className="bg-gray-50 flex items-center justify-center">
         <div className="bg-white rounded-lg shadow-sm p-8 max-w-md">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2 text-center">
@@ -100,8 +104,9 @@ export default function DocumentsDetailPage() {
           >
             Retry
           </button>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
@@ -122,8 +127,9 @@ export default function DocumentsDetailPage() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+    <DashboardLayout>
+      <div className="bg-gray-50">
+        {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <button
@@ -446,6 +452,7 @@ export default function DocumentsDetailPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

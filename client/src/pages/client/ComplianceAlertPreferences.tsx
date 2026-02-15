@@ -10,6 +10,7 @@
  */
 
 import { useState } from "react";
+import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -537,6 +538,7 @@ export default function ComplianceAlertPreferences() {
   }
 
   return (
+    <DashboardLayout>
     <div className="container mx-auto py-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -912,5 +914,6 @@ export default function ComplianceAlertPreferences() {
         </CardContent>
       </Card>
     </div>
+    </DashboardLayout>
   );
 }

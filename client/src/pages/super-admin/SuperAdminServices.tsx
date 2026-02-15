@@ -11,8 +11,8 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { DashboardLayout } from "@/layouts";
 import {
-  DashboardLayout,
   PageShell,
   MetricCard,
   DataTable,

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -352,7 +353,8 @@ export default function SuperAdminPortal() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
+    <DashboardLayout>
+    <div className="bg-gradient-to-br from-purple-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 border-b sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -1094,5 +1096,6 @@ export default function SuperAdminPortal() {
         </DialogContent>
       </Dialog>
     </div>
+    </DashboardLayout>
   );
 }

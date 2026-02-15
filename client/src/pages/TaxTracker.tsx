@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { DashboardLayout } from '@/layouts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,14 +80,17 @@ export default function TaxTracker() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">Loading TaxTracker...</div>
-      </div>
+      <DashboardLayout>
+        <div className="bg-background flex items-center justify-center">
+          <div className="text-center">Loading TaxTracker...</div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
+    <DashboardLayout>
+    <div className="bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -482,6 +486,7 @@ export default function TaxTracker() {
         </Tabs>
       </div>
     </div>
+    </DashboardLayout>
   );
 }
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import {
@@ -289,7 +290,7 @@ export default function QCDeliveryHandoff() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+      <div className="bg-gray-50 dark:bg-gray-900 p-6">
         <div className="max-w-7xl mx-auto">
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-64"></div>
@@ -305,7 +306,8 @@ export default function QCDeliveryHandoff() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <DashboardLayout>
+    <div className="bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -792,5 +794,6 @@ export default function QCDeliveryHandoff() {
         </Dialog>
       </div>
     </div>
+    </DashboardLayout>
   );
 }

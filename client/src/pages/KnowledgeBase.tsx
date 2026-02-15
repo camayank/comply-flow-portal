@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Plus, BookOpen, Tag, Filter, Eye, ThumbsUp, ThumbsDown, Clock, User, Edit3, Trash2, Star, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -166,7 +167,8 @@ export default function KnowledgeBase() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <DashboardLayout>
+    <div className="bg-gray-50 dark:bg-gray-900">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -539,5 +541,6 @@ export default function KnowledgeBase() {
         </div>
       </div>
     </div>
+    </DashboardLayout>
   );
 }

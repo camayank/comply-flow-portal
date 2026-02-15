@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { MinimalLayout } from '@/layouts';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -233,9 +234,10 @@ const SmartStart = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
-      <div className="container mx-auto px-4 py-6">
-        <DashboardNav currentPath="/smart-start" />
+    <MinimalLayout>
+      <div className="bg-gradient-to-br from-blue-50 to-purple-50">
+        <div className="container mx-auto px-4 py-6">
+          <DashboardNav currentPath="/smart-start" />
         
         {/* Hero Section */}
         <div className="text-center mb-8">
@@ -706,8 +708,9 @@ const SmartStart = () => {
             </div>
           </TabsContent>
         </Tabs>
+        </div>
       </div>
-    </div>
+    </MinimalLayout>
   );
 };
 

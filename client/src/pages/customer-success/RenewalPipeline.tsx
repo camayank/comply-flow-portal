@@ -8,6 +8,7 @@
  */
 
 import { useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Card,
@@ -217,6 +218,7 @@ export default function RenewalPipeline() {
   };
 
   return (
+    <DashboardLayout>
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -641,5 +643,6 @@ export default function RenewalPipeline() {
         </DialogContent>
       </Dialog>
     </div>
+    </DashboardLayout>
   );
 }

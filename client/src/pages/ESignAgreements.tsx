@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useLocation } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -106,7 +107,7 @@ const ESignAgreements = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
+      <div className="bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
           <p className="text-gray-600">Loading documents...</p>
@@ -117,7 +118,7 @@ const ESignAgreements = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center">
+      <div className="bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center min-h-[50vh]">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center">
             <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
@@ -135,7 +136,8 @@ const ESignAgreements = () => {
   const allRequiredSigned = signedRequiredCount === requiredDocs.length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50">
+    <DashboardLayout>
+    <div className="bg-gradient-to-br from-blue-50 to-cyan-50">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
@@ -307,6 +309,7 @@ const ESignAgreements = () => {
         </div>
       </div>
     </div>
+    </DashboardLayout>
   );
 };
 

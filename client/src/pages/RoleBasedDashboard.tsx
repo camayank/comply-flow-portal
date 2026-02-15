@@ -14,6 +14,7 @@
  */
 
 import { useState } from "react";
+import { DashboardLayout } from '@/layouts';
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
@@ -926,7 +927,8 @@ function QCDashboard({ data, quickActions }: { data: any; quickActions: QuickAct
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6 p-6">
+    <DashboardLayout>
+      <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
           <Skeleton className="h-8 w-48 mb-2" />
@@ -943,7 +945,8 @@ function DashboardSkeleton() {
         <Skeleton className="h-96 lg:col-span-2" />
         <Skeleton className="h-96" />
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }
 
@@ -975,14 +978,16 @@ export default function RoleBasedDashboard() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center gap-4">
         <AlertCircle className="h-12 w-12 text-red-500" />
         <h2 className="text-xl font-semibold">Failed to load dashboard</h2>
         <Button onClick={() => refetch()}>
           <RefreshCw className="h-4 w-4 mr-2" />
           Retry
         </Button>
-      </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
@@ -993,53 +998,67 @@ export default function RoleBasedDashboard() {
   switch (role) {
     case 'client':
       return (
-        <div className="container mx-auto p-6">
-          <ClientDashboard data={dashboardData?.data} quickActions={quickActions} />
-        </div>
+        <DashboardLayout>
+          <div className="container mx-auto p-6">
+            <ClientDashboard data={dashboardData?.data} quickActions={quickActions} />
+          </div>
+        </DashboardLayout>
       );
 
     case 'agent':
       return (
-        <div className="container mx-auto p-6">
-          <AgentDashboard data={dashboardData?.data} quickActions={quickActions} />
-        </div>
+        <DashboardLayout>
+          <div className="container mx-auto p-6">
+            <AgentDashboard data={dashboardData?.data} quickActions={quickActions} />
+          </div>
+        </DashboardLayout>
       );
 
     case 'ops_executive':
     case 'ops_lead':
       return (
-        <div className="container mx-auto p-6">
-          <OperationsDashboard data={dashboardData?.data} quickActions={quickActions} />
-        </div>
+        <DashboardLayout>
+          <div className="container mx-auto p-6">
+            <OperationsDashboard data={dashboardData?.data} quickActions={quickActions} />
+          </div>
+        </DashboardLayout>
       );
 
     case 'qc_reviewer':
       return (
-        <div className="container mx-auto p-6">
-          <QCDashboard data={dashboardData?.data} quickActions={quickActions} />
-        </div>
+        <DashboardLayout>
+          <div className="container mx-auto p-6">
+            <QCDashboard data={dashboardData?.data} quickActions={quickActions} />
+          </div>
+        </DashboardLayout>
       );
 
     case 'finance':
       return (
-        <div className="container mx-auto p-6">
-          <FinanceDashboard data={dashboardData?.data} quickActions={quickActions} />
-        </div>
+        <DashboardLayout>
+          <div className="container mx-auto p-6">
+            <FinanceDashboard data={dashboardData?.data} quickActions={quickActions} />
+          </div>
+        </DashboardLayout>
       );
 
     case 'admin':
     case 'super_admin':
       return (
-        <div className="container mx-auto p-6">
-          <AdminDashboard data={dashboardData?.data} quickActions={quickActions} />
-        </div>
+        <DashboardLayout>
+          <div className="container mx-auto p-6">
+            <AdminDashboard data={dashboardData?.data} quickActions={quickActions} />
+          </div>
+        </DashboardLayout>
       );
 
     default:
       return (
-        <div className="container mx-auto p-6">
-          <ClientDashboard data={dashboardData?.data} quickActions={quickActions} />
-        </div>
+        <DashboardLayout>
+          <div className="container mx-auto p-6">
+            <ClientDashboard data={dashboardData?.data} quickActions={quickActions} />
+          </div>
+        </DashboardLayout>
       );
   }
 }

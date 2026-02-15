@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { DashboardLayout } from '@/layouts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,39 +82,44 @@ export default function ReferralDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">Loading referral data...</div>
-      </div>
+      <DashboardLayout>
+        <div className="bg-background flex items-center justify-center">
+          <div className="text-center">Loading referral data...</div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   if (!referralData && !generateCodeMutation.isPending) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
-          <CardHeader className="text-center">
-            <Gift className="h-16 w-16 mx-auto text-primary mb-4" />
-            <CardTitle>Start Earning Referral Credits!</CardTitle>
-            <CardDescription>
-              Refer startups and earn 10% credit on every successful referral
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              onClick={() => generateCodeMutation.mutate()}
-              className="w-full"
-              disabled={generateCodeMutation.isPending}
-            >
-              {generateCodeMutation.isPending ? "Generating..." : "Generate My Referral Code"}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <DashboardLayout>
+        <div className="bg-background flex items-center justify-center p-4">
+          <Card className="max-w-md w-full">
+            <CardHeader className="text-center">
+              <Gift className="h-16 w-16 mx-auto text-primary mb-4" />
+              <CardTitle>Start Earning Referral Credits!</CardTitle>
+              <CardDescription>
+                Refer startups and earn 10% credit on every successful referral
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                onClick={() => generateCodeMutation.mutate()}
+                className="w-full"
+                disabled={generateCodeMutation.isPending}
+              >
+                {generateCodeMutation.isPending ? "Generating..." : "Generate My Referral Code"}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
+    <DashboardLayout>
+    <div className="bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
           <div className="bg-primary/10 p-3 rounded-full">
@@ -285,6 +291,7 @@ export default function ReferralDashboard() {
         </Tabs>
       </div>
     </div>
+    </DashboardLayout>
   );
 }
 

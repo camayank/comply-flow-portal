@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { MinimalLayout } from '@/layouts';
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -673,9 +674,10 @@ const OnboardingFlow = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Header - Mobile optimized */}
-      <header className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-50">
+    <MinimalLayout>
+      <div className="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        {/* Header - Mobile optimized */}
+        <header className="bg-white/80 backdrop-blur-md border-b sticky top-0 z-50">
         <div className="container mx-auto px-3 md:px-4 py-3 md:py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -773,7 +775,8 @@ const OnboardingFlow = () => {
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </MinimalLayout>
   );
 };
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { Link } from 'wouter';
 import {
   Card,
@@ -267,8 +268,9 @@ export default function EscalationManagement() {
   ) || [];
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
+    <DashboardLayout>
+      <div className="bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -903,7 +905,8 @@ export default function EscalationManagement() {
             </Card>
           </TabsContent>
         </Tabs>
+        </div>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useQuery } from '@tanstack/react-query';
 import { 
   Card, 
@@ -162,23 +163,26 @@ export default function QualityMetricsDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-64"></div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
-              ))}
+      <DashboardLayout>
+        <div className="bg-gray-50 dark:bg-gray-900 p-6">
+          <div className="max-w-7xl mx-auto">
+            <div className="animate-pulse space-y-6">
+              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-64"></div>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="h-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <DashboardLayout>
+    <div className="bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
@@ -705,5 +709,6 @@ export default function QualityMetricsDashboard() {
         </Tabs>
       </div>
     </div>
+    </DashboardLayout>
   );
 }

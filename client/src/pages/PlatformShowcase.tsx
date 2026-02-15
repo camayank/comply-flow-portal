@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { PublicLayout } from '@/layouts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -193,8 +194,9 @@ const PlatformShowcase = () => {
   ];
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="mb-8 text-center">
+    <PublicLayout>
+      <div className="container mx-auto p-6 max-w-7xl">
+        <div className="mb-8 text-center">
         <div className="flex items-center justify-center mb-4">
           <Crown className="h-8 w-8 text-yellow-500 mr-2" />
           <h1 className="text-4xl font-bold">Platform Excellence</h1>
@@ -439,7 +441,8 @@ const PlatformShowcase = () => {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </PublicLayout>
   );
 };
 

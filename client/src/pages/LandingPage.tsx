@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { PublicLayout } from '@/layouts';
 import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -130,9 +131,10 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Modern Header */}
-      <ModernHeader
+    <PublicLayout>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        {/* Modern Header */}
+        <ModernHeader
         {...HeaderPresets.digiComplyLanding}
         mobileNavigationItems={[
           { href: '/service-selection', label: 'Services', icon: FileText, description: 'Browse our compliance services' },
@@ -1232,7 +1234,8 @@ const LandingPage = () => {
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </PublicLayout>
   );
 };
 

@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useCallback } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useLocation, useRoute } from 'wouter';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -164,14 +165,17 @@ const DocumentUpload = () => {
 
   if (loadingDocs && serviceRequestId) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
-      </div>
+      <DashboardLayout>
+        <div className="flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50">
+    <DashboardLayout>
+      <div className="bg-gradient-to-br from-purple-50 to-pink-50">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
@@ -362,7 +366,8 @@ const DocumentUpload = () => {
           </Card>
         </div>
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { MinimalLayout } from '@/layouts';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -160,8 +161,9 @@ const IndustryClassification = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-50">
-      <div className="container mx-auto px-4 py-8">
+    <MinimalLayout>
+      <div className="bg-gradient-to-br from-indigo-50 to-purple-50">
+        <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">
@@ -323,6 +325,7 @@ const IndustryClassification = () => {
         </div>
       </div>
     </div>
+    </MinimalLayout>
   );
 };
 

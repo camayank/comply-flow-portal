@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -753,7 +754,8 @@ const UpsellEngine = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900" data-testid="upsell-engine">
+    <DashboardLayout>
+    <div className="bg-gray-50 dark:bg-gray-900" data-testid="upsell-engine">
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Upsell Engine</h1>
@@ -783,6 +785,7 @@ const UpsellEngine = () => {
         </Tabs>
       </div>
     </div>
+    </DashboardLayout>
   );
 };
 

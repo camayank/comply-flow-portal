@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -331,6 +332,7 @@ const DocumentVault = () => {
   }
 
   return (
+    <DashboardLayout>
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-4">
@@ -964,6 +966,7 @@ const DocumentVault = () => {
         </DialogContent>
       </Dialog>
     </div>
+    </DashboardLayout>
   );
 };
 

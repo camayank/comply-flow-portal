@@ -1,3 +1,4 @@
+import { DashboardLayout } from '@/layouts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -696,7 +697,8 @@ export default function DevHub() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6">
+    <DashboardLayout>
+    <div className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -887,5 +889,6 @@ export default function DevHub() {
         </div>
       </div>
     </div>
+    </DashboardLayout>
   );
 }

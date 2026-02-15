@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { DashboardLayout } from '@/layouts';
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -130,19 +131,22 @@ export default function DigiScore() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <DashboardLayout>
+        <div className="bg-background flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
           <p className="text-muted-foreground">Loading compliance score...</p>
+          </div>
         </div>
-      </div>
+      </DashboardLayout>
     );
   }
 
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <DashboardLayout>
+        <div className="bg-background flex items-center justify-center">
         <Card className="max-w-md">
           <CardContent className="pt-6 text-center">
             <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -155,12 +159,14 @@ export default function DigiScore() {
             </Button>
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
+    <DashboardLayout>
+      <div className="bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -437,6 +443,7 @@ export default function DigiScore() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

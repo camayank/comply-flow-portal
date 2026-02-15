@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,7 +55,8 @@ const FounderDetails = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
+    <DashboardLayout>
+    <div className="bg-gradient-to-br from-green-50 to-blue-50">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
@@ -292,6 +294,7 @@ const FounderDetails = () => {
         </div>
       </div>
     </div>
+    </DashboardLayout>
   );
 };
 

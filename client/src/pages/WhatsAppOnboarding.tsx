@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useLocation } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -280,7 +281,8 @@ const WhatsAppOnboarding = () => {
   const recommendedPackage = getRecommendedPackage();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
+    <DashboardLayout>
+    <div className="bg-gradient-to-br from-green-50 to-blue-50">
       <div className="container mx-auto px-4 py-6">
         <DashboardNav currentPath="/whatsapp-onboarding" />
         
@@ -828,6 +830,7 @@ const WhatsAppOnboarding = () => {
         )}
       </div>
     </div>
+    </DashboardLayout>
   );
 };
 

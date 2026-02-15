@@ -1,4 +1,5 @@
 import React from "react";
+import { PublicLayout } from '@/layouts';
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -110,9 +111,10 @@ const UniversalLandingPage = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
-      {/* Hero Section */}
-      <div className="relative overflow-hidden">
+    <PublicLayout>
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
+        {/* Hero Section */}
+        <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center">
@@ -665,7 +667,8 @@ const UniversalLandingPage = () => {
           </div>
         </div>
       </footer>
-    </div>
+      </div>
+    </PublicLayout>
   );
 };
 

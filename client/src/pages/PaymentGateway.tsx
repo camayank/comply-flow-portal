@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { DashboardLayout } from '@/layouts';
 import { useLocation, useRoute } from 'wouter';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -225,7 +226,8 @@ const PaymentGateway = () => {
   // Payment Success View
   if (paymentSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center p-4">
+      <DashboardLayout>
+        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardContent className="pt-8 pb-8 text-center">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -257,24 +259,28 @@ const PaymentGateway = () => {
             </div>
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   // Loading state
   if (loadingPending) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center">
+      <DashboardLayout>
+        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-emerald-600 mx-auto mb-4" />
           <p className="text-gray-600">Loading payment details...</p>
         </div>
-      </div>
+        </div>
+      </DashboardLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-50">
+    <DashboardLayout>
+      <div className="bg-gradient-to-br from-emerald-50 to-teal-50">
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -607,7 +613,8 @@ const PaymentGateway = () => {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 };
 
