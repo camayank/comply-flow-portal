@@ -44,7 +44,7 @@ export default function LandingPage() {
                 Login
               </Button>
             </Link>
-            <Link href="/register">
+            <Link href="/onboarding">
               <Button className="bg-navy-800 hover:bg-navy-700 text-white">
                 Start Free
               </Button>
@@ -67,7 +67,7 @@ export default function LandingPage() {
                 and constant penalty risk. DigiComply automates it all.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/register">
+                <Link href="/onboarding">
                   <Button size="lg" className="bg-navy-800 hover:bg-navy-700 text-white px-8">
                     Get Started Free
                     <ArrowRight className="ml-2 h-5 w-5" />
@@ -264,7 +264,7 @@ export default function LandingPage() {
           <p className="text-lg text-navy-100 mb-8 max-w-2xl mx-auto">
             Join 10,000+ businesses that trust DigiComply for their compliance needs.
           </p>
-          <Link href="/register">
+          <Link href="/onboarding">
             <Button size="lg" className="bg-white text-navy-800 hover:bg-slate-100 px-8">
               Start Your Free Trial
               <ArrowRight className="ml-2 h-5 w-5" />

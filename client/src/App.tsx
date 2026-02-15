@@ -311,7 +311,7 @@ const AppContent = () => {
                 <Route path="/compliance-ops" component={ComplianceManagementDashboard} />
                 <Route path="/client-profile" component={ClientProfile} />
                 <Route path="/workflow-dashboard" component={DigiComplyWorkflowDashboard} />
-                <Route path="/smart-start" component={SmartStart} />
+                <Route path="/smart-start" component={OnboardingFlow} />
                 <Route path="/whatsapp-onboarding" component={WhatsAppOnboarding} />
                 <Route path="/10k" component={ComplianceScorecard} />
                 <Route path="/compliance-scorecard" component={ComplianceScorecard} />
@@ -506,9 +506,9 @@ const AppContent = () => {
                 <Route path="/super-admin/operations" component={Operations} />
                 <Route path="/super-admin/analytics" component={Analytics} />
                 <Route path="/super-admin/services" component={SuperAdminServices} />
-                {/* CONSOLIDATED: Single onboarding flow */}
-                <Route path="/onboarding" component={SmartStart} />
-                <Route path="/streamlined-onboarding" component={SmartStart} />
+                {/* CONSOLIDATED: Single onboarding flow - using redesigned OnboardingFlow */}
+                <Route path="/onboarding" component={OnboardingFlow} />
+                <Route path="/streamlined-onboarding" component={OnboardingFlow} />
                 <Route path="/business-type" component={BusinessType} />
                 <Route path="/package-selection" component={PackageSelection} />
                 <Route path="/founder-details" component={FounderDetails} />
