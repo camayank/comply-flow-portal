@@ -84,6 +84,22 @@ export const DEPARTMENTS = {
   FINANCE: 'finance'
 } as const;
 
+export const ACTIVITY_TYPES = {
+  STATUS_CHANGE: 'status_change',
+  NOTE_ADDED: 'note_added',
+  DOCUMENT_UPLOADED: 'document_uploaded',
+  DOCUMENT_REQUESTED: 'document_requested',
+  FILING_UPDATE: 'filing_update',
+  PAYMENT_RECEIVED: 'payment_received',
+  PAYMENT_FAILED: 'payment_failed',
+  ASSIGNMENT_CHANGE: 'assignment_change',
+  SLA_UPDATE: 'sla_update',
+  ESCALATION: 'escalation',
+  COMMUNICATION: 'communication',
+  CASE_CREATED: 'case_created',
+  CASE_COMPLETED: 'case_completed',
+} as const;
+
 // Enhanced user system with multi-business support and security
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -5373,6 +5389,36 @@ export const insertIdSequenceSchema = createInsertSchema(idSequences).omit({
 
 export type IdSequence = typeof idSequences.$inferSelect;
 export type InsertIdSequence = z.infer<typeof insertIdSequenceSchema>;
+
+// ============================================================================
+// UNIFIED CLIENT ACTIVITY TIMELINE
+// ============================================================================
+
+// Unified activity timeline for clients - single source of truth
+export const clientActivities = pgTable("client_activities", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(), // FK to business_entities.id
+  serviceRequestId: integer("service_request_id"), // optional, links to specific case
+  activityType: text("activity_type").notNull(), // from ACTIVITY_TYPES
+  title: text("title").notNull(),
+  description: text("description"),
+  oldValue: text("old_value"), // for status changes
+  newValue: text("new_value"), // for status changes
+  metadata: json("metadata"), // flexible additional data
+  performedBy: integer("performed_by"), // user who performed action
+  performedByName: text("performed_by_name"), // denormalized for display
+  isClientVisible: boolean("is_client_visible").default(false),
+  isSystemGenerated: boolean("is_system_generated").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertClientActivitySchema = createInsertSchema(clientActivities).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ClientActivity = typeof clientActivities.$inferSelect;
+export type InsertClientActivity = z.infer<typeof insertClientActivitySchema>;
 
 // ============================================================================
 // ID TYPE CONSTANTS
