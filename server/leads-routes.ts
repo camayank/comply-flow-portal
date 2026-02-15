@@ -694,7 +694,8 @@ router.post('/leads/:id/convert', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE
       fullName: lead.companyName || lead.contactPerson || 'New Client',
       role: 'client' as const,
       isActive: true,
-      emailVerified: false
+      emailVerified: false,
+      leadId: lead.id, // Propagate lead ID for tracking conversion source
     };
 
     const newUser = await storage.createUser(userData);
@@ -726,7 +727,8 @@ router.post('/leads/:id/convert', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE
       assignedManager: null,
       notes: notes || `Converted from lead ${lead.leadId}`,
       isActive: true,
-      lifecycleStage: 'onboarding'
+      lifecycleStage: 'onboarding',
+      leadId: lead.id, // Propagate lead ID for tracking conversion source
     };
 
     const newEntity = await storage.createBusinessEntity(entityData);
@@ -751,7 +753,8 @@ router.post('/leads/:id/convert', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE
         currentMilestone: 'initiated',
         notes: `Auto-created from lead conversion`,
         assignedTeamMember: null,
-        assignedAgentId: lead.agentId ? Number(lead.agentId) : null
+        assignedAgentId: lead.agentId ? Number(lead.agentId) : null,
+        leadId: lead.id, // Propagate lead ID for tracking conversion source
       });
     }
 
