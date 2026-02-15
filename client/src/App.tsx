@@ -160,6 +160,9 @@ const ComplianceAlertPreferences = lazy(() => import("./pages/client/ComplianceA
 const ExecutiveSummary = lazy(() => import("./pages/ExecutiveSummary"));
 const OpsCaseDashboard = lazy(() => import("./pages/ops/CaseDashboard"));
 const OpsClientDashboard = lazy(() => import("./pages/ops/ClientDashboard"));
+const OpsTeamAssignment = lazy(() => import("./pages/ops/TeamAssignmentDashboard"));
+const OpsPerformanceMetrics = lazy(() => import("./pages/ops/PerformanceMetricsDashboard"));
+const OpsClientCommunicationHub = lazy(() => import("./pages/ops/ClientCommunicationHub"));
 
 const publicRoutePrefixes = [
   '/',
@@ -418,6 +421,12 @@ const AppContent = () => {
                 <Route path="/document-review" component={OperationsDocumentReview} />
                 <Route path="/ops/case/:id" component={OpsCaseDashboard} />
                 <Route path="/ops/client/:clientId" component={OpsClientDashboard} />
+                <Route path="/ops/team" component={OpsTeamAssignment} />
+                <Route path="/ops/team-assignment" component={OpsTeamAssignment} />
+                <Route path="/ops/performance" component={OpsPerformanceMetrics} />
+                <Route path="/ops/performance-metrics" component={OpsPerformanceMetrics} />
+                <Route path="/ops/communications" component={OpsClientCommunicationHub} />
+                <Route path="/ops/communication-hub" component={OpsClientCommunicationHub} />
 
                 {/* Client Service Tracking */}
                 <Route path="/my-services" component={ClientServicesDashboard} />

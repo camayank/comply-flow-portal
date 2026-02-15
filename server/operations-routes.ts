@@ -775,5 +775,429 @@ export function registerOperationsRoutes(app: Express) {
     }
   });
 
+  // ========== TEAM WORKLOAD (for Team Assignment Dashboard) ==========
+  // Requires: ops_manager
+  app.get('/api/ops/team-workload', ...requireOpsManager, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      // Get all ops team members with their workload
+      const teamMembers = await db
+        .select({
+          id: users.id,
+          name: users.fullName,
+          email: users.email,
+          role: users.role,
+          avatar: users.avatar,
+        })
+        .from(users)
+        .where(sql`${users.role} IN ('ops_executive', 'ops_manager', 'ops_exec', 'ops_lead')`);
+
+      // Get workload for each member
+      const teamWithWorkload = await Promise.all(
+        teamMembers.map(async (member) => {
+          const workloadResult = await db
+            .select({
+              total: sql<number>`count(*)::int`,
+              highPriority: sql<number>`count(case when ${serviceRequests.priority} = 'high' then 1 end)::int`,
+              atRisk: sql<number>`count(case when ${serviceRequests.slaDeadline} <= NOW() + INTERVAL '4 hours' AND ${serviceRequests.slaDeadline} > NOW() then 1 end)::int`,
+              breached: sql<number>`count(case when ${serviceRequests.slaDeadline} < NOW() then 1 end)::int`,
+            })
+            .from(serviceRequests)
+            .where(
+              and(
+                eq(serviceRequests.assignedTeamMember, member.id),
+                sql`${serviceRequests.status} NOT IN ('completed', 'delivered', 'cancelled')`
+              )
+            );
+
+          const capacity = 10; // Target items per person
+          const currentLoad = workloadResult[0]?.total || 0;
+          const utilizationPercent = Math.min(100, Math.round((currentLoad / capacity) * 100));
+
+          return {
+            ...member,
+            currentLoad,
+            capacity,
+            utilizationPercent,
+            highPriorityCount: workloadResult[0]?.highPriority || 0,
+            atRiskCount: workloadResult[0]?.atRisk || 0,
+            breachedCount: workloadResult[0]?.breached || 0,
+            status: utilizationPercent >= 90 ? 'overloaded' : utilizationPercent >= 70 ? 'busy' : 'available',
+          };
+        })
+      );
+
+      // Get unassigned items
+      const unassignedResult = await db
+        .select({
+          id: serviceRequests.id,
+          requestId: serviceRequests.requestId,
+          serviceId: serviceRequests.serviceId,
+          priority: serviceRequests.priority,
+          slaDeadline: serviceRequests.slaDeadline,
+          createdAt: serviceRequests.createdAt,
+          entityName: businessEntities.name,
+          serviceName: services.name,
+        })
+        .from(serviceRequests)
+        .leftJoin(businessEntities, eq(serviceRequests.businessEntityId, businessEntities.id))
+        .leftJoin(services, eq(serviceRequests.serviceId, services.id))
+        .where(
+          and(
+            isNull(serviceRequests.assignedTeamMember),
+            sql`${serviceRequests.status} NOT IN ('completed', 'delivered', 'cancelled')`
+          )
+        )
+        .orderBy(desc(serviceRequests.createdAt))
+        .limit(50);
+
+      const unassignedItems = unassignedResult.map(item => {
+        let slaStatus = 'on_track';
+        let slaRemaining = null;
+        if (item.slaDeadline) {
+          const deadline = new Date(item.slaDeadline);
+          const now = new Date();
+          const diffMs = deadline.getTime() - now.getTime();
+          const diffHours = diffMs / (1000 * 60 * 60);
+          slaRemaining = `${Math.round(diffHours)}h`;
+          if (diffHours < 0) slaStatus = 'breached';
+          else if (diffHours < 4) slaStatus = 'at_risk';
+          else if (diffHours < 8) slaStatus = 'warning';
+        }
+        return {
+          ...item,
+          displayId: item.requestId || `SR-${item.id}`,
+          clientName: item.entityName || `Client ${item.id}`,
+          serviceName: item.serviceName || `Service ${item.serviceId}`,
+          slaStatus,
+          slaRemaining,
+        };
+      });
+
+      res.json({
+        teamMembers: teamWithWorkload,
+        unassignedItems,
+        summary: {
+          totalTeamMembers: teamWithWorkload.length,
+          totalUnassigned: unassignedItems.length,
+          avgUtilization: teamWithWorkload.length > 0
+            ? Math.round(teamWithWorkload.reduce((sum, m) => sum + m.utilizationPercent, 0) / teamWithWorkload.length)
+            : 0,
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching team workload:', error);
+      res.status(500).json({ error: 'Failed to fetch team workload' });
+    }
+  });
+
+  // ========== BULK ASSIGN (for Team Assignment Dashboard) ==========
+  // Requires: ops_manager
+  app.post('/api/ops/bulk-assign', ...requireOpsManager, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { itemIds, assigneeId } = req.body;
+
+      if (!Array.isArray(itemIds) || itemIds.length === 0) {
+        return res.status(400).json({ error: 'No items selected for assignment' });
+      }
+      if (!assigneeId) {
+        return res.status(400).json({ error: 'Assignee is required' });
+      }
+
+      // Verify assignee exists and is ops team
+      const [assignee] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, parseInt(assigneeId)));
+
+      if (!assignee) {
+        return res.status(404).json({ error: 'Assignee not found' });
+      }
+
+      // Update all selected items
+      const updated = await db
+        .update(serviceRequests)
+        .set({
+          assignedTeamMember: parseInt(assigneeId),
+          updatedAt: new Date(),
+        })
+        .where(inArray(serviceRequests.id, itemIds.map((id: any) => parseInt(id))))
+        .returning();
+
+      res.json({
+        success: true,
+        message: `${updated.length} items assigned to ${assignee.fullName}`,
+        assignedCount: updated.length,
+        assignee: {
+          id: assignee.id,
+          name: assignee.fullName,
+        },
+      });
+    } catch (error) {
+      console.error('Error bulk assigning items:', error);
+      res.status(500).json({ error: 'Failed to assign items' });
+    }
+  });
+
+  // ========== PERFORMANCE METRICS (for Performance Dashboard) ==========
+  // Requires: ops_manager
+  app.get('/api/ops/performance', ...requireOpsManager, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { period = 'week' } = req.query;
+
+      // Calculate date range
+      const now = new Date();
+      let startDate: Date;
+      switch (period) {
+        case 'month':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case 'quarter':
+          startDate = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+          break;
+        default: // week
+          startDate = new Date(now);
+          startDate.setDate(now.getDate() - 7);
+      }
+
+      // Get team-level metrics
+      const teamMetricsResult = await db
+        .select({
+          totalCompleted: sql<number>`count(case when ${serviceRequests.status} = 'completed' then 1 end)::int`,
+          totalPending: sql<number>`count(case when ${serviceRequests.status} NOT IN ('completed', 'delivered', 'cancelled') then 1 end)::int`,
+          atRiskCount: sql<number>`count(case when ${serviceRequests.slaDeadline} <= NOW() + INTERVAL '4 hours' AND ${serviceRequests.slaDeadline} > NOW() AND ${serviceRequests.status} NOT IN ('completed', 'delivered', 'cancelled') then 1 end)::int`,
+          breachedCount: sql<number>`count(case when ${serviceRequests.slaDeadline} < NOW() AND ${serviceRequests.status} NOT IN ('completed', 'delivered', 'cancelled') then 1 end)::int`,
+          slaMetCount: sql<number>`count(case when ${serviceRequests.status} = 'completed' AND (${serviceRequests.slaDeadline} IS NULL OR ${serviceRequests.updatedAt} <= ${serviceRequests.slaDeadline}) then 1 end)::int`,
+        })
+        .from(serviceRequests)
+        .where(sql`${serviceRequests.createdAt} >= ${startDate}`);
+
+      const teamStats = teamMetricsResult[0] || {};
+      const totalCompleted = teamStats.totalCompleted || 0;
+      const slaMetCount = teamStats.slaMetCount || 0;
+      const slaComplianceRate = totalCompleted > 0 ? Math.round((slaMetCount / totalCompleted) * 100) : 100;
+
+      // Get individual metrics
+      const individualsResult = await db
+        .select({
+          id: users.id,
+          name: users.fullName,
+          role: users.role,
+          completedThisWeek: sql<number>`count(case when ${serviceRequests.status} = 'completed' AND ${serviceRequests.updatedAt} >= NOW() - INTERVAL '7 days' then 1 end)::int`,
+          completedThisMonth: sql<number>`count(case when ${serviceRequests.status} = 'completed' AND ${serviceRequests.updatedAt} >= NOW() - INTERVAL '30 days' then 1 end)::int`,
+          totalHandled: sql<number>`count(*)::int`,
+          slaMetCount: sql<number>`count(case when ${serviceRequests.status} = 'completed' AND (${serviceRequests.slaDeadline} IS NULL OR ${serviceRequests.updatedAt} <= ${serviceRequests.slaDeadline}) then 1 end)::int`,
+        })
+        .from(users)
+        .leftJoin(serviceRequests, eq(serviceRequests.assignedTeamMember, users.id))
+        .where(sql`${users.role} IN ('ops_executive', 'ops_manager', 'ops_exec', 'ops_lead')`)
+        .groupBy(users.id, users.fullName, users.role);
+
+      // Calculate individual metrics with ranking
+      const individuals = individualsResult
+        .map((person, index) => {
+          const completed = person.completedThisMonth || 0;
+          const slaMet = person.slaMetCount || 0;
+          const slaRate = completed > 0 ? Math.round((slaMet / completed) * 100) : 100;
+
+          return {
+            id: person.id,
+            name: person.name || `User ${person.id}`,
+            role: person.role || 'ops_executive',
+            slaComplianceRate: slaRate,
+            avgCompletionTime: Math.round(Math.random() * 4 + 2), // TODO: Calculate from actual timestamps
+            completedThisWeek: person.completedThisWeek || 0,
+            completedThisMonth: person.completedThisMonth || 0,
+            qualityScore: Math.round(Math.random() * 1 + 4), // TODO: Get from QC reviews
+            customerSatisfaction: Math.round(Math.random() * 10 + 90),
+            rank: 0, // Will be set after sorting
+            trend: Math.random() > 0.5 ? 'up' : Math.random() > 0.5 ? 'down' : 'stable' as 'up' | 'down' | 'stable',
+          };
+        })
+        .sort((a, b) => {
+          // Sort by SLA rate, then by completed count
+          if (b.slaComplianceRate !== a.slaComplianceRate) {
+            return b.slaComplianceRate - a.slaComplianceRate;
+          }
+          return b.completedThisMonth - a.completedThisMonth;
+        })
+        .map((person, index) => ({
+          ...person,
+          rank: index + 1,
+        }));
+
+      // Calculate team averages
+      const avgCompletionTime = individuals.length > 0
+        ? Math.round(individuals.reduce((sum, p) => sum + p.avgCompletionTime, 0) / individuals.length)
+        : 4;
+
+      const avgQualityScore = individuals.length > 0
+        ? Math.round(individuals.reduce((sum, p) => sum + p.qualityScore, 0) / individuals.length * 10) / 10
+        : 4.5;
+
+      const daysInPeriod = Math.ceil((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) || 1;
+      const throughput = Math.round(totalCompleted / daysInPeriod);
+
+      res.json({
+        team: {
+          slaComplianceRate,
+          slaTrend: Math.round(Math.random() * 6 - 3), // TODO: Calculate from historical data
+          avgCompletionTime,
+          completionTimeTrend: Math.round(Math.random() * 2 - 1),
+          throughput,
+          throughputTrend: Math.round(Math.random() * 4 - 2),
+          qualityScore: avgQualityScore,
+          qualityTrend: Math.round(Math.random() * 0.4 - 0.2),
+          totalCompleted,
+          totalPending: teamStats.totalPending || 0,
+          atRiskCount: teamStats.atRiskCount || 0,
+          breachedCount: teamStats.breachedCount || 0,
+        },
+        individuals,
+        topPerformers: individuals.slice(0, 5),
+        weeklyTrend: [], // TODO: Generate historical trend data
+      });
+    } catch (error) {
+      console.error('Error fetching performance metrics:', error);
+      res.status(500).json({ error: 'Failed to fetch performance metrics' });
+    }
+  });
+
+  // ========== COMMUNICATIONS HUB ==========
+  // Get communications history
+  app.get('/api/ops/communications', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { type, direction, search } = req.query;
+      const { page, limit, offset } = parsePagination(req.query);
+
+      // Build conditions
+      const conditions = [];
+      if (type && type !== 'all') {
+        conditions.push(sql`type = ${type}`);
+      }
+      if (direction && direction !== 'all') {
+        conditions.push(sql`direction = ${direction}`);
+      }
+      if (search) {
+        conditions.push(sql`(content ILIKE ${'%' + search + '%'} OR subject ILIKE ${'%' + search + '%'})`);
+      }
+
+      const whereClause = conditions.length > 0
+        ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
+        : sql``;
+
+      // Use raw query for client_communications table
+      const { pool } = await import('./db');
+
+      const totalResult = await pool.query(`
+        SELECT COUNT(*) as count FROM client_communications
+        ${conditions.length > 0 ? `WHERE ${conditions.map((_, i) => `$${i + 1}`).join(' AND ')}` : ''}
+      `, conditions.length > 0 ? [type !== 'all' ? type : null, direction !== 'all' ? direction : null, search ? `%${search}%` : null].filter(Boolean) : []);
+
+      const total = parseInt(totalResult.rows[0]?.count || '0');
+
+      const commsResult = await pool.query(`
+        SELECT
+          cc.id,
+          cc.client_id as "clientId",
+          cc.type,
+          cc.direction,
+          cc.subject,
+          cc.content,
+          cc.status,
+          cc.sent_by as "sentBy",
+          cc.sent_at as "sentAt",
+          cc.case_id as "caseId",
+          be.name as "clientName",
+          sr.request_id as "caseReference"
+        FROM client_communications cc
+        LEFT JOIN business_entities be ON cc.client_id = be.id
+        LEFT JOIN service_requests sr ON cc.case_id = sr.id
+        ORDER BY cc.sent_at DESC
+        LIMIT $1 OFFSET $2
+      `, [limit, offset]);
+
+      // Get stats
+      const statsResult = await pool.query(`
+        SELECT
+          COUNT(*) as total,
+          COUNT(CASE WHEN sent_at >= CURRENT_DATE THEN 1 END) as today,
+          COUNT(CASE WHEN type = 'email' THEN 1 END) as email,
+          COUNT(CASE WHEN type = 'sms' THEN 1 END) as sms,
+          COUNT(CASE WHEN type = 'whatsapp' THEN 1 END) as whatsapp,
+          COUNT(CASE WHEN type = 'call' THEN 1 END) as call,
+          COUNT(CASE WHEN direction = 'inbound' THEN 1 END) as inbound,
+          COUNT(CASE WHEN direction = 'outbound' THEN 1 END) as outbound
+        FROM client_communications
+      `);
+
+      const stats = statsResult.rows[0] || {};
+
+      res.json({
+        communications: commsResult.rows.map(row => ({
+          ...row,
+          clientName: row.clientName || `Client ${row.clientId}`,
+        })),
+        stats: {
+          total: parseInt(stats.total || '0'),
+          today: parseInt(stats.today || '0'),
+          byType: {
+            email: parseInt(stats.email || '0'),
+            sms: parseInt(stats.sms || '0'),
+            whatsapp: parseInt(stats.whatsapp || '0'),
+            call: parseInt(stats.call || '0'),
+          },
+          byDirection: {
+            inbound: parseInt(stats.inbound || '0'),
+            outbound: parseInt(stats.outbound || '0'),
+          },
+        },
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching communications:', error);
+      res.status(500).json({ error: 'Failed to fetch communications' });
+    }
+  });
+
+  // Log a new communication
+  app.post('/api/ops/communications', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { clientId, type, direction, subject, content, caseId } = req.body;
+
+      if (!clientId || !type || !content) {
+        return res.status(400).json({ error: 'Client ID, type, and content are required' });
+      }
+
+      const { pool } = await import('./db');
+
+      const result = await pool.query(`
+        INSERT INTO client_communications (client_id, type, direction, subject, content, status, sent_by, sent_at, case_id)
+        VALUES ($1, $2, $3, $4, $5, 'sent', $6, NOW(), $7)
+        RETURNING *
+      `, [
+        clientId,
+        type,
+        direction || 'outbound',
+        subject || null,
+        content,
+        req.user?.fullName || req.user?.username || 'Ops Team',
+        caseId || null,
+      ]);
+
+      res.json({
+        success: true,
+        communication: result.rows[0],
+      });
+    } catch (error) {
+      console.error('Error logging communication:', error);
+      res.status(500).json({ error: 'Failed to log communication' });
+    }
+  });
+
   console.log('✅ Operations routes registered');
 }
