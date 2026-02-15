@@ -6,28 +6,10 @@ import {
   Briefcase, BarChart3, Bell, Clock, Database, Lock, Server, Cpu,
   Layers, GitBranch, Activity, Target, PieChart, DollarSign
 } from 'lucide-react';
-import { Link, useLocation } from 'wouter';
-
-// Routes that use sidebar/dashboard layout and need footer offset
-const DASHBOARD_ROUTES = [
-  '/client-portal', '/portal-v2', '/admin', '/operations', '/agent',
-  '/tasks', '/leads', '/compliance', '/services', '/clients',
-  '/executive-dashboard', '/financials', '/crm', '/hr',
-  '/sales', '/qc', '/customer-success', '/security', '/messaging',
-  '/notifications', '/bulk-upload', '/universal', '/workflow',
-  '/super-admin', '/my-dashboard', '/role-dashboard', '/work-queue',
-  '/compliance-dashboard', '/compliance-calendar', '/compliance-management',
-  '/service-requests', '/proposals', '/referrals', '/autocomply',
-  '/taxtracker', '/digiscore', '/ai-documents', '/vault', '/config',
-  '/escalations', '/messages', '/inbox', '/blueprint', '/pre-sales',
-];
+import { Link } from 'wouter';
 
 const Footer = () => {
-  const [location] = useLocation();
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
-
-  // Check if current route is a dashboard route that has a sidebar
-  const isDashboardRoute = DASHBOARD_ROUTES.some(route => location.startsWith(route));
 
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section);
@@ -80,7 +62,7 @@ const Footer = () => {
   ];
 
   return (
-    <footer className={`bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white ${isDashboardRoute ? 'lg:ml-60' : ''}`} tabIndex={-1}>
+    <footer className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white" tabIndex={-1}>
       {/* CTA Banner */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
