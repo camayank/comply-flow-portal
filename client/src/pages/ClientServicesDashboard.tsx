@@ -47,7 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DashboardLayout, PageShell } from '@/components/v3';
+import { DashboardLayout, PageShell } from '@/layouts';
 import {
   FileText,
   Calendar,

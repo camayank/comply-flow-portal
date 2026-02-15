@@ -9,7 +9,7 @@
  */
 
 import { useState } from 'react';
-import { DashboardLayout, PageShell } from '@/components/v3';
+import { DashboardLayout, PageShell } from '@/layouts';
 import {
   LayoutDashboard,
   FileBarChart,

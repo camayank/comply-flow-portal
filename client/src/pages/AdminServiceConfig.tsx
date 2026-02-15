@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DashboardLayout, PageShell } from '@/components/v3';
+import { DashboardLayout, PageShell } from '@/layouts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

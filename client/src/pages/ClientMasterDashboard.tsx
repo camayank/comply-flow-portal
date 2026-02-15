@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { DashboardLayout, PageShell } from '@/components/v3';
+import { DashboardLayout, PageShell } from '@/layouts';
 import {
   Building2,
   Users,

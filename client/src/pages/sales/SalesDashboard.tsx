@@ -55,7 +55,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { DashboardLayout, PageShell, MetricCard } from '@/components/v3';
+import { DashboardLayout, PageShell, MetricCard } from '@/layouts';
 import {
   TrendingUp,
   Users,

@@ -10,7 +10,7 @@ import {
   CreditCard, ShoppingBag, DollarSign, Users, Plus,
   Eye, CheckCircle, Clock, AlertCircle, Edit, Wallet
 } from 'lucide-react';
-import { DashboardLayout } from '@/components/layouts/DashboardLayout';
+import { DashboardLayout } from '@/layouts';
 import { PageSection } from '@/components/layouts/PageLayout';
 import { useStandardQuery } from '@/hooks/useStandardQuery';
 import { get } from '@/lib/api';

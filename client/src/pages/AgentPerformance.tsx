@@ -21,7 +21,7 @@ import {
   Star,
   Zap,
 } from 'lucide-react';
-import { DashboardLayout, PageShell } from '@/components/v3';
+import { DashboardLayout, PageShell } from '@/layouts';
 import { useAuth } from '@/hooks/useAuth';
 import { AGENT_NAVIGATION } from '@/config/agent-navigation';
 

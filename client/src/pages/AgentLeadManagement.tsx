@@ -41,7 +41,7 @@ import { useToast } from '@/hooks/use-toast';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 import { SkeletonList } from '@/components/ui/skeleton-loader';
 import { EmptyList, EmptySearchResults } from '@/components/ui/empty-state';
-import { DashboardLayout, PageShell } from '@/components/v3';
+import { DashboardLayout, PageShell } from '@/layouts';
 import { useAuth } from '@/hooks/useAuth';
 import { AGENT_NAVIGATION } from '@/config/agent-navigation';
 

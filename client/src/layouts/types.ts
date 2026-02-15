@@ -15,6 +15,10 @@ export interface DashboardLayoutProps extends BaseLayoutProps {
   title?: string;
   breadcrumbs?: Breadcrumb[];
   actions?: ReactNode;
+  // Legacy props for backwards compatibility - ignored, handled internally
+  navigation?: unknown;
+  user?: unknown;
+  logo?: ReactNode;
 }
 
 export interface MinimalLayoutProps extends BaseLayoutProps {

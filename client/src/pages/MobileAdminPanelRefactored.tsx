@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DashboardLayout } from '@/components/layouts/DashboardLayout';
+import { DashboardLayout } from '@/layouts';
 import { useStandardQuery } from '@/hooks/useStandardQuery';
 import { get } from '@/lib/api';
 import { ServiceConfigForm } from '@/components/ServiceConfigForm';

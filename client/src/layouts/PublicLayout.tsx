@@ -1,6 +1,6 @@
 import { PublicLayoutProps } from './types';
 import { PublicHeader } from '@/components/headers/PublicHeader';
-import { Footer } from '@/components/Footer';
+import Footer from '@/components/Footer';
 
 export function PublicLayout({
   children,

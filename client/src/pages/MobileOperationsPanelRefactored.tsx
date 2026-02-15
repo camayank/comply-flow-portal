@@ -15,7 +15,7 @@ import {
   ListTodo,
   FileSearch,
 } from 'lucide-react';
-import { DashboardLayout } from '@/components/layouts/DashboardLayout';
+import { DashboardLayout } from '@/layouts';
 import { useStandardQuery } from '@/hooks/useStandardQuery';
 import { useAuth } from '@/hooks/use-auth';
 import { get } from '@/lib/api';

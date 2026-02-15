@@ -1,4 +1,4 @@
-import { DashboardLayout } from '@/components/layouts/DashboardLayout';
+import { DashboardLayout } from '@/layouts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, Receipt, FileText, Shield, Home, Settings, ArrowRight } from 'lucide-react';
 import { Link } from 'wouter';
