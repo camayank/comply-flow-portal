@@ -1,12 +1,91 @@
-# Ops Case Dashboard Implementation Plan
+# Ops Case Dashboard + Client Dashboard Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Build an ops-focused Case Dashboard with full lead traceability for human-operated compliance workflows.
+**Goal:** Build a two-level ops dashboard system with full lead traceability:
+- **Client Dashboard** (`/ops/client/:clientId`) - Single source of truth for all client work items
+- **Case Dashboard** (`/ops/case/:id`) - Deep dive into individual cases
 
-**Architecture:** Schema-first approach - add lead_id foreign keys and filing status fields, then build API endpoints, then frontend components. TDD where possible.
+**Architecture:** Schema-first approach:
+1. Add lead_id foreign keys for traceability
+2. Add client_activities table for unified timeline
+3. Build API endpoints
+4. Build frontend components and pages
 
 **Tech Stack:** Drizzle ORM, PostgreSQL, Express, React, TanStack Query, Tailwind CSS, shadcn/ui
+
+---
+
+## Task 0: Add client_activities Table for Unified Timeline
+
+**Files:**
+- Modify: `shared/schema.ts`
+
+**Step 1: Add ACTIVITY_TYPES constant**
+
+Add after existing constants (around line 75):
+
+```typescript
+export const ACTIVITY_TYPES = {
+  STATUS_CHANGE: 'status_change',
+  NOTE_ADDED: 'note_added',
+  DOCUMENT_UPLOADED: 'document_uploaded',
+  DOCUMENT_REQUESTED: 'document_requested',
+  FILING_UPDATE: 'filing_update',
+  PAYMENT_RECEIVED: 'payment_received',
+  PAYMENT_FAILED: 'payment_failed',
+  ASSIGNMENT_CHANGE: 'assignment_change',
+  SLA_UPDATE: 'sla_update',
+  ESCALATION: 'escalation',
+  COMMUNICATION: 'communication',
+  CASE_CREATED: 'case_created',
+  CASE_COMPLETED: 'case_completed',
+} as const;
+```
+
+**Step 2: Add clientActivities table**
+
+Add after caseNotes table:
+
+```typescript
+// Unified activity timeline for clients - single source of truth
+export const clientActivities = pgTable("client_activities", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(), // FK to business_entities.id
+  serviceRequestId: integer("service_request_id"), // optional, links to specific case
+  activityType: text("activity_type").notNull(), // from ACTIVITY_TYPES
+  title: text("title").notNull(),
+  description: text("description"),
+  oldValue: text("old_value"), // for status changes
+  newValue: text("new_value"), // for status changes
+  metadata: json("metadata"), // flexible additional data
+  performedBy: integer("performed_by"), // user who performed action
+  performedByName: text("performed_by_name"), // denormalized for display
+  isClientVisible: boolean("is_client_visible").default(false),
+  isSystemGenerated: boolean("is_system_generated").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertClientActivitySchema = createInsertSchema(clientActivities).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ClientActivity = typeof clientActivities.$inferSelect;
+export type InsertClientActivity = z.infer<typeof insertClientActivitySchema>;
+```
+
+**Step 3: Verify schema compiles**
+
+Run: `npx tsc --noEmit shared/schema.ts`
+Expected: No errors
+
+**Step 4: Commit**
+
+```bash
+git add shared/schema.ts
+git commit -m "feat(schema): add client_activities table for unified timeline"
+```
 
 ---
 
@@ -1598,11 +1677,750 @@ npm run dev
 3. Test adding a note
 4. Test updating filing status
 
+**Step 4: Commit**
+
+```bash
+git add .
+git commit -m "test: verify case dashboard implementation"
+```
+
+---
+
+## Task 14: Add Client Dashboard API Routes
+
+**Files:**
+- Modify: `server/ops-case-routes.ts`
+
+**Step 1: Add client detail endpoint**
+
+Add to ops-case-routes.ts:
+
+```typescript
+// GET /api/ops/clients/:clientId - Full client detail with all work items
+router.get('/clients/:clientId', requireAuth, requireRole(opsRoles), async (req: Request, res: Response) => {
+  try {
+    const { clientId } = req.params;
+
+    // Fetch client (business entity)
+    const [client] = await db
+      .select()
+      .from(businessEntities)
+      .leftJoin(leads, eq(businessEntities.leadId, leads.id))
+      .where(
+        /^\d+$/.test(clientId)
+          ? eq(businessEntities.id, parseInt(clientId))
+          : eq(businessEntities.clientId, clientId)
+      )
+      .limit(1);
+
+    if (!client) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+
+    // Fetch all service requests for this client
+    const workItems = await db
+      .select()
+      .from(serviceRequests)
+      .where(eq(serviceRequests.businessEntityId, client.business_entities.id))
+      .orderBy(desc(serviceRequests.createdAt));
+
+    // Fetch unified timeline
+    const timeline = await db
+      .select()
+      .from(clientActivities)
+      .where(eq(clientActivities.clientId, client.business_entities.id))
+      .orderBy(desc(clientActivities.createdAt))
+      .limit(50);
+
+    // Calculate summary stats
+    const stats = {
+      totalCases: workItems.length,
+      activeCases: workItems.filter(w => !['completed', 'failed'].includes(w.status)).length,
+      completedCases: workItems.filter(w => w.status === 'completed').length,
+      totalRevenue: workItems.reduce((sum, w) => sum + (w.totalAmount || 0), 0),
+    };
+
+    res.json({
+      client: client.business_entities,
+      lead: client.leads,
+      workItems,
+      timeline,
+      stats,
+    });
+  } catch (error) {
+    console.error('Error fetching client:', error);
+    res.status(500).json({ error: 'Failed to fetch client details' });
+  }
+});
+
+// GET /api/ops/clients/:clientId/timeline - Unified timeline
+router.get('/clients/:clientId/timeline', requireAuth, requireRole(opsRoles), async (req: Request, res: Response) => {
+  try {
+    const { clientId } = req.params;
+    const { limit = 50, offset = 0 } = req.query;
+
+    const timeline = await db
+      .select()
+      .from(clientActivities)
+      .where(eq(clientActivities.clientId, parseInt(clientId)))
+      .orderBy(desc(clientActivities.createdAt))
+      .limit(Number(limit))
+      .offset(Number(offset));
+
+    res.json({ timeline });
+  } catch (error) {
+    console.error('Error fetching timeline:', error);
+    res.status(500).json({ error: 'Failed to fetch timeline' });
+  }
+});
+
+// POST /api/ops/clients/:clientId/activities - Log activity
+router.post('/clients/:clientId/activities', requireAuth, requireRole(opsRoles), async (req: Request, res: Response) => {
+  try {
+    const { clientId } = req.params;
+    const { activityType, title, description, serviceRequestId, isClientVisible, metadata } = req.body;
+    const user = (req as any).user;
+
+    const [activity] = await db
+      .insert(clientActivities)
+      .values({
+        clientId: parseInt(clientId),
+        serviceRequestId,
+        activityType,
+        title,
+        description,
+        performedBy: user?.id,
+        performedByName: user?.fullName || user?.username,
+        isClientVisible: isClientVisible || false,
+        metadata,
+      })
+      .returning();
+
+    res.status(201).json(activity);
+  } catch (error) {
+    console.error('Error logging activity:', error);
+    res.status(500).json({ error: 'Failed to log activity' });
+  }
+});
+```
+
+**Step 2: Commit**
+
+```bash
+git add server/ops-case-routes.ts
+git commit -m "feat(api): add client dashboard routes with unified timeline"
+```
+
+---
+
+## Task 15: Create WorkItemsTable Component
+
+**Files:**
+- Create: `client/src/components/ops/WorkItemsTable.tsx`
+
+**Step 1: Create the component**
+
+```typescript
+import { Link } from 'wouter';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { ExternalLink, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
+interface WorkItem {
+  id: number;
+  requestId: string;
+  serviceId: string;
+  status: string;
+  priority: string;
+  filingStage?: string;
+  totalAmount?: number;
+  slaDeadline?: string;
+  createdAt: string;
+}
+
+interface WorkItemsTableProps {
+  items: WorkItem[];
+  showClientColumn?: boolean;
+}
+
+export function WorkItemsTable({ items, showClientColumn = false }: WorkItemsTableProps) {
+  const getStatusBadge = (status: string) => {
+    const colors: Record<string, string> = {
+      initiated: 'bg-blue-100 text-blue-700',
+      docs_uploaded: 'bg-purple-100 text-purple-700',
+      in_progress: 'bg-yellow-100 text-yellow-700',
+      qc_review: 'bg-orange-100 text-orange-700',
+      completed: 'bg-green-100 text-green-700',
+      on_hold: 'bg-gray-100 text-gray-700',
+      failed: 'bg-red-100 text-red-700',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-700';
+  };
+
+  const getPriorityBadge = (priority: string) => {
+    const colors: Record<string, string> = {
+      urgent: 'bg-red-500 text-white',
+      high: 'bg-orange-500 text-white',
+      medium: 'bg-blue-500 text-white',
+      low: 'bg-gray-500 text-white',
+    };
+    return colors[priority] || 'bg-gray-500 text-white';
+  };
+
+  const getSlaIndicator = (deadline?: string) => {
+    if (!deadline) return null;
+    const hours = (new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60);
+    if (hours < 0) return <AlertTriangle className="h-4 w-4 text-red-500" />;
+    if (hours < 24) return <Clock className="h-4 w-4 text-orange-500" />;
+    return <CheckCircle className="h-4 w-4 text-green-500" />;
+  };
+
+  const formatService = (serviceId: string) => {
+    return serviceId
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  };
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Case ID</TableHead>
+          <TableHead>Service</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Filing</TableHead>
+          <TableHead>Priority</TableHead>
+          <TableHead>SLA</TableHead>
+          <TableHead>Amount</TableHead>
+          <TableHead>Created</TableHead>
+          <TableHead></TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {items.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+              No work items found
+            </TableCell>
+          </TableRow>
+        ) : (
+          items.map((item) => (
+            <TableRow key={item.id}>
+              <TableCell className="font-mono text-sm">
+                {item.requestId || `#${item.id}`}
+              </TableCell>
+              <TableCell>{formatService(item.serviceId)}</TableCell>
+              <TableCell>
+                <Badge className={getStatusBadge(item.status)}>
+                  {item.status.replace(/_/g, ' ')}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline" className="text-xs">
+                  {(item.filingStage || 'not_filed').replace(/_/g, ' ')}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <Badge className={getPriorityBadge(item.priority)}>
+                  {item.priority}
+                </Badge>
+              </TableCell>
+              <TableCell>{getSlaIndicator(item.slaDeadline)}</TableCell>
+              <TableCell>
+                {item.totalAmount ? `₹${item.totalAmount.toLocaleString()}` : '-'}
+              </TableCell>
+              <TableCell className="text-sm text-gray-500">
+                {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+              </TableCell>
+              <TableCell>
+                <Link href={`/ops/case/${item.id}`}>
+                  <Button variant="ghost" size="sm">
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </TableCell>
+            </TableRow>
+          ))
+        )}
+      </TableBody>
+    </Table>
+  );
+}
+```
+
+**Step 2: Commit**
+
+```bash
+git add client/src/components/ops/WorkItemsTable.tsx
+git commit -m "feat(ui): add WorkItemsTable component"
+```
+
+---
+
+## Task 16: Create UnifiedTimeline Component
+
+**Files:**
+- Create: `client/src/components/ops/UnifiedTimeline.tsx`
+
+**Step 1: Create the component**
+
+```typescript
+import { Badge } from '@/components/ui/badge';
+import {
+  FileText,
+  MessageSquare,
+  Upload,
+  CreditCard,
+  UserPlus,
+  Clock,
+  AlertTriangle,
+  CheckCircle,
+  Send,
+  Bell
+} from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
+interface Activity {
+  id: number;
+  activityType: string;
+  title: string;
+  description?: string;
+  serviceRequestId?: number;
+  performedByName?: string;
+  isClientVisible?: boolean;
+  createdAt: string;
+  metadata?: Record<string, any>;
+}
+
+interface UnifiedTimelineProps {
+  activities: Activity[];
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+}
+
+const activityIcons: Record<string, any> = {
+  status_change: Clock,
+  note_added: MessageSquare,
+  document_uploaded: Upload,
+  document_requested: FileText,
+  filing_update: Send,
+  payment_received: CreditCard,
+  payment_failed: AlertTriangle,
+  assignment_change: UserPlus,
+  sla_update: Clock,
+  escalation: AlertTriangle,
+  communication: Bell,
+  case_created: FileText,
+  case_completed: CheckCircle,
+};
+
+const activityColors: Record<string, string> = {
+  status_change: 'bg-blue-100 text-blue-600',
+  note_added: 'bg-purple-100 text-purple-600',
+  document_uploaded: 'bg-green-100 text-green-600',
+  document_requested: 'bg-yellow-100 text-yellow-600',
+  filing_update: 'bg-indigo-100 text-indigo-600',
+  payment_received: 'bg-green-100 text-green-600',
+  payment_failed: 'bg-red-100 text-red-600',
+  assignment_change: 'bg-cyan-100 text-cyan-600',
+  sla_update: 'bg-orange-100 text-orange-600',
+  escalation: 'bg-red-100 text-red-600',
+  communication: 'bg-blue-100 text-blue-600',
+  case_created: 'bg-blue-100 text-blue-600',
+  case_completed: 'bg-green-100 text-green-600',
+};
+
+export function UnifiedTimeline({ activities, onLoadMore, hasMore }: UnifiedTimelineProps) {
+  if (activities.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+        <p className="text-sm">No activity yet</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {activities.map((activity, index) => {
+        const Icon = activityIcons[activity.activityType] || Clock;
+        const colorClass = activityColors[activity.activityType] || 'bg-gray-100 text-gray-600';
+
+        return (
+          <div key={activity.id} className="flex gap-3">
+            {/* Timeline line */}
+            <div className="flex flex-col items-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${colorClass}`}>
+                <Icon className="h-4 w-4" />
+              </div>
+              {index < activities.length - 1 && (
+                <div className="w-0.5 flex-1 bg-gray-200 mt-2" />
+              )}
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 pb-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-medium text-sm">{activity.title}</p>
+                  {activity.description && (
+                    <p className="text-sm text-gray-600 mt-1">{activity.description}</p>
+                  )}
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-gray-500">
+                      {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
+                    </span>
+                    {activity.performedByName && (
+                      <>
+                        <span className="text-xs text-gray-400">•</span>
+                        <span className="text-xs text-gray-500">{activity.performedByName}</span>
+                      </>
+                    )}
+                    {activity.serviceRequestId && (
+                      <>
+                        <span className="text-xs text-gray-400">•</span>
+                        <Badge variant="outline" className="text-xs">
+                          Case #{activity.serviceRequestId}
+                        </Badge>
+                      </>
+                    )}
+                  </div>
+                </div>
+                {activity.isClientVisible && (
+                  <Badge variant="secondary" className="text-xs">
+                    Client Visible
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {hasMore && onLoadMore && (
+        <button
+          onClick={onLoadMore}
+          className="w-full py-2 text-sm text-blue-600 hover:text-blue-800"
+        >
+          Load more activities
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+**Step 2: Commit**
+
+```bash
+git add client/src/components/ops/UnifiedTimeline.tsx
+git commit -m "feat(ui): add UnifiedTimeline component"
+```
+
+---
+
+## Task 17: Create ClientDashboard Page
+
+**Files:**
+- Create: `client/src/pages/ops/ClientDashboard.tsx`
+
+**Step 1: Create the page**
+
+```typescript
+import { useRoute, Link } from 'wouter';
+import { useQuery } from '@tanstack/react-query';
+import { DashboardLayout } from '@/layouts';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { apiRequest } from '@/lib/queryClient';
+import {
+  ArrowLeft,
+  Building2,
+  FileText,
+  Clock,
+  DollarSign,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+  TrendingUp,
+  Mail,
+  Phone,
+} from 'lucide-react';
+import { WorkItemsTable } from '@/components/ops/WorkItemsTable';
+import { UnifiedTimeline } from '@/components/ops/UnifiedTimeline';
+
+export default function ClientDashboard() {
+  const [, params] = useRoute('/ops/client/:clientId');
+  const clientId = params?.clientId;
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['ops-client', clientId],
+    queryFn: () => apiRequest('GET', `/api/ops/clients/${clientId}`),
+    enabled: !!clientId,
+  });
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+          <AlertCircle className="h-12 w-12 text-red-500" />
+          <h2 className="text-lg font-semibold">Client Not Found</h2>
+          <Link href="/operations/work-queue">
+            <Button>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Work Queue
+            </Button>
+          </Link>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const { client, lead, workItems, timeline, stats } = data;
+
+  return (
+    <DashboardLayout>
+      {/* Header */}
+      <div className="bg-white border-b sticky top-0 z-10 -mx-4 -mt-4 px-4 lg:-mx-6 lg:px-6 mb-6">
+        <div className="py-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <Link href="/operations/work-queue">
+                <Button variant="ghost" size="sm">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+              </Link>
+              <div>
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-gray-400" />
+                  <h1 className="text-xl font-bold">{client.name}</h1>
+                  <Badge variant="outline" className="font-mono">
+                    {client.clientId}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-4 text-sm text-gray-500 mt-1">
+                  {client.contactEmail && (
+                    <span className="flex items-center gap-1">
+                      <Mail className="h-3 w-3" />
+                      {client.contactEmail}
+                    </span>
+                  )}
+                  {client.contactPhone && (
+                    <span className="flex items-center gap-1">
+                      <Phone className="h-3 w-3" />
+                      {client.contactPhone}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm">
+                Edit Client
+              </Button>
+              <Button size="sm">
+                New Service Request
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Total Cases</p>
+                <p className="text-2xl font-bold">{stats.totalCases}</p>
+              </div>
+              <FileText className="h-8 w-8 text-gray-300" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Active</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.activeCases}</p>
+              </div>
+              <Clock className="h-8 w-8 text-blue-200" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Completed</p>
+                <p className="text-2xl font-bold text-green-600">{stats.completedCases}</p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-green-200" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Revenue</p>
+                <p className="text-2xl font-bold">₹{stats.totalRevenue.toLocaleString()}</p>
+              </div>
+              <DollarSign className="h-8 w-8 text-gray-300" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Lead Attribution */}
+      {lead && (
+        <Card className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <TrendingUp className="h-5 w-5 text-blue-600" />
+                <div>
+                  <p className="text-sm font-medium text-blue-900">Lead Attribution</p>
+                  <p className="text-xs text-blue-600">
+                    Source: {lead.leadSource} • Lead ID: {lead.leadId}
+                    {lead.convertedAt && ` • Converted: ${new Date(lead.convertedAt).toLocaleDateString()}`}
+                  </p>
+                </div>
+              </div>
+              <Badge className="bg-blue-100 text-blue-700">
+                {lead.leadStage || 'Converted'}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Main Content */}
+      <Card>
+        <Tabs defaultValue="cases">
+          <CardHeader className="pb-0">
+            <TabsList>
+              <TabsTrigger value="cases">
+                Work Items ({workItems.length})
+              </TabsTrigger>
+              <TabsTrigger value="timeline">
+                Timeline
+              </TabsTrigger>
+              <TabsTrigger value="documents">
+                Documents
+              </TabsTrigger>
+            </TabsList>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <TabsContent value="cases" className="mt-0">
+              <WorkItemsTable items={workItems} />
+            </TabsContent>
+            <TabsContent value="timeline" className="mt-0">
+              <UnifiedTimeline activities={timeline} />
+            </TabsContent>
+            <TabsContent value="documents" className="mt-0">
+              <div className="text-center py-8 text-gray-500">
+                <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Documents view coming soon</p>
+              </div>
+            </TabsContent>
+          </CardContent>
+        </Tabs>
+      </Card>
+    </DashboardLayout>
+  );
+}
+```
+
+**Step 2: Add route to App.tsx**
+
+```typescript
+import ClientDashboard from '@/pages/ops/ClientDashboard';
+
+// Add route
+<Route path="/ops/client/:clientId" component={ClientDashboard} />
+```
+
+**Step 3: Update component exports**
+
+In `client/src/components/ops/index.ts`:
+
+```typescript
+export { FilingStatusCard } from './FilingStatusCard';
+export { ClientInfoCard } from './ClientInfoCard';
+export { SlaCard } from './SlaCard';
+export { InternalNotesTab } from './InternalNotesTab';
+export { WorkItemsTable } from './WorkItemsTable';
+export { UnifiedTimeline } from './UnifiedTimeline';
+```
+
+**Step 4: Commit**
+
+```bash
+git add client/src/pages/ops/ClientDashboard.tsx client/src/components/ops/index.ts client/src/App.tsx
+git commit -m "feat(ui): add ClientDashboard page with unified timeline"
+```
+
+---
+
+## Task 18: Final Integration and Test
+
+**Step 1: Update CaseDashboard to link to ClientDashboard**
+
+In CaseDashboard.tsx, add link in ClientInfoCard area:
+
+```typescript
+<Link href={`/ops/client/${caseData.businessEntityId}`}>
+  <Button variant="link" size="sm">View All Client Cases</Button>
+</Link>
+```
+
+**Step 2: Run migration**
+
+```bash
+npx drizzle-kit push
+# Or: psql $DATABASE_URL < server/migrations/007_lead_traceability_and_case_notes.sql
+```
+
+**Step 3: Test both dashboards**
+
+1. Navigate to `/ops/client/1` - verify client dashboard loads
+2. Click on a case - verify it opens case dashboard
+3. From case dashboard, click "View All Client Cases" - verify it goes back to client dashboard
+4. Test unified timeline
+5. Test work items table
+
 **Step 4: Final commit**
 
 ```bash
 git add .
-git commit -m "feat: complete ops case dashboard implementation"
+git commit -m "feat: complete client + case dashboard integration"
 ```
 
 ---
@@ -1611,10 +2429,11 @@ git commit -m "feat: complete ops case dashboard implementation"
 
 | Task | Description | Files |
 |------|-------------|-------|
+| 0 | Add client_activities table | shared/schema.ts |
 | 1 | Add lead_id fields to schema | shared/schema.ts |
 | 2 | Add case_notes table | shared/schema.ts |
 | 3 | Create database migration | server/migrations/007_*.sql |
-| 4 | Create API routes | server/ops-case-routes.ts |
+| 4 | Create Case API routes | server/ops-case-routes.ts |
 | 5 | Create component directories | client/src/components/ops/, pages/ops/ |
 | 6 | Create FilingStatusCard | components/ops/FilingStatusCard.tsx |
 | 7 | Create ClientInfoCard | components/ops/ClientInfoCard.tsx |
@@ -1623,6 +2442,11 @@ git commit -m "feat: complete ops case dashboard implementation"
 | 10 | Create CaseDashboard page | pages/ops/CaseDashboard.tsx |
 | 11 | Update exports and routes | index.ts, App.tsx |
 | 12 | Update lead conversion | leads-routes.ts |
-| 13 | Run migration and test | - |
+| 13 | Test case dashboard | - |
+| 14 | Add Client API routes | server/ops-case-routes.ts |
+| 15 | Create WorkItemsTable | components/ops/WorkItemsTable.tsx |
+| 16 | Create UnifiedTimeline | components/ops/UnifiedTimeline.tsx |
+| 17 | Create ClientDashboard | pages/ops/ClientDashboard.tsx |
+| 18 | Final integration | - |
 
-**Total estimated commits:** 13
+**Total estimated commits:** 18
