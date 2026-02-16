@@ -3,6 +3,8 @@
  * Runs before each test file
  */
 
+import { jest } from '@jest/globals';
+
 // Set test environment
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgresql://test:test@localhost:5432/comply_flow_test';

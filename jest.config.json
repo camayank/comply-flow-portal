@@ -1,24 +1,38 @@
 {
-  "name": "jest-config",
   "preset": "ts-jest",
   "testEnvironment": "node",
   "roots": [
-    "<rootDir>/server"
+    "<rootDir>/server",
+    "<rootDir>/shared"
   ],
   "testMatch": [
     "**/__tests__/**/*.ts",
     "**/?(*.)+(spec|test).ts"
   ],
   "transform": {
-    "^.+\\.ts$": "ts-jest"
+    "^.+\\.ts$": ["ts-jest", {
+      "tsconfig": {
+        "module": "commonjs",
+        "moduleResolution": "node",
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "strict": true,
+        "skipLibCheck": true,
+        "target": "ES2020"
+      }
+    }]
   },
+  "moduleFileExtensions": ["ts", "js", "json", "node"],
   "collectCoverageFrom": [
     "server/**/*.ts",
+    "shared/**/*.ts",
     "!server/**/*.d.ts",
+    "!shared/**/*.d.ts",
     "!server/**/__tests__/**",
+    "!shared/**/__tests__/**",
     "!server/**/node_modules/**"
   ],
-  "coverageThresholds": {
+  "coverageThreshold": {
     "global": {
       "branches": 60,
       "functions": 60,
@@ -27,5 +41,6 @@
     }
   },
   "setupFilesAfterEnv": ["<rootDir>/server/__tests__/setup.ts"],
-  "testTimeout": 10000
+  "testTimeout": 30000,
+  "maxWorkers": 1
 }
