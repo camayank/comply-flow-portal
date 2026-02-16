@@ -13,6 +13,7 @@ import operationsRoutes from './operations';
 import adminRoutes from './admin';
 import paymentRoutes from './payment';
 import complianceStateRoutes from '../compliance-state-routes';
+import monitoringRoutes from '../monitoring/routes';
 // Note: opsCaseRoutes are registered in main server/routes.ts via server/ops-case-routes.ts
 
 /**
@@ -45,6 +46,9 @@ export function registerApiRoutes(app: Express): void {
 
   // Compliance State routes
   app.use(`${API_PREFIX}/compliance-state`, complianceStateRoutes);
+
+  // Monitoring routes (APM, metrics, alerts)
+  app.use(`${API_PREFIX}/monitoring`, monitoringRoutes);
 
   console.log('✅ API v1 routes registered');
 

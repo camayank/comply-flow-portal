@@ -14,6 +14,7 @@ import { createBackwardCompatibilityMiddleware, apiVersionMiddleware } from "./a
 import { deprecationMiddleware, deprecationResponseInterceptor } from "./deprecation-middleware";
 import { sanitizeRequest, globalErrorHandler, trackRequest } from "./robustness-middleware";
 import { jobManager } from "./job-lifecycle-manager";
+import { apmMiddleware } from "./monitoring";
 import './compliance-state-scheduler'; // Auto-start compliance state scheduler
 
 // Validate environment variables on startup
@@ -64,6 +65,9 @@ app.use(express.static('public'));
 // Request logging and correlation
 app.use(requestLogger);
 app.use(attachLogger);
+
+// APM middleware (tracks request metrics for monitoring dashboard)
+app.use(apmMiddleware);
 
 // API Deprecation tracking (adds headers to V1 endpoints)
 app.use(deprecationMiddleware);
