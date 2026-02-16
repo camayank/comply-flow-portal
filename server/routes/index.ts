@@ -13,6 +13,7 @@ import operationsRoutes from './operations';
 import adminRoutes from './admin';
 import paymentRoutes from './payment';
 import complianceStateRoutes from '../compliance-state-routes';
+// Note: opsCaseRoutes are registered in main server/routes.ts via server/ops-case-routes.ts
 
 /**
  * Register all API routes
@@ -33,6 +34,8 @@ export function registerApiRoutes(app: Express): void {
 
   // Operations portal routes
   app.use(`${API_PREFIX}/operations`, operationsRoutes);
+
+  // Note: Ops Case Dashboard routes registered in main server/routes.ts
 
   // Admin portal routes
   app.use(`${API_PREFIX}/admin`, adminRoutes);

@@ -17,149 +17,172 @@ import { UnifiedLayoutProvider } from "@/layouts";
 // Loading component for lazy routes
 const PageLoader = () => <SkeletonPage />;
 
-// Lazy load all pages for code splitting
-const LandingPageV3 = lazy(() => import("@/pages/v3/LandingPage"));
-// REMOVED: UnifiedDashboard - consolidated into RoleBasedDashboard
-// REMOVED: MobileResponsiveLanding - replaced by v3 LandingPage
-const Login = lazy(() => import("./pages/Login"));
-const ClientRegistration = lazy(() => import("./pages/ClientRegistration"));
-const LeadManagement = lazy(() => import("./pages/LeadManagement"));
-const ServiceRequestUI = lazy(() => import("./pages/ServiceRequestUI"));
-const ServiceRequestsHub = lazy(() => import("./pages/ServiceRequestsHub"));
-const ProposalManagement = lazy(() => import("./pages/ProposalManagement"));
-const ReferralDashboard = lazy(() => import("./pages/ReferralDashboard"));
-const AutoComply = lazy(() => import("./pages/AutoComply"));
-const TaxTracker = lazy(() => import("./pages/TaxTracker"));
-const DigiScore = lazy(() => import("./pages/DigiScore"));
-const TaskManagement = lazy(() => import("./pages/TaskManagement"));
-const AiDocumentPreparation = lazy(() => import("./pages/AiDocumentPreparation"));
+// ============================================================
+// LAZY IMPORTS - Organized by Feature Domain
+// ============================================================
+
+// --- Shared / Public Pages ---
+const LandingPageV3 = lazy(() => import("@/features/shared/pages/LandingPage"));
+const NotFound = lazy(() => import("@/features/shared/pages/NotFound"));
+const DevHub = lazy(() => import("@/features/shared/pages/DevHub"));
+const TaskManagement = lazy(() => import("@/features/shared/pages/TaskManagement"));
+const AiDocumentPreparation = lazy(() => import("@/features/shared/pages/AiDocumentPreparation"));
+const PlatformDemo = lazy(() => import("@/features/shared/pages/PlatformDemo"));
+const PlatformShowcase = lazy(() => import("@/features/shared/pages/PlatformShowcase"));
+const SyncDashboard = lazy(() => import("@/features/shared/pages/SyncDashboard"));
+const SmartSuggestionsEngine = lazy(() => import("@/features/shared/pages/SmartSuggestions"));
+const WhatsAppOnboarding = lazy(() => import("@/features/shared/pages/WhatsAppOnboarding"));
+const KnowledgeBase = lazy(() => import("@/features/shared/pages/KnowledgeBase"));
 const DesignSystemShowcase = lazy(() => import("./components/DesignSystemShowcase"));
-// DEPRECATED: LandingPage - replaced by v3 LandingPage
-// const LandingPage = lazy(() => import("./pages/LandingPage"));
-const OnboardingFlow = lazy(() => import("./pages/OnboardingFlow"));
-const PlatformDemo = lazy(() => import("./pages/PlatformDemo"));
-// DEPRECATED: Consolidated into SmartStart
-// const Onboarding = lazy(() => import("./pages/Onboarding"));
-const BusinessType = lazy(() => import("./pages/BusinessType"));
-const PackageSelection = lazy(() => import("./pages/PackageSelection"));
-const FounderDetails = lazy(() => import("./pages/FounderDetails"));
-const IndustryClassification = lazy(() => import("./pages/IndustryClassification"));
-// DEPRECATED: ServiceSelection - no longer used
-const ServiceFlowDashboard = lazy(() => import("./pages/ServiceFlowDashboard"));
-const DocumentUpload = lazy(() => import("./pages/DocumentUpload"));
-const ESignAgreements = lazy(() => import("./pages/ESignAgreements"));
-const PaymentGateway = lazy(() => import("./pages/PaymentGateway"));
-// REMOVED: ComplianceTracker - consolidated into ComplianceTrackerDashboard
-const Confirmation = lazy(() => import("./pages/Confirmation"));
-// DEPRECATED: AdminPanel, MobileOperationsPanel, MobileAdminPanel - Using refactored versions instead
-const SyncDashboard = lazy(() => import("./pages/SyncDashboard"));
-const PlatformShowcase = lazy(() => import("./pages/PlatformShowcase"));
-const ComplianceTrackerDashboard = lazy(() => import("./pages/ComplianceTrackerDashboard"));
-const RetainershipPlans = lazy(() => import("./pages/RetainershipPlans"));
-const SmartSuggestionsEngine = lazy(() => import("./pages/SmartSuggestionsEngine"));
-const DocumentVault = lazy(() => import("./pages/DocumentVault"));
-// REMOVED: SmartStart, StreamlinedOnboarding - consolidated into OnboardingFlow
-const WhatsAppOnboarding = lazy(() => import("./pages/WhatsAppOnboarding"));
-const ComplianceScorecard = lazy(() => import("./pages/ComplianceScorecard"));
-const ClientServiceCatalog = lazy(() => import("./pages/ClientServiceCatalog"));
-const ServiceRequestCreate = lazy(() => import("./pages/ServiceRequestCreate"));
-const ServiceRequestDetail = lazy(() => import("./pages/ServiceRequestDetail"));
-const ClientComplianceCalendar = lazy(() => import("./pages/ClientComplianceCalendar"));
-const ClientProfile = lazy(() => import("./pages/ClientProfile"));
-// DEPRECATED: OperationsPanel - Using MobileOperationsPanelRefactored instead
-// DEPRECATED: AgentPortal - Consolidated into MobileAgentPortal
-const MobileAgentPortal = lazy(() => import("./pages/MobileAgentPortal"));
-const MasterBlueprintDashboard = lazy(() => import("./pages/MasterBlueprintDashboard"));
-// DEPRECATED: UniversalAdminPanel, UniversalOperationsPanel - Merged into refactored panels
-// DEPRECATED: UniversalLandingPage - replaced by v3 LandingPage
-const WorkflowImport = lazy(() => import("./pages/WorkflowImport"));
-const AdminServiceConfig = lazy(() => import("./pages/AdminServiceConfig"));
-const StatusManagement = lazy(() => import("./pages/StatusManagement"));
-const OperationsWorkQueue = lazy(() => import("./pages/OperationsWorkQueue"));
-const OperationsDocumentReview = lazy(() => import("./pages/OperationsDocumentReview"));
-const ClientServicesDashboard = lazy(() => import("./pages/ClientServicesDashboard"));
-const ServiceCatalogBrowser = lazy(() => import("./pages/ServiceCatalogBrowser"));
-const AdminServicesOverview = lazy(() => import("./pages/AdminServicesOverview"));
-const RoleBasedDashboard = lazy(() => import("./pages/RoleBasedDashboard"));
-const LeadPipeline = lazy(() => import("./pages/LeadPipeline"));
-const ConfigurationManager = lazy(() => import("./pages/ConfigurationManager"));
-const ComplianceManagementDashboard = lazy(() => import("./pages/ComplianceManagementDashboard"));
-const PreSalesManager = lazy(() => import("./pages/PreSalesManager"));
-const QCDashboard = lazy(() => import("./pages/QCDashboard"));
-const QCDeliveryHandoff = lazy(() => import("./pages/QCDeliveryHandoff"));
-const QualityMetricsDashboard = lazy(() => import("./pages/QualityMetricsDashboard"));
-const AccountIndex = lazy(() => import("./pages/portal-v2/AccountIndex"));
-const AccountBusinesses = lazy(() => import("./pages/portal-v2/AccountBusinesses"));
-const AccountBilling = lazy(() => import("./pages/portal-v2/AccountBilling"));
-const AccountDocuments = lazy(() => import("./pages/portal-v2/AccountDocuments"));
-const AccountSecurity = lazy(() => import("./pages/portal-v2/AccountSecurity"));
-const AccountNotifications = lazy(() => import("./pages/portal-v2/AccountNotifications"));
-const WebhookManagement = lazy(() => import("./pages/admin/WebhookManagement"));
-const APIKeyManagement = lazy(() => import("./pages/admin/APIKeyManagement"));
-const DeliveryConfirmation = lazy(() => import("./pages/DeliveryConfirmation"));
-const HRDashboard = lazy(() => import("./pages/HRDashboard"));
-const ClientMasterDashboard = lazy(() => import("./pages/ClientMasterDashboard"));
-const FinancialManagementDashboard = lazy(() => import("./pages/FinancialManagementDashboard"));
-const ExecutiveDashboard = lazy(() => import("./pages/ExecutiveDashboard"));
-const BusinessIntelligence = lazy(() => import("./pages/BusinessIntelligence"));
-// DEPRECATED: Consolidated into ClientDashboardV3
-// const MobileDashboard = lazy(() => import("./pages/MobileDashboard"));
-const AgentDashboard = lazy(() => import("./pages/AgentDashboard"));
-const AgentLeadManagement = lazy(() => import("./pages/AgentLeadManagement"));
-const AgentCommissionTracker = lazy(() => import("./pages/AgentCommissionTracker"));
-const AgentPerformance = lazy(() => import("./pages/AgentPerformance"));
-const AgentProfileSettings = lazy(() => import("./pages/AgentProfileSettings"));
-const CustomerServiceDashboard = lazy(() => import("./pages/CustomerServiceDashboard"));
-const ClientSupport = lazy(() => import("./pages/ClientSupport"));
-// REMOVED: SuperAdminPortal - replaced by v3 SuperAdminDashboard
-const SuperAdminDashboardV3 = lazy(() => import("@/pages/v3/super-admin/SuperAdminDashboard"));
-const TenantManagement = lazy(() => import("./pages/super-admin/TenantManagement"));
-const PricingEngine = lazy(() => import("./pages/super-admin/PricingEngine"));
-const CommissionConfig = lazy(() => import("./pages/super-admin/CommissionConfig"));
-const SecurityCenter = lazy(() => import("./pages/super-admin/SecurityCenter"));
-const Operations = lazy(() => import("./pages/super-admin/Operations"));
-const Analytics = lazy(() => import("./pages/super-admin/Analytics"));
-const SuperAdminServices = lazy(() => import("./pages/super-admin/SuperAdminServices"));
-const RoleSelection = lazy(() => import("./pages/RoleSelection"));
-const LifecycleDashboard = lazy(() => import("./pages/LifecycleDashboard"));
-const ComplianceDetail = lazy(() => import("./pages/ComplianceDetail"));
-const ServicesDetail = lazy(() => import("./pages/ServicesDetail"));
-const DocumentsDetail = lazy(() => import("./pages/DocumentsDetail"));
-const FundingDetail = lazy(() => import("./pages/FundingDetail"));
-const Timeline = lazy(() => import("./pages/Timeline"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const BulkUploadCenter = lazy(() => import("./pages/BulkUploadCenter"));
 const DigiComplyWorkflowDashboard = lazy(() => import("./components/DigiComplyWorkflowDashboard"));
-const FounderLiteDashboard = lazy(() => import("./pages/FounderLiteDashboard"));
-const MobileClientPortalRefactored = lazy(() => import("./pages/MobileClientPortalRefactored"));
-const ClientDashboardV3 = lazy(() => import("@/pages/v3/client/ClientDashboard"));
-const MobileOperationsPanelRefactored = lazy(() => import("./pages/MobileOperationsPanelRefactored"));
-const MobileAdminPanelRefactored = lazy(() => import("./pages/MobileAdminPanelRefactored"));
-// REMOVED: SalesProposalManagerRefactored - consolidated into ProposalManagement
-const DevHub = lazy(() => import("./pages/DevHub"));
-const PlaybookManagement = lazy(() => import("./pages/customer-success/PlaybookManagement"));
-const RenewalPipeline = lazy(() => import("./pages/customer-success/RenewalPipeline"));
-const SalesDashboard = lazy(() => import("./pages/sales/SalesDashboard"));
-const AuditLogViewer = lazy(() => import("./pages/compliance/AuditLogViewer"));
-const DataDeletionRequests = lazy(() => import("./pages/compliance/DataDeletionRequests"));
-const AccessReviews = lazy(() => import("./pages/admin/AccessReviews"));
-const BlueprintManagement = lazy(() => import("./pages/admin/BlueprintManagement"));
-const AdminDashboardV3 = lazy(() => import("@/pages/v3/admin/AdminDashboard"));
-const AdminUserManagement = lazy(() => import("./pages/admin/AdminUserManagement"));
-const AdminReports = lazy(() => import("./pages/admin/AdminReports"));
-const SecurityIncidents = lazy(() => import("./pages/security/SecurityIncidents"));
-const EscalationDashboard = lazy(() => import("./pages/operations/EscalationDashboard"));
-const NotificationCenter = lazy(() => import("./pages/notifications/NotificationCenter"));
-const MessageCenter = lazy(() => import("./pages/messaging/MessageCenter"));
-const CommissionDisputes = lazy(() => import("./pages/agent/CommissionDisputes"));
-const AgentKYC = lazy(() => import("./pages/agent/AgentKYC"));
-const ComplianceAlertPreferences = lazy(() => import("./pages/client/ComplianceAlertPreferences"));
-const ExecutiveSummary = lazy(() => import("./pages/ExecutiveSummary"));
-const OpsCaseDashboard = lazy(() => import("./pages/ops/CaseDashboard"));
-const OpsClientDashboard = lazy(() => import("./pages/ops/ClientDashboard"));
-const OpsTeamAssignment = lazy(() => import("./pages/ops/TeamAssignmentDashboard"));
-const OpsPerformanceMetrics = lazy(() => import("./pages/ops/PerformanceMetricsDashboard"));
-const OpsClientCommunicationHub = lazy(() => import("./pages/ops/ClientCommunicationHub"));
+
+// --- Auth Pages ---
+const Login = lazy(() => import("@/features/auth/pages/Login"));
+const RoleSelection = lazy(() => import("@/features/auth/pages/RoleSelection"));
+const RoleBasedDashboard = lazy(() => import("@/features/auth/pages/RoleBasedDashboard"));
+
+// --- Onboarding Pages ---
+const ClientRegistration = lazy(() => import("@/features/onboarding/pages/Registration"));
+const OnboardingFlow = lazy(() => import("@/features/onboarding/pages/OnboardingFlow"));
+const BusinessType = lazy(() => import("@/features/onboarding/pages/BusinessType"));
+const PackageSelection = lazy(() => import("@/features/onboarding/pages/PackageSelection"));
+const FounderDetails = lazy(() => import("@/features/onboarding/pages/FounderDetails"));
+const IndustryClassification = lazy(() => import("@/features/onboarding/pages/IndustryClassification"));
+const ServiceFlowDashboard = lazy(() => import("@/features/onboarding/pages/ServiceFlow"));
+const DocumentUpload = lazy(() => import("@/features/onboarding/pages/DocumentUpload"));
+const ESignAgreements = lazy(() => import("@/features/onboarding/pages/ESignAgreements"));
+const PaymentGateway = lazy(() => import("@/features/onboarding/pages/PaymentGateway"));
+const Confirmation = lazy(() => import("@/features/onboarding/pages/Confirmation"));
+
+// --- Client Portal Pages ---
+const MobileClientPortalRefactored = lazy(() => import("@/features/client-portal/pages/Dashboard"));
+const ClientDashboardV3 = lazy(() => import("@/features/client-portal/pages/DashboardV3"));
+const ClientServicesDashboard = lazy(() => import("@/features/client-portal/pages/MyServices"));
+const ClientServiceCatalog = lazy(() => import("@/features/client-portal/pages/ServiceCatalog"));
+const ServiceCatalogBrowser = lazy(() => import("@/features/client-portal/pages/ServiceCatalogAlt"));
+const ServiceRequestUI = lazy(() => import("@/features/client-portal/pages/ServiceRequestUI"));
+const ServiceRequestsHub = lazy(() => import("@/features/client-portal/pages/ServiceRequestsHub"));
+const ServiceRequestCreate = lazy(() => import("@/features/client-portal/pages/ServiceRequestCreate"));
+const ServiceRequestDetail = lazy(() => import("@/features/client-portal/pages/ServiceRequestDetail"));
+const ClientComplianceCalendar = lazy(() => import("@/features/client-portal/pages/ComplianceCalendar"));
+const ClientProfile = lazy(() => import("@/features/client-portal/pages/Profile"));
+const DocumentVault = lazy(() => import("@/features/client-portal/pages/DocumentVault"));
+const ReferralDashboard = lazy(() => import("@/features/client-portal/pages/Referrals"));
+const RetainershipPlans = lazy(() => import("@/features/client-portal/pages/RetainershipPlans"));
+const LifecycleDashboard = lazy(() => import("@/features/client-portal/pages/LifecycleDashboard"));
+const ComplianceDetail = lazy(() => import("@/features/compliance/pages/Detail"));
+const ServicesDetail = lazy(() => import("@/features/client-portal/pages/ServicesDetail"));
+const DocumentsDetail = lazy(() => import("@/features/client-portal/pages/DocumentsDetail"));
+const FundingDetail = lazy(() => import("@/features/client-portal/pages/FundingDetail"));
+const Timeline = lazy(() => import("@/features/client-portal/pages/Timeline"));
+const ClientSupport = lazy(() => import("@/features/client-portal/pages/Support"));
+const ComplianceAlertPreferences = lazy(() => import("@/features/client-portal/pages/AlertPreferences"));
+const FounderLiteDashboard = lazy(() => import("@/features/client-portal/pages/FounderLite"));
+
+// --- Client Portal Account Pages ---
+const AccountIndex = lazy(() => import("@/features/client-portal/pages/account/Index"));
+const AccountBusinesses = lazy(() => import("@/features/client-portal/pages/account/Businesses"));
+const AccountBilling = lazy(() => import("@/features/client-portal/pages/account/Billing"));
+const AccountDocuments = lazy(() => import("@/features/client-portal/pages/account/Documents"));
+const AccountSecurity = lazy(() => import("@/features/client-portal/pages/account/Security"));
+const AccountNotifications = lazy(() => import("@/features/client-portal/pages/account/Notifications"));
+
+// --- Compliance Pages ---
+const AutoComply = lazy(() => import("@/features/compliance/pages/AutoComply"));
+const TaxTracker = lazy(() => import("@/features/compliance/pages/TaxTracker"));
+const DigiScore = lazy(() => import("@/features/compliance/pages/DigiScore"));
+const ComplianceTrackerDashboard = lazy(() => import("@/features/compliance/pages/TrackerDashboard"));
+const ComplianceScorecard = lazy(() => import("@/features/compliance/pages/Scorecard"));
+const ComplianceManagementDashboard = lazy(() => import("@/features/compliance/pages/ManagementDashboard"));
+const AuditLogViewer = lazy(() => import("@/features/compliance/pages/AuditLog"));
+const DataDeletionRequests = lazy(() => import("@/features/compliance/pages/DataDeletion"));
+
+// --- Operations Pages ---
+const MobileOperationsPanelRefactored = lazy(() => import("@/features/operations/pages/Dashboard"));
+const OperationsWorkQueue = lazy(() => import("@/features/operations/pages/WorkQueue"));
+const OperationsDocumentReview = lazy(() => import("@/features/operations/pages/DocumentReview"));
+const EscalationDashboard = lazy(() => import("@/features/operations/pages/Escalations"));
+const OpsCaseDashboard = lazy(() => import("@/features/operations/pages/CaseDashboard"));
+const OpsClientDashboard = lazy(() => import("@/features/operations/pages/ClientDashboard"));
+const OpsTeamAssignment = lazy(() => import("@/features/operations/pages/TeamAssignment"));
+const OpsPerformanceMetrics = lazy(() => import("@/features/operations/pages/PerformanceMetrics"));
+const OpsClientCommunicationHub = lazy(() => import("@/features/operations/pages/CommunicationHub"));
+
+// --- Admin Pages ---
+const MobileAdminPanelRefactored = lazy(() => import("@/features/admin/pages/Dashboard"));
+const AdminDashboardV3 = lazy(() => import("@/features/admin/pages/DashboardV3"));
+const AdminUserManagement = lazy(() => import("@/features/admin/pages/UserManagement"));
+const AdminReports = lazy(() => import("@/features/admin/pages/Reports"));
+const AdminServiceConfig = lazy(() => import("@/features/admin/pages/ServiceConfig"));
+const AdminServicesOverview = lazy(() => import("@/features/admin/pages/ServicesOverview"));
+const StatusManagement = lazy(() => import("@/features/admin/pages/StatusManagement"));
+const ConfigurationManager = lazy(() => import("@/features/admin/pages/Configuration"));
+const WorkflowImport = lazy(() => import("@/features/admin/pages/WorkflowImport"));
+const BulkUploadCenter = lazy(() => import("@/features/admin/pages/BulkUpload"));
+const BlueprintManagement = lazy(() => import("@/features/admin/pages/Blueprints"));
+const AccessReviews = lazy(() => import("@/features/admin/pages/AccessReviews"));
+const MasterBlueprintDashboard = lazy(() => import("@/features/admin/pages/MasterBlueprint"));
+const ClientMasterDashboard = lazy(() => import("@/features/admin/pages/ClientMaster"));
+const WebhookManagement = lazy(() => import("@/features/admin/pages/Webhooks"));
+const APIKeyManagement = lazy(() => import("@/features/admin/pages/ApiKeys"));
+
+// --- Super Admin Pages ---
+const SuperAdminDashboardV3 = lazy(() => import("@/features/super-admin/pages/Dashboard"));
+const TenantManagement = lazy(() => import("@/features/super-admin/pages/Tenants"));
+const PricingEngine = lazy(() => import("@/features/super-admin/pages/Pricing"));
+const CommissionConfig = lazy(() => import("@/features/super-admin/pages/Commissions"));
+const SecurityCenter = lazy(() => import("@/features/super-admin/pages/Security"));
+const Operations = lazy(() => import("@/features/super-admin/pages/Operations"));
+const Analytics = lazy(() => import("@/features/super-admin/pages/Analytics"));
+const SuperAdminServices = lazy(() => import("@/features/super-admin/pages/Services"));
+
+// --- Sales Pages ---
+const LeadManagement = lazy(() => import("@/features/sales/pages/LeadManagement"));
+const LeadPipeline = lazy(() => import("@/features/sales/pages/LeadPipeline"));
+const ProposalManagement = lazy(() => import("@/features/sales/pages/Proposals"));
+const PreSalesManager = lazy(() => import("@/features/sales/pages/PreSales"));
+const SalesDashboard = lazy(() => import("@/features/sales/pages/Dashboard"));
+
+// --- Agent Pages ---
+const MobileAgentPortal = lazy(() => import("@/features/agent/pages/Portal"));
+const AgentDashboard = lazy(() => import("@/features/agent/pages/Dashboard"));
+const AgentLeadManagement = lazy(() => import("@/features/agent/pages/LeadManagement"));
+const AgentCommissionTracker = lazy(() => import("@/features/agent/pages/CommissionTracker"));
+const AgentPerformance = lazy(() => import("@/features/agent/pages/Performance"));
+const AgentProfileSettings = lazy(() => import("@/features/agent/pages/ProfileSettings"));
+const CommissionDisputes = lazy(() => import("@/features/agent/pages/Disputes"));
+const AgentKYC = lazy(() => import("@/features/agent/pages/KYC"));
+
+// --- QC Pages ---
+const QCDashboard = lazy(() => import("@/features/qc/pages/Dashboard"));
+const QCDeliveryHandoff = lazy(() => import("@/features/qc/pages/DeliveryHandoff"));
+const QualityMetricsDashboard = lazy(() => import("@/features/qc/pages/Metrics"));
+const DeliveryConfirmation = lazy(() => import("@/features/qc/pages/DeliveryConfirmation"));
+
+// --- Customer Success Pages ---
+const CustomerServiceDashboard = lazy(() => import("@/features/customer-success/pages/Dashboard"));
+const PlaybookManagement = lazy(() => import("@/features/customer-success/pages/Playbooks"));
+const RenewalPipeline = lazy(() => import("@/features/customer-success/pages/Renewals"));
+
+// --- Executive Pages ---
+const ExecutiveDashboard = lazy(() => import("@/features/executive/pages/Dashboard"));
+const BusinessIntelligence = lazy(() => import("@/features/executive/pages/BusinessIntelligence"));
+const ExecutiveSummary = lazy(() => import("@/features/executive/pages/Summary"));
+
+// --- Finance & HR Pages ---
+const FinancialManagementDashboard = lazy(() => import("@/features/finance/pages/Dashboard"));
+const HRDashboard = lazy(() => import("@/features/hr/pages/Dashboard"));
+
+// --- Messaging Pages ---
+const NotificationCenter = lazy(() => import("@/features/messaging/pages/NotificationCenter"));
+const MessageCenter = lazy(() => import("@/features/messaging/pages/MessageCenter"));
+
+// --- Security Pages ---
+const SecurityIncidents = lazy(() => import("@/features/security/pages/Incidents"));
+
+// ============================================================
+// Route Configuration
+// ============================================================
 
 const publicRoutePrefixes = [
   '/',
@@ -255,34 +278,95 @@ const AppContent = () => {
               <main id="main-content" className="flex-grow focus:outline-none" tabIndex={-1}>
                 <Suspense fallback={<PageLoader />}>
                   <Switch>
+                {/* ========== PUBLIC ROUTES ========== */}
                 <Route path="/" component={LandingPageV3} />
                 <Route path="/hub" component={DevHub} />
                 <Route path="/dev" component={DevHub} />
                 <Route path="/landing" component={LandingPageV3} />
-                <Route path="/dashboard" component={RoleBasedDashboard} />
-                <Route path="/my-dashboard" component={RoleBasedDashboard} />
-                <Route path="/role-dashboard" component={RoleBasedDashboard} />
-                <Route path="/select-role" component={RoleSelection} />
-                <Route path="/role-selection" component={RoleSelection} />
                 <Route path="/mobile-landing" component={LandingPageV3} />
+                <Route path="/design-system" component={DesignSystemShowcase} />
+                <Route path="/platform-demo" component={PlatformDemo} />
+                <Route path="/10k" component={ComplianceScorecard} />
+                <Route path="/compliance-scorecard" component={ComplianceScorecard} />
+
+                {/* ========== AUTH ROUTES ========== */}
                 <Route path="/login" component={Login} />
                 <Route path="/signin" component={Login} />
                 <Route path="/register" component={ClientRegistration} />
                 <Route path="/client-registration" component={ClientRegistration} />
                 <Route path="/signup" component={ClientRegistration} />
-                <Route path="/leads" component={LeadManagement} />
-                <Route path="/lead-management" component={LeadManagement} />
-                <Route path="/lead-pipeline" component={LeadPipeline} />
-                <Route path="/pipeline" component={LeadPipeline} />
-                <Route path="/crm" component={LeadPipeline} />
+                <Route path="/select-role" component={RoleSelection} />
+                <Route path="/role-selection" component={RoleSelection} />
+                <Route path="/dashboard" component={RoleBasedDashboard} />
+                <Route path="/my-dashboard" component={RoleBasedDashboard} />
+                <Route path="/role-dashboard" component={RoleBasedDashboard} />
+
+                {/* ========== ONBOARDING ROUTES ========== */}
+                <Route path="/onboarding" component={OnboardingFlow} />
+                <Route path="/onboarding-flow" component={OnboardingFlow} />
+                <Route path="/streamlined-onboarding" component={OnboardingFlow} />
+                <Route path="/smart-start" component={OnboardingFlow} />
+                <Route path="/whatsapp-onboarding" component={WhatsAppOnboarding} />
+                <Route path="/business-type" component={BusinessType} />
+                <Route path="/package-selection" component={PackageSelection} />
+                <Route path="/founder-details" component={FounderDetails} />
+                <Route path="/industry-classification" component={IndustryClassification} />
+                <Route path="/service-flow" component={ServiceFlowDashboard} />
+                <Route path="/documents" component={DocumentUpload} />
+                <Route path="/document-upload" component={DocumentUpload} />
+                <Route path="/esign-agreements" component={ESignAgreements} />
+                <Route path="/payment-gateway" component={PaymentGateway} />
+                <Route path="/confirmation" component={Confirmation} />
+
+                {/* ========== CLIENT PORTAL ROUTES ========== */}
+                <Route path="/portal" component={MobileClientPortalRefactored} />
+                <Route path="/client-portal" component={MobileClientPortalRefactored} />
+                <Route path="/client-portal/entities" component={MobileClientPortalRefactored} />
+                <Route path="/client-portal/services" component={ServiceRequestUI} />
+                <Route path="/client-portal/documents" component={DocumentVault} />
+                <Route path="/portal-v2" component={ClientDashboardV3} />
+                <Route path="/portal-v2/account" component={AccountIndex} />
+                <Route path="/portal-v2/account/businesses" component={AccountBusinesses} />
+                <Route path="/portal-v2/account/billing" component={AccountBilling} />
+                <Route path="/portal-v2/account/documents" component={AccountDocuments} />
+                <Route path="/portal-v2/account/security" component={AccountSecurity} />
+                <Route path="/portal-v2/account/notifications" component={AccountNotifications} />
+                <Route path="/my-services" component={ClientServicesDashboard} />
+                <Route path="/client/services" component={ClientServicesDashboard} />
+                <Route path="/client/alert-preferences" component={ComplianceAlertPreferences} />
+                <Route path="/service-tracker" component={ClientServicesDashboard} />
+                <Route path="/services" component={ClientServiceCatalog} />
+                <Route path="/service-catalog" component={ServiceCatalogBrowser} />
+                <Route path="/browse-services" component={ServiceCatalogBrowser} />
+                <Route path="/service-request/create" component={ServiceRequestCreate} />
+                <Route path="/service-request/:id" component={ServiceRequestDetail} />
                 <Route path="/service-requests" component={ServiceRequestsHub} />
                 <Route path="/requests" component={ServiceRequestsHub} />
                 <Route path="/my-requests" component={ServiceRequestsHub} />
-                <Route path="/proposals" component={ProposalManagement} />
-                <Route path="/proposal-management" component={ProposalManagement} />
+                <Route path="/compliance-calendar" component={ClientComplianceCalendar} />
+                <Route path="/client-profile" component={ClientProfile} />
+                <Route path="/vault" component={DocumentVault} />
                 <Route path="/referrals" component={ReferralDashboard} />
                 <Route path="/referral-dashboard" component={ReferralDashboard} />
                 <Route path="/wallet" component={ReferralDashboard} />
+                <Route path="/retainership" component={RetainershipPlans} />
+                <Route path="/lifecycle" component={LifecycleDashboard} />
+                <Route path="/lifecycle-dashboard" component={LifecycleDashboard} />
+                <Route path="/lifecycle/compliance" component={ComplianceDetail} />
+                <Route path="/lifecycle/services" component={ServicesDetail} />
+                <Route path="/lifecycle/documents" component={DocumentsDetail} />
+                <Route path="/lifecycle/funding" component={FundingDetail} />
+                <Route path="/lifecycle/timeline" component={Timeline} />
+                <Route path="/support" component={ClientSupport} />
+                <Route path="/help" component={ClientSupport} />
+                <Route path="/tickets" component={ClientSupport} />
+                <Route path="/founder" component={FounderLiteDashboard} />
+                <Route path="/compliance-state" component={FounderLiteDashboard} />
+                <Route path="/mobile-dashboard" component={ClientDashboardV3} />
+                <Route path="/mobile" component={ClientDashboardV3} />
+                <Route path="/command-center" component={ClientDashboardV3} />
+
+                {/* ========== COMPLIANCE ROUTES ========== */}
                 <Route path="/autocomply" component={AutoComply} />
                 <Route path="/workflows" component={AutoComply} />
                 <Route path="/automation" component={AutoComply} />
@@ -292,123 +376,20 @@ const AppContent = () => {
                 <Route path="/digiscore" component={DigiScore} />
                 <Route path="/compliance-score" component={DigiScore} />
                 <Route path="/score" component={DigiScore} />
-                <Route path="/tasks" component={TaskManagement} />
-                <Route path="/task-management" component={TaskManagement} />
-                <Route path="/my-tasks" component={TaskManagement} />
-                <Route path="/ai-documents" component={AiDocumentPreparation} />
-                <Route path="/doc-prep" component={AiDocumentPreparation} />
-                <Route path="/document-preparation" component={AiDocumentPreparation} />
-                <Route path="/doc-generator" component={AiDocumentPreparation} />
-                <Route path="/design-system" component={DesignSystemShowcase} />
-                {/* Legacy landing retained for policy pages only */}
-                <Route path="/onboarding-flow" component={OnboardingFlow} />
-                <Route path="/platform-demo" component={PlatformDemo} />
+                <Route path="/tracker" component={ComplianceTrackerDashboard} />
                 <Route path="/compliance-dashboard" component={ComplianceTrackerDashboard} />
-                <Route path="/services" component={ClientServiceCatalog} />
-                <Route path="/service-catalog" component={ClientServiceCatalog} />
-                <Route path="/service-request/create" component={ServiceRequestCreate} />
-                <Route path="/service-request/:id" component={ServiceRequestDetail} />
-                <Route path="/compliance-calendar" component={ClientComplianceCalendar} />
                 <Route path="/compliance-management" component={ComplianceManagementDashboard} />
                 <Route path="/compliance-admin" component={ComplianceManagementDashboard} />
                 <Route path="/compliance-ops" component={ComplianceManagementDashboard} />
-                <Route path="/client-profile" component={ClientProfile} />
-                <Route path="/workflow-dashboard" component={DigiComplyWorkflowDashboard} />
-                <Route path="/smart-start" component={OnboardingFlow} />
-                <Route path="/whatsapp-onboarding" component={WhatsAppOnboarding} />
-                <Route path="/10k" component={ComplianceScorecard} />
-                <Route path="/compliance-scorecard" component={ComplianceScorecard} />
-                <Route path="/lifecycle" component={LifecycleDashboard} />
-                <Route path="/lifecycle-dashboard" component={LifecycleDashboard} />
-                <Route path="/lifecycle/compliance" component={ComplianceDetail} />
-                <Route path="/lifecycle/services" component={ServicesDetail} />
-                <Route path="/lifecycle/documents" component={DocumentsDetail} />
-                <Route path="/lifecycle/funding" component={FundingDetail} />
-                <Route path="/lifecycle/timeline" component={Timeline} />
-                <Route path="/lifecycle/compliance" component={ComplianceDetail} />
-                <Route path="/lifecycle/services" component={ServicesDetail} />
-                <Route path="/portal-v2" component={ClientDashboardV3} />
-                <Route path="/portal-v2/account" component={AccountIndex} />
-                <Route path="/portal-v2/account/businesses" component={AccountBusinesses} />
-                <Route path="/portal-v2/account/billing" component={AccountBilling} />
-                <Route path="/portal-v2/account/documents" component={AccountDocuments} />
-                <Route path="/portal-v2/account/security" component={AccountSecurity} />
-                <Route path="/portal-v2/account/notifications" component={AccountNotifications} />
-
-                {/* Enterprise Admin Routes */}
-                <Route path="/admin/webhooks" component={WebhookManagement} />
-                <Route path="/admin/api-keys" component={APIKeyManagement} />
-                <Route path="/developer/api-keys" component={APIKeyManagement} />
-                <Route path="/admin/clients" component={ClientMasterDashboard} />
-                <Route path="/admin/users" component={AdminUserManagement} />
-                <Route path="/admin/dashboard" component={AdminDashboardV3} />
-                <Route path="/admin/reports" component={AdminReports} />
-                <Route path="/admin/workflow-import" component={WorkflowImport} />
-
-                {/* Customer Success Routes */}
-                <Route path="/customer-success/playbooks" component={PlaybookManagement} />
-                <Route path="/playbooks" component={PlaybookManagement} />
-                <Route path="/customer-success/renewals" component={RenewalPipeline} />
-                <Route path="/renewals" component={RenewalPipeline} />
-                <Route path="/renewal-pipeline" component={RenewalPipeline} />
-
-                {/* Sales Dashboard Routes */}
-                <Route path="/sales" component={SalesDashboard} />
-                <Route path="/sales/dashboard" component={SalesDashboard} />
-                <Route path="/sales/pipeline" component={SalesDashboard} />
-                <Route path="/sales/team" component={SalesDashboard} />
-                <Route path="/sales/forecasts" component={SalesDashboard} />
-                <Route path="/sales/targets" component={SalesDashboard} />
-
-                {/* Audit & Compliance Routes */}
                 <Route path="/compliance/audit-log" component={AuditLogViewer} />
                 <Route path="/audit-log" component={AuditLogViewer} />
                 <Route path="/compliance/data-requests" component={DataDeletionRequests} />
                 <Route path="/data-requests" component={DataDeletionRequests} />
-                <Route path="/admin/access-reviews" component={AccessReviews} />
-                <Route path="/access-reviews" component={AccessReviews} />
-                <Route path="/admin/blueprints" component={BlueprintManagement} />
-                <Route path="/admin/enterprise" component={BlueprintManagement} />
-                <Route path="/enterprise-config" component={BlueprintManagement} />
 
-                {/* Security Incidents Routes */}
-                <Route path="/security/incidents" component={SecurityIncidents} />
-                <Route path="/incidents" component={SecurityIncidents} />
-                <Route path="/security-incidents" component={SecurityIncidents} />
-
-                {/* Escalation Management Routes (Ops Manager) */}
-                <Route path="/escalations" component={EscalationDashboard} />
-                <Route path="/ops/escalations" component={EscalationDashboard} />
-                <Route path="/escalation-dashboard" component={EscalationDashboard} />
-
-                {/* Notification Center (All Roles) */}
-                <Route path="/notifications" component={NotificationCenter} />
-                <Route path="/notification-center" component={NotificationCenter} />
-                <Route path="/alerts" component={NotificationCenter} />
-
-                {/* Messaging Center (Client-Ops Communication) */}
-                <Route path="/messages" component={MessageCenter} />
-                <Route path="/messaging" component={MessageCenter} />
-                <Route path="/conversations" component={MessageCenter} />
-                <Route path="/inbox" component={MessageCenter} />
-
-                <Route path="/portal" component={MobileClientPortalRefactored} />
-                <Route path="/client-portal" component={MobileClientPortalRefactored} />
-                <Route path="/client-portal/entities" component={MobileClientPortalRefactored} />
-                <Route path="/client-portal/services" component={ServiceRequestUI} />
-                <Route path="/client-portal/documents" component={DocumentVault} />
+                {/* ========== OPERATIONS ROUTES ========== */}
                 <Route path="/operations" component={MobileOperationsPanelRefactored} />
                 <Route path="/ops" component={MobileOperationsPanelRefactored} />
                 <Route path="/universal-ops" component={MobileOperationsPanelRefactored} />
-                {/* CONSOLIDATED: /operations-manager merged into /operations */}
-                <Route path="/admin" component={MobileAdminPanelRefactored} />
-                <Route path="/admin-control" component={MobileAdminPanelRefactored} />
-                <Route path="/blueprint" component={MasterBlueprintDashboard} />
-                <Route path="/master-blueprint" component={MasterBlueprintDashboard} />
-                {/* CONSOLIDATED: /universal-admin and /universal-ops merged into /admin and /operations */}
-                <Route path="/admin-config" component={AdminServiceConfig} />
-                <Route path="/status-management" component={StatusManagement} />
-                <Route path="/workflow-statuses" component={StatusManagement} />
                 <Route path="/work-queue" component={OperationsWorkQueue} />
                 <Route path="/ops/work-queue" component={OperationsWorkQueue} />
                 <Route path="/operations/work-queue" component={OperationsWorkQueue} />
@@ -416,6 +397,9 @@ const AppContent = () => {
                 <Route path="/ops/document-review" component={OperationsDocumentReview} />
                 <Route path="/operations/document-review" component={OperationsDocumentReview} />
                 <Route path="/document-review" component={OperationsDocumentReview} />
+                <Route path="/escalations" component={EscalationDashboard} />
+                <Route path="/ops/escalations" component={EscalationDashboard} />
+                <Route path="/escalation-dashboard" component={EscalationDashboard} />
                 <Route path="/ops/case/:id" component={OpsCaseDashboard} />
                 <Route path="/ops/client/:clientId" component={OpsClientDashboard} />
                 <Route path="/ops/team" component={OpsTeamAssignment} />
@@ -425,69 +409,72 @@ const AppContent = () => {
                 <Route path="/ops/communications" component={OpsClientCommunicationHub} />
                 <Route path="/ops/communication-hub" component={OpsClientCommunicationHub} />
 
-                {/* Client Service Tracking */}
-                <Route path="/my-services" component={ClientServicesDashboard} />
-                <Route path="/client/services" component={ClientServicesDashboard} />
-                <Route path="/client/alert-preferences" component={ComplianceAlertPreferences} />
-                <Route path="/service-tracker" component={ClientServicesDashboard} />
-
-                {/* Service Catalog Browser (96+ services) */}
-                <Route path="/service-catalog" component={ServiceCatalogBrowser} />
-                <Route path="/browse-services" component={ServiceCatalogBrowser} />
-
-                {/* Admin Services Management */}
+                {/* ========== ADMIN ROUTES ========== */}
+                <Route path="/admin" component={MobileAdminPanelRefactored} />
+                <Route path="/admin-control" component={MobileAdminPanelRefactored} />
+                <Route path="/admin/dashboard" component={AdminDashboardV3} />
+                <Route path="/admin/users" component={AdminUserManagement} />
+                <Route path="/admin/reports" component={AdminReports} />
                 <Route path="/admin/services" component={AdminServicesOverview} />
                 <Route path="/services-management" component={AdminServicesOverview} />
                 <Route path="/manage-services" component={AdminServicesOverview} />
-
-                {/* Configuration Management */}
+                <Route path="/admin-config" component={AdminServiceConfig} />
+                <Route path="/status-management" component={StatusManagement} />
+                <Route path="/workflow-statuses" component={StatusManagement} />
                 <Route path="/config" component={ConfigurationManager} />
                 <Route path="/configuration" component={ConfigurationManager} />
                 <Route path="/admin/config" component={ConfigurationManager} />
                 <Route path="/settings" component={ConfigurationManager} />
-
                 <Route path="/workflow-import" component={WorkflowImport} />
-
-                {/* Bulk Upload Routes */}
+                <Route path="/admin/workflow-import" component={WorkflowImport} />
                 <Route path="/bulk-upload" component={BulkUploadCenter} />
                 <Route path="/bulk-import" component={BulkUploadCenter} />
                 <Route path="/data-import" component={BulkUploadCenter} />
                 <Route path="/admin/bulk-upload" component={BulkUploadCenter} />
-
-                <Route path="/pre-sales" component={PreSalesManager} />
-                <Route path="/sales-proposals" component={ProposalManagement} />
-                <Route path="/qc" component={QCDashboard} />
-                <Route path="/qc/queue" component={QCDashboard} />
-                <Route path="/qc-dashboard" component={QCDashboard} />
-                <Route path="/quality-control" component={QCDashboard} />
-                <Route path="/qc-delivery-handoff" component={QCDeliveryHandoff} />
-                <Route path="/delivery-handoff" component={QCDeliveryHandoff} />
-                <Route path="/quality-metrics" component={QualityMetricsDashboard} />
-                <Route path="/qc-metrics" component={QualityMetricsDashboard} />
-                <Route path="/delivery/:deliveryId" component={DeliveryConfirmation} />
-                <Route path="/hr" component={HRDashboard} />
-                <Route path="/hr-dashboard" component={HRDashboard} />
-                <Route path="/human-resources" component={HRDashboard} />
+                <Route path="/admin/blueprints" component={BlueprintManagement} />
+                <Route path="/admin/enterprise" component={BlueprintManagement} />
+                <Route path="/enterprise-config" component={BlueprintManagement} />
+                <Route path="/admin/access-reviews" component={AccessReviews} />
+                <Route path="/access-reviews" component={AccessReviews} />
+                <Route path="/blueprint" component={MasterBlueprintDashboard} />
+                <Route path="/master-blueprint" component={MasterBlueprintDashboard} />
+                <Route path="/admin/clients" component={ClientMasterDashboard} />
                 <Route path="/client-master" component={ClientMasterDashboard} />
                 <Route path="/clients" component={ClientMasterDashboard} />
                 <Route path="/client-management" component={ClientMasterDashboard} />
-                <Route path="/financial-management" component={FinancialManagementDashboard} />
-                <Route path="/financials" component={FinancialManagementDashboard} />
-                <Route path="/revenue-analytics" component={FinancialManagementDashboard} />
-                <Route path="/executive-dashboard" component={ExecutiveDashboard} />
-                <Route path="/analytics" component={ExecutiveDashboard} />
-                <Route path="/business-intelligence" component={BusinessIntelligence} />
-                <Route path="/bi" component={BusinessIntelligence} />
-                <Route path="/insights" component={BusinessIntelligence} />
-                {/* CONSOLIDATED: Mobile routes redirect to responsive portal-v2 */}
-                <Route path="/mobile-dashboard" component={ClientDashboardV3} />
-                <Route path="/mobile" component={ClientDashboardV3} />
-                <Route path="/command-center" component={ClientDashboardV3} />
-                <Route path="/founder" component={FounderLiteDashboard} />
-                <Route path="/compliance-state" component={FounderLiteDashboard} />
-                <Route path="/executive-summary" component={ExecutiveSummary} />
-                <Route path="/investor-summary" component={ExecutiveSummary} />
-                <Route path="/compliance-report" component={ExecutiveSummary} />
+                <Route path="/admin/webhooks" component={WebhookManagement} />
+                <Route path="/admin/api-keys" component={APIKeyManagement} />
+                <Route path="/developer/api-keys" component={APIKeyManagement} />
+
+                {/* ========== SUPER ADMIN ROUTES ========== */}
+                <Route path="/super-admin" component={SuperAdminDashboardV3} />
+                <Route path="/super-admin/dashboard" component={SuperAdminDashboardV3} />
+                <Route path="/super-admin/tenants" component={TenantManagement} />
+                <Route path="/super-admin/pricing" component={PricingEngine} />
+                <Route path="/super-admin/commissions" component={CommissionConfig} />
+                <Route path="/super-admin/security" component={SecurityCenter} />
+                <Route path="/super-admin/operations" component={Operations} />
+                <Route path="/super-admin/analytics" component={Analytics} />
+                <Route path="/super-admin/services" component={SuperAdminServices} />
+
+                {/* ========== SALES ROUTES ========== */}
+                <Route path="/leads" component={LeadManagement} />
+                <Route path="/lead-management" component={LeadManagement} />
+                <Route path="/lead-pipeline" component={LeadPipeline} />
+                <Route path="/pipeline" component={LeadPipeline} />
+                <Route path="/crm" component={LeadPipeline} />
+                <Route path="/proposals" component={ProposalManagement} />
+                <Route path="/proposal-management" component={ProposalManagement} />
+                <Route path="/sales-proposals" component={ProposalManagement} />
+                <Route path="/pre-sales" component={PreSalesManager} />
+                <Route path="/sales" component={SalesDashboard} />
+                <Route path="/sales/dashboard" component={SalesDashboard} />
+                <Route path="/sales/pipeline" component={SalesDashboard} />
+                <Route path="/sales/team" component={SalesDashboard} />
+                <Route path="/sales/forecasts" component={SalesDashboard} />
+                <Route path="/sales/targets" component={SalesDashboard} />
+
+                {/* ========== AGENT ROUTES ========== */}
                 <Route path="/agent" component={MobileAgentPortal} />
                 <Route path="/agent/dashboard" component={AgentDashboard} />
                 <Route path="/agent/leads" component={AgentLeadManagement} />
@@ -499,49 +486,82 @@ const AppContent = () => {
                 <Route path="/agent/kyc" component={AgentKYC} />
                 <Route path="/agent/commission-disputes" component={CommissionDisputes} />
                 <Route path="/commission-disputes" component={CommissionDisputes} />
-                {/* CONSOLIDATED: All agent portal routes point to main agent */}
                 <Route path="/agents" component={MobileAgentPortal} />
                 <Route path="/agent-portal" component={MobileAgentPortal} />
                 <Route path="/partner" component={MobileAgentPortal} />
                 <Route path="/partners" component={MobileAgentPortal} />
+
+                {/* ========== QC ROUTES ========== */}
+                <Route path="/qc" component={QCDashboard} />
+                <Route path="/qc/queue" component={QCDashboard} />
+                <Route path="/qc-dashboard" component={QCDashboard} />
+                <Route path="/quality-control" component={QCDashboard} />
+                <Route path="/qc-delivery-handoff" component={QCDeliveryHandoff} />
+                <Route path="/delivery-handoff" component={QCDeliveryHandoff} />
+                <Route path="/quality-metrics" component={QualityMetricsDashboard} />
+                <Route path="/qc-metrics" component={QualityMetricsDashboard} />
+                <Route path="/delivery/:deliveryId" component={DeliveryConfirmation} />
+
+                {/* ========== CUSTOMER SUCCESS ROUTES ========== */}
                 <Route path="/customer-service" component={CustomerServiceDashboard} />
-                <Route path="/support" component={ClientSupport} />
-                <Route path="/help" component={ClientSupport} />
-                <Route path="/tickets" component={ClientSupport} />
-                <Route path="/super-admin" component={SuperAdminDashboardV3} />
-                <Route path="/super-admin/dashboard" component={SuperAdminDashboardV3} />
-                <Route path="/super-admin/tenants" component={TenantManagement} />
-                <Route path="/super-admin/pricing" component={PricingEngine} />
-                <Route path="/super-admin/commissions" component={CommissionConfig} />
-                <Route path="/super-admin/security" component={SecurityCenter} />
-                <Route path="/super-admin/operations" component={Operations} />
-                <Route path="/super-admin/analytics" component={Analytics} />
-                <Route path="/super-admin/services" component={SuperAdminServices} />
-                {/* CONSOLIDATED: Single onboarding flow - using redesigned OnboardingFlow */}
-                <Route path="/onboarding" component={OnboardingFlow} />
-                <Route path="/streamlined-onboarding" component={OnboardingFlow} />
-                <Route path="/business-type" component={BusinessType} />
-                <Route path="/package-selection" component={PackageSelection} />
-                <Route path="/founder-details" component={FounderDetails} />
-                <Route path="/industry-classification" component={IndustryClassification} />
-                <Route path="/service-flow" component={ServiceFlowDashboard} />
-                <Route path="/documents" component={DocumentUpload} />
-                <Route path="/document-upload" component={DocumentUpload} />
-                <Route path="/esign-agreements" component={ESignAgreements} />
-                <Route path="/payment-gateway" component={PaymentGateway} />
-                <Route path="/tracker" component={ComplianceTrackerDashboard} />
-                <Route path="/confirmation" component={Confirmation} />
+                <Route path="/customer-success/playbooks" component={PlaybookManagement} />
+                <Route path="/playbooks" component={PlaybookManagement} />
+                <Route path="/customer-success/renewals" component={RenewalPipeline} />
+                <Route path="/renewals" component={RenewalPipeline} />
+                <Route path="/renewal-pipeline" component={RenewalPipeline} />
+
+                {/* ========== EXECUTIVE ROUTES ========== */}
+                <Route path="/executive-dashboard" component={ExecutiveDashboard} />
+                <Route path="/analytics" component={ExecutiveDashboard} />
+                <Route path="/business-intelligence" component={BusinessIntelligence} />
+                <Route path="/bi" component={BusinessIntelligence} />
+                <Route path="/insights" component={BusinessIntelligence} />
+                <Route path="/executive-summary" component={ExecutiveSummary} />
+                <Route path="/investor-summary" component={ExecutiveSummary} />
+                <Route path="/compliance-report" component={ExecutiveSummary} />
+
+                {/* ========== FINANCE & HR ROUTES ========== */}
+                <Route path="/financial-management" component={FinancialManagementDashboard} />
+                <Route path="/financials" component={FinancialManagementDashboard} />
+                <Route path="/revenue-analytics" component={FinancialManagementDashboard} />
+                <Route path="/hr" component={HRDashboard} />
+                <Route path="/hr-dashboard" component={HRDashboard} />
+                <Route path="/human-resources" component={HRDashboard} />
+
+                {/* ========== MESSAGING ROUTES ========== */}
+                <Route path="/notifications" component={NotificationCenter} />
+                <Route path="/notification-center" component={NotificationCenter} />
+                <Route path="/alerts" component={NotificationCenter} />
+                <Route path="/messages" component={MessageCenter} />
+                <Route path="/messaging" component={MessageCenter} />
+                <Route path="/conversations" component={MessageCenter} />
+                <Route path="/inbox" component={MessageCenter} />
+
+                {/* ========== SECURITY ROUTES ========== */}
+                <Route path="/security/incidents" component={SecurityIncidents} />
+                <Route path="/incidents" component={SecurityIncidents} />
+                <Route path="/security-incidents" component={SecurityIncidents} />
+
+                {/* ========== SHARED / MISC ROUTES ========== */}
+                <Route path="/tasks" component={TaskManagement} />
+                <Route path="/task-management" component={TaskManagement} />
+                <Route path="/my-tasks" component={TaskManagement} />
+                <Route path="/ai-documents" component={AiDocumentPreparation} />
+                <Route path="/doc-prep" component={AiDocumentPreparation} />
+                <Route path="/document-preparation" component={AiDocumentPreparation} />
+                <Route path="/doc-generator" component={AiDocumentPreparation} />
                 <Route path="/sync" component={SyncDashboard} />
                 <Route path="/excellence" component={PlatformShowcase} />
-                <Route path="/retainership" component={RetainershipPlans} />
                 <Route path="/suggestions" component={SmartSuggestionsEngine} />
-                <Route path="/vault" component={DocumentVault} />
+                <Route path="/workflow-dashboard" component={DigiComplyWorkflowDashboard} />
+                <Route path="/knowledge-base" component={KnowledgeBase} />
 
-                {/* Legal/Policy Pages - placeholder routes (redirect to landing for now) */}
+                {/* Legal/Policy Pages - placeholder routes */}
                 <Route path="/privacy-policy" component={LandingPageV3} />
                 <Route path="/terms-of-service" component={LandingPageV3} />
                 <Route path="/refund-policy" component={LandingPageV3} />
 
+                {/* 404 Fallback */}
                 <Route component={NotFound} />
               </Switch>
               </Suspense>
