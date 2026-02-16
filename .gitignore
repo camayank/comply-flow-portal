@@ -101,3 +101,4 @@ comply-flow-portal/
 
 # Git worktrees
 .worktrees/
+output/
