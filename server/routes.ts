@@ -77,9 +77,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Service Requests API (Protected)
+  // SECURITY: Clients can only create for themselves, ops/admin can create for any client
   app.post("/api/service-requests", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const validatedData = insertServiceRequestSchema.parse(req.body);
+
+      // Verify role-based access and ownership
+      const userRole = req.user?.role || req.user?.roles?.[0];
+      const isOpsOrAdmin = ['ops_executive', 'ops_manager', 'admin', 'super_admin', 'customer_service'].includes(userRole);
+
+      // If businessEntityId is provided, verify ownership (unless ops/admin)
+      if (validatedData.businessEntityId && !isOpsOrAdmin) {
+        // For clients, they can only create service requests for their own business
+        const userBusinesses = await db.select().from(users)
+          .where(eq(users.id, req.user!.id));
+        const userBizId = userBusinesses[0]?.businessEntityId;
+
+        if (userBizId !== validatedData.businessEntityId) {
+          return res.status(403).json({
+            error: "Not authorized to create service request for this business entity"
+          });
+        }
+      }
 
       // Calculate total amount from services
       const servicesList = await Promise.all(
@@ -1235,10 +1254,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Document Upload with Hash Verification
-  app.post("/api/service-requests/:id/documents", async (req: Request, res: Response) => {
+  // SECURITY: Requires authentication + ownership verification
+  app.post("/api/service-requests/:id/documents", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const { documents } = req.body;
+
+      // Verify user owns this service request or is ops/admin
+      const serviceRequest = await storage.getServiceRequest(id);
+      if (!serviceRequest) {
+        return res.status(404).json({ error: "Service request not found" });
+      }
+
+      const userRole = req.user?.role || req.user?.roles?.[0];
+      const isOpsOrAdmin = ['ops_executive', 'ops_manager', 'admin', 'super_admin'].includes(userRole);
+
+      if (!isOpsOrAdmin && serviceRequest.userId !== req.user?.id) {
+        return res.status(403).json({ error: "Not authorized to upload documents to this service request" });
+      }
       
       // Validate file types and sizes
       for (const doc of documents) {
@@ -1314,7 +1347,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Workflow Templates API
-  app.get("/api/workflow-templates", async (req: Request, res: Response) => {
+  // SECURITY: Template viewing requires authentication, management requires admin
+  app.get("/api/workflow-templates", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const templates = workflowEngine.getTemplates();
       res.json(templates);
@@ -1323,7 +1357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/workflow-templates/:templateId", async (req: Request, res: Response) => {
+  app.get("/api/workflow-templates/:templateId", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const template = workflowEngine.getTemplate(req.params.templateId);
       if (!template) {
@@ -1354,20 +1388,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/workflow-instances/:instanceId", async (req: Request, res: Response) => {
+  app.get("/api/workflow-instances/:instanceId", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const instance = workflowEngine.getInstance(req.params.instanceId);
       if (!instance) {
         return res.status(404).json({ error: "Workflow instance not found" });
       }
+
+      // Verify ownership or ops/admin access
+      const userRole = req.user?.role || req.user?.roles?.[0];
+      const isOpsOrAdmin = ['ops_executive', 'ops_manager', 'admin', 'super_admin'].includes(userRole);
+
+      if (!isOpsOrAdmin && instance.userId !== req.user?.id) {
+        return res.status(403).json({ error: "Not authorized to view this workflow instance" });
+      }
+
       res.json(instance);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch workflow instance" });
     }
   });
 
-  app.get("/api/workflow-instances/:instanceId/progress", async (req: Request, res: Response) => {
+  app.get("/api/workflow-instances/:instanceId/progress", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
+      const instance = workflowEngine.getInstance(req.params.instanceId);
+      if (!instance) {
+        return res.status(404).json({ error: "Workflow instance not found" });
+      }
+
+      // Verify ownership or ops/admin access
+      const userRole = req.user?.role || req.user?.roles?.[0];
+      const isOpsOrAdmin = ['ops_executive', 'ops_manager', 'admin', 'super_admin'].includes(userRole);
+
+      if (!isOpsOrAdmin && instance.userId !== req.user?.id) {
+        return res.status(403).json({ error: "Not authorized to view this workflow progress" });
+      }
+
       const progress = workflowEngine.getProgress(req.params.instanceId);
       res.json(progress);
     } catch (error) {
@@ -1376,38 +1432,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Workflow Step Management
-  app.patch("/api/workflow-instances/:instanceId/steps/:stepId", async (req: Request, res: Response) => {
+  // SECURITY: Requires ops role to update workflow steps
+  app.patch("/api/workflow-instances/:instanceId/steps/:stepId", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { instanceId, stepId } = req.params;
       const { status, notes, uploadedDocs } = req.body;
-      
+
       const success = workflowEngine.updateStepStatus(instanceId, stepId, status, notes);
       if (!success) {
         return res.status(404).json({ error: "Workflow instance or step not found" });
       }
-      
-      res.json({ 
-        success: true, 
-        instanceId, 
-        stepId, 
-        status, 
-        updatedAt: new Date().toISOString() 
+
+      res.json({
+        success: true,
+        instanceId,
+        stepId,
+        status,
+        updatedAt: new Date().toISOString()
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to update workflow step" });
     }
   });
 
-  app.get("/api/workflow-instances/:instanceId/steps/:stepId/validate", async (req: Request, res: Response) => {
+  app.get("/api/workflow-instances/:instanceId/steps/:stepId/validate", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { instanceId, stepId } = req.params;
       const isValid = workflowEngine.validateDependencies(instanceId, stepId);
-      
-      res.json({ 
+
+      res.json({
         valid: isValid,
         canProceed: isValid,
         instanceId,
-        stepId 
+        stepId
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to validate workflow dependencies" });
@@ -1415,45 +1472,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Workflow Customization API
-  app.post("/api/workflow-instances/:instanceId/custom-steps", async (req: Request, res: Response) => {
+  // SECURITY: Requires admin access to customize workflows
+  app.post("/api/workflow-instances/:instanceId/custom-steps", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { instanceId } = req.params;
       const { afterStepId, stepData, reason } = req.body;
-      
+
       const success = workflowEngine.addCustomStep(instanceId, afterStepId, stepData, reason);
       if (!success) {
         return res.status(404).json({ error: "Workflow instance not found" });
       }
-      
-      res.status(201).json({ 
-        success: true, 
+
+      res.status(201).json({
+        success: true,
         message: "Custom step added successfully",
-        instanceId 
+        instanceId
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to add custom step" });
     }
   });
 
-  app.post("/api/workflow-instances/:instanceId/customizations", async (req: Request, res: Response) => {
+  app.post("/api/workflow-instances/:instanceId/customizations", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { instanceId } = req.params;
       const customization: WorkflowCustomization = {
         ...req.body,
         appliedAt: new Date()
       };
-      
+
       const instance = workflowEngine.getInstance(instanceId);
       if (!instance) {
         return res.status(404).json({ error: "Workflow instance not found" });
       }
-      
+
       instance.customizations.push(customization);
-      
-      res.status(201).json({ 
-        success: true, 
+
+      res.status(201).json({
+        success: true,
         customization,
-        message: "Workflow customization applied" 
+        message: "Workflow customization applied"
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to apply workflow customization" });
@@ -1461,27 +1519,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Service-specific workflow endpoints
-  app.get("/api/services/:serviceId/workflow-template", async (req: Request, res: Response) => {
+  app.get("/api/services/:serviceId/workflow-template", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { serviceId } = req.params;
-      
+
       // Map service IDs to workflow template IDs
       const serviceToTemplateMap: Record<string, string> = {
         'company-incorporation': 'company-incorporation-standard',
         'llp-incorporation': 'llp-incorporation-standard',
         'opc-incorporation': 'opc-incorporation-standard'
       };
-      
+
       const templateId = serviceToTemplateMap[serviceId];
       if (!templateId) {
         return res.status(404).json({ error: "No workflow template found for this service" });
       }
-      
+
       const template = workflowEngine.getTemplate(templateId);
       if (!template) {
         return res.status(404).json({ error: "Workflow template not found" });
       }
-      
+
       res.json(template);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch service workflow template" });
@@ -1489,22 +1547,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Bulk workflow operations
-  app.get("/api/workflow-instances/user/:userId", async (req: Request, res: Response) => {
+  // SECURITY: Users can only see their own workflows, ops/admin can see any user's workflows
+  app.get("/api/workflow-instances/user/:userId", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const userId = parseInt(req.params.userId);
+
+      // Verify ownership or ops/admin access
+      const userRole = req.user?.role || req.user?.roles?.[0];
+      const isOpsOrAdmin = ['ops_executive', 'ops_manager', 'admin', 'super_admin'].includes(userRole);
+
+      if (!isOpsOrAdmin && userId !== req.user?.id) {
+        return res.status(403).json({ error: "Not authorized to view workflows for this user" });
+      }
+
       const userInstances = Array.from(workflowEngine['instances'].values())
         .filter(instance => instance.userId === userId);
-      
+
       res.json(userInstances);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch user workflows" });
     }
   });
 
-  app.get("/api/workflow-analytics", async (req: Request, res: Response) => {
+  // SECURITY: Workflow analytics requires admin access
+  app.get("/api/workflow-analytics", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const allInstances = Array.from(workflowEngine['instances'].values());
-      
+
       const analytics = {
         totalWorkflows: allInstances.length,
         completedWorkflows: allInstances.filter(w => w.status === 'completed').length,
@@ -2090,7 +2159,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Enhanced Workflow Validation API
-  app.post("/api/workflow/validate", async (req: Request, res: Response) => {
+  // SECURITY: All workflow management endpoints require admin access
+  app.post("/api/workflow/validate", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { steps } = req.body;
       const validation = WorkflowValidator.validateWorkflow(steps);
@@ -2100,7 +2170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/workflow/preview-changes", async (req: Request, res: Response) => {
+  app.post("/api/workflow/preview-changes", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { originalSteps, updatedSteps } = req.body;
       const preview = WorkflowValidator.previewWorkflowChanges(originalSteps, updatedSteps);
@@ -2110,7 +2180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/workflow/execution-plan", async (req: Request, res: Response) => {
+  app.post("/api/workflow/execution-plan", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { steps } = req.body;
       const plan = WorkflowValidator.generateExecutionPlan(steps);
@@ -2120,12 +2190,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/workflow/executable-steps", async (req: Request, res: Response) => {
+  app.get("/api/workflow/executable-steps", ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { steps, completed } = req.query;
       const stepsData = JSON.parse(steps as string);
       const completedIds = JSON.parse(completed as string);
-      
+
       const executableSteps = WorkflowValidator.getExecutableSteps(stepsData, completedIds);
       res.json(executableSteps);
     } catch (error: any) {
@@ -2133,11 +2203,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/workflow/simulate/:completionRate", async (req: Request, res: Response) => {
+  app.post("/api/workflow/simulate/:completionRate", ...requireAdminAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { completionRate } = req.params;
       const { steps } = req.body;
-      
+
       const simulation = WorkflowExecutor.simulateExecution(steps, parseFloat(completionRate));
       res.json(simulation);
     } catch (error: any) {

@@ -29,8 +29,15 @@ import {
   DEFAULT_ESCALATION_RULES,
   SlaStatus
 } from './auto-escalation-engine';
+import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES } from './rbac-middleware';
 
 const router = Router();
+
+// ============================================================================
+// SECURITY: All work queue routes require authentication and ops role
+// ============================================================================
+router.use(sessionAuthMiddleware);
+router.use(requireMinimumRole(USER_ROLES.OPS_EXECUTIVE));
 
 // ============================================================================
 // UNIFIED WORK QUEUE ENDPOINTS

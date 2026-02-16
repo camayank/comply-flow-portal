@@ -1,18 +1,32 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { db } from './db';
 import { referralCodes, referrals, walletCredits, walletTransactions, users, businessEntities, payments } from '@shared/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES, type AuthenticatedRequest } from './rbac-middleware';
 
 export function registerReferralRoutes(app: Express) {
 
+  // ============================================================================
+  // PROTECTED ROUTES - Require authentication + ownership
+  // ============================================================================
+
   // Generate referral code for a client
-  app.post('/api/referrals/generate-code', async (req, res) => {
+  // SECURITY: User can only generate code for themselves (or admin for anyone)
+  app.post('/api/referrals/generate-code', sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { clientId } = req.body;
 
       if (!clientId) {
         return res.status(400).json({ error: 'Client ID is required' });
+      }
+
+      // Verify ownership: user can only generate code for themselves unless admin
+      const userRole = req.user?.role || req.user?.roles?.[0];
+      const isAdmin = ['admin', 'super_admin'].includes(userRole);
+
+      if (!isAdmin && req.user?.id !== clientId) {
+        return res.status(403).json({ error: 'Not authorized to generate referral code for this user' });
       }
 
       // Check if client already has a code
@@ -283,9 +297,18 @@ export function registerReferralRoutes(app: Express) {
   });
 
   // Get client's referral code and stats
-  app.get('/api/referrals/my-code/:clientId', async (req, res) => {
+  // SECURITY: User can only view their own referral code (or admin can view any)
+  app.get('/api/referrals/my-code/:clientId', sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const clientId = parseInt(req.params.clientId);
+
+      // Verify ownership
+      const userRole = req.user?.role || req.user?.roles?.[0];
+      const isAdmin = ['admin', 'super_admin'].includes(userRole);
+
+      if (!isAdmin && req.user?.id !== clientId) {
+        return res.status(403).json({ error: 'Not authorized to view this referral code' });
+      }
 
       const [code] = await db
         .select()
@@ -320,9 +343,18 @@ export function registerReferralRoutes(app: Express) {
   });
 
   // Get wallet balance and transaction history
-  app.get('/api/wallet/:clientId', async (req, res) => {
+  // SECURITY: User can only view their own wallet (or admin can view any)
+  app.get('/api/wallet/:clientId', sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const clientId = parseInt(req.params.clientId);
+
+      // Verify ownership
+      const userRole = req.user?.role || req.user?.roles?.[0];
+      const isAdmin = ['admin', 'super_admin', 'accountant'].includes(userRole);
+
+      if (!isAdmin && req.user?.id !== clientId) {
+        return res.status(403).json({ error: 'Not authorized to view this wallet' });
+      }
 
       const [wallet] = await db
         .select()
@@ -362,12 +394,21 @@ export function registerReferralRoutes(app: Express) {
   });
 
   // Apply wallet credit to service payment
-  app.post('/api/wallet/apply-credit', async (req, res) => {
+  // SECURITY: User can only apply credit from their own wallet (or admin for anyone)
+  app.post('/api/wallet/apply-credit', sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { clientId, serviceRequestId, amount } = req.body;
 
       if (!clientId || !serviceRequestId || !amount) {
         return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      // Verify ownership
+      const userRole = req.user?.role || req.user?.roles?.[0];
+      const isAdmin = ['admin', 'super_admin', 'accountant'].includes(userRole);
+
+      if (!isAdmin && req.user?.id !== clientId) {
+        return res.status(403).json({ error: 'Not authorized to use this wallet' });
       }
 
       const [wallet] = await db

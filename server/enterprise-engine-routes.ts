@@ -353,7 +353,8 @@ router.get('/blueprints/code/:code', async (req: Request, res: Response) => {
 });
 
 // Create new blueprint
-router.post('/blueprints', async (req: Request, res: Response) => {
+// SECURITY: Requires admin role to create blueprints
+router.post('/blueprints', requireAdmin, async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).user?.tenantId || 'default';
     const createdBy = (req as any).user?.id || 'system';
@@ -377,7 +378,8 @@ router.post('/blueprints', async (req: Request, res: Response) => {
 });
 
 // Update blueprint
-router.put('/blueprints/:id', async (req: Request, res: Response) => {
+// SECURITY: Requires admin role to update blueprints
+router.put('/blueprints/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const updatedBy = (req as any).user?.id;
@@ -397,7 +399,8 @@ router.put('/blueprints/:id', async (req: Request, res: Response) => {
 });
 
 // Delete blueprint (soft delete)
-router.delete('/blueprints/:id', async (req: Request, res: Response) => {
+// SECURITY: Requires admin role to delete blueprints
+router.delete('/blueprints/:id', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const success = await blueprintService.deleteBlueprint(id);
@@ -414,7 +417,8 @@ router.delete('/blueprints/:id', async (req: Request, res: Response) => {
 });
 
 // Clone blueprint
-router.post('/blueprints/:id/clone', async (req: Request, res: Response) => {
+// SECURITY: Requires admin role to clone blueprints
+router.post('/blueprints/:id/clone', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { newCode, newName } = req.body;
@@ -433,7 +437,8 @@ router.post('/blueprints/:id/clone', async (req: Request, res: Response) => {
 });
 
 // Activate blueprint
-router.post('/blueprints/:id/activate', async (req: Request, res: Response) => {
+// SECURITY: Requires admin role to activate blueprints
+router.post('/blueprints/:id/activate', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const blueprint = await blueprintService.activateBlueprint(id);
@@ -445,7 +450,8 @@ router.post('/blueprints/:id/activate', async (req: Request, res: Response) => {
 });
 
 // Deactivate blueprint
-router.post('/blueprints/:id/deactivate', async (req: Request, res: Response) => {
+// SECURITY: Requires admin role to deactivate blueprints
+router.post('/blueprints/:id/deactivate', requireAdmin, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const blueprint = await blueprintService.deactivateBlueprint(id);
