@@ -225,13 +225,47 @@ export interface HealthStatus {
 let requestMetrics = {
   total: 0,
   errors: 0,
-  totalDuration: 0
+  totalDuration: 0,
+  lastMinuteRequests: [] as number[],
+  lastMinuteErrors: [] as number[],
 };
 
 export function trackRequest(duration: number, isError: boolean) {
+  const now = Date.now();
   requestMetrics.total++;
   requestMetrics.totalDuration += duration;
   if (isError) requestMetrics.errors++;
+
+  // Track last minute metrics
+  requestMetrics.lastMinuteRequests.push(now);
+  if (isError) requestMetrics.lastMinuteErrors.push(now);
+
+  // Clean up old entries (older than 1 minute)
+  const oneMinuteAgo = now - 60000;
+  requestMetrics.lastMinuteRequests = requestMetrics.lastMinuteRequests.filter(t => t > oneMinuteAgo);
+  requestMetrics.lastMinuteErrors = requestMetrics.lastMinuteErrors.filter(t => t > oneMinuteAgo);
+}
+
+/**
+ * Get health metrics for monitoring
+ */
+export function getHealthMetrics() {
+  const errorRate = requestMetrics.total > 0
+    ? (requestMetrics.errors / requestMetrics.total) * 100
+    : 0;
+
+  const avgResponseTime = requestMetrics.total > 0
+    ? requestMetrics.totalDuration / requestMetrics.total
+    : 0;
+
+  return {
+    totalRequests: requestMetrics.total,
+    totalErrors: requestMetrics.errors,
+    errorRate,
+    avgResponseTime,
+    requestsLastMinute: requestMetrics.lastMinuteRequests.length,
+    errorsLastMinute: requestMetrics.lastMinuteErrors.length,
+  };
 }
 
 export async function getHealthStatus(pool: any): Promise<HealthStatus> {

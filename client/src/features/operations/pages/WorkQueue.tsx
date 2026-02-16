@@ -358,6 +358,12 @@ function WorkItemDetailDialog({ item, onClose }: { item: WorkItem; onClose: () =
         <div>
           <p className="text-sm text-muted-foreground">Status</p>
           <p className="font-medium">{item.currentStatus}</p>
+          {item.clientStatusLabel && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+              <Eye className="h-3 w-3" />
+              Client sees: "{item.clientStatusLabel}"
+            </p>
+          )}
         </div>
         <div>
           <p className="text-sm text-muted-foreground">SLA Status</p>
@@ -760,7 +766,15 @@ export default function OperationsWorkQueue() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{item.currentStatus}</Badge>
+                      <div className="space-y-1">
+                        <Badge variant="outline">{item.currentStatus}</Badge>
+                        {item.clientStatusLabel && item.clientStatusLabel !== item.currentStatus && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Eye className="h-3 w-3" />
+                            <span>Client sees: {item.clientStatusLabel}</span>
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <SlaStatusBadge

@@ -143,3 +143,118 @@ export function formatErrorResponse(error: AppError | Error) {
     }
   };
 }
+
+// ============================================================================
+// STANDARDIZED API RESPONSE HELPERS
+// ============================================================================
+
+/**
+ * Standard success response format
+ */
+export interface ApiSuccessResponse<T = any> {
+  success: true;
+  data: T;
+  meta?: {
+    total?: number;
+    page?: number;
+    pageSize?: number;
+    hasMore?: boolean;
+  };
+}
+
+/**
+ * Standard error response format
+ */
+export interface ApiErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    details?: Record<string, any>;
+  };
+}
+
+/**
+ * Create a standardized success response
+ */
+export function successResponse<T>(
+  data: T,
+  meta?: ApiSuccessResponse['meta']
+): ApiSuccessResponse<T> {
+  return {
+    success: true,
+    data,
+    ...(meta && { meta }),
+  };
+}
+
+/**
+ * Create a standardized paginated response
+ */
+export function paginatedResponse<T>(
+  items: T[],
+  total: number,
+  page: number,
+  pageSize: number
+): ApiSuccessResponse<T[]> {
+  return {
+    success: true,
+    data: items,
+    meta: {
+      total,
+      page,
+      pageSize,
+      hasMore: page * pageSize < total,
+    },
+  };
+}
+
+/**
+ * Create a standardized error response
+ */
+export function errorResponse(
+  code: string,
+  message: string,
+  details?: Record<string, any>
+): ApiErrorResponse {
+  return {
+    success: false,
+    error: {
+      code,
+      message,
+      ...(details && { details }),
+    },
+  };
+}
+
+// Common error codes for consistency
+export const ErrorCodes = {
+  // Authentication
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+  SESSION_EXPIRED: 'SESSION_EXPIRED',
+  TOKEN_INVALID: 'TOKEN_INVALID',
+
+  // Authorization
+  FORBIDDEN: 'FORBIDDEN',
+  INSUFFICIENT_PERMISSIONS: 'INSUFFICIENT_PERMISSIONS',
+
+  // Validation
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  INVALID_INPUT: 'INVALID_INPUT',
+  MISSING_REQUIRED_FIELD: 'MISSING_REQUIRED_FIELD',
+
+  // Resource
+  NOT_FOUND: 'NOT_FOUND',
+  RESOURCE_EXISTS: 'RESOURCE_EXISTS',
+  CONFLICT: 'CONFLICT',
+
+  // Rate limiting
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
+
+  // Server
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
+  DATABASE_ERROR: 'DATABASE_ERROR',
+  EXTERNAL_SERVICE_ERROR: 'EXTERNAL_SERVICE_ERROR',
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
+} as const;

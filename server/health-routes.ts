@@ -1,16 +1,18 @@
 import type { Express } from "express";
-import { db } from './db';
+import { db, getPoolStats } from './db';
 import { sql } from 'drizzle-orm';
 import { storage } from './storage';
+import { getHealthMetrics } from './robustness-middleware';
 
 export function registerHealthRoutes(app: Express) {
-  
+
   // Simple health check
   app.get('/health', (req, res) => {
-    res.json({ 
-      status: 'ok', 
+    res.json({
+      status: 'ok',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
+      version: process.env.npm_package_version || '1.0.0',
     });
   });
 
@@ -23,13 +25,29 @@ export function registerHealthRoutes(app: Express) {
       checks: {}
     };
 
-    // Check database connectivity
+    // Check database connectivity and pool stats
     try {
       await db.execute(sql`SELECT 1`);
+      const poolStats = getPoolStats();
       healthStatus.checks.database = {
         status: 'ok',
-        message: 'Database connection successful'
+        message: 'Database connection successful',
+        pool: {
+          total: poolStats.totalCount,
+          idle: poolStats.idleCount,
+          waiting: poolStats.waitingCount,
+          max: poolStats.maxConnections,
+          utilization: `${Math.round((poolStats.totalCount - poolStats.idleCount) / poolStats.maxConnections * 100)}%`,
+        }
       };
+
+      // Warn if pool is under pressure
+      if (poolStats.waitingCount > 0) {
+        healthStatus.checks.database.warning = 'Queries waiting for connections';
+        if (poolStats.waitingCount > 5) {
+          healthStatus.status = 'degraded';
+        }
+      }
     } catch (error) {
       healthStatus.status = 'degraded';
       healthStatus.checks.database = {
@@ -86,6 +104,31 @@ export function registerHealthRoutes(app: Express) {
         status: 'error',
         message: error instanceof Error ? error.message : 'Storage check failed'
       };
+    }
+
+    // Request metrics (if available)
+    try {
+      const metrics = getHealthMetrics();
+      healthStatus.checks.requests = {
+        status: 'ok',
+        totalRequests: metrics.totalRequests,
+        errorRate: `${metrics.errorRate.toFixed(2)}%`,
+        avgResponseTime: `${metrics.avgResponseTime.toFixed(0)}ms`,
+        lastMinute: {
+          requests: metrics.requestsLastMinute,
+          errors: metrics.errorsLastMinute,
+        },
+      };
+
+      // Warn if error rate is high
+      if (metrics.errorRate > 10) {
+        healthStatus.checks.requests.warning = 'High error rate detected';
+        if (metrics.errorRate > 25) {
+          healthStatus.status = 'degraded';
+        }
+      }
+    } catch {
+      // Metrics not available, skip
     }
 
     const statusCode = healthStatus.status === 'ok' ? 200 : 503;

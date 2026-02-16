@@ -179,11 +179,44 @@ const apiLimiter = createRateLimit(
   (req) => req.ip || 'unknown'
 );
 
-// Apply rate limiters
+// Payment operations - Strict limiting (prevent payment fraud)
+const paymentLimiter = createRateLimit(
+  60 * 60 * 1000, // 1 hour
+  20, // 20 payment operations per hour
+  'Payment rate limit exceeded. Please wait before trying again.',
+  (req) => req.ip || 'unknown'
+);
+
+// File upload - Prevent storage abuse
+const uploadLimiter = createRateLimit(
+  60 * 60 * 1000, // 1 hour
+  50, // 50 uploads per hour
+  'Upload limit exceeded. Please wait before uploading more files.',
+  (req) => req.ip || 'unknown'
+);
+
+// Write operations (POST/PUT/PATCH/DELETE) - Moderate limiting
+const writeLimiter = createRateLimit(
+  15 * 60 * 1000, // 15 minutes
+  100, // 100 write operations per 15 minutes
+  'Write operation limit exceeded. Please slow down.',
+  (req) => req.ip || 'unknown'
+);
+
+// Apply rate limiters (order matters - more specific first)
 app.use('/api/auth/client/send-otp', otpPerEmailLimiter, otpPerIPLimiter);
 app.use('/api/auth/client/verify-otp', otpPerIPLimiter);
 app.use('/api/auth', authLimiter);
 app.use('/api/admin', adminLimiter);
+app.use('/api/payments', paymentLimiter);
+app.use('/api/files', uploadLimiter);
+app.use('/api', (req, res, next) => {
+  // Apply write limiter only for mutating operations
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    return writeLimiter(req, res, next);
+  }
+  next();
+});
 app.use('/api', apiLimiter);
 
 app.use((req, res, next) => {
