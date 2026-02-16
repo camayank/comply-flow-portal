@@ -1,11 +1,18 @@
-import { Express, Request, Response } from "express";
+import { Express, Request, Response, NextFunction } from "express";
 import { z } from "zod";
-import { 
-  insertServiceDefinitionSchema, 
+import {
+  insertServiceDefinitionSchema,
   insertAdvancedTaskTemplateSchema,
   insertServiceConfigurationSchema,
   insertTaskExecutionSchema
 } from "@shared/schema";
+import { authenticateToken } from './middleware/auth';
+import {
+  requireRole,
+  requirePermissionFromConfig,
+  requireAnyPermission,
+  PERMISSIONS,
+} from './middleware/rbac';
 
 interface ServiceManagementStorage {
   // Service Definitions
@@ -48,13 +55,53 @@ interface ServiceManagementStorage {
 }
 
 export function registerServiceManagementRoutes(app: Express, storage: ServiceManagementStorage) {
-  
+
+  // ============================================================================
+  // AUTHENTICATION & AUTHORIZATION MIDDLEWARE
+  // ============================================================================
+
+  // All service management routes require authentication
+  const serviceRouteAuth = [authenticateToken as any];
+
+  // View permissions - most authenticated users can view
+  const viewServiceAuth = [
+    ...serviceRouteAuth,
+    requirePermissionFromConfig(PERMISSIONS.SERVICES.VIEW) as any,
+  ];
+
+  // Create/Update/Delete permissions - only admin roles
+  const manageServiceAuth = [
+    ...serviceRouteAuth,
+    requireAnyPermission(
+      PERMISSIONS.SERVICES.CREATE,
+      PERMISSIONS.SERVICES.UPDATE,
+      PERMISSIONS.SERVICES.DELETE
+    ) as any,
+  ];
+
+  // Delete permission - only super_admin/admin
+  const deleteServiceAuth = [
+    ...serviceRouteAuth,
+    requirePermissionFromConfig(PERMISSIONS.SERVICES.DELETE) as any,
+  ];
+
+  // Workflow/Template management
+  const manageWorkflowAuth = [
+    ...serviceRouteAuth,
+    requireAnyPermission(
+      PERMISSIONS.WORKFLOWS.CREATE,
+      PERMISSIONS.WORKFLOWS.UPDATE,
+      PERMISSIONS.WORKFLOWS.DELETE,
+      PERMISSIONS.WORKFLOWS.MANAGE_TEMPLATES
+    ) as any,
+  ];
+
   // ============================================================================
   // SERVICE DEFINITIONS MANAGEMENT
   // ============================================================================
-  
+
   // Get all service definitions with filtering and pagination
-  app.get("/api/services/definitions", async (req: Request, res: Response) => {
+  app.get("/api/services/definitions", viewServiceAuth, async (req: Request, res: Response) => {
     try {
       const {
         search,
@@ -85,7 +132,7 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
   });
   
   // Get single service definition by ID
-  app.get("/api/services/definitions/:id", async (req: Request, res: Response) => {
+  app.get("/api/services/definitions/:id", viewServiceAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const service = await storage.getServiceDefinition(parseInt(id));
@@ -102,7 +149,7 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
   });
   
   // Get service definition by code
-  app.get("/api/services/definitions/code/:code", async (req: Request, res: Response) => {
+  app.get("/api/services/definitions/code/:code", viewServiceAuth, async (req: Request, res: Response) => {
     try {
       const { code } = req.params;
       const service = await storage.getServiceDefinitionByCode(code);
@@ -118,8 +165,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Create new service definition
-  app.post("/api/services/definitions", async (req: Request, res: Response) => {
+  // Create new service definition (Admin only)
+  app.post("/api/services/definitions", manageServiceAuth, async (req: Request, res: Response) => {
     try {
       const serviceData = insertServiceDefinitionSchema.parse(req.body);
       const service = await storage.createServiceDefinition(serviceData);
@@ -133,8 +180,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Update service definition
-  app.put("/api/services/definitions/:id", async (req: Request, res: Response) => {
+  // Update service definition (Admin only)
+  app.put("/api/services/definitions/:id", manageServiceAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const updates = req.body;
@@ -152,8 +199,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Delete service definition
-  app.delete("/api/services/definitions/:id", async (req: Request, res: Response) => {
+  // Delete service definition (Super Admin/Admin only)
+  app.delete("/api/services/definitions/:id", deleteServiceAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const success = await storage.deleteServiceDefinition(parseInt(id));
@@ -169,8 +216,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Duplicate service definition
-  app.post("/api/services/definitions/:id/duplicate", async (req: Request, res: Response) => {
+  // Duplicate service definition (Admin only)
+  app.post("/api/services/definitions/:id/duplicate", manageServiceAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { newCode, newName } = req.body;
@@ -197,7 +244,7 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
   // ============================================================================
   
   // Get all task templates with filtering
-  app.get("/api/services/task-templates", async (req: Request, res: Response) => {
+  app.get("/api/services/task-templates", viewServiceAuth, async (req: Request, res: Response) => {
     try {
       const { search, taskType, category, skillLevel, isActive } = req.query;
       
@@ -218,7 +265,7 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
   });
   
   // Get task templates for specific service
-  app.get("/api/services/definitions/:serviceCode/templates", async (req: Request, res: Response) => {
+  app.get("/api/services/definitions/:serviceCode/templates", viewServiceAuth, async (req: Request, res: Response) => {
     try {
       const { serviceCode } = req.params;
       const templates = await storage.getTaskTemplatesForService(serviceCode);
@@ -230,7 +277,7 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
   });
   
   // Get single task template by ID
-  app.get("/api/services/task-templates/:id", async (req: Request, res: Response) => {
+  app.get("/api/services/task-templates/:id", viewServiceAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const template = await storage.getTaskTemplate(parseInt(id));
@@ -247,7 +294,7 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
   });
   
   // Get task template by code
-  app.get("/api/services/task-templates/code/:code", async (req: Request, res: Response) => {
+  app.get("/api/services/task-templates/code/:code", viewServiceAuth, async (req: Request, res: Response) => {
     try {
       const { code } = req.params;
       const template = await storage.getTaskTemplateByCode(code);
@@ -263,8 +310,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Create new task template
-  app.post("/api/services/task-templates", async (req: Request, res: Response) => {
+  // Create new task template (Admin/Workflow Manager only)
+  app.post("/api/services/task-templates", manageWorkflowAuth, async (req: Request, res: Response) => {
     try {
       const templateData = insertAdvancedTaskTemplateSchema.parse(req.body);
       const template = await storage.createTaskTemplate(templateData);
@@ -278,8 +325,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Update task template
-  app.put("/api/services/task-templates/:id", async (req: Request, res: Response) => {
+  // Update task template (Admin/Workflow Manager only)
+  app.put("/api/services/task-templates/:id", manageWorkflowAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const updates = req.body;
@@ -297,8 +344,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Delete task template
-  app.delete("/api/services/task-templates/:id", async (req: Request, res: Response) => {
+  // Delete task template (Admin only)
+  app.delete("/api/services/task-templates/:id", deleteServiceAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const success = await storage.deleteTaskTemplate(parseInt(id));
@@ -319,7 +366,7 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
   // ============================================================================
   
   // Get all service configurations
-  app.get("/api/services/configurations", async (req: Request, res: Response) => {
+  app.get("/api/services/configurations", viewServiceAuth, async (req: Request, res: Response) => {
     try {
       const { serviceDefinitionId } = req.query;
       const serviceDefId = serviceDefinitionId ? parseInt(serviceDefinitionId as string) : undefined;
@@ -333,7 +380,7 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
   });
   
   // Get service configuration by ID
-  app.get("/api/services/configurations/:id", async (req: Request, res: Response) => {
+  app.get("/api/services/configurations/:id", viewServiceAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const config = await storage.getServiceConfiguration(parseInt(id));
@@ -350,7 +397,7 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
   });
   
   // Get default configuration for service
-  app.get("/api/services/definitions/:serviceId/default-config", async (req: Request, res: Response) => {
+  app.get("/api/services/definitions/:serviceId/default-config", viewServiceAuth, async (req: Request, res: Response) => {
     try {
       const { serviceId } = req.params;
       const config = await storage.getDefaultServiceConfiguration(parseInt(serviceId));
@@ -366,8 +413,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Create service configuration
-  app.post("/api/services/configurations", async (req: Request, res: Response) => {
+  // Create service configuration (Admin only)
+  app.post("/api/services/configurations", manageServiceAuth, async (req: Request, res: Response) => {
     try {
       const configData = insertServiceConfigurationSchema.parse(req.body);
       const config = await storage.createServiceConfiguration(configData);
@@ -381,8 +428,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Update service configuration
-  app.put("/api/services/configurations/:id", async (req: Request, res: Response) => {
+  // Update service configuration (Admin only)
+  app.put("/api/services/configurations/:id", manageServiceAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const updates = req.body;
@@ -400,8 +447,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Delete service configuration
-  app.delete("/api/services/configurations/:id", async (req: Request, res: Response) => {
+  // Delete service configuration (Admin only)
+  app.delete("/api/services/configurations/:id", deleteServiceAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const success = await storage.deleteServiceConfiguration(parseInt(id));
@@ -421,8 +468,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
   // TASK EXECUTIONS MANAGEMENT
   // ============================================================================
   
-  // Get all task executions with filtering
-  app.get("/api/services/task-executions", async (req: Request, res: Response) => {
+  // Get all task executions with filtering (Operations/Admin)
+  app.get("/api/services/task-executions", serviceRouteAuth, async (req: Request, res: Response) => {
     try {
       const {
         serviceRequestId,
@@ -451,7 +498,7 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
   });
   
   // Get task execution by ID
-  app.get("/api/services/task-executions/:id", async (req: Request, res: Response) => {
+  app.get("/api/services/task-executions/:id", serviceRouteAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const execution = await storage.getTaskExecution(parseInt(id));
@@ -467,8 +514,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Create task execution
-  app.post("/api/services/task-executions", async (req: Request, res: Response) => {
+  // Create task execution (Operations/Admin)
+  app.post("/api/services/task-executions", serviceRouteAuth, async (req: Request, res: Response) => {
     try {
       const executionData = insertTaskExecutionSchema.parse(req.body);
       const execution = await storage.createTaskExecution(executionData);
@@ -482,8 +529,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Update task execution
-  app.put("/api/services/task-executions/:id", async (req: Request, res: Response) => {
+  // Update task execution (Operations/Admin)
+  app.put("/api/services/task-executions/:id", serviceRouteAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const updates = req.body;
@@ -501,8 +548,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Complete task execution
-  app.post("/api/services/task-executions/:id/complete", async (req: Request, res: Response) => {
+  // Complete task execution (Operations/Admin)
+  app.post("/api/services/task-executions/:id/complete", serviceRouteAuth, async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const { outputData } = req.body;
@@ -520,8 +567,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Get task execution metrics
-  app.get("/api/services/task-executions/metrics", async (req: Request, res: Response) => {
+  // Get task execution metrics (Admin/Manager)
+  app.get("/api/services/task-executions/metrics", viewServiceAuth, async (req: Request, res: Response) => {
     try {
       const metrics = await storage.getTaskExecutionMetrics();
       res.json(metrics);
@@ -535,8 +582,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
   // ANALYTICS AND PERFORMANCE
   // ============================================================================
   
-  // Get service performance summary
-  app.get("/api/services/performance", async (req: Request, res: Response) => {
+  // Get service performance summary (Admin/Manager)
+  app.get("/api/services/performance", viewServiceAuth, async (req: Request, res: Response) => {
     try {
       const { serviceCode } = req.query;
       const summary = await storage.getServicePerformanceSummary(serviceCode as string);
@@ -547,8 +594,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Get service management analytics
-  app.get("/api/services/analytics", async (req: Request, res: Response) => {
+  // Get service management analytics (Admin/Manager)
+  app.get("/api/services/analytics", viewServiceAuth, async (req: Request, res: Response) => {
     try {
       const analytics = await storage.getServiceManagementAnalytics();
       res.json(analytics);
@@ -562,8 +609,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
   // SERVICE CATALOG OPERATIONS
   // ============================================================================
   
-  // Get service catalog with enhanced features
-  app.get("/api/services/catalog", async (req: Request, res: Response) => {
+  // Get service catalog with enhanced features (All authenticated users)
+  app.get("/api/services/catalog", serviceRouteAuth, async (req: Request, res: Response) => {
     try {
       const {
         category,
@@ -602,8 +649,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Get service recommendations based on client profile
-  app.post("/api/services/recommendations", async (req: Request, res: Response) => {
+  // Get service recommendations based on client profile (Authenticated users)
+  app.post("/api/services/recommendations", serviceRouteAuth, async (req: Request, res: Response) => {
     try {
       const { clientProfile, currentServices, businessGoals } = req.body;
       
@@ -637,8 +684,8 @@ export function registerServiceManagementRoutes(app: Express, storage: ServiceMa
     }
   });
   
-  // Bulk operations for service management
-  app.post("/api/services/bulk-operations", async (req: Request, res: Response) => {
+  // Bulk operations for service management (Admin only)
+  app.post("/api/services/bulk-operations", deleteServiceAuth, async (req: Request, res: Response) => {
     try {
       const { operation, serviceIds, updates } = req.body;
       

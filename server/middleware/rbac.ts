@@ -8,19 +8,18 @@
 import { Request, Response, NextFunction } from 'express';
 import { pool } from '../config/database';
 import { logger } from '../config/logger';
+import {
+  USER_ROLES,
+  ROLE_HIERARCHY,
+  ROLE_PERMISSIONS,
+  PERMISSIONS,
+  hasPermission as checkPermission,
+  hasEqualOrHigherRole,
+  type UserRole,
+} from '../../shared/rbac-permissions';
 
-// Role hierarchy levels for comparison
-const ROLE_LEVELS: Record<string, number> = {
-  'super_admin': 100,
-  'admin': 90,
-  'ops_manager': 80,
-  'ops_executive': 70,
-  'customer_service': 60,
-  'qc_executive': 55,
-  'accountant': 50,
-  'agent': 40,
-  'client': 10,
-};
+// Re-export for backward compatibility
+export const ROLE_LEVELS: Record<string, number> = ROLE_HIERARCHY as Record<string, number>;
 
 /**
  * Check if user has required role
@@ -190,3 +189,126 @@ export const requireAdmin = requireRole('super_admin', 'admin');
  * Super admin only middleware
  */
 export const requireSuperAdmin = requireRole('super_admin');
+
+/**
+ * Middleware to check specific permission from unified RBAC config
+ */
+export function requirePermissionFromConfig(...requiredPermissions: string[]) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user || !req.userId) {
+        res.status(401).json({
+          success: false,
+          error: 'Authentication required',
+        });
+        return;
+      }
+
+      const userRole = (req.user.role || (req.user.roles && req.user.roles[0])) as UserRole;
+
+      if (!userRole) {
+        res.status(403).json({
+          success: false,
+          error: 'User role not found',
+        });
+        return;
+      }
+
+      // Check if user's role has all required permissions
+      const hasAllPermissions = requiredPermissions.every(perm =>
+        checkPermission(userRole, perm)
+      );
+
+      if (!hasAllPermissions) {
+        logger.warn(`Permission denied for user ${req.userId} with role ${userRole}. Required: ${requiredPermissions.join(', ')}`);
+        res.status(403).json({
+          success: false,
+          error: 'Insufficient permissions for this action',
+        });
+        return;
+      }
+
+      next();
+    } catch (error) {
+      logger.error('Permission check error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Permission check failed',
+      });
+    }
+  };
+}
+
+/**
+ * Middleware to check any of the specified permissions
+ */
+export function requireAnyPermission(...permissions: string[]) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user || !req.userId) {
+        res.status(401).json({
+          success: false,
+          error: 'Authentication required',
+        });
+        return;
+      }
+
+      const userRole = (req.user.role || (req.user.roles && req.user.roles[0])) as UserRole;
+
+      if (!userRole) {
+        res.status(403).json({
+          success: false,
+          error: 'User role not found',
+        });
+        return;
+      }
+
+      // Check if user's role has any of the required permissions
+      const hasAnyPermission = permissions.some(perm =>
+        checkPermission(userRole, perm)
+      );
+
+      if (!hasAnyPermission) {
+        logger.warn(`Permission denied for user ${req.userId} with role ${userRole}. Required any of: ${permissions.join(', ')}`);
+        res.status(403).json({
+          success: false,
+          error: 'Insufficient permissions for this action',
+        });
+        return;
+      }
+
+      next();
+    } catch (error) {
+      logger.error('Permission check error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Permission check failed',
+      });
+    }
+  };
+}
+
+// Pre-configured permission middleware for common operations
+export const requireServiceManagement = requireAnyPermission(
+  PERMISSIONS.SERVICES.CREATE,
+  PERMISSIONS.SERVICES.UPDATE,
+  PERMISSIONS.SERVICES.DELETE
+);
+
+export const requireServiceView = requirePermissionFromConfig(PERMISSIONS.SERVICES.VIEW);
+
+export const requireWorkflowManagement = requireAnyPermission(
+  PERMISSIONS.WORKFLOWS.CREATE,
+  PERMISSIONS.WORKFLOWS.UPDATE,
+  PERMISSIONS.WORKFLOWS.DELETE,
+  PERMISSIONS.WORKFLOWS.MANAGE_TEMPLATES
+);
+
+export const requireBlueprintManagement = requireAnyPermission(
+  PERMISSIONS.BLUEPRINTS.CREATE,
+  PERMISSIONS.BLUEPRINTS.UPDATE,
+  PERMISSIONS.BLUEPRINTS.DELETE
+);
+
+// Export permissions for use in routes
+export { PERMISSIONS, USER_ROLES };
