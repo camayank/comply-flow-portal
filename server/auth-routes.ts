@@ -272,12 +272,21 @@ export async function registerAuthRoutes(app: Express) {
         return res.status(400).json({ error: 'Username and password are required' });
       }
 
-      // Get user
-      const [user] = await db
+      // Get user by username or email (supports both for flexibility)
+      let [user] = await db
         .select()
         .from(users)
         .where(eq(users.username, username))
         .limit(1);
+
+      // Fallback to email if username not found
+      if (!user) {
+        [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.email, username))
+          .limit(1);
+      }
 
       if (!user) {
         return res.status(401).json({ error: 'Invalid credentials' });

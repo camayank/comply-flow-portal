@@ -103,6 +103,11 @@ export function createBackwardCompatibilityMiddleware(targetVersion: ApiVersion 
       return next();
     }
 
+    // Skip referral and wallet routes
+    if (path.startsWith('/api/referrals/') || path.startsWith('/api/wallet/')) {
+      return next();
+    }
+
     // Skip service request routes (main CRUD)
     if (path.startsWith('/api/service-requests')) {
       return next();
