@@ -400,3 +400,588 @@ export function getStageProgress(currentStage: LifecycleStage): number {
   if (currentIndex === -1) return 0;
   return Math.round(((currentIndex + 1) / stageOrder.length) * 100);
 }
+
+// ============================================================================
+// Compliance Type Configuration
+// ============================================================================
+
+export type ComplianceType =
+  | 'statutory'
+  | 'tax'
+  | 'labor'
+  | 'corporate'
+  | 'industry_specific'
+  | 'environmental'
+  | 'data_privacy';
+
+export interface ComplianceTypeConfig {
+  label: string;
+  description: string;
+  icon: LucideIcon;
+  color: string;
+  bgColor: string;
+  priority: number;
+}
+
+export const complianceTypeConfig: Record<ComplianceType, ComplianceTypeConfig> = {
+  statutory: {
+    label: 'Statutory',
+    description: 'Government mandated registrations and filings',
+    icon: Shield,
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-100 dark:bg-emerald-900',
+    priority: 1,
+  },
+  tax: {
+    label: 'Tax Compliance',
+    description: 'Income tax, GST, and other tax filings',
+    icon: DollarSign,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-100 dark:bg-blue-900',
+    priority: 2,
+  },
+  labor: {
+    label: 'Labor & Employment',
+    description: 'PF, ESI, and employment regulations',
+    icon: Briefcase,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-100 dark:bg-purple-900',
+    priority: 3,
+  },
+  corporate: {
+    label: 'Corporate Governance',
+    description: 'Board meetings, ROC filings, and governance',
+    icon: Building2,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-100 dark:bg-indigo-900',
+    priority: 4,
+  },
+  industry_specific: {
+    label: 'Industry Specific',
+    description: 'Sector-specific licenses and certifications',
+    icon: Target,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-100 dark:bg-amber-900',
+    priority: 5,
+  },
+  environmental: {
+    label: 'Environmental',
+    description: 'Pollution control and environmental clearances',
+    icon: Sprout,
+    color: 'text-green-600',
+    bgColor: 'bg-green-100 dark:bg-green-900',
+    priority: 6,
+  },
+  data_privacy: {
+    label: 'Data Privacy',
+    description: 'GDPR, data protection, and privacy compliance',
+    icon: Shield,
+    color: 'text-rose-600',
+    bgColor: 'bg-rose-100 dark:bg-rose-900',
+    priority: 7,
+  },
+};
+
+// ============================================================================
+// Funding Round Configuration
+// ============================================================================
+
+export type FundingRound =
+  | 'bootstrapped'
+  | 'friends_family'
+  | 'angel'
+  | 'pre_seed'
+  | 'seed'
+  | 'series_a'
+  | 'series_b'
+  | 'series_c'
+  | 'series_d_plus'
+  | 'pre_ipo'
+  | 'ipo';
+
+export interface FundingRoundConfig {
+  label: string;
+  shortLabel: string;
+  description: string;
+  typicalRange: string;
+  color: string;
+  bgColor: string;
+  icon: LucideIcon;
+  order: number;
+  typicalValuation?: string;
+}
+
+export const fundingRoundConfig: Record<FundingRound, FundingRoundConfig> = {
+  bootstrapped: {
+    label: 'Bootstrapped',
+    shortLabel: 'Boot',
+    description: 'Self-funded with personal savings',
+    typicalRange: '₹0 - ₹50L',
+    color: 'text-slate-600',
+    bgColor: 'bg-slate-100 dark:bg-slate-900',
+    icon: Rocket,
+    order: 0,
+  },
+  friends_family: {
+    label: 'Friends & Family',
+    shortLabel: 'F&F',
+    description: 'Initial funding from personal network',
+    typicalRange: '₹10L - ₹1Cr',
+    color: 'text-pink-600',
+    bgColor: 'bg-pink-100 dark:bg-pink-900',
+    icon: Briefcase,
+    order: 1,
+  },
+  angel: {
+    label: 'Angel Round',
+    shortLabel: 'Angel',
+    description: 'Investment from angel investors',
+    typicalRange: '₹50L - ₹5Cr',
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-100 dark:bg-amber-900',
+    icon: Crown,
+    order: 2,
+  },
+  pre_seed: {
+    label: 'Pre-Seed',
+    shortLabel: 'Pre-Seed',
+    description: 'Early institutional investment',
+    typicalRange: '₹1Cr - ₹10Cr',
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-100 dark:bg-blue-900',
+    icon: Sprout,
+    order: 3,
+    typicalValuation: '₹5Cr - ₹25Cr',
+  },
+  seed: {
+    label: 'Seed Round',
+    shortLabel: 'Seed',
+    description: 'First significant institutional round',
+    typicalRange: '₹5Cr - ₹25Cr',
+    color: 'text-green-600',
+    bgColor: 'bg-green-100 dark:bg-green-900',
+    icon: Sprout,
+    order: 4,
+    typicalValuation: '₹25Cr - ₹100Cr',
+  },
+  series_a: {
+    label: 'Series A',
+    shortLabel: 'Ser A',
+    description: 'First major venture round',
+    typicalRange: '₹25Cr - ₹100Cr',
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-100 dark:bg-indigo-900',
+    icon: TrendingUp,
+    order: 5,
+    typicalValuation: '₹100Cr - ₹500Cr',
+  },
+  series_b: {
+    label: 'Series B',
+    shortLabel: 'Ser B',
+    description: 'Scaling and expansion round',
+    typicalRange: '₹75Cr - ₹300Cr',
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-100 dark:bg-purple-900',
+    icon: Zap,
+    order: 6,
+    typicalValuation: '₹300Cr - ₹1500Cr',
+  },
+  series_c: {
+    label: 'Series C',
+    shortLabel: 'Ser C',
+    description: 'Growth and market dominance',
+    typicalRange: '₹150Cr - ₹750Cr',
+    color: 'text-orange-600',
+    bgColor: 'bg-orange-100 dark:bg-orange-900',
+    icon: Building2,
+    order: 7,
+    typicalValuation: '₹750Cr - ₹5000Cr',
+  },
+  series_d_plus: {
+    label: 'Series D+',
+    shortLabel: 'Ser D+',
+    description: 'Late-stage growth rounds',
+    typicalRange: '₹300Cr+',
+    color: 'text-rose-600',
+    bgColor: 'bg-rose-100 dark:bg-rose-900',
+    icon: Crown,
+    order: 8,
+    typicalValuation: '₹2000Cr+',
+  },
+  pre_ipo: {
+    label: 'Pre-IPO',
+    shortLabel: 'Pre-IPO',
+    description: 'Final private round before public listing',
+    typicalRange: '₹500Cr+',
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-100 dark:bg-amber-900',
+    icon: Flag,
+    order: 9,
+    typicalValuation: '₹5000Cr+',
+  },
+  ipo: {
+    label: 'IPO',
+    shortLabel: 'IPO',
+    description: 'Initial Public Offering',
+    typicalRange: 'Market determined',
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-100 dark:bg-emerald-900',
+    icon: Globe,
+    order: 10,
+    typicalValuation: 'Public market',
+  },
+};
+
+export const fundingRoundOrder: FundingRound[] = [
+  'bootstrapped',
+  'friends_family',
+  'angel',
+  'pre_seed',
+  'seed',
+  'series_a',
+  'series_b',
+  'series_c',
+  'series_d_plus',
+  'pre_ipo',
+  'ipo',
+];
+
+// ============================================================================
+// Achievement/Badge Configuration
+// ============================================================================
+
+export type AchievementType =
+  | 'compliance'
+  | 'funding'
+  | 'growth'
+  | 'milestone'
+  | 'certification'
+  | 'special';
+
+export interface Achievement {
+  id: string;
+  type: AchievementType;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  color: string;
+  bgColor: string;
+  points: number;
+  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+  unlockedAt?: string;
+}
+
+export interface AchievementTypeConfig {
+  label: string;
+  color: string;
+  bgColor: string;
+}
+
+export const achievementTypeConfig: Record<AchievementType, AchievementTypeConfig> = {
+  compliance: {
+    label: 'Compliance',
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-100 dark:bg-emerald-900',
+  },
+  funding: {
+    label: 'Funding',
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-100 dark:bg-blue-900',
+  },
+  growth: {
+    label: 'Growth',
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-100 dark:bg-purple-900',
+  },
+  milestone: {
+    label: 'Milestone',
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-100 dark:bg-amber-900',
+  },
+  certification: {
+    label: 'Certification',
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-100 dark:bg-indigo-900',
+  },
+  special: {
+    label: 'Special',
+    color: 'text-rose-600',
+    bgColor: 'bg-rose-100 dark:bg-rose-900',
+  },
+};
+
+export const rarityConfig: Record<Achievement['rarity'], { label: string; color: string; bgColor: string }> = {
+  common: {
+    label: 'Common',
+    color: 'text-slate-600',
+    bgColor: 'bg-slate-100 dark:bg-slate-900',
+  },
+  uncommon: {
+    label: 'Uncommon',
+    color: 'text-green-600',
+    bgColor: 'bg-green-100 dark:bg-green-900',
+  },
+  rare: {
+    label: 'Rare',
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-100 dark:bg-blue-900',
+  },
+  epic: {
+    label: 'Epic',
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-100 dark:bg-purple-900',
+  },
+  legendary: {
+    label: 'Legendary',
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-100 dark:bg-amber-900',
+  },
+};
+
+// ============================================================================
+// Document Category Configuration (per Stage)
+// ============================================================================
+
+export interface StageDocumentCategory {
+  id: string;
+  label: string;
+  description: string;
+  required: boolean;
+  icon: LucideIcon;
+}
+
+export const stageDocuments: Record<LifecycleStage, StageDocumentCategory[]> = {
+  bootstrap: [
+    { id: 'coi', label: 'Certificate of Incorporation', description: 'Company registration certificate', required: true, icon: FileText },
+    { id: 'moa', label: 'MOA/AOA', description: 'Memorandum and Articles of Association', required: true, icon: FileText },
+    { id: 'pan', label: 'PAN Card', description: 'Company PAN card', required: true, icon: FileText },
+    { id: 'tan', label: 'TAN Registration', description: 'Tax Deduction Account Number', required: true, icon: FileText },
+    { id: 'bank', label: 'Bank Account Proof', description: 'Bank account opening documents', required: true, icon: FileText },
+  ],
+  seed: [
+    { id: 'gst', label: 'GST Registration', description: 'GST certificate', required: true, icon: FileText },
+    { id: 'shop_est', label: 'Shop & Establishment', description: 'Shop and establishment license', required: true, icon: FileText },
+    { id: 'ip_filing', label: 'IP Filings', description: 'Trademark/Patent applications', required: false, icon: FileText },
+    { id: 'emp_agreements', label: 'Employment Agreements', description: 'Standard employment contracts', required: true, icon: FileText },
+  ],
+  early_growth: [
+    { id: 'pf_esi', label: 'PF/ESI Registration', description: 'Provident fund and ESI registration', required: true, icon: FileText },
+    { id: 'professional_tax', label: 'Professional Tax', description: 'Professional tax registration', required: true, icon: FileText },
+    { id: 'iso', label: 'ISO Certifications', description: 'Quality management certifications', required: false, icon: FileText },
+    { id: 'data_protection', label: 'Data Protection Policy', description: 'Privacy and data protection documents', required: true, icon: FileText },
+  ],
+  growth: [
+    { id: 'internal_audit', label: 'Internal Audit Report', description: 'Internal audit setup and reports', required: true, icon: FileText },
+    { id: 'governance', label: 'Governance Policies', description: 'Corporate governance documents', required: true, icon: FileText },
+    { id: 'board_composition', label: 'Board Composition', description: 'Board member documentation', required: true, icon: FileText },
+    { id: 'hr_policies', label: 'HR Policy Manual', description: 'Comprehensive HR policies', required: true, icon: FileText },
+  ],
+  scaling: [
+    { id: 'soc2', label: 'SOC 2 Compliance', description: 'SOC 2 audit reports', required: false, icon: Shield },
+    { id: 'intl_compliance', label: 'International Compliance', description: 'Cross-border compliance documents', required: false, icon: Globe },
+    { id: 'transfer_pricing', label: 'Transfer Pricing', description: 'Transfer pricing documentation', required: false, icon: FileText },
+    { id: 'erm', label: 'Risk Management', description: 'Enterprise risk management framework', required: true, icon: Shield },
+  ],
+  pre_ipo: [
+    { id: 'sebi', label: 'SEBI Compliance', description: 'SEBI registration and filings', required: true, icon: Shield },
+    { id: 'independent_directors', label: 'Independent Directors', description: 'Independent director appointments', required: true, icon: FileText },
+    { id: 'audit_committee', label: 'Audit Committee', description: 'Audit committee formation', required: true, icon: FileText },
+    { id: 'drhp', label: 'DRHP', description: 'Draft Red Herring Prospectus', required: true, icon: FileText },
+  ],
+  public: [
+    { id: 'quarterly_reports', label: 'Quarterly Reports', description: 'Quarterly financial statements', required: true, icon: FileText },
+    { id: 'agm', label: 'AGM Minutes', description: 'Annual general meeting records', required: true, icon: FileText },
+    { id: 'insider_trading', label: 'Insider Trading Policy', description: 'Insider trading compliance', required: true, icon: Shield },
+    { id: 'continuous_disclosure', label: 'Continuous Disclosure', description: 'Material event disclosures', required: true, icon: FileText },
+  ],
+  exit_ready: [
+    { id: 'audit_history', label: 'Audit History', description: 'Complete audit records', required: true, icon: FileText },
+    { id: 'legal_docs', label: 'Legal Documentation', description: 'Clean legal records', required: true, icon: FileText },
+    { id: 'ip_ownership', label: 'IP Ownership', description: 'IP ownership clarity documents', required: true, icon: FileText },
+    { id: 'esop_vesting', label: 'ESOP Vesting', description: 'Employee stock vesting records', required: true, icon: FileText },
+  ],
+};
+
+// ============================================================================
+// Lifecycle Metrics Configuration
+// ============================================================================
+
+export interface LifecycleMetricConfig {
+  id: string;
+  label: string;
+  description: string;
+  format: 'number' | 'percentage' | 'currency' | 'duration';
+  icon: LucideIcon;
+  goodThreshold?: number;
+  warningThreshold?: number;
+}
+
+export const lifecycleMetrics: LifecycleMetricConfig[] = [
+  {
+    id: 'compliance_score',
+    label: 'Compliance Score',
+    description: 'Overall compliance health percentage',
+    format: 'percentage',
+    icon: Shield,
+    goodThreshold: 80,
+    warningThreshold: 60,
+  },
+  {
+    id: 'stage_progress',
+    label: 'Stage Progress',
+    description: 'Progress through current stage',
+    format: 'percentage',
+    icon: TrendingUp,
+    goodThreshold: 70,
+    warningThreshold: 40,
+  },
+  {
+    id: 'pending_actions',
+    label: 'Pending Actions',
+    description: 'Number of pending compliance actions',
+    format: 'number',
+    icon: Clock,
+  },
+  {
+    id: 'completed_milestones',
+    label: 'Milestones Completed',
+    description: 'Total milestones achieved',
+    format: 'number',
+    icon: Target,
+  },
+  {
+    id: 'funding_readiness',
+    label: 'Funding Readiness',
+    description: 'Readiness for next funding round',
+    format: 'percentage',
+    icon: DollarSign,
+    goodThreshold: 80,
+    warningThreshold: 50,
+  },
+  {
+    id: 'company_age',
+    label: 'Company Age',
+    description: 'Time since incorporation',
+    format: 'duration',
+    icon: Clock,
+  },
+];
+
+// ============================================================================
+// Additional Utility Functions
+// ============================================================================
+
+/**
+ * Get recommended services for a lifecycle stage
+ */
+export function getRecommendedServicesForStage(stage: LifecycleStage): string[] {
+  const stageConfig = stageConfigs[stage];
+  return stageConfig.typicalRequirements;
+}
+
+/**
+ * Get compliance types relevant for a stage
+ */
+export function getComplianceTypesForStage(stage: LifecycleStage): ComplianceType[] {
+  const stageToCompliance: Record<LifecycleStage, ComplianceType[]> = {
+    bootstrap: ['statutory', 'tax'],
+    seed: ['statutory', 'tax', 'labor'],
+    early_growth: ['statutory', 'tax', 'labor', 'data_privacy'],
+    growth: ['statutory', 'tax', 'labor', 'corporate', 'data_privacy'],
+    scaling: ['statutory', 'tax', 'labor', 'corporate', 'data_privacy', 'industry_specific'],
+    pre_ipo: ['statutory', 'tax', 'labor', 'corporate', 'data_privacy', 'industry_specific'],
+    public: ['statutory', 'tax', 'labor', 'corporate', 'data_privacy', 'industry_specific', 'environmental'],
+    exit_ready: ['statutory', 'tax', 'labor', 'corporate'],
+  };
+  return stageToCompliance[stage];
+}
+
+/**
+ * Calculate days in current stage
+ */
+export function getDaysInStage(stageEnteredAt: Date | string): number {
+  const entered = new Date(stageEnteredAt);
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - entered.getTime());
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Format company age
+ */
+export function formatCompanyAge(incorporationDate: Date | string): string {
+  const incorporated = new Date(incorporationDate);
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - incorporated.getTime());
+  const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (days < 30) return `${days} days`;
+  if (days < 365) return `${Math.floor(days / 30)} months`;
+
+  const years = Math.floor(days / 365);
+  const remainingMonths = Math.floor((days % 365) / 30);
+  if (remainingMonths === 0) return `${years} year${years > 1 ? 's' : ''}`;
+  return `${years}y ${remainingMonths}m`;
+}
+
+/**
+ * Get stage from funding round
+ */
+export function getStageFromFundingRound(round: FundingRound): LifecycleStage {
+  const fundingToStage: Record<FundingRound, LifecycleStage> = {
+    bootstrapped: 'bootstrap',
+    friends_family: 'bootstrap',
+    angel: 'seed',
+    pre_seed: 'seed',
+    seed: 'seed',
+    series_a: 'early_growth',
+    series_b: 'growth',
+    series_c: 'scaling',
+    series_d_plus: 'scaling',
+    pre_ipo: 'pre_ipo',
+    ipo: 'public',
+  };
+  return fundingToStage[round];
+}
+
+/**
+ * Calculate transition readiness percentage
+ */
+export function calculateTransitionReadiness(
+  completedRequirements: number,
+  totalRequirements: number
+): number {
+  if (totalRequirements === 0) return 100;
+  return Math.round((completedRequirements / totalRequirements) * 100);
+}
+
+/**
+ * Get urgency color class
+ */
+export function getUrgencyColorClass(urgency: ActionUrgency): string {
+  const colors: Record<ActionUrgency, string> = {
+    critical: 'text-red-600 bg-red-100 dark:bg-red-900',
+    high: 'text-orange-600 bg-orange-100 dark:bg-orange-900',
+    medium: 'text-amber-600 bg-amber-100 dark:bg-amber-900',
+    low: 'text-blue-600 bg-blue-100 dark:bg-blue-900',
+  };
+  return colors[urgency];
+}
+
+/**
+ * Format currency in Indian format
+ */
+export function formatCurrency(
+  amount: number | string | null | undefined,
+  currency: string = 'INR'
+): string {
+  if (amount === null || amount === undefined) return '—';
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(num)) return '—';
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(num);
+}

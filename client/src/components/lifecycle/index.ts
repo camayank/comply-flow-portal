@@ -4,3 +4,6 @@ export { default as MetricCard } from '@/features/client-portal/components/Metri
 export { default as StatusBadge } from '@/features/client-portal/components/StatusBadge';
 export { default as ActionButton } from '@/features/client-portal/components/ActionButton';
 export { default as QuickCommand, QuickCommandTrigger } from '@/features/client-portal/components/QuickCommand';
+
+// Re-export all from lifecycle feature module
+export * from '@/features/lifecycle';
