@@ -1,3 +1,13 @@
+/**
+ * @deprecated Use BulkUploadDialogEnhanced instead.
+ * This legacy component uses simple templateHeaders (string[]).
+ * The enhanced version supports column definitions with types, validation, and editable preview grid.
+ *
+ * Migration guide:
+ * - Replace `templateHeaders: string[]` with `columns: ColumnDefinition[]`
+ * - Add column types, validation rules, and options
+ * - See BulkUploadDialogEnhanced.tsx for interface details
+ */
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';

@@ -1,3 +1,14 @@
+/**
+ * @deprecated UNUSED FILE - This file is not imported anywhere in the application.
+ *
+ * The main server uses:
+ * - server/routes.ts (main route registration)
+ * - server/routes/client-v2-robust.ts (active US-style client routes)
+ *
+ * This file was created as part of the V2 migration but was superseded by client-v2-robust.ts
+ *
+ * DO NOT USE - Consider deleting this file in next cleanup cycle.
+ */
 import { Router } from 'express';
 import { db } from '../db';
 import multer from 'multer';

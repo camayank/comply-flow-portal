@@ -1,6 +1,14 @@
 /**
  * Routes Index
  * Central route registration for all API endpoints
+ *
+ * @deprecated PARTIALLY UNUSED - The registerApiRoutes() function is never called.
+ * The main server uses server/routes.ts which has its own route registration.
+ *
+ * This file was intended to be a modular route registration system but the app
+ * evolved to use the monolithic server/routes.ts instead.
+ *
+ * Consider consolidating all routes in future refactor.
  */
 
 import { Express } from 'express';
