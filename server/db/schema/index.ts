@@ -5,3 +5,4 @@
  */
 
 export * from './webhook-events';
+export * from './notification-delivery-log';
