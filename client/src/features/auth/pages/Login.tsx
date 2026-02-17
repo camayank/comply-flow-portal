@@ -353,7 +353,7 @@ function StaffLogin() {
       <div className="flex items-center justify-between">
         <button
           type="button"
-          onClick={() => window.location.href = '/forgot-password'}
+          onClick={() => setLocation('/forgot-password')}
           className="text-sm text-primary hover:underline bg-transparent border-none cursor-pointer"
         >
           Forgot password?

@@ -312,9 +312,9 @@ const Footer = () => {
             </div>
             <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6">
               <Link href="/hub" className="hover:text-blue-400 transition-colors">Dev Hub</Link>
-              <a href="/privacy-policy" className="hover:text-blue-400 transition-colors">Privacy</a>
-              <a href="/terms-of-service" className="hover:text-blue-400 transition-colors">Terms</a>
-              <a href="/refund-policy" className="hover:text-blue-400 transition-colors">Refunds</a>
+              <Link href="/privacy-policy" className="hover:text-blue-400 transition-colors">Privacy</Link>
+              <Link href="/terms-of-service" className="hover:text-blue-400 transition-colors">Terms</Link>
+              <Link href="/refund-policy" className="hover:text-blue-400 transition-colors">Refunds</Link>
               <span className="text-slate-600">|</span>
               <Link href="/login" className="hover:text-blue-400 transition-colors">Login</Link>
               <Link href="/smart-start" className="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1">

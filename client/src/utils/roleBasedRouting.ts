@@ -143,7 +143,7 @@ export function getRoleDashboardRoute(role: string): string {
       if (level >= 90) return '/admin';
       if (level >= 50) return '/operations';
       if (level >= 40) return '/agent';
-      return '/client-portal';
+      return '/portal-v2';
   }
 }
 
