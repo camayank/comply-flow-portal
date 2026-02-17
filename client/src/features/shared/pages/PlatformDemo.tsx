@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PublicLayout } from '@/layouts';
 import { Link } from 'wouter';
+import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -304,14 +305,8 @@ const PlatformDemo = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-slate-900 text-white py-8">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-slate-400 text-sm">
-            © 2025 DigiComply. Part of LegalSuvidha.com Group. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      {/* Footer - Using shared component for consistency */}
+      <Footer />
       </div>
     </PublicLayout>
   );

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { PublicLayout } from '@/layouts';
 import { Link } from 'wouter';
+import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -1163,77 +1164,8 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Modern Footer */}
-      <footer className="bg-gray-900 text-white py-8 sm:py-12">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-6xl mx-auto">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-              <div>
-                <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                  <Building2 className="h-6 w-6 text-blue-400" />
-                  <span className="text-lg sm:text-xl font-bold">DigiComply®</span>
-                </div>
-                <p className="text-xs sm:text-sm text-gray-400 mb-3 sm:mb-4">
-                  India's most trusted compliance automation platform for startups and SMEs.
-                </p>
-                <div className="flex gap-3">
-                  <Button size="sm" variant="outline" className="text-xs border-gray-600 text-gray-300 hover:bg-gray-800">
-                    <Phone className="h-3 w-3 mr-1" />
-                    Call
-                  </Button>
-                  <Button size="sm" variant="outline" className="text-xs border-gray-600 text-gray-300 hover:bg-gray-800">
-                    <Mail className="h-3 w-3 mr-1" />
-                    Email
-                  </Button>
-                </div>
-              </div>
-              
-              <div>
-                <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Services</h3>
-                <ul className="space-y-2 text-xs sm:text-sm text-gray-400">
-                  <li><Link to="/service-selection" className="hover:text-white transition-colors">Company Incorporation</Link></li>
-                  <li><Link to="/service-selection" className="hover:text-white transition-colors">Annual Compliance</Link></li>
-                  <li><Link to="/service-selection" className="hover:text-white transition-colors">GST Registration</Link></li>
-                  <li><Link to="/service-selection" className="hover:text-white transition-colors">Startup India</Link></li>
-                </ul>
-              </div>
-              
-              <div>
-                <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Platform</h3>
-                <ul className="space-y-2 text-xs sm:text-sm text-gray-400">
-                  <li><Link to="/portal" className="hover:text-white transition-colors">Client Portal</Link></li>
-                  <li><Link to="/operations" className="hover:text-white transition-colors">Operations</Link></li>
-                  <li><Link to="/admin" className="hover:text-white transition-colors">Admin</Link></li>
-                  <li><Link to="/agent" className="hover:text-white transition-colors">Partners</Link></li>
-                </ul>
-              </div>
-              
-              <div>
-                <h3 className="font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Resources</h3>
-                <ul className="space-y-2 text-xs sm:text-sm text-gray-400">
-                  <li><Link to="/10k" className="hover:text-white transition-colors">Free Scorecard</Link></li>
-                  <li><Link to="/platform-showcase" className="hover:text-white transition-colors">Platform Demo</Link></li>
-                  <li><Link to="/compliance-scorecard" className="hover:text-white transition-colors">Compliance Guide</Link></li>
-                  <li>24/7 Support</li>
-                </ul>
-              </div>
-            </div>
-            
-            <div className="border-t border-gray-800 pt-6 sm:pt-8 mt-6 sm:mt-8">
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
-                <p className="text-xs sm:text-sm text-gray-400">
-                  © 2025 DigiComply. Part of LegalSuvidha.com Group. All rights reserved.
-                </p>
-                <div className="flex gap-4 text-xs sm:text-sm text-gray-400">
-                  <Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-                  <Link to="/terms" className="hover:text-white transition-colors">Terms</Link>
-                  <Link to="/security" className="hover:text-white transition-colors">Security</Link>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
+      {/* Footer - Using shared component for consistency */}
+      <Footer />
       </div>
     </PublicLayout>
   );
