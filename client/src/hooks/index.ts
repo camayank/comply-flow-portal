@@ -15,3 +15,5 @@ export * from './useCompliance';
 export * from './useOperations';
 export * from './useCustomerSuccess';
 export * from './useAudit';
+export * from './useGovernmentFilings';
+export * from './useReports';
