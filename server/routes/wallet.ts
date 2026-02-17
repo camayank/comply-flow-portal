@@ -11,6 +11,7 @@ import { wallets, walletTransactions, referralCodes, referrals } from '../db/sch
 import { users } from '../db/schema/users';
 import { authenticate } from '../middleware/auth';
 import crypto from 'crypto';
+import { walletService } from '../services/wallet-service';
 
 const router = Router();
 
@@ -142,52 +143,26 @@ router.post('/add-funds', authenticate, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Valid userId and amount are required' });
     }
 
-    // Get user's wallet
-    let wallet = await db.query.wallets.findFirst({
-      where: eq(wallets.userId, userId),
-    });
-
-    if (!wallet) {
-      const [newWallet] = await db.insert(wallets)
-        .values({ userId })
-        .returning();
-      wallet = newWallet;
-    }
-
-    if (wallet.isFrozen) {
-      return res.status(400).json({ error: 'Wallet is frozen' });
-    }
-
-    const currentBalance = parseFloat(wallet.balance);
-    const newBalance = currentBalance + amount;
-
-    // Update balance
-    await db.update(wallets)
-      .set({
-        balance: newBalance.toFixed(2),
-        updatedAt: new Date(),
-      })
-      .where(eq(wallets.id, wallet.id));
-
-    // Create transaction record
-    const [transaction] = await db.insert(walletTransactions).values({
-      walletId: wallet.id,
-      type: 'credit',
-      amount: amount.toFixed(2),
-      balanceBefore: currentBalance.toFixed(2),
-      balanceAfter: newBalance.toFixed(2),
-      description: description || 'Manual credit by admin',
+    // Use wallet service for the credit operation
+    const result = await walletService.credit(
+      userId,
+      amount,
+      description || 'Manual credit by admin',
       category,
-      referenceType: 'manual',
-      status: 'completed',
-      processedBy: adminUser.id,
-    }).returning();
+      'manual',
+      undefined,
+      adminUser.id
+    );
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
 
     res.json({
       success: true,
-      newBalance,
+      newBalance: result.newBalance,
       transaction: {
-        id: transaction.id,
+        id: result.transactionId,
         amount,
         type: 'credit',
       },
@@ -517,7 +492,7 @@ async function processReferralRewards(referralId: number): Promise<void> {
 }
 
 /**
- * Credit wallet helper
+ * Credit wallet helper - delegates to walletService
  */
 async function creditWallet(
   userId: number,
@@ -527,42 +502,7 @@ async function creditWallet(
   referenceType: string,
   referenceId: number
 ): Promise<void> {
-  // Get or create wallet
-  let wallet = await db.query.wallets.findFirst({
-    where: eq(wallets.userId, userId),
-  });
-
-  if (!wallet) {
-    const [newWallet] = await db.insert(wallets)
-      .values({ userId })
-      .returning();
-    wallet = newWallet;
-  }
-
-  const currentBalance = parseFloat(wallet.balance);
-  const newBalance = currentBalance + amount;
-
-  // Update balance
-  await db.update(wallets)
-    .set({
-      balance: newBalance.toFixed(2),
-      updatedAt: new Date(),
-    })
-    .where(eq(wallets.id, wallet.id));
-
-  // Create transaction record
-  await db.insert(walletTransactions).values({
-    walletId: wallet.id,
-    type: 'credit',
-    amount: amount.toFixed(2),
-    balanceBefore: currentBalance.toFixed(2),
-    balanceAfter: newBalance.toFixed(2),
-    description,
-    category,
-    referenceType,
-    referenceId,
-    status: 'completed',
-  });
+  await walletService.credit(userId, amount, description, category, referenceType, referenceId);
 }
 
 /**
