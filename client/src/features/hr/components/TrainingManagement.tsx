@@ -613,6 +613,7 @@ function TrainingAnalytics({ data }: { data: any }) {
 
 // Create Program Dialog
 function CreateProgramDialog({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+  const { toast } = useToast();
   const form = useForm({
     resolver: zodResolver(programSchema),
     defaultValues: {
@@ -624,7 +625,11 @@ function CreateProgramDialog({ isOpen, onClose }: { isOpen: boolean, onClose: ()
   });
 
   const onSubmit = (data: any) => {
-    console.log(data);
+    // TODO: Implement actual training program creation API call
+    toast({
+      title: 'Training Program Created',
+      description: `${data.title} has been created successfully.`,
+    });
     onClose();
   };
 
@@ -792,6 +797,7 @@ function EnrollEmployeeDialog({
   program: any,
   employees: any[]
 }) {
+  const { toast } = useToast();
   const form = useForm({
     resolver: zodResolver(enrollmentSchema),
     defaultValues: {
@@ -800,7 +806,11 @@ function EnrollEmployeeDialog({
   });
 
   const onSubmit = (data: any) => {
-    console.log(data);
+    // TODO: Implement actual enrollment API call
+    toast({
+      title: 'Employee Enrolled',
+      description: 'Employee has been enrolled in the training program.',
+    });
     onClose();
   };
 

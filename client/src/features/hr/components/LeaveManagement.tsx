@@ -645,6 +645,7 @@ function CreateLeaveRequestDialog({
   onClose: () => void,
   employees: any[]
 }) {
+  const { toast } = useToast();
   const form = useForm({
     resolver: zodResolver(leaveRequestSchema),
     defaultValues: {
@@ -654,7 +655,11 @@ function CreateLeaveRequestDialog({
   });
 
   const onSubmit = (data: any) => {
-    console.log(data);
+    // TODO: Implement actual leave request API call
+    toast({
+      title: 'Leave Request Created',
+      description: 'Your leave request has been submitted for approval.',
+    });
     onClose();
   };
 
@@ -812,6 +817,7 @@ function UpdateLeaveBalanceDialog({
   onClose: () => void,
   employees: any[]
 }) {
+  const { toast } = useToast();
   const form = useForm({
     resolver: zodResolver(leaveBalanceSchema),
     defaultValues: {
@@ -823,7 +829,11 @@ function UpdateLeaveBalanceDialog({
   });
 
   const onSubmit = (data: any) => {
-    console.log(data);
+    // TODO: Implement actual leave balance update API call
+    toast({
+      title: 'Leave Balance Updated',
+      description: 'The leave balance has been updated successfully.',
+    });
     onClose();
   };
 

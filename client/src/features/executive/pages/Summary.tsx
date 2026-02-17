@@ -171,8 +171,8 @@ export default function ExecutiveSummary() {
           text: `Compliance Health Score: ${data?.healthScore}/100 (Grade ${data?.healthGrade})`,
           url: window.location.href
         });
-      } catch (err) {
-        console.log('Share cancelled');
+      } catch {
+        // Share cancelled by user - no action needed
       }
     } else {
       navigator.clipboard.writeText(window.location.href);

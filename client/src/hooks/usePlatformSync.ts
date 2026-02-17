@@ -291,9 +291,6 @@ export function useComponentSync(componentName: string) {
   const queryClient = useQueryClient();
 
   const syncComponent = useCallback(async () => {
-    // Component-specific sync logic
-    console.log(`Syncing component: ${componentName}`);
-    
     // Invalidate component-specific queries
     if (componentName === 'AdminPanel') {
       queryClient.invalidateQueries({ queryKey: ['/api/admin'] });

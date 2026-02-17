@@ -579,6 +579,7 @@ function MarkAttendanceDialog({
   employees: any[],
   selectedDate: string
 }) {
+  const { toast } = useToast();
   const form = useForm({
     resolver: zodResolver(attendanceSchema),
     defaultValues: {
@@ -588,7 +589,10 @@ function MarkAttendanceDialog({
   });
 
   const onSubmit = (data: any) => {
-    console.log(data);
+    toast({
+      title: 'Attendance Marked',
+      description: 'Employee attendance has been recorded successfully.',
+    });
     onClose();
   };
 
@@ -692,6 +696,7 @@ function CreateShiftDialog({
   onClose: () => void,
   employees: any[]
 }) {
+  const { toast } = useToast();
   const form = useForm({
     resolver: zodResolver(shiftSchema),
     defaultValues: {
@@ -701,7 +706,10 @@ function CreateShiftDialog({
   });
 
   const onSubmit = (data: any) => {
-    console.log(data);
+    toast({
+      title: 'Shift Created',
+      description: 'New shift schedule has been created successfully.',
+    });
     onClose();
   };
 

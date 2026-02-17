@@ -38,6 +38,7 @@ const DigiComplyWorkflowDashboard = lazy(() => import("./components/DigiComplyWo
 
 // --- Auth Pages ---
 const Login = lazy(() => import("@/features/auth/pages/Login"));
+const ForgotPassword = lazy(() => import("@/features/auth/pages/ForgotPassword"));
 const RoleSelection = lazy(() => import("@/features/auth/pages/RoleSelection"));
 const RoleBasedDashboard = lazy(() => import("@/features/auth/pages/RoleBasedDashboard"));
 
@@ -292,6 +293,8 @@ const AppContent = () => {
                 {/* ========== AUTH ROUTES ========== */}
                 <Route path="/login" component={Login} />
                 <Route path="/signin" component={Login} />
+                <Route path="/forgot-password" component={ForgotPassword} />
+                <Route path="/reset-password" component={ForgotPassword} />
                 <Route path="/register" component={ClientRegistration} />
                 <Route path="/client-registration" component={ClientRegistration} />
                 <Route path="/signup" component={ClientRegistration} />

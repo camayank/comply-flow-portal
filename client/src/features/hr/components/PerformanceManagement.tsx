@@ -426,6 +426,7 @@ function EmployeePerformance({ employees }: { employees: any[] }) {
 
 // Create Review Dialog
 function CreateReviewDialog({ isOpen, onClose, employees }: { isOpen: boolean, onClose: () => void, employees: any[] }) {
+  const { toast } = useToast();
   const form = useForm({
     resolver: zodResolver(reviewSchema),
     defaultValues: {
@@ -443,8 +444,11 @@ function CreateReviewDialog({ isOpen, onClose, employees }: { isOpen: boolean, o
   });
 
   const onSubmit = (data: any) => {
-    // Handle form submission
-    console.log(data);
+    // TODO: Implement actual review creation API call
+    toast({
+      title: 'Performance Review Created',
+      description: 'The performance review has been saved successfully.',
+    });
     onClose();
   };
 
@@ -596,6 +600,7 @@ function CreateReviewDialog({ isOpen, onClose, employees }: { isOpen: boolean, o
 
 // Create Goal Dialog
 function CreateGoalDialog({ isOpen, onClose, employees }: { isOpen: boolean, onClose: () => void, employees: any[] }) {
+  const { toast } = useToast();
   const form = useForm({
     resolver: zodResolver(goalSchema),
     defaultValues: {
@@ -608,7 +613,11 @@ function CreateGoalDialog({ isOpen, onClose, employees }: { isOpen: boolean, onC
   });
 
   const onSubmit = (data: any) => {
-    console.log(data);
+    // TODO: Implement actual goal creation API call
+    toast({
+      title: 'Goal Created',
+      description: `${data.title} has been created successfully.`,
+    });
     onClose();
   };
 

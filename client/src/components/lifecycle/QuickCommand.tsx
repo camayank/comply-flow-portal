@@ -122,7 +122,7 @@ export default function QuickCommand({ open, onOpenChange }: QuickCommandProps) 
             <CheckSquare className="mr-2 h-4 w-4" />
             <span>Complete Checkpoint</span>
           </CommandItem>
-          <CommandItem onSelect={() => console.log('Schedule consultation')}>
+          <CommandItem onSelect={() => navigateTo('/lifecycle/consultation')}>
             <Calendar className="mr-2 h-4 w-4" />
             <span>Schedule Consultation</span>
           </CommandItem>
@@ -132,24 +132,24 @@ export default function QuickCommand({ open, onOpenChange }: QuickCommandProps) 
 
         {/* Other */}
         <CommandGroup heading="Other">
-          <CommandItem onSelect={() => console.log('Notifications')}>
+          <CommandItem onSelect={() => navigateTo('/notifications')}>
             <Bell className="mr-2 h-4 w-4" />
             <span>Notifications</span>
             <span className="ml-auto text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">3</span>
           </CommandItem>
-          <CommandItem onSelect={() => console.log('Team')}>
+          <CommandItem onSelect={() => navigateTo('/settings/team')}>
             <Users className="mr-2 h-4 w-4" />
             <span>Team Settings</span>
           </CommandItem>
-          <CommandItem onSelect={() => console.log('Billing')}>
+          <CommandItem onSelect={() => navigateTo('/settings/billing')}>
             <CreditCard className="mr-2 h-4 w-4" />
             <span>Billing & Payments</span>
           </CommandItem>
-          <CommandItem onSelect={() => console.log('Settings')}>
+          <CommandItem onSelect={() => navigateTo('/settings')}>
             <Settings className="mr-2 h-4 w-4" />
             <span>Settings</span>
           </CommandItem>
-          <CommandItem onSelect={() => console.log('Help')}>
+          <CommandItem onSelect={() => navigateTo('/help')}>
             <HelpCircle className="mr-2 h-4 w-4" />
             <span>Help & Support</span>
           </CommandItem>
