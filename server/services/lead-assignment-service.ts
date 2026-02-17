@@ -5,7 +5,7 @@
  */
 import { db } from '../db';
 import { eq, and, desc, sql, inArray, isNull, or } from 'drizzle-orm';
-import { users, leadsEnhanced, operationsTeam, serviceAssignments } from '@shared/schema';
+import { users, leads, operationsTeam } from '@shared/schema';
 import { logger } from '../logger';
 
 // Types
@@ -63,8 +63,8 @@ class LeadAssignmentService {
       // Get lead details
       const [lead] = await db
         .select()
-        .from(leadsEnhanced)
-        .where(eq(leadsEnhanced.id, leadId))
+        .from(leads)
+        .where(eq(leads.id, leadId))
         .limit(1);
 
       if (!lead) {
@@ -73,7 +73,7 @@ class LeadAssignmentService {
 
       // Get available sales executives
       const candidates = await this.getAvailableCandidates(
-        options?.serviceCategory || lead.serviceInterest || undefined,
+        options?.serviceCategory || lead.serviceInterested || undefined,
         rules
       );
 
@@ -85,9 +85,9 @@ class LeadAssignmentService {
       const scoredCandidates = this.scoreCandidates(
         candidates,
         {
-          serviceCategory: options?.serviceCategory || lead.serviceInterest || undefined,
+          serviceCategory: options?.serviceCategory || lead.serviceInterested || undefined,
           priority: options?.priority || lead.priority || 'medium',
-          leadSource: lead.source || undefined,
+          leadSource: lead.leadSource || undefined,
         },
         rules
       );
@@ -101,14 +101,12 @@ class LeadAssignmentService {
 
       // Assign the lead
       await db
-        .update(leadsEnhanced)
+        .update(leads)
         .set({
-          assignedTo: String(bestCandidate.userId),
-          assignmentType: 'auto',
-          assignedAt: new Date(),
+          assignedTo: bestCandidate.userId,
           updatedAt: new Date(),
         })
-        .where(eq(leadsEnhanced.id, leadId));
+        .where(eq(leads.id, leadId));
 
       // Update workload
       await this.incrementWorkload(bestCandidate.userId);
@@ -141,8 +139,8 @@ class LeadAssignmentService {
       // Verify lead exists
       const [lead] = await db
         .select()
-        .from(leadsEnhanced)
-        .where(eq(leadsEnhanced.id, leadId))
+        .from(leads)
+        .where(eq(leads.id, leadId))
         .limit(1);
 
       if (!lead) {
@@ -166,18 +164,16 @@ class LeadAssignmentService {
       }
 
       // Get previous assignee for workload update
-      const previousAssigneeId = lead.assignedTo ? parseInt(lead.assignedTo) : null;
+      const previousAssigneeId = lead.assignedTo || null;
 
       // Update lead assignment
       await db
-        .update(leadsEnhanced)
+        .update(leads)
         .set({
-          assignedTo: String(assignToUserId),
-          assignmentType: 'manual',
-          assignedAt: new Date(),
+          assignedTo: assignToUserId,
           updatedAt: new Date(),
         })
-        .where(eq(leadsEnhanced.id, leadId));
+        .where(eq(leads.id, leadId));
 
       // Update workloads
       if (previousAssigneeId && previousAssigneeId !== assignToUserId) {
@@ -457,30 +453,25 @@ class LeadAssignmentService {
     results: Array<{ leadId: number; success: boolean; assignedTo?: number; reason?: string }>;
   }> {
     // Get unassigned leads
-    let leads;
+    let unassignedLeads;
     if (leadIds && leadIds.length > 0) {
-      leads = await db
+      unassignedLeads = await db
         .select()
-        .from(leadsEnhanced)
-        .where(inArray(leadsEnhanced.id, leadIds));
+        .from(leads)
+        .where(inArray(leads.id, leadIds));
     } else {
-      leads = await db
+      unassignedLeads = await db
         .select()
-        .from(leadsEnhanced)
-        .where(
-          or(
-            isNull(leadsEnhanced.assignedTo),
-            eq(leadsEnhanced.assignedTo, '')
-          )
-        )
+        .from(leads)
+        .where(isNull(leads.assignedTo))
         .limit(100); // Process max 100 at a time
     }
 
     const results: Array<{ leadId: number; success: boolean; assignedTo?: number; reason?: string }> = [];
 
-    for (const lead of leads) {
+    for (const lead of unassignedLeads) {
       const result = await this.autoAssign(lead.id, {
-        serviceCategory: lead.serviceInterest || undefined,
+        serviceCategory: lead.serviceInterested || undefined,
         priority: lead.priority || undefined,
         rules,
       });
@@ -510,20 +501,13 @@ class LeadAssignmentService {
     try {
       // Get the last assigned executive
       const [lastAssigned] = await db
-        .select({ assignedTo: leadsEnhanced.assignedTo })
-        .from(leadsEnhanced)
-        .where(
-          and(
-            sql`assigned_to IS NOT NULL`,
-            sql`assigned_to != ''`
-          )
-        )
-        .orderBy(desc(leadsEnhanced.assignedAt))
+        .select({ assignedTo: leads.assignedTo })
+        .from(leads)
+        .where(sql`assigned_to IS NOT NULL`)
+        .orderBy(desc(leads.updatedAt))
         .limit(1);
 
-      const lastAssignedId = lastAssigned?.assignedTo
-        ? parseInt(lastAssigned.assignedTo)
-        : 0;
+      const lastAssignedId = lastAssigned?.assignedTo || 0;
 
       // Get available executives sorted by ID
       const candidates = await this.getAvailableCandidates();
@@ -544,8 +528,8 @@ class LeadAssignmentService {
       // Get lead
       const [lead] = await db
         .select()
-        .from(leadsEnhanced)
-        .where(eq(leadsEnhanced.id, leadId))
+        .from(leads)
+        .where(eq(leads.id, leadId))
         .limit(1);
 
       if (!lead) {
@@ -554,14 +538,12 @@ class LeadAssignmentService {
 
       // Assign
       await db
-        .update(leadsEnhanced)
+        .update(leads)
         .set({
-          assignedTo: String(nextCandidate.userId),
-          assignmentType: 'auto',
-          assignedAt: new Date(),
+          assignedTo: nextCandidate.userId,
           updatedAt: new Date(),
         })
-        .where(eq(leadsEnhanced.id, leadId));
+        .where(eq(leads.id, leadId));
 
       await this.incrementWorkload(nextCandidate.userId);
 

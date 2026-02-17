@@ -6,7 +6,8 @@
 import { db } from '../db';
 import { eq, and, desc, gte, lte, isNull, or, sql } from 'drizzle-orm';
 import { commissionRules, commissionPayouts, PAYOUT_STATUS } from '@shared/super-admin-schema';
-import { users, agents, serviceRequests, salesProposals } from '@shared/schema';
+import { users, serviceRequests, salesProposals } from '@shared/schema';
+import { agents } from '@shared/universal-schema';
 import { walletService } from './wallet-service';
 import { logger } from '../logger';
 

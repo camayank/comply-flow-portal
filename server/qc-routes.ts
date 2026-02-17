@@ -793,6 +793,200 @@ export function registerQCRoutes(app: Application) {
     }
   });
 
+  // ========== QC WORKFLOW SERVICE ENDPOINTS ==========
+
+  // Import QC workflow service
+  const { qcWorkflowService } = require('./services/qc-workflow-service');
+
+  // Initialize QC review for a service request
+  app.post('/api/qc/workflow/initialize/:serviceRequestId', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { serviceRequestId } = req.params;
+      const { serviceType, priority } = req.body;
+
+      const result = await qcWorkflowService.initializeReview(
+        parseInt(serviceRequestId),
+        serviceType,
+        priority
+      );
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error initializing QC review:', error);
+      res.status(500).json({ error: 'Failed to initialize QC review' });
+    }
+  });
+
+  // Get checklist for service type
+  app.get('/api/qc/workflow/checklist/:serviceType', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { serviceType } = req.params;
+      const checklist = await qcWorkflowService.getChecklistForServiceType(serviceType);
+      res.json(checklist);
+    } catch (error) {
+      console.error('Error fetching checklist:', error);
+      res.status(500).json({ error: 'Failed to fetch checklist' });
+    }
+  });
+
+  // Update checklist item
+  app.patch('/api/qc/workflow/reviews/:reviewId/checklist/:itemId', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { reviewId, itemId } = req.params;
+      const { status, notes } = req.body;
+      const currentUserId = req.user!.id;
+
+      const result = await qcWorkflowService.updateChecklistItem(
+        parseInt(reviewId),
+        itemId,
+        status,
+        notes,
+        currentUserId
+      );
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error updating checklist item:', error);
+      res.status(500).json({ error: 'Failed to update checklist item' });
+    }
+  });
+
+  // Complete QC review with workflow
+  app.post('/api/qc/workflow/reviews/:reviewId/complete', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { reviewId } = req.params;
+      const { decision, reviewNotes, internalComments, reworkInstructions } = req.body;
+      const currentUserId = req.user!.id;
+
+      const result = await qcWorkflowService.completeReview(
+        parseInt(reviewId),
+        decision,
+        currentUserId,
+        { reviewNotes, internalComments, reworkInstructions }
+      );
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error completing QC review:', error);
+      res.status(500).json({ error: 'Failed to complete QC review' });
+    }
+  });
+
+  // Prepare handoff document
+  app.post('/api/qc/workflow/reviews/:reviewId/handoff', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { reviewId } = req.params;
+      const { deliverables, keyHighlights, nextSteps, handoffNotes, signatureRequired } = req.body;
+      const currentUserId = req.user!.id;
+
+      const result = await qcWorkflowService.prepareHandoff(
+        parseInt(reviewId),
+        currentUserId,
+        deliverables,
+        { keyHighlights, nextSteps, handoffNotes, signatureRequired }
+      );
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error preparing handoff:', error);
+      res.status(500).json({ error: 'Failed to prepare handoff' });
+    }
+  });
+
+  // Capture client signature
+  app.post('/api/qc/workflow/deliveries/:deliveryId/signature', sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { deliveryId } = req.params;
+      const { signatureImage, signedBy, ipAddress, deviceInfo } = req.body;
+
+      const verificationCode = qcWorkflowService.generateVerificationCode();
+
+      const result = await qcWorkflowService.captureSignature(
+        parseInt(deliveryId),
+        {
+          signatureImage,
+          signedAt: new Date(),
+          signedBy,
+          ipAddress,
+          deviceInfo,
+          verificationCode
+        }
+      );
+
+      if (result.success) {
+        res.json({ success: true, verificationCode });
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error capturing signature:', error);
+      res.status(500).json({ error: 'Failed to capture signature' });
+    }
+  });
+
+  // Notify client for handoff
+  app.post('/api/qc/workflow/deliveries/:deliveryId/notify', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { deliveryId } = req.params;
+      const { clientUserId } = req.body;
+
+      const result = await qcWorkflowService.notifyClientForHandoff(
+        parseInt(deliveryId),
+        clientUserId
+      );
+
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error notifying client:', error);
+      res.status(500).json({ error: 'Failed to notify client' });
+    }
+  });
+
+  // Get pending handoffs
+  app.get('/api/qc/workflow/handoffs/pending', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { myOnly } = req.query;
+      const currentUserId = myOnly === 'true' ? req.user!.id : undefined;
+
+      const handoffs = await qcWorkflowService.getPendingHandoffs(currentUserId);
+      res.json(handoffs);
+    } catch (error) {
+      console.error('Error fetching pending handoffs:', error);
+      res.status(500).json({ error: 'Failed to fetch pending handoffs' });
+    }
+  });
+
+  // Get workflow statistics
+  app.get('/api/qc/workflow/stats', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const stats = await qcWorkflowService.getWorkflowStats();
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching workflow stats:', error);
+      res.status(500).json({ error: 'Failed to fetch workflow stats' });
+    }
+  });
+
   console.log('✅ QC routes registered');
 }
 
