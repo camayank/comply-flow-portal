@@ -19,6 +19,7 @@ import messagingRoutes from './messaging';
 import walletRoutes from './wallet';
 import agentKycRoutes from './agent-kyc';
 import razorpayWebhookRoutes from './webhooks/razorpay';
+import auditRoutes from './audit';
 // Note: opsCaseRoutes are registered in main server/routes.ts via server/ops-case-routes.ts
 
 /**
@@ -75,6 +76,10 @@ export function registerApiRoutes(app: Express): void {
 
   // Webhook routes (external payment provider callbacks)
   app.use('/webhooks/razorpay', razorpayWebhookRoutes);
+
+  // Audit log routes (compliance and security)
+  app.use(`${API_PREFIX}/audit`, auditRoutes);
+  app.use('/api/audit', auditRoutes);
 
   console.log('✅ API v1 routes registered');
 
