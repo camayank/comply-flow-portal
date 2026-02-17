@@ -180,7 +180,7 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
       )
       .limit(1);
 
-    if (session && session.expiresAt >= new Date()) {
+    if (session && session.expiresAt > new Date()) {
       const [user] = await db
         .select()
         .from(users)
