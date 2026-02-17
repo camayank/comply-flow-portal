@@ -7,9 +7,151 @@ import {
 } from '../shared/schema';
 import { eq, and, or, desc, asc, sql, count, avg, sum, gte, lte, between } from 'drizzle-orm';
 import { storage } from './storage';
+import { analyticsService } from './services/analytics-service';
+import {
+  sessionAuthMiddleware,
+  requireMinimumRole,
+  USER_ROLES,
+  type AuthenticatedRequest
+} from './rbac-middleware';
 
 export function registerDashboardAnalyticsRoutes(app: Express) {
   console.log('📊 Registering Dashboard Analytics routes...');
+
+  // ============================================================================
+  // CONSOLIDATED ANALYTICS SERVICE ENDPOINTS
+  // ============================================================================
+
+  // Dashboard KPIs - Real-time metrics
+  app.get('/api/analytics/kpis', sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { dateRange = '30' } = req.query;
+      const kpis = await analyticsService.getDashboardKPIs(parseInt(dateRange as string));
+      res.json(kpis);
+    } catch (error) {
+      console.error('Error fetching KPIs:', error);
+      res.status(500).json({ error: 'Failed to fetch KPIs' });
+    }
+  });
+
+  // Revenue analytics
+  app.get('/api/analytics/revenue', sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_MANAGER), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { dateRange = '90' } = req.query;
+      const revenue = await analyticsService.getRevenueAnalytics(parseInt(dateRange as string));
+      res.json(revenue);
+    } catch (error) {
+      console.error('Error fetching revenue analytics:', error);
+      res.status(500).json({ error: 'Failed to fetch revenue analytics' });
+    }
+  });
+
+  // Conversion funnel
+  app.get('/api/analytics/funnel', sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { dateRange = '30' } = req.query;
+      const funnel = await analyticsService.getConversionFunnel(parseInt(dateRange as string));
+      res.json(funnel);
+    } catch (error) {
+      console.error('Error fetching conversion funnel:', error);
+      res.status(500).json({ error: 'Failed to fetch conversion funnel' });
+    }
+  });
+
+  // Performance metrics
+  app.get('/api/analytics/performance', sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { dateRange = '30' } = req.query;
+      const performance = await analyticsService.getPerformanceMetrics(parseInt(dateRange as string));
+      res.json(performance);
+    } catch (error) {
+      console.error('Error fetching performance metrics:', error);
+      res.status(500).json({ error: 'Failed to fetch performance metrics' });
+    }
+  });
+
+  // Metric trends
+  app.get('/api/analytics/trends/:metric', sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { metric } = req.params;
+      const { granularity = 'daily', dateRange = '30' } = req.query;
+
+      if (!['revenue', 'services', 'leads', 'clients'].includes(metric)) {
+        res.status(400).json({ error: 'Invalid metric' });
+        return;
+      }
+
+      const trends = await analyticsService.getMetricTrend(
+        metric as 'revenue' | 'services' | 'leads' | 'clients',
+        granularity as 'daily' | 'weekly' | 'monthly',
+        parseInt(dateRange as string)
+      );
+      res.json(trends);
+    } catch (error) {
+      console.error('Error fetching metric trends:', error);
+      res.status(500).json({ error: 'Failed to fetch metric trends' });
+    }
+  });
+
+  // Top performers
+  app.get('/api/analytics/top-performers', sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_MANAGER), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { metric = 'services', limit = '10' } = req.query;
+
+      if (!['services', 'revenue', 'quality'].includes(metric as string)) {
+        res.status(400).json({ error: 'Invalid metric' });
+        return;
+      }
+
+      const performers = await analyticsService.getTopPerformers(
+        metric as 'services' | 'revenue' | 'quality',
+        parseInt(limit as string)
+      );
+      res.json(performers);
+    } catch (error) {
+      console.error('Error fetching top performers:', error);
+      res.status(500).json({ error: 'Failed to fetch top performers' });
+    }
+  });
+
+  // AI-generated insights
+  app.get('/api/analytics/insights', sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const insights = await analyticsService.generateInsights();
+      res.json({ insights, generatedAt: new Date().toISOString() });
+    } catch (error) {
+      console.error('Error generating insights:', error);
+      res.status(500).json({ error: 'Failed to generate insights' });
+    }
+  });
+
+  // Export analytics
+  app.get('/api/analytics/export', sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_MANAGER), async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { type = 'kpis', format = 'json' } = req.query;
+
+      if (!['kpis', 'revenue', 'performance'].includes(type as string)) {
+        res.status(400).json({ error: 'Invalid export type' });
+        return;
+      }
+
+      const data = await analyticsService.exportAnalytics(
+        type as 'kpis' | 'revenue' | 'performance',
+        format as 'json' | 'csv'
+      );
+
+      if (format === 'csv') {
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=analytics-${type}-${Date.now()}.csv`);
+        res.send(data);
+      } else {
+        res.json(data);
+      }
+    } catch (error) {
+      console.error('Error exporting analytics:', error);
+      res.status(500).json({ error: 'Failed to export analytics' });
+    }
+  });
 
   // ============================================================================
   // UNIFIED EXECUTIVE DASHBOARD API
