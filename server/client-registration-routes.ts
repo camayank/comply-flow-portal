@@ -6,6 +6,12 @@ import bcrypt from 'bcrypt';
 import { generateClientId } from './services/id-generator';
 import { syncComplianceTracking } from './compliance-tracking-sync';
 import { generateTempPassword } from './security-utils';
+import { otpService } from './services/notifications/otp.service';
+import { EmailService } from './services/notifications/channels/email.service';
+import { logger } from './logger';
+
+// Create email service instance for client registration
+const emailService = new EmailService();
 
 export function registerClientRegistrationRoutes(app: Express) {
 
@@ -105,8 +111,21 @@ export function registerClientRegistrationRoutes(app: Express) {
 
       await syncComplianceTracking({ entityIds: [newEntity.id] });
 
-      // TODO: Send welcome email with temporary password
-      // Password is sent via email service (not logged for security)
+      // Send welcome email with credentials
+      const emailTemplate = emailService.getTemplate('welcome', {
+        userName: newUser.fullName || newUser.username,
+        email: newUser.email,
+        tempPassword,
+        loginUrl: `${process.env.APP_URL || 'https://digicomply.in'}/login`,
+      });
+
+      await emailService.send({
+        to: newUser.email,
+        subject: emailTemplate.subject,
+        html: emailTemplate.html,
+      });
+
+      logger.info(`Welcome email sent to ${newUser.email}`);
 
       // SECURITY: Never send passwords in API responses
       // Password is sent via secure email channel only
@@ -132,9 +151,16 @@ export function registerClientRegistrationRoutes(app: Express) {
     try {
       const { email, otp } = req.body;
 
-      // TODO: Implement OTP verification logic
-      // For now, just mark user as verified
-      
+      if (!email || !otp) {
+        return res.status(400).json({ error: 'Email and OTP are required' });
+      }
+
+      const result = await otpService.verify(email, 'verification', otp);
+
+      if (!result.valid) {
+        return res.status(400).json({ error: result.reason });
+      }
+
       const [user] = await db
         .select()
         .from(users)
@@ -145,14 +171,15 @@ export function registerClientRegistrationRoutes(app: Express) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      // In production, verify OTP here
-      // For now, just return success
+      // Mark user as verified (if you have an emailVerified field, update it here)
+      logger.info(`Email verified successfully for ${email}`);
+
       res.json({
         success: true,
         message: 'Email verified successfully',
       });
-    } catch (error) {
-      console.error('Email verification error:', error);
+    } catch (error: any) {
+      logger.error('Email verification error:', error);
       res.status(500).json({ error: 'Verification failed' });
     }
   });
@@ -162,6 +189,10 @@ export function registerClientRegistrationRoutes(app: Express) {
     try {
       const { email } = req.body;
 
+      if (!email) {
+        return res.status(400).json({ error: 'Email is required' });
+      }
+
       const [user] = await db
         .select()
         .from(users)
@@ -172,15 +203,53 @@ export function registerClientRegistrationRoutes(app: Express) {
         return res.status(404).json({ error: 'User not found' });
       }
 
-      // TODO: Generate and send new OTP
-      console.log(`OTP resent to ${email}`);
+      const result = await otpService.generateAndSend(
+        email,
+        'verification',
+        { userName: user.fullName || undefined }
+      );
+
+      if (!result.success) {
+        return res.status(429).json({ error: result.error });
+      }
 
       res.json({
         success: true,
         message: 'OTP sent successfully',
+        expiresAt: result.expiresAt,
       });
-    } catch (error) {
-      console.error('Resend OTP error:', error);
+    } catch (error: any) {
+      logger.error('Resend OTP error:', error);
+      res.status(500).json({ error: 'Failed to send OTP' });
+    }
+  });
+
+  // Send verification OTP (initial request)
+  app.post('/api/client/send-otp', async (req, res) => {
+    try {
+      const { identifier, purpose = 'verification' } = req.body;
+
+      if (!identifier) {
+        return res.status(400).json({ error: 'Identifier (email or phone) is required' });
+      }
+
+      const result = await otpService.generateAndSend(
+        identifier,
+        purpose as any,
+        { ipAddress: req.ip, userAgent: req.headers['user-agent'] }
+      );
+
+      if (!result.success) {
+        return res.status(429).json({ error: result.error });
+      }
+
+      res.json({
+        success: true,
+        message: 'OTP sent successfully',
+        expiresAt: result.expiresAt,
+      });
+    } catch (error: any) {
+      logger.error('Send OTP error:', error);
       res.status(500).json({ error: 'Failed to send OTP' });
     }
   });
