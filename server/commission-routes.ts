@@ -4,6 +4,7 @@ import { commissionRules, commissionPayouts, AGENT_TIER, PAYOUT_STATUS } from "@
 import { users } from "@shared/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES, type AuthenticatedRequest } from "./rbac-middleware";
+import { commissionService } from "./services/commission-service";
 
 // Valid agent tiers for validation
 const VALID_AGENT_TIERS = ['silver', 'gold', 'platinum'] as const;
@@ -568,6 +569,239 @@ export function registerCommissionRoutes(app: Express) {
       } catch (error: any) {
         console.error('Failed to mark commission payout as paid:', error);
         res.status(500).json({ error: "Failed to mark commission payout as paid" });
+      }
+    }
+  );
+
+  // ============================================================================
+  // COMMISSION SERVICE ENDPOINTS (Calculation & Processing)
+  // ============================================================================
+
+  /**
+   * POST /api/super-admin/commission/calculate
+   * Preview commission calculation for a sale
+   * Body: { agentId, saleAmount, serviceCategory?, serviceId? }
+   */
+  app.post(
+    "/api/super-admin/commission/calculate",
+    sessionAuthMiddleware,
+    requireMinimumRole(USER_ROLES.OPS_MANAGER),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { agentId, saleAmount, serviceCategory, serviceId } = req.body;
+
+        if (!agentId || saleAmount === undefined) {
+          return res.status(400).json({ error: "agentId and saleAmount are required" });
+        }
+
+        const calculation = await commissionService.calculateCommission(
+          agentId,
+          parseFloat(saleAmount),
+          serviceCategory,
+          serviceId
+        );
+
+        res.json(calculation);
+      } catch (error: any) {
+        console.error('Commission calculation error:', error);
+        res.status(500).json({ error: "Failed to calculate commission" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/super-admin/commission/generate-payouts
+   * Generate payouts for all agents for a period
+   * Body: { periodStart, periodEnd }
+   */
+  app.post(
+    "/api/super-admin/commission/generate-payouts",
+    sessionAuthMiddleware,
+    requireMinimumRole(USER_ROLES.SUPER_ADMIN),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { periodStart, periodEnd } = req.body;
+
+        if (!periodStart || !periodEnd) {
+          return res.status(400).json({ error: "periodStart and periodEnd are required" });
+        }
+
+        const start = new Date(periodStart);
+        const end = new Date(periodEnd);
+
+        if (end <= start) {
+          return res.status(400).json({ error: "periodEnd must be after periodStart" });
+        }
+
+        // Get all agents with sales in period
+        const agentsSummary = await commissionService.getAgentsSalesSummary(start, end);
+
+        const results = [];
+        for (const agent of agentsSummary) {
+          if (agent.totalSales > 0) {
+            try {
+              const payout = await commissionService.generatePayout(
+                agent.agentId,
+                start,
+                end
+              );
+              results.push({
+                agentId: agent.agentId,
+                agentName: agent.agentName,
+                success: true,
+                payoutId: payout.payoutId,
+                amount: payout.amount,
+              });
+            } catch (err: any) {
+              results.push({
+                agentId: agent.agentId,
+                agentName: agent.agentName,
+                success: false,
+                error: err.message,
+              });
+            }
+          }
+        }
+
+        res.json({
+          periodStart: start,
+          periodEnd: end,
+          totalAgents: results.length,
+          results,
+        });
+      } catch (error: any) {
+        console.error('Generate payouts error:', error);
+        res.status(500).json({ error: "Failed to generate payouts" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/super-admin/commission-payouts/:id/process
+   * Process approved payout via wallet credit
+   */
+  app.post(
+    "/api/super-admin/commission-payouts/:id/process",
+    sessionAuthMiddleware,
+    requireMinimumRole(USER_ROLES.SUPER_ADMIN),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const payoutId = parseInt(req.params.id);
+        if (isNaN(payoutId)) {
+          return res.status(400).json({ error: "Invalid payout ID" });
+        }
+
+        const result = await commissionService.processPayout(payoutId);
+
+        if (!result.success) {
+          return res.status(400).json({ error: result.error });
+        }
+
+        res.json({
+          success: true,
+          message: "Payout processed and credited to agent wallet",
+          payoutId: result.payoutId,
+          walletTransactionId: result.walletTransactionId,
+        });
+      } catch (error: any) {
+        console.error('Process payout error:', error);
+        res.status(500).json({ error: "Failed to process payout" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/super-admin/commission/clawback
+   * Apply clawback for refunded/cancelled sale
+   * Body: { agentId, originalSaleAmount, reason }
+   */
+  app.post(
+    "/api/super-admin/commission/clawback",
+    sessionAuthMiddleware,
+    requireMinimumRole(USER_ROLES.SUPER_ADMIN),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { agentId, originalSaleAmount, reason } = req.body;
+
+        if (!agentId || !originalSaleAmount || !reason) {
+          return res.status(400).json({ error: "agentId, originalSaleAmount, and reason are required" });
+        }
+
+        const result = await commissionService.applyClawback(
+          agentId,
+          parseFloat(originalSaleAmount),
+          reason
+        );
+
+        if (!result.success) {
+          return res.status(400).json({ error: "Failed to apply clawback. Insufficient wallet balance?" });
+        }
+
+        res.json({
+          success: true,
+          message: `Clawback of Rs ${result.deductionAmount.toFixed(2)} applied`,
+          deductionAmount: result.deductionAmount,
+        });
+      } catch (error: any) {
+        console.error('Clawback error:', error);
+        res.status(500).json({ error: "Failed to apply clawback" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/super-admin/commission/stats
+   * Get commission statistics
+   */
+  app.get(
+    "/api/super-admin/commission/stats",
+    sessionAuthMiddleware,
+    requireMinimumRole(USER_ROLES.OPS_MANAGER),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const stats = await commissionService.getStats();
+        res.json(stats);
+      } catch (error: any) {
+        console.error('Commission stats error:', error);
+        res.status(500).json({ error: "Failed to fetch commission stats" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/super-admin/commission/agents-summary
+   * Get all agents' commission summary for a period
+   * Query params: periodStart, periodEnd
+   */
+  app.get(
+    "/api/super-admin/commission/agents-summary",
+    sessionAuthMiddleware,
+    requireMinimumRole(USER_ROLES.OPS_MANAGER),
+    async (req: AuthenticatedRequest, res: Response) => {
+      try {
+        const { periodStart, periodEnd } = req.query;
+
+        // Default to current month if not specified
+        const now = new Date();
+        const start = periodStart
+          ? new Date(periodStart as string)
+          : new Date(now.getFullYear(), now.getMonth(), 1);
+        const end = periodEnd
+          ? new Date(periodEnd as string)
+          : new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+        const summary = await commissionService.getAgentsSalesSummary(start, end);
+
+        res.json({
+          periodStart: start,
+          periodEnd: end,
+          agents: summary,
+          totalSales: summary.reduce((sum, a) => sum + a.totalSales, 0),
+          totalCommission: summary.reduce((sum, a) => sum + a.totalCommission, 0),
+        });
+      } catch (error: any) {
+        console.error('Agents summary error:', error);
+        res.status(500).json({ error: "Failed to fetch agents summary" });
       }
     }
   );
