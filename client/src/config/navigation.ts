@@ -18,6 +18,13 @@ import {
   Target,
   PieChart,
   LucideIcon,
+  HelpCircle,
+  Gift,
+  Clock,
+  GraduationCap,
+  UserCheck,
+  TrendingUp,
+  Clipboard,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -71,6 +78,7 @@ const CLIENT_NAV: NavSection[] = [
     title: 'Account',
     items: [
       { label: 'Messages', href: '/messages', icon: MessageSquare },
+      { label: 'Support', href: '/support', icon: HelpCircle },
       { label: 'Notifications', href: '/notifications', icon: Bell },
       { label: 'Billing', href: '/portal-v2/account/billing', icon: CreditCard },
       { label: 'Settings', href: '/portal-v2/account/security', icon: Settings },
@@ -85,6 +93,13 @@ const AGENT_NAV: NavSection[] = [
       { label: 'My Leads', href: '/agent/leads', icon: Users },
       { label: 'Commissions', href: '/agent/commissions', icon: CreditCard },
       { label: 'Performance', href: '/agent/performance', icon: BarChart3 },
+    ],
+  },
+  {
+    title: 'Sales',
+    items: [
+      { label: 'Proposals', href: '/proposals', icon: FileText },
+      { label: 'Referrals', href: '/referrals', icon: Gift },
     ],
   },
   {
@@ -106,9 +121,18 @@ const OPERATIONS_NAV: NavSection[] = [
     ],
   },
   {
+    title: 'Management',
+    items: [
+      { label: 'Team Assignment', href: '/ops/team-assignment', icon: Users },
+      { label: 'Status Management', href: '/status-management', icon: Clipboard },
+    ],
+  },
+  {
     title: 'Analytics',
     items: [
       { label: 'Metrics', href: '/quality-metrics', icon: BarChart3 },
+      { label: 'Performance', href: '/ops/performance', icon: TrendingUp },
+      { label: 'Executive', href: '/executive-dashboard', icon: PieChart },
     ],
   },
 ];
@@ -130,6 +154,14 @@ const SALES_NAV: NavSection[] = [
       { label: 'Leads', href: '/leads', icon: Users },
       { label: 'Pipeline', href: '/lead-pipeline', icon: Activity },
       { label: 'Proposals', href: '/proposals', icon: FileText },
+    ],
+  },
+  {
+    title: 'Analytics',
+    items: [
+      { label: 'Referrals', href: '/referrals', icon: Gift },
+      { label: 'Analytics', href: '/analytics', icon: BarChart3 },
+      { label: 'Executive', href: '/executive-dashboard', icon: PieChart },
     ],
   },
 ];
@@ -185,7 +217,16 @@ const HR_NAV: NavSection[] = [
     items: [
       { label: 'Dashboard', href: '/hr', icon: Home },
       { label: 'Employees', href: '/hr/employees', icon: Users },
+      { label: 'Attendance', href: '/hr/attendance', icon: Clock },
+      { label: 'Leave', href: '/hr/leave', icon: Calendar },
+    ],
+  },
+  {
+    title: 'Development',
+    items: [
+      { label: 'Training', href: '/hr/training', icon: GraduationCap },
       { label: 'Performance', href: '/hr/performance', icon: BarChart3 },
+      { label: 'Onboarding', href: '/hr/onboarding', icon: UserCheck },
     ],
   },
 ];

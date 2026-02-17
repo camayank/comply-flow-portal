@@ -22,6 +22,7 @@ import razorpayWebhookRoutes from './webhooks/razorpay';
 import auditRoutes from './audit';
 import governmentFilingRoutes from './government-filing';
 import reportsRoutes from './reports';
+import hrRoutes from './hr';
 // Note: opsCaseRoutes are registered in main server/routes.ts via server/ops-case-routes.ts
 
 /**
@@ -90,6 +91,10 @@ export function registerApiRoutes(app: Express): void {
   // Report generator routes
   app.use(`${API_PREFIX}/reports`, reportsRoutes);
   app.use('/api/reports', reportsRoutes);
+
+  // HR management routes (employees, attendance, leave, training, performance)
+  app.use(`${API_PREFIX}/hr`, hrRoutes);
+  app.use('/api/hr', hrRoutes);
 
   console.log('✅ API v1 routes registered');
 

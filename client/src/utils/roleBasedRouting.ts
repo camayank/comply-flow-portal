@@ -61,15 +61,34 @@ export const iconMap: Record<string, LucideIcon> = {
   'Home': Home,
 };
 
+/**
+ * User Roles Definition
+ *
+ * ROLE HIERARCHY:
+ * - super_admin (100): Full platform access, multi-tenant management
+ * - admin (90): Single-tenant administration, user/service management
+ * - sales_manager (85): Sales team lead, pipeline analytics
+ * - ops_manager (80): Operations team lead, work assignment
+ * - sales_executive (75): Individual sales contributor
+ * - ops_executive (70): Standard operations role (PREFERRED)
+ * - customer_service (60): Client support and ticket handling
+ * - qc_executive (55): Quality control and review
+ * - accountant (50): Financial operations
+ * - agent (40): External sales agent/partner
+ * - client (10): End customer
+ *
+ * NOTE: ops_exec and ops_lead are aliases for ops_executive (legacy support)
+ * New implementations should use OPS_EXECUTIVE
+ */
 export const USER_ROLES = {
   SUPER_ADMIN: 'super_admin',
   ADMIN: 'admin',
   SALES_MANAGER: 'sales_manager',
   SALES_EXECUTIVE: 'sales_executive',
   OPS_MANAGER: 'ops_manager',
-  OPS_EXECUTIVE: 'ops_executive',
-  OPS_EXEC: 'ops_exec',
-  OPS_LEAD: 'ops_lead',
+  OPS_EXECUTIVE: 'ops_executive', // Preferred operations role
+  OPS_EXEC: 'ops_exec',           // Legacy alias for ops_executive
+  OPS_LEAD: 'ops_lead',           // Legacy alias for ops_executive
   CUSTOMER_SERVICE: 'customer_service',
   QC_EXECUTIVE: 'qc_executive',
   ACCOUNTANT: 'accountant',

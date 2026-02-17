@@ -24,6 +24,9 @@ const PageLoader = () => <SkeletonPage />;
 // --- Shared / Public Pages ---
 const LandingPageV3 = lazy(() => import("@/features/shared/pages/LandingPage"));
 const NotFound = lazy(() => import("@/features/shared/pages/NotFound"));
+const PrivacyPolicy = lazy(() => import("@/features/shared/pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("@/features/shared/pages/TermsOfService"));
+const RefundPolicy = lazy(() => import("@/features/shared/pages/RefundPolicy"));
 const DevHub = lazy(() => import("@/features/shared/pages/DevHub"));
 const TaskManagement = lazy(() => import("@/features/shared/pages/TaskManagement"));
 const AiDocumentPreparation = lazy(() => import("@/features/shared/pages/AiDocumentPreparation"));
@@ -559,10 +562,10 @@ const AppContent = () => {
                 <Route path="/workflow-dashboard" component={DigiComplyWorkflowDashboard} />
                 <Route path="/knowledge-base" component={KnowledgeBase} />
 
-                {/* Legal/Policy Pages - placeholder routes */}
-                <Route path="/privacy-policy" component={LandingPageV3} />
-                <Route path="/terms-of-service" component={LandingPageV3} />
-                <Route path="/refund-policy" component={LandingPageV3} />
+                {/* Legal/Policy Pages */}
+                <Route path="/privacy-policy" component={PrivacyPolicy} />
+                <Route path="/terms-of-service" component={TermsOfService} />
+                <Route path="/refund-policy" component={RefundPolicy} />
 
                 {/* 404 Fallback */}
                 <Route component={NotFound} />
