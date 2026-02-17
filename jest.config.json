@@ -22,6 +22,9 @@
       }
     }]
   },
+  "moduleNameMapper": {
+    "^@shared/(.*)$": "<rootDir>/shared/$1"
+  },
   "moduleFileExtensions": ["ts", "js", "json", "node"],
   "collectCoverageFrom": [
     "server/**/*.ts",
