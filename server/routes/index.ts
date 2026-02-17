@@ -14,6 +14,10 @@ import adminRoutes from './admin';
 import paymentRoutes from './payment';
 import complianceStateRoutes from '../compliance-state-routes';
 import monitoringRoutes from '../monitoring/routes';
+import notificationRoutes from './notifications';
+import messagingRoutes from './messaging';
+import walletRoutes from './wallet';
+import agentKycRoutes from './agent-kyc';
 // Note: opsCaseRoutes are registered in main server/routes.ts via server/ops-case-routes.ts
 
 /**
@@ -49,6 +53,24 @@ export function registerApiRoutes(app: Express): void {
 
   // Monitoring routes (APM, metrics, alerts)
   app.use(`${API_PREFIX}/monitoring`, monitoringRoutes);
+
+  // Notification routes (in-app, preferences, OTP)
+  app.use(`${API_PREFIX}/notifications`, notificationRoutes);
+  app.use('/api/notifications', notificationRoutes); // Also mount at /api for backwards compat
+
+  // Messaging routes (threads, messages)
+  app.use(`${API_PREFIX}/messages`, messagingRoutes);
+  app.use('/api/messages', messagingRoutes);
+
+  // Wallet & Referral routes
+  app.use(`${API_PREFIX}/wallet`, walletRoutes);
+  app.use('/api/wallet', walletRoutes);
+  app.use(`${API_PREFIX}/referrals`, walletRoutes);
+  app.use('/api/referrals', walletRoutes);
+
+  // Agent KYC routes
+  app.use(`${API_PREFIX}/agent/kyc`, agentKycRoutes);
+  app.use('/api/agent/kyc', agentKycRoutes);
 
   console.log('✅ API v1 routes registered');
 
