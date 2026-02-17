@@ -21,6 +21,7 @@ import agentKycRoutes from './agent-kyc';
 import razorpayWebhookRoutes from './webhooks/razorpay';
 import auditRoutes from './audit';
 import governmentFilingRoutes from './government-filing';
+import reportsRoutes from './reports';
 // Note: opsCaseRoutes are registered in main server/routes.ts via server/ops-case-routes.ts
 
 /**
@@ -85,6 +86,10 @@ export function registerApiRoutes(app: Express): void {
   // Government filing routes (GST, ITR, MCA, TDS, PF, ESI)
   app.use(`${API_PREFIX}/government`, governmentFilingRoutes);
   app.use('/api/government', governmentFilingRoutes);
+
+  // Report generator routes
+  app.use(`${API_PREFIX}/reports`, reportsRoutes);
+  app.use('/api/reports', reportsRoutes);
 
   console.log('✅ API v1 routes registered');
 
