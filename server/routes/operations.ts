@@ -9,6 +9,7 @@ import { authenticateToken } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { apiLimiter } from '../middleware/rateLimiter';
 import { asyncHandler, NotFoundError, ValidationError } from '../middleware/errorHandler';
+import { slaService } from '../services/sla-service';
 
 const router = Router();
 
@@ -679,6 +680,106 @@ router.post('/tasks/bulk-assign', asyncHandler(async (req: Request, res: Respons
     message: `Assigned ${results.success.length} of ${taskIds.length} tasks`,
     results
   });
+}));
+
+// =====================================================
+// SLA MANAGEMENT ENDPOINTS
+// =====================================================
+
+/**
+ * GET /api/v1/operations/sla/:requestId
+ * Get SLA status for a specific service request
+ */
+router.get('/sla/:requestId', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const requestId = parseInt(req.params.requestId);
+
+    if (isNaN(requestId)) {
+      throw new ValidationError('Invalid request ID');
+    }
+
+    const status = await slaService.getStatus(requestId);
+
+    if (!status) {
+      throw new NotFoundError('Service request');
+    }
+
+    res.json({
+      success: true,
+      data: status
+    });
+  } catch (error: any) {
+    if (error instanceof NotFoundError || error instanceof ValidationError) {
+      throw error;
+    }
+    res.status(500).json({ error: 'Failed to get SLA status' });
+  }
+}));
+
+/**
+ * GET /api/v1/operations/sla/summary
+ * Get SLA summary statistics for dashboard
+ */
+router.get('/sla/summary', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const summary = await slaService.getSLASummary();
+
+    res.json({
+      success: true,
+      data: summary
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get SLA summary' });
+  }
+}));
+
+/**
+ * POST /api/v1/operations/sla/check
+ * Trigger SLA check manually (admin only)
+ */
+router.post('/sla/check', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const result = await slaService.checkBreachesAndEscalate();
+
+    res.json({
+      success: true,
+      message: `SLA check completed: ${result.checked} checked, ${result.escalated} escalated, ${result.breached} breached`,
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'SLA check failed' });
+  }
+}));
+
+/**
+ * POST /api/v1/operations/sla/:requestId/escalate
+ * Manually escalate a service request
+ */
+router.post('/sla/:requestId/escalate', asyncHandler(async (req: Request, res: Response) => {
+  try {
+    const requestId = parseInt(req.params.requestId);
+    const { level = 1, notifyRoles = ['ops_manager'] } = req.body;
+
+    if (isNaN(requestId)) {
+      throw new ValidationError('Invalid request ID');
+    }
+
+    const success = await slaService.escalate(requestId, level, notifyRoles);
+
+    if (!success) {
+      throw new NotFoundError('Service request');
+    }
+
+    res.json({
+      success: true,
+      message: `Service request escalated to level ${level}`
+    });
+  } catch (error: any) {
+    if (error instanceof NotFoundError || error instanceof ValidationError) {
+      throw error;
+    }
+    res.status(500).json({ error: 'Failed to escalate service request' });
+  }
 }));
 
 export default router;
