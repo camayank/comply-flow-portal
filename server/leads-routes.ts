@@ -15,6 +15,7 @@ import {
 } from './rbac-middleware';
 import { generateClientId, generateLeadId } from './services/id-generator';
 import { generateTempPassword } from './security-utils';
+import { leadAssignmentService } from './services/lead-assignment-service';
 
 const router = express.Router();
 
@@ -803,6 +804,157 @@ router.post('/leads/:id/convert', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE
   } catch (error) {
     console.error('Error converting lead:', error);
     res.status(500).json({ error: 'Failed to convert lead to client' });
+  }
+});
+
+// ============================================================================
+// INTELLIGENT LEAD ASSIGNMENT ENDPOINTS
+// ============================================================================
+
+// POST /api/leads/:id/auto-assign - Auto-assign lead using intelligent matching
+router.post('/leads/:id/auto-assign', requireMinimumRole(USER_ROLES.SALES_MANAGER), async (req: AuthenticatedRequest, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+    const { serviceCategory, priority, rules } = req.body;
+
+    const result = await leadAssignmentService.autoAssign(leadId, {
+      serviceCategory,
+      priority,
+      rules,
+    });
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    res.json({
+      success: true,
+      message: 'Lead auto-assigned successfully',
+      assignedTo: result.assignedTo,
+      assignedToName: result.assignedToName,
+      matchScore: result.matchScore,
+    });
+  } catch (error) {
+    console.error('Error auto-assigning lead:', error);
+    res.status(500).json({ error: 'Failed to auto-assign lead' });
+  }
+});
+
+// POST /api/leads/:id/manual-assign - Manually assign lead to specific executive
+router.post('/leads/:id/manual-assign', requireMinimumRole(USER_ROLES.SALES_MANAGER), async (req: AuthenticatedRequest, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+    const { assignToUserId, notes } = req.body;
+
+    if (!assignToUserId) {
+      return res.status(400).json({ error: 'assignToUserId is required' });
+    }
+
+    const result = await leadAssignmentService.manualAssign(
+      leadId,
+      assignToUserId,
+      req.user?.id || 0,
+      notes
+    );
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    res.json({
+      success: true,
+      message: 'Lead manually assigned',
+      assignedTo: result.assignedTo,
+      assignedToName: result.assignedToName,
+    });
+  } catch (error) {
+    console.error('Error manually assigning lead:', error);
+    res.status(500).json({ error: 'Failed to manually assign lead' });
+  }
+});
+
+// POST /api/leads/:id/reassign - Reassign lead to different executive
+router.post('/leads/:id/reassign', requireMinimumRole(USER_ROLES.SALES_MANAGER), async (req: AuthenticatedRequest, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+    const { newAssigneeId, reason } = req.body;
+
+    if (!newAssigneeId || !reason) {
+      return res.status(400).json({ error: 'newAssigneeId and reason are required' });
+    }
+
+    const result = await leadAssignmentService.reassign(
+      leadId,
+      newAssigneeId,
+      req.user?.id || 0,
+      reason
+    );
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    res.json({
+      success: true,
+      message: 'Lead reassigned successfully',
+      assignedTo: result.assignedTo,
+      assignedToName: result.assignedToName,
+    });
+  } catch (error) {
+    console.error('Error reassigning lead:', error);
+    res.status(500).json({ error: 'Failed to reassign lead' });
+  }
+});
+
+// POST /api/leads/:id/round-robin-assign - Round-robin assignment for even distribution
+router.post('/leads/:id/round-robin-assign', requireMinimumRole(USER_ROLES.SALES_MANAGER), async (req: AuthenticatedRequest, res) => {
+  try {
+    const leadId = parseInt(req.params.id);
+
+    const result = await leadAssignmentService.roundRobinAssign(leadId);
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    res.json({
+      success: true,
+      message: 'Lead assigned via round-robin',
+      assignedTo: result.assignedTo,
+      assignedToName: result.assignedToName,
+    });
+  } catch (error) {
+    console.error('Error round-robin assigning lead:', error);
+    res.status(500).json({ error: 'Failed to round-robin assign lead' });
+  }
+});
+
+// POST /api/leads/bulk-auto-assign - Bulk auto-assign multiple leads
+router.post('/leads/bulk-auto-assign', requireMinimumRole(USER_ROLES.SALES_MANAGER), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { leadIds, rules } = req.body;
+
+    const result = await leadAssignmentService.bulkAutoAssign(leadIds, rules);
+
+    res.json({
+      success: true,
+      message: `Assigned ${result.assigned} of ${result.total} leads`,
+      ...result,
+    });
+  } catch (error) {
+    console.error('Error bulk auto-assigning leads:', error);
+    res.status(500).json({ error: 'Failed to bulk auto-assign leads' });
+  }
+});
+
+// GET /api/leads/workload-summary - Get executive workload summary
+router.get('/leads/workload-summary', requireMinimumRole(USER_ROLES.SALES_MANAGER), async (req: AuthenticatedRequest, res) => {
+  try {
+    const summary = await leadAssignmentService.getWorkloadSummary();
+    res.json(summary);
+  } catch (error) {
+    console.error('Error fetching workload summary:', error);
+    res.status(500).json({ error: 'Failed to fetch workload summary' });
   }
 });
 
