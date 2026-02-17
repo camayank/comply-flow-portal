@@ -13,7 +13,7 @@ import {
   messages,
   messageReadReceipts,
 } from '../db/schema/messaging';
-import { users } from '../db/schema/users';
+import { users } from '@shared/schema';
 import { notificationHub } from '../services/notifications';
 import { authenticate } from '../middleware/auth';
 

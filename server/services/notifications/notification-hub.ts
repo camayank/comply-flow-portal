@@ -7,12 +7,12 @@
 import { db } from '../../db';
 import { eq, and, desc } from 'drizzle-orm';
 import { notifications, notificationPreferences, NewNotification } from '../../db/schema/notifications';
-import { users } from '../../db/schema/users';
+import { users } from '@shared/schema';
 import { EmailService } from './channels/email.service';
 import { SMSService } from './channels/sms.service';
 import { WhatsAppService } from './channels/whatsapp.service';
 import { PushService } from './channels/push.service';
-import { queueManager } from '../../queues';
+import { addJob } from '../../queues';
 
 // ============================================
 // TYPES
@@ -329,7 +329,7 @@ export class NotificationHub {
 
     const delay = endDate.getTime() - now.getTime();
 
-    await queueManager.addJob('notifications', {
+    await addJob('notifications', {
       type: 'delayed_notification',
       payload,
     }, { delay });

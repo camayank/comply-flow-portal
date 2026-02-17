@@ -5,7 +5,7 @@
  */
 
 import { pgTable, serial, integer, varchar, text, boolean, timestamp, decimal, index, unique } from 'drizzle-orm/pg-core';
-import { users } from './users';
+import { users } from '@shared/schema';
 
 // ============================================
 // WALLETS TABLE

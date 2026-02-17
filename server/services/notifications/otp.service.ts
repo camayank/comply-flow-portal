@@ -5,7 +5,7 @@
  */
 
 import crypto from 'crypto';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'bcrypt';
 import { db } from '../../db';
 import { eq, and, gt, desc, gte } from 'drizzle-orm';
 import { otpCodes, NewOTPCode } from '../../db/schema/notifications';

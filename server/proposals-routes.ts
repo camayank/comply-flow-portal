@@ -9,6 +9,8 @@ import {
   AuthenticatedRequest
 } from './rbac-middleware';
 import { generateTempPassword } from './security-utils';
+import { proposalService } from './services/proposal-service';
+import { logger } from './logger';
 
 const router = express.Router();
 
@@ -136,22 +138,86 @@ router.delete('/proposals/:id', requireMinimumRole(USER_ROLES.ADMIN), async (req
   }
 });
 
-// POST /api/proposals/:id/send - Send proposal to client
-router.post('/proposals/:id/send', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
+// GET /api/proposals/:id/pdf - Generate and download PDF
+router.get('/proposals/:id/pdf', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
-    const sentProposal = await storage.sendProposal(parseInt(req.params.id));
+    const proposalId = parseInt(req.params.id);
+    const pdfBuffer = await proposalService.generatePDF(proposalId);
 
-    if (!sentProposal) {
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=DigiComply-Proposal-${proposalId}.pdf`);
+    res.send(pdfBuffer);
+  } catch (error: any) {
+    logger.error('PDF generation error:', error);
+    if (error.message === 'Proposal not found') {
       return res.status(404).json({ error: 'Proposal not found' });
     }
+    res.status(500).json({ error: 'Failed to generate PDF' });
+  }
+});
 
-    res.json({ 
-      message: 'Proposal sent successfully', 
-      proposal: sentProposal 
+// GET /api/proposals/:id/preview - Preview PDF in browser
+router.get('/proposals/:id/preview', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
+  try {
+    const proposalId = parseInt(req.params.id);
+    const pdfBuffer = await proposalService.generatePDF(proposalId);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename=DigiComply-Proposal-${proposalId}.pdf`);
+    res.send(pdfBuffer);
+  } catch (error: any) {
+    logger.error('PDF preview error:', error);
+    if (error.message === 'Proposal not found') {
+      return res.status(404).json({ error: 'Proposal not found' });
+    }
+    res.status(500).json({ error: 'Failed to generate PDF preview' });
+  }
+});
+
+// POST /api/proposals/:id/send - Send proposal to client via email with PDF
+router.post('/proposals/:id/send', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
+  try {
+    const proposalId = parseInt(req.params.id);
+
+    // Use the proposal service to send email with PDF
+    const result = await proposalService.sendToClient(proposalId);
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    // Get updated proposal
+    const sentProposal = await storage.getProposal(proposalId);
+
+    res.json({
+      success: true,
+      message: 'Proposal sent successfully via email',
+      proposal: sentProposal
     });
   } catch (error) {
     console.error('Error sending proposal:', error);
     res.status(500).json({ error: 'Failed to send proposal' });
+  }
+});
+
+// GET /api/proposals/:id/view - Track proposal view (public endpoint for tracking)
+router.get('/proposals/:id/view', async (req, res) => {
+  try {
+    const proposalId = parseInt(req.params.id);
+
+    await proposalService.trackView(proposalId, {
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    // Return PDF for viewing
+    const pdfBuffer = await proposalService.generatePDF(proposalId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename=DigiComply-Proposal-${proposalId}.pdf`);
+    res.send(pdfBuffer);
+  } catch (error: any) {
+    logger.error('Proposal view tracking error:', error);
+    res.status(404).json({ error: 'Proposal not found' });
   }
 });
 

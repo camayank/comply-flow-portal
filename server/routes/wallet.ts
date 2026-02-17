@@ -8,7 +8,7 @@ import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { wallets, walletTransactions, referralCodes, referrals } from '../db/schema/wallet';
-import { users } from '../db/schema/users';
+import { users } from '@shared/schema';
 import { authenticate } from '../middleware/auth';
 import crypto from 'crypto';
 import { walletService } from '../services/wallet-service';
