@@ -18,7 +18,10 @@ import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES, type Authenticat
 import { storage } from './storage';
 import { nanoid } from 'nanoid';
 import { sendWhatsApp } from './services/whatsappService';
-import nodemailer from 'nodemailer';
+import * as nodemailerModule from 'nodemailer';
+
+// Handle ESM/CJS interop - nodemailer may export as default or module
+const nodemailer = (nodemailerModule as any).default || nodemailerModule;
 
 // Document Request Types
 interface DocumentRequest {

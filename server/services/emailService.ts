@@ -3,8 +3,11 @@
  * Handles email sending via SMTP/SendGrid/other providers
  */
 
-import nodemailer from 'nodemailer';
+import * as nodemailerModule from 'nodemailer';
 import { pool } from '../config/database';
+
+// Handle ESM/CJS interop - nodemailer may export as default or module
+const nodemailer = (nodemailerModule as any).default || nodemailerModule;
 import { logger, notificationLogger } from '../config/logger';
 
 // Email configuration

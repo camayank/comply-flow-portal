@@ -1,6 +1,9 @@
-import nodemailer from 'nodemailer';
+import * as nodemailerModule from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { logEmail } from './services/communication-logger';
+
+// Handle ESM/CJS interop - nodemailer may export as default or module
+const nodemailer = (nodemailerModule as any).default || nodemailerModule;
 
 interface EmailOptions {
   to: string;

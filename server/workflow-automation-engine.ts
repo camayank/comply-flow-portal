@@ -1,4 +1,4 @@
-import nodemailer from 'nodemailer';
+import * as nodemailerModule from 'nodemailer';
 import { db } from './db';
 import {
   workflowAutomationRules,
@@ -13,6 +13,9 @@ import {
 import { and, eq } from 'drizzle-orm';
 import { sendWhatsApp } from './services/whatsappService';
 import { generateTaskId } from './services/id-generator';
+
+// Handle ESM/CJS interop - nodemailer may export as default or module
+const nodemailer = (nodemailerModule as any).default || nodemailerModule;
 
 const emailTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',

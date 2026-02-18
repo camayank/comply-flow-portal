@@ -9,11 +9,14 @@
  * - Proper error handling and logging
  */
 
-import nodemailer from 'nodemailer';
+import * as nodemailerModule from 'nodemailer';
 import { db } from '../../../db';
 import { eq } from 'drizzle-orm';
 import { notificationDeliveryLog } from '../../../db/schema/notification-delivery-log';
 import type { NotificationResult } from '../notification-hub';
+
+// Handle ESM/CJS interop - nodemailer may export as default or module
+const nodemailer = (nodemailerModule as any).default || nodemailerModule;
 
 // ============================================
 // TYPES

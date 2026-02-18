@@ -11,10 +11,13 @@ import { eq, and, sql } from 'drizzle-orm';
 import cron from 'node-cron';
 import { EventEmitter } from 'events';
 import { sendWhatsApp, verifyWhatsAppConfig } from './services/whatsappService';
-import nodemailer from 'nodemailer';
+import * as nodemailerModule from 'nodemailer';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
+
+// Handle ESM/CJS interop - nodemailer may export as default or module
+const nodemailer = (nodemailerModule as any).default || nodemailerModule;
 
 // Email transporter configuration
 const emailTransporter = nodemailer.createTransport({
