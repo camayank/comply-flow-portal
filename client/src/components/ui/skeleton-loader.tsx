@@ -176,10 +176,42 @@ export function SkeletonForm({ fields = 3, className }: { fields?: number; class
 
 /**
  * Full page loading skeleton
+ * Uses inline styles for critical elements to ensure visibility before CSS loads
  */
 export function SkeletonPage({ className }: SkeletonProps) {
   return (
-    <div className={cn("min-h-screen bg-background p-4 md:p-8 space-y-6", className)}>
+    <div
+      className={cn("min-h-screen bg-background p-4 md:p-8 space-y-6", className)}
+      style={{
+        minHeight: '100vh',
+        backgroundColor: '#f8fafc',
+        padding: '2rem'
+      }}
+    >
+      {/* Loading indicator - always visible */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          padding: '16px',
+          marginBottom: '24px'
+        }}
+      >
+        <div
+          style={{
+            width: '24px',
+            height: '24px',
+            border: '3px solid #e2e8f0',
+            borderTopColor: '#3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }}
+        />
+        <span style={{ color: '#64748b', fontSize: '14px' }}>Loading...</span>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <SkeletonTitle className="w-1/3" />
@@ -199,6 +231,13 @@ export function SkeletonPage({ className }: SkeletonProps) {
       <SkeletonCard>
         <SkeletonTable />
       </SkeletonCard>
+
+      {/* Inline keyframes for spinner */}
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

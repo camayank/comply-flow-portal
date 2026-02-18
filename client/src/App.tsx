@@ -266,6 +266,38 @@ const AppContent = () => {
     }
   }, [isAuthenticated, isLoading, location, setLocation, user]);
 
+  // Show loading state for protected routes while auth is being checked
+  const showAuthLoading = isLoading && !isPublicRoute(location);
+
+  if (showAuthLoading) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#f8fafc',
+          gap: '16px'
+        }}
+      >
+        <div
+          style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid #e2e8f0',
+            borderTopColor: '#3b82f6',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }}
+        />
+        <p style={{ color: '#64748b', fontSize: '14px' }}>Loading...</p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   return (
     <ErrorBoundary>
         <GlobalErrorHandler />
