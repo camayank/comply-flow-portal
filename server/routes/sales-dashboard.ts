@@ -1,6 +1,6 @@
 /**
  * Sales Dashboard Routes
- * Comprehensive API endpoints for Sales Dashboard data
+ * Database-backed API endpoints for Sales Dashboard data
  *
  * Provides:
  * - Pipeline overview and stage breakdown
@@ -11,408 +11,443 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { pool } from '../config/database';
+import { authenticateToken } from '../middleware/auth';
+import { requireRole } from '../middleware/rbac';
+import { apiLimiter } from '../middleware/rateLimiter';
+import { asyncHandler, NotFoundError, ValidationError } from '../middleware/errorHandler';
 
 const router = Router();
 
-// Generate realistic sales data
-const generateLeads = () => {
-  const statuses = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'];
-  const sources = ['Website', 'Referral', 'Cold Call', 'LinkedIn', 'Event', 'Advertisement', 'Partner'];
-  const companies = [
-    'Tech Solutions Pvt Ltd', 'StartupXYZ', 'Global Traders', 'FinServ India',
-    'Manufacturing Co', 'Retail Corp', 'Healthcare Plus', 'EduTech Systems',
-    'Logistics Hub', 'AgriTech India', 'E-commerce Ventures', 'Media House'
-  ];
-  const executives = ['Rahul Verma', 'Anita Desai', 'Suresh Nair', 'Priya Sharma'];
-
-  const leads = [];
-  const baseDate = new Date();
-
-  for (let i = 1; i <= 50; i++) {
-    const status = statuses[Math.floor(Math.random() * statuses.length)];
-    const createdDate = new Date(baseDate);
-    createdDate.setDate(createdDate.getDate() - Math.floor(Math.random() * 60));
-
-    const lastContactDate = new Date(createdDate);
-    lastContactDate.setDate(lastContactDate.getDate() + Math.floor(Math.random() * 14));
-
-    leads.push({
-      id: i,
-      name: ['Rajesh', 'Priya', 'Amit', 'Sneha', 'Vikram', 'Neha', 'Arun', 'Kavita'][i % 8] + ' ' +
-            ['Kumar', 'Sharma', 'Patel', 'Gupta', 'Singh', 'Reddy', 'Nair', 'Iyer'][i % 8],
-      company: companies[i % companies.length],
-      email: `contact${i}@${companies[i % companies.length].toLowerCase().replace(/\s+/g, '')}.com`,
-      phone: `+91 ${90000 + Math.floor(Math.random() * 9999)} ${10000 + Math.floor(Math.random() * 89999)}`,
-      source: sources[Math.floor(Math.random() * sources.length)],
-      status,
-      value: Math.floor(Math.random() * 500000) + 50000,
-      assignedTo: executives[Math.floor(Math.random() * executives.length)],
-      createdAt: createdDate.toISOString().split('T')[0],
-      lastContact: lastContactDate.toISOString().split('T')[0]
-    });
-  }
-
-  return leads;
-};
-
-const generateProposals = () => {
-  const statuses = ['draft', 'sent', 'viewed', 'accepted', 'rejected'];
-  const proposals = [];
-  const baseDate = new Date();
-
-  const proposalTitles = [
-    'Annual Compliance Package',
-    'Company Registration + GST',
-    'Full Service Retainership',
-    'GST Filing Package',
-    'Tax Audit Package',
-    'ROC Filing Annual',
-    'Payroll Compliance',
-    'Legal Documentation'
-  ];
-
-  for (let i = 1; i <= 20; i++) {
-    const createdDate = new Date(baseDate);
-    createdDate.setDate(createdDate.getDate() - Math.floor(Math.random() * 30));
-
-    const validUntilDate = new Date(createdDate);
-    validUntilDate.setDate(validUntilDate.getDate() + 30);
-
-    proposals.push({
-      id: i,
-      title: proposalTitles[i % proposalTitles.length],
-      client: ['Tech Solutions', 'StartupXYZ', 'FinServ India', 'Global Traders', 'Manufacturing Co'][i % 5],
-      value: Math.floor(Math.random() * 300000) + 30000,
-      status: statuses[Math.floor(Math.random() * statuses.length)],
-      createdAt: createdDate.toISOString().split('T')[0],
-      validUntil: validUntilDate.toISOString().split('T')[0]
-    });
-  }
-
-  return proposals;
-};
-
-const generateTeamMembers = () => {
-  return [
-    {
-      id: 1,
-      name: 'Rahul Verma',
-      role: 'Sales Executive',
-      leads: Math.floor(Math.random() * 20) + 15,
-      conversions: Math.floor(Math.random() * 10) + 5,
-      revenue: Math.floor(Math.random() * 400000) + 300000,
-      target: 500000
-    },
-    {
-      id: 2,
-      name: 'Anita Desai',
-      role: 'Sales Executive',
-      leads: Math.floor(Math.random() * 25) + 20,
-      conversions: Math.floor(Math.random() * 12) + 8,
-      revenue: Math.floor(Math.random() * 500000) + 400000,
-      target: 600000
-    },
-    {
-      id: 3,
-      name: 'Suresh Nair',
-      role: 'Sales Executive',
-      leads: Math.floor(Math.random() * 15) + 10,
-      conversions: Math.floor(Math.random() * 6) + 3,
-      revenue: Math.floor(Math.random() * 250000) + 150000,
-      target: 400000
-    },
-    {
-      id: 4,
-      name: 'Priya Sharma',
-      role: 'Senior Sales Executive',
-      leads: Math.floor(Math.random() * 30) + 25,
-      conversions: Math.floor(Math.random() * 15) + 10,
-      revenue: Math.floor(Math.random() * 600000) + 500000,
-      target: 750000
-    }
-  ];
-};
+// Apply authentication and role-based access to all routes
+router.use(authenticateToken);
+router.use(requireRole('sales_manager', 'sales_executive', 'admin', 'super_admin'));
+router.use(apiLimiter);
 
 // GET /api/sales/leads - Get all leads with optional filtering
-router.get('/leads', async (req: Request, res: Response) => {
-  try {
-    const { status, source, assignedTo, search, page = 1, limit = 20 } = req.query;
-    let leads = generateLeads();
+router.get('/leads', asyncHandler(async (req: Request, res: Response) => {
+  const { status, source, assignedTo, search, page = 1, limit = 20 } = req.query;
 
-    // Apply filters
-    if (status && status !== 'all') {
-      leads = leads.filter(lead => lead.status === status);
-    }
+  let query = `
+    SELECT
+      id, lead_id as "leadId", client_name as name, client_name as company,
+      contact_email as email, contact_phone as phone, lead_source as source,
+      COALESCE(lead_stage, status) as status, estimated_value as value,
+      pre_sales_executive as "assignedTo", created_at as "createdAt",
+      last_contact_date as "lastContact", priority, remarks, state,
+      entity_type as "entityType", service_interested as "serviceInterested"
+    FROM leads WHERE 1=1
+  `;
+  const params: any[] = [];
+  let paramCount = 0;
 
-    if (source && source !== 'all') {
-      leads = leads.filter(lead => lead.source === source);
-    }
-
-    if (assignedTo && assignedTo !== 'all') {
-      leads = leads.filter(lead => lead.assignedTo === assignedTo);
-    }
-
-    if (search) {
-      const searchLower = (search as string).toLowerCase();
-      leads = leads.filter(lead =>
-        lead.name.toLowerCase().includes(searchLower) ||
-        lead.company.toLowerCase().includes(searchLower) ||
-        lead.email.toLowerCase().includes(searchLower)
-      );
-    }
-
-    // Sort by created date (most recent first)
-    leads.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    // Pagination
-    const startIndex = (Number(page) - 1) * Number(limit);
-    const paginatedLeads = leads.slice(startIndex, startIndex + Number(limit));
-
-    res.json({
-      data: paginatedLeads,
-      total: leads.length,
-      page: Number(page),
-      limit: Number(limit),
-      totalPages: Math.ceil(leads.length / Number(limit))
-    });
-  } catch (error) {
-    console.error('Error fetching sales leads:', error);
-    res.status(500).json({ error: 'Failed to fetch leads' });
+  // Apply filters
+  if (status && status !== 'all') {
+    paramCount++;
+    query += ` AND (lead_stage = $${paramCount} OR status = $${paramCount})`;
+    params.push(status);
   }
-});
+
+  if (source && source !== 'all') {
+    paramCount++;
+    query += ` AND lead_source = $${paramCount}`;
+    params.push(source);
+  }
+
+  if (assignedTo && assignedTo !== 'all') {
+    paramCount++;
+    query += ` AND pre_sales_executive = $${paramCount}`;
+    params.push(assignedTo);
+  }
+
+  if (search) {
+    paramCount++;
+    query += ` AND (
+      client_name ILIKE $${paramCount} OR
+      contact_email ILIKE $${paramCount} OR
+      contact_phone ILIKE $${paramCount}
+    )`;
+    params.push(`%${search}%`);
+  }
+
+  // Get total count
+  const countQuery = query.replace(/SELECT[\s\S]*?FROM/, 'SELECT COUNT(*) FROM');
+  const countResult = await pool.query(countQuery, params);
+  const total = parseInt(countResult.rows[0].count);
+
+  // Add sorting and pagination
+  query += ' ORDER BY created_at DESC';
+
+  const offset = (Number(page) - 1) * Number(limit);
+  paramCount++;
+  query += ` LIMIT $${paramCount}`;
+  params.push(Number(limit));
+  paramCount++;
+  query += ` OFFSET $${paramCount}`;
+  params.push(offset);
+
+  const result = await pool.query(query, params);
+
+  res.json({
+    data: result.rows,
+    total,
+    page: Number(page),
+    limit: Number(limit),
+    totalPages: Math.ceil(total / Number(limit))
+  });
+}));
 
 // GET /api/sales/leads/:id - Get single lead
-router.get('/leads/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const leads = generateLeads();
-    const lead = leads.find(l => l.id === Number(id));
+router.get('/leads/:id', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
 
-    if (!lead) {
-      return res.status(404).json({ error: 'Lead not found' });
-    }
+  const result = await pool.query(`
+    SELECT
+      id, lead_id as "leadId", client_name as name, client_name as company,
+      contact_email as email, contact_phone as phone, lead_source as source,
+      COALESCE(lead_stage, status) as status, estimated_value as value,
+      pre_sales_executive as "assignedTo", created_at as "createdAt",
+      last_contact_date as "lastContact", priority, remarks, state,
+      entity_type as "entityType", service_interested as "serviceInterested",
+      interaction_history as "interactionHistory", next_followup_date as "nextFollowupDate"
+    FROM leads WHERE id = $1
+  `, [id]);
 
-    res.json(lead);
-  } catch (error) {
-    console.error('Error fetching lead:', error);
-    res.status(500).json({ error: 'Failed to fetch lead' });
+  if (result.rows.length === 0) {
+    throw new NotFoundError('Lead not found');
   }
-});
+
+  res.json(result.rows[0]);
+}));
 
 // POST /api/sales/leads - Create new lead
-router.post('/leads', async (req: Request, res: Response) => {
-  try {
-    const leadData = req.body;
+router.post('/leads', asyncHandler(async (req: Request, res: Response) => {
+  const {
+    name, company, email, phone, source, notes,
+    priority, estimatedValue, serviceInterested, state, entityType
+  } = req.body;
 
-    if (!leadData.name || !leadData.company || !leadData.email) {
-      return res.status(400).json({ error: 'Name, company, and email are required' });
-    }
-
-    const newLead = {
-      id: Date.now(),
-      ...leadData,
-      status: 'new',
-      createdAt: new Date().toISOString().split('T')[0],
-      lastContact: new Date().toISOString().split('T')[0]
-    };
-
-    res.status(201).json(newLead);
-  } catch (error) {
-    console.error('Error creating lead:', error);
-    res.status(500).json({ error: 'Failed to create lead' });
+  if (!name || !phone) {
+    throw new ValidationError('Name and phone are required');
   }
-});
+
+  // Generate lead ID
+  const countResult = await pool.query('SELECT COUNT(*) FROM leads');
+  const leadNumber = parseInt(countResult.rows[0].count) + 1;
+  const leadId = `L${String(leadNumber).padStart(4, '0')}`;
+
+  const result = await pool.query(`
+    INSERT INTO leads (
+      lead_id, client_name, contact_email, contact_phone, lead_source,
+      notes, priority, estimated_value, service_interested, state, entity_type,
+      status, lead_stage, pre_sales_executive
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'new', 'new', $12)
+    RETURNING
+      id, lead_id as "leadId", client_name as name, contact_email as email,
+      contact_phone as phone, lead_source as source, status, created_at as "createdAt"
+  `, [
+    leadId, company || name, email, phone, source || 'Website',
+    notes, priority || 'medium', estimatedValue || null,
+    serviceInterested || 'General Inquiry', state, entityType,
+    req.user?.email || 'System'
+  ]);
+
+  res.status(201).json(result.rows[0]);
+}));
 
 // PATCH /api/sales/leads/:id - Update lead
-router.patch('/leads/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
+router.patch('/leads/:id', asyncHandler(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const updateData = req.body;
 
-    res.json({
-      id: Number(id),
-      ...updateData,
-      updatedAt: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Error updating lead:', error);
-    res.status(500).json({ error: 'Failed to update lead' });
+  // Build dynamic update query
+  const allowedFields: Record<string, string> = {
+    name: 'client_name',
+    company: 'client_name',
+    email: 'contact_email',
+    phone: 'contact_phone',
+    source: 'lead_source',
+    status: 'status',
+    leadStage: 'lead_stage',
+    priority: 'priority',
+    estimatedValue: 'estimated_value',
+    assignedTo: 'pre_sales_executive',
+    remarks: 'remarks',
+    notes: 'notes',
+    nextFollowupDate: 'next_followup_date',
+    serviceInterested: 'service_interested'
+  };
+
+  const updates: string[] = [];
+  const values: any[] = [];
+  let paramCount = 0;
+
+  for (const [key, value] of Object.entries(updateData)) {
+    if (allowedFields[key] && value !== undefined) {
+      paramCount++;
+      updates.push(`${allowedFields[key]} = $${paramCount}`);
+      values.push(value);
+    }
   }
-});
+
+  if (updates.length === 0) {
+    throw new ValidationError('No valid fields to update');
+  }
+
+  paramCount++;
+  updates.push(`updated_at = NOW()`);
+  values.push(id);
+
+  const result = await pool.query(`
+    UPDATE leads SET ${updates.join(', ')}
+    WHERE id = $${paramCount}
+    RETURNING id, lead_id as "leadId", client_name as name, status, updated_at as "updatedAt"
+  `, values);
+
+  if (result.rows.length === 0) {
+    throw new NotFoundError('Lead not found');
+  }
+
+  res.json(result.rows[0]);
+}));
 
 // GET /api/sales/proposals - Get all proposals
-router.get('/proposals', async (req: Request, res: Response) => {
-  try {
-    const { status } = req.query;
-    let proposals = generateProposals();
+router.get('/proposals', asyncHandler(async (req: Request, res: Response) => {
+  const { status } = req.query;
 
-    if (status && status !== 'all') {
-      proposals = proposals.filter(p => p.status === status);
-    }
+  let query = `
+    SELECT
+      sp.id, sp.lead_id as "leadId", l.client_name as client,
+      sp.proposal_amount as value, sp.proposal_status as status,
+      sp.created_at as "createdAt", sp.next_followup_date as "validUntil",
+      sp.sales_executive as "createdBy", sp.required_services as services,
+      l.service_interested as title
+    FROM sales_proposals sp
+    LEFT JOIN leads l ON sp.lead_id = l.lead_id
+    WHERE 1=1
+  `;
+  const params: any[] = [];
 
-    res.json(proposals);
-  } catch (error) {
-    console.error('Error fetching proposals:', error);
-    res.status(500).json({ error: 'Failed to fetch proposals' });
+  if (status && status !== 'all') {
+    params.push(status);
+    query += ` AND sp.proposal_status = $${params.length}`;
   }
-});
+
+  query += ' ORDER BY sp.created_at DESC';
+
+  const result = await pool.query(query, params);
+  res.json(result.rows);
+}));
 
 // POST /api/sales/proposals - Create proposal
-router.post('/proposals', async (req: Request, res: Response) => {
-  try {
-    const proposalData = req.body;
+router.post('/proposals', asyncHandler(async (req: Request, res: Response) => {
+  const { leadId, amount, services, notes } = req.body;
 
-    const newProposal = {
-      id: Date.now(),
-      ...proposalData,
-      status: 'draft',
-      createdAt: new Date().toISOString().split('T')[0],
-      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    };
-
-    res.status(201).json(newProposal);
-  } catch (error) {
-    console.error('Error creating proposal:', error);
-    res.status(500).json({ error: 'Failed to create proposal' });
+  if (!leadId) {
+    throw new ValidationError('Lead ID is required');
   }
-});
+
+  const result = await pool.query(`
+    INSERT INTO sales_proposals (
+      lead_id, sales_executive, proposal_amount, required_services,
+      proposal_status, final_remark
+    ) VALUES ($1, $2, $3, $4, 'draft', $5)
+    RETURNING id, lead_id as "leadId", proposal_amount as value, proposal_status as status, created_at as "createdAt"
+  `, [leadId, req.user?.email || 'System', amount || 0, JSON.stringify(services || []), notes]);
+
+  res.status(201).json(result.rows[0]);
+}));
 
 // GET /api/sales/team - Get team performance data
-router.get('/team', async (req: Request, res: Response) => {
-  try {
-    const team = generateTeamMembers();
-    res.json(team);
-  } catch (error) {
-    console.error('Error fetching team data:', error);
-    res.status(500).json({ error: 'Failed to fetch team data' });
-  }
-});
+router.get('/team', asyncHandler(async (req: Request, res: Response) => {
+  const result = await pool.query(`
+    SELECT
+      pre_sales_executive as name,
+      'Sales Executive' as role,
+      COUNT(*) as leads,
+      COUNT(CASE WHEN status = 'converted' OR lead_stage = 'converted' THEN 1 END) as conversions,
+      COALESCE(SUM(CASE WHEN status = 'converted' THEN estimated_value::numeric ELSE 0 END), 0) as revenue,
+      500000 as target
+    FROM leads
+    WHERE pre_sales_executive IS NOT NULL
+    GROUP BY pre_sales_executive
+    ORDER BY revenue DESC
+  `);
+
+  res.json(result.rows.map((row, idx) => ({
+    id: idx + 1,
+    name: row.name || 'Unassigned',
+    role: row.role,
+    leads: parseInt(row.leads),
+    conversions: parseInt(row.conversions),
+    revenue: parseFloat(row.revenue) || 0,
+    target: row.target
+  })));
+}));
 
 // GET /api/sales/pipeline - Get pipeline stage breakdown
-router.get('/pipeline', async (req: Request, res: Response) => {
-  try {
-    const leads = generateLeads();
+router.get('/pipeline', asyncHandler(async (req: Request, res: Response) => {
+  const stages = [
+    { key: 'new', label: 'New', color: 'bg-blue-500' },
+    { key: 'contacted', label: 'Contacted', color: 'bg-purple-500' },
+    { key: 'qualified', label: 'Qualified', color: 'bg-yellow-500' },
+    { key: 'proposal', label: 'Proposal', color: 'bg-orange-500' },
+    { key: 'negotiation', label: 'Negotiation', color: 'bg-pink-500' },
+    { key: 'converted', label: 'Won', color: 'bg-green-500' },
+    { key: 'lost', label: 'Lost', color: 'bg-red-500' }
+  ];
 
-    const stages = [
-      { key: 'new', label: 'New', color: 'bg-blue-500' },
-      { key: 'contacted', label: 'Contacted', color: 'bg-purple-500' },
-      { key: 'qualified', label: 'Qualified', color: 'bg-yellow-500' },
-      { key: 'proposal', label: 'Proposal', color: 'bg-orange-500' },
-      { key: 'negotiation', label: 'Negotiation', color: 'bg-pink-500' },
-      { key: 'won', label: 'Won', color: 'bg-green-500' },
-      { key: 'lost', label: 'Lost', color: 'bg-red-500' }
-    ];
+  const pipeline = [];
 
-    const pipeline = stages.map(stage => {
-      const stageLeads = leads.filter(l => l.status === stage.key);
-      return {
-        ...stage,
-        count: stageLeads.length,
-        value: stageLeads.reduce((sum, l) => sum + l.value, 0),
-        leads: stageLeads.slice(0, 5) // Top 5 leads per stage
-      };
+  for (const stage of stages) {
+    const result = await pool.query(`
+      SELECT
+        COUNT(*) as count,
+        COALESCE(SUM(estimated_value::numeric), 0) as value
+      FROM leads
+      WHERE COALESCE(lead_stage, status) = $1
+    `, [stage.key]);
+
+    const leadsResult = await pool.query(`
+      SELECT
+        id, lead_id as "leadId", client_name as name,
+        estimated_value as value, priority
+      FROM leads
+      WHERE COALESCE(lead_stage, status) = $1
+      ORDER BY created_at DESC
+      LIMIT 5
+    `, [stage.key]);
+
+    pipeline.push({
+      ...stage,
+      count: parseInt(result.rows[0].count),
+      value: parseFloat(result.rows[0].value) || 0,
+      leads: leadsResult.rows
     });
-
-    res.json(pipeline);
-  } catch (error) {
-    console.error('Error fetching pipeline:', error);
-    res.status(500).json({ error: 'Failed to fetch pipeline' });
   }
-});
+
+  res.json(pipeline);
+}));
 
 // GET /api/sales/metrics - Get sales metrics/KPIs
-router.get('/metrics', async (req: Request, res: Response) => {
-  try {
-    const leads = generateLeads();
-    const proposals = generateProposals();
-    const team = generateTeamMembers();
+router.get('/metrics', asyncHandler(async (req: Request, res: Response) => {
+  // Lead metrics
+  const leadsResult = await pool.query(`
+    SELECT
+      COUNT(*) as total,
+      COUNT(CASE WHEN COALESCE(lead_stage, status) IN ('qualified', 'proposal', 'negotiation') THEN 1 END) as qualified,
+      COUNT(CASE WHEN COALESCE(lead_stage, status) = 'converted' THEN 1 END) as won,
+      COALESCE(SUM(CASE WHEN COALESCE(lead_stage, status) NOT IN ('converted', 'lost') THEN estimated_value::numeric ELSE 0 END), 0) as pipeline_value
+    FROM leads
+  `);
 
-    const totalLeads = leads.length;
-    const qualifiedLeads = leads.filter(l => ['qualified', 'proposal', 'negotiation'].includes(l.status)).length;
-    const pipelineValue = leads.filter(l => !['won', 'lost'].includes(l.status)).reduce((sum, l) => sum + l.value, 0);
-    const wonDeals = leads.filter(l => l.status === 'won').length;
-    const conversionRate = totalLeads > 0 ? Math.round((wonDeals / totalLeads) * 100) : 0;
+  const leads = leadsResult.rows[0];
+  const totalLeads = parseInt(leads.total);
+  const qualifiedLeads = parseInt(leads.qualified);
+  const wonDeals = parseInt(leads.won);
+  const pipelineValue = parseFloat(leads.pipeline_value) || 0;
+  const conversionRate = totalLeads > 0 ? Math.round((wonDeals / totalLeads) * 100) : 0;
 
-    const totalRevenue = team.reduce((sum, m) => sum + m.revenue, 0);
-    const totalTarget = team.reduce((sum, m) => sum + m.target, 0);
-    const targetProgress = totalTarget > 0 ? Math.round((totalRevenue / totalTarget) * 100) : 0;
+  // Revenue from converted leads
+  const revenueResult = await pool.query(`
+    SELECT COALESCE(SUM(estimated_value::numeric), 0) as revenue
+    FROM leads WHERE COALESCE(lead_stage, status) = 'converted'
+  `);
+  const totalRevenue = parseFloat(revenueResult.rows[0].revenue) || 0;
 
-    const activeProposals = proposals.filter(p => ['sent', 'viewed'].includes(p.status)).length;
-    const proposalValue = proposals.filter(p => ['sent', 'viewed'].includes(p.status))
-      .reduce((sum, p) => sum + p.value, 0);
+  // Team size
+  const teamResult = await pool.query(`
+    SELECT COUNT(DISTINCT pre_sales_executive) as count
+    FROM leads WHERE pre_sales_executive IS NOT NULL
+  `);
+  const teamSize = parseInt(teamResult.rows[0].count) || 1;
 
-    res.json({
-      totalLeads,
-      qualifiedLeads,
-      pipelineValue,
-      wonDeals,
-      conversionRate,
-      totalRevenue,
-      totalTarget,
-      targetProgress,
-      activeProposals,
-      proposalValue,
-      teamSize: team.length,
-      avgRevenuePerRep: Math.round(totalRevenue / team.length)
-    });
-  } catch (error) {
-    console.error('Error fetching sales metrics:', error);
-    res.status(500).json({ error: 'Failed to fetch sales metrics' });
-  }
-});
+  // Proposal metrics
+  const proposalResult = await pool.query(`
+    SELECT
+      COUNT(*) as total,
+      COUNT(CASE WHEN proposal_status IN ('sent', 'viewed') THEN 1 END) as active,
+      COALESCE(SUM(CASE WHEN proposal_status IN ('sent', 'viewed') THEN proposal_amount::numeric ELSE 0 END), 0) as value
+    FROM sales_proposals
+  `);
+  const proposals = proposalResult.rows[0];
+  const activeProposals = parseInt(proposals.active);
+  const proposalValue = parseFloat(proposals.value) || 0;
+
+  const totalTarget = teamSize * 500000; // Default target per team member
+
+  res.json({
+    totalLeads,
+    qualifiedLeads,
+    pipelineValue,
+    wonDeals,
+    conversionRate,
+    totalRevenue,
+    totalTarget,
+    targetProgress: totalTarget > 0 ? Math.round((totalRevenue / totalTarget) * 100) : 0,
+    activeProposals,
+    proposalValue,
+    teamSize,
+    avgRevenuePerRep: teamSize > 0 ? Math.round(totalRevenue / teamSize) : 0
+  });
+}));
 
 // GET /api/sales/forecasts - Get sales forecasts
-router.get('/forecasts', async (req: Request, res: Response) => {
-  try {
-    const leads = generateLeads();
-    const now = new Date();
+router.get('/forecasts', asyncHandler(async (req: Request, res: Response) => {
+  // Get pipeline leads with weighted forecast
+  const pipelineResult = await pool.query(`
+    SELECT
+      COALESCE(lead_stage, status) as stage,
+      COALESCE(estimated_value::numeric, 0) as value
+    FROM leads
+    WHERE COALESCE(lead_stage, status) NOT IN ('converted', 'lost')
+  `);
 
-    // Calculate forecasts based on pipeline
-    const pipelineLeads = leads.filter(l => !['won', 'lost'].includes(l.status));
+  const stageProbabilities: Record<string, number> = {
+    new: 0.10,
+    contacted: 0.20,
+    qualified: 0.40,
+    proposal: 0.60,
+    negotiation: 0.80
+  };
 
-    // Weighted forecast based on stage probability
-    const stageProbabilities: Record<string, number> = {
-      new: 0.10,
-      contacted: 0.20,
-      qualified: 0.40,
-      proposal: 0.60,
-      negotiation: 0.80
-    };
+  let weightedForecast = 0;
+  let pipelineTotal = 0;
 
-    const weightedForecast = pipelineLeads.reduce((sum, lead) => {
-      const probability = stageProbabilities[lead.status] || 0;
-      return sum + (lead.value * probability);
-    }, 0);
-
-    // Monthly forecast data
-    const monthlyData = [];
-    for (let i = 0; i < 6; i++) {
-      const month = new Date(now.getFullYear(), now.getMonth() + i, 1);
-      const baseValue = 500000 + Math.random() * 200000;
-
-      monthlyData.push({
-        month: month.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }),
-        forecast: Math.floor(baseValue * (1 + i * 0.05)),
-        target: 600000 + (i * 25000),
-        actual: i === 0 ? Math.floor(baseValue * 0.7) : null
-      });
-    }
-
-    res.json({
-      weightedForecast: Math.round(weightedForecast),
-      pipelineTotal: pipelineLeads.reduce((sum, l) => sum + l.value, 0),
-      pipelineCount: pipelineLeads.length,
-      monthlyData,
-      confidence: {
-        low: Math.round(weightedForecast * 0.7),
-        medium: Math.round(weightedForecast),
-        high: Math.round(weightedForecast * 1.2)
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching forecasts:', error);
-    res.status(500).json({ error: 'Failed to fetch forecasts' });
+  for (const row of pipelineResult.rows) {
+    const probability = stageProbabilities[row.stage] || 0.10;
+    const value = parseFloat(row.value) || 0;
+    weightedForecast += value * probability;
+    pipelineTotal += value;
   }
-});
+
+  // Monthly forecast data
+  const now = new Date();
+  const monthlyData = [];
+
+  for (let i = 0; i < 6; i++) {
+    const month = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const baseValue = 500000 + (i * 25000);
+
+    monthlyData.push({
+      month: month.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }),
+      forecast: Math.floor(weightedForecast / 6 * (1 + i * 0.05)),
+      target: baseValue,
+      actual: i === 0 ? Math.floor(weightedForecast * 0.3) : null
+    });
+  }
+
+  res.json({
+    weightedForecast: Math.round(weightedForecast),
+    pipelineTotal: Math.round(pipelineTotal),
+    pipelineCount: pipelineResult.rows.length,
+    monthlyData,
+    confidence: {
+      low: Math.round(weightedForecast * 0.7),
+      medium: Math.round(weightedForecast),
+      high: Math.round(weightedForecast * 1.2)
+    }
+  });
+}));
 
 export default router;
