@@ -48,6 +48,8 @@ const DEFAULT_QUERY_FN = async ({ queryKey }: { queryKey: readonly unknown[] }) 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      refetchOnWindowFocus: false,  // Prevent refetch when tab regains focus
+      refetchOnReconnect: false,     // Prevent refetch when network reconnects
       queryFn: DEFAULT_QUERY_FN,
       staleTime: 1000 * 60 * 5, // 5 minutes
       retry: (failureCount, error) => {
