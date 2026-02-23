@@ -615,6 +615,12 @@ export function getAllowedRoutes(role: string): string[] {
         '/leads',
         '/lead-management',
         '/proposals',
+        // Customer service specific routes
+        '/support',
+        '/tickets',
+        '/playbooks',
+        '/renewals',
+        '/templates',
         ...commonRoutes,
       ];
 

@@ -45,31 +45,31 @@ export function MobileBottomNav({ items, className }: MobileBottomNavProps) {
           const active = isActive(item.href);
 
           return (
-            <Link key={item.href} href={item.href}>
-              <a
-                className={cn(
-                  'flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[4rem]',
-                  active
-                    ? 'text-primary'
-                    : 'text-muted-foreground hover:text-foreground'
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[4rem]',
+                active
+                  ? 'text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+              aria-current={active ? 'page' : undefined}
+            >
+              <div className="relative">
+                <Icon className="h-5 w-5" aria-hidden="true" />
+                {item.badge !== undefined && item.badge > 0 && (
+                  <Badge
+                    variant="destructive"
+                    className="absolute -top-2 -right-2 h-4 min-w-[1rem] flex items-center justify-center px-1 text-[10px]"
+                  >
+                    {item.badge > 9 ? '9+' : item.badge}
+                  </Badge>
                 )}
-                aria-current={active ? 'page' : undefined}
-              >
-                <div className="relative">
-                  <Icon className="h-5 w-5" aria-hidden="true" />
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <Badge 
-                      variant="destructive" 
-                      className="absolute -top-2 -right-2 h-4 min-w-[1rem] flex items-center justify-center px-1 text-[10px]"
-                    >
-                      {item.badge > 9 ? '9+' : item.badge}
-                    </Badge>
-                  )}
-                </div>
-                <span className="text-[11px] font-medium truncate max-w-full">
-                  {item.label}
-                </span>
-              </a>
+              </div>
+              <span className="text-[11px] font-medium truncate max-w-full">
+                {item.label}
+              </span>
             </Link>
           );
         })}

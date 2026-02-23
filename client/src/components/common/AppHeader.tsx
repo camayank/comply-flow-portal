@@ -3,7 +3,6 @@
  * Consistent header across all authenticated pages
  */
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Bell, Search, Menu, User, Settings, LogOut } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -200,19 +199,15 @@ export function AppHeader({
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href={profileHref}>
-                    <a className="flex items-center">
-                      <User className="mr-2 h-4 w-4" />
-                      Profile
-                    </a>
+                  <Link href={profileHref} className="flex items-center cursor-pointer">
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href={settingsHref}>
-                    <a className="flex items-center">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Settings
-                    </a>
+                  <Link href={settingsHref} className="flex items-center cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

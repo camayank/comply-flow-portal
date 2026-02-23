@@ -132,6 +132,7 @@ export default function QCDeliveryHandoff() {
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [selectedItem, setSelectedItem] = useState<HandoffItem | null>(null);
   const [isHandoffDialogOpen, setIsHandoffDialogOpen] = useState(false);
+  const [isViewDetailsOpen, setIsViewDetailsOpen] = useState(false);
   const [deliveryNotes, setDeliveryNotes] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState('email');
   const [includeDocuments, setIncludeDocuments] = useState<string[]>([]);
@@ -569,6 +570,10 @@ export default function QCDeliveryHandoff() {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={() => {
+                              setSelectedItem(item);
+                              setIsViewDetailsOpen(true);
+                            }}
                             data-testid={`button-view-${item.id}`}
                           >
                             <Eye className="h-4 w-4 mr-2" />
@@ -787,6 +792,176 @@ export default function QCDeliveryHandoff() {
                       </>
                     )}
                   </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* View Details Dialog */}
+        <Dialog open={isViewDetailsOpen} onOpenChange={setIsViewDetailsOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Service Details
+              </DialogTitle>
+              <DialogDescription>
+                View complete details for this service request
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedItem && (
+              <div className="space-y-6">
+                {/* Client Info */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Client Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm font-medium">Client Name</Label>
+                        <p className="text-gray-600 dark:text-gray-300">{selectedItem.clientName}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Service</Label>
+                        <p className="text-gray-600 dark:text-gray-300">{selectedItem.serviceName}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Email</Label>
+                        <p className="text-gray-600 dark:text-gray-300">{selectedItem.clientEmail}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Phone</Label>
+                        <p className="text-gray-600 dark:text-gray-300">{selectedItem.clientPhone}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* QC Details */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">QC Review Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm font-medium">Quality Score</Label>
+                        <div className="flex items-center gap-2">
+                          <Progress value={selectedItem.qualityScore} className="flex-1" />
+                          <span className="font-semibold">{selectedItem.qualityScore}%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Priority</Label>
+                        <Badge className={PRIORITY_COLORS[selectedItem.priority as keyof typeof PRIORITY_COLORS]}>
+                          {selectedItem.priority}
+                        </Badge>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Approved By</Label>
+                        <p className="text-gray-600 dark:text-gray-300">{selectedItem.qcApprovedBy}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Status</Label>
+                        <Badge className={STATUS_COLORS[selectedItem.status]}>
+                          {STATUS_LABELS[selectedItem.status]}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Review Notes</Label>
+                      <p className="text-gray-600 dark:text-gray-300 text-sm">
+                        {selectedItem.reviewNotes}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium">Completion Summary</Label>
+                      <p className="text-gray-600 dark:text-gray-300 text-sm">
+                        {selectedItem.completionSummary}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Deliverables */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Deliverables</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {selectedItem.deliverables.map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="flex items-center justify-between p-3 border rounded-lg"
+                        >
+                          <div className="flex items-center gap-3">
+                            <FileText className="h-4 w-4" />
+                            <div>
+                              <p className="font-medium flex items-center gap-2">
+                                {doc.name}
+                                {doc.isOfficial && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    <Shield className="h-3 w-3 mr-1" />
+                                    Official
+                                  </Badge>
+                                )}
+                              </p>
+                              <p className="text-xs text-gray-500">{doc.type.toUpperCase()} • {doc.size}</p>
+                            </div>
+                          </div>
+                          {doc.isReady ? (
+                            <Badge className="bg-green-100 text-green-800">Ready</Badge>
+                          ) : (
+                            <Badge variant="destructive">Not Ready</Badge>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Next Steps */}
+                {selectedItem.nextSteps.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-lg">Next Steps for Client</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                        {selectedItem.nextSteps.map((step, index) => (
+                          <li key={index}>{step}</li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsViewDetailsOpen(false)}
+                    data-testid="button-close-details"
+                  >
+                    Close
+                  </Button>
+                  {selectedItem.status === 'ready_for_delivery' && (
+                    <Button
+                      onClick={() => {
+                        setIsViewDetailsOpen(false);
+                        handleOpenHandoff(selectedItem);
+                      }}
+                      className="bg-green-600 hover:bg-green-700"
+                      data-testid="button-initiate-from-details"
+                    >
+                      <Send className="h-4 w-4 mr-2" />
+                      Initiate Delivery
+                    </Button>
+                  )}
                 </div>
               </div>
             )}

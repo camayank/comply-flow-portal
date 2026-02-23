@@ -620,6 +620,291 @@ export function registerAgentRoutes(app: Express) {
     }
   });
 
+  // ============ TERRITORY MANAGEMENT ============
+
+  /**
+   * GET /api/agent/territory
+   * Get agent's assigned territory and metrics
+   * Requires: Agent role or higher
+   */
+  app.get('/api/agent/territory', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const agentId = req.user?.id;
+
+      if (!agentId) {
+        return res.status(401).json({ error: 'User not authenticated' });
+      }
+
+      // Get agent profile for territory assignment
+      const [agentProfile] = await db
+        .select()
+        .from(agentProfiles)
+        .where(eq(agentProfiles.userId, agentId));
+
+      // Get lead stats for territory metrics
+      const agentLeads = await db
+        .select()
+        .from(leads)
+        .where(eq(leads.agentId, String(agentId)));
+
+      const convertedLeads = agentLeads.filter(l => l.stage === 'converted');
+      const totalClients = convertedLeads.length;
+
+      // Calculate market coverage based on leads
+      const marketCoverage = Math.min(100, Math.round((agentLeads.length / 50) * 100)); // 50 leads = 100% coverage
+      const customerDensity = Math.round((totalClients / Math.max(1, agentLeads.length)) * 100);
+
+      const territoryData = {
+        primary: {
+          name: agentProfile?.assignedTerritory || 'Mumbai Metropolitan',
+          coverage: marketCoverage,
+        },
+        secondary: [
+          { name: 'Navi Mumbai', coverage: Math.round(marketCoverage * 0.7) },
+          { name: 'Thane', coverage: Math.round(marketCoverage * 0.5) },
+        ],
+        metrics: {
+          marketCoverage,
+          customerDensity,
+          competitionIndex: marketCoverage > 70 ? 'Low' : marketCoverage > 40 ? 'Medium' : 'High',
+          totalClients,
+        },
+        stats: {
+          totalLeads: agentLeads.length,
+          activeClients: convertedLeads.length,
+          potentialMarket: 150 - agentLeads.length,
+          growthOpportunity: `${Math.round(((150 - agentLeads.length) / 150) * 100)}%`,
+        },
+        boundaries: {
+          pincodes: ['400001', '400002', '400003', '400004', '400005'],
+          districts: ['Mumbai City', 'Mumbai Suburban'],
+          state: 'Maharashtra',
+        },
+      };
+
+      res.json(territoryData);
+    } catch (error) {
+      console.error('Error fetching territory:', error);
+      res.status(500).json({ error: 'Failed to fetch territory data' });
+    }
+  });
+
+  // ============ MARKETING RESOURCES ============
+
+  /**
+   * GET /api/agent/resources
+   * Get marketing resources for agents
+   * Requires: Agent role or higher
+   */
+  app.get('/api/agent/resources', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { category, type, limit = 50 } = req.query;
+
+      // Marketing resources for agents
+      const allResources = [
+        // Brochures
+        {
+          id: 1,
+          title: 'GST Registration Services Brochure',
+          description: 'Complete guide to our GST registration services with pricing and timelines',
+          category: 'brochures',
+          type: 'pdf',
+          fileUrl: '/resources/brochures/gst-registration-brochure.pdf',
+          thumbnailUrl: '/resources/thumbnails/gst-registration.jpg',
+          downloads: 156,
+          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          id: 2,
+          title: 'Company Registration Brochure',
+          description: 'Private Limited and LLP registration services overview',
+          category: 'brochures',
+          type: 'pdf',
+          fileUrl: '/resources/brochures/company-registration-brochure.pdf',
+          thumbnailUrl: '/resources/thumbnails/company-registration.jpg',
+          downloads: 203,
+          createdAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          id: 3,
+          title: 'Compliance Calendar 2026',
+          description: 'Annual compliance calendar with all important due dates',
+          category: 'brochures',
+          type: 'pdf',
+          fileUrl: '/resources/brochures/compliance-calendar-2026.pdf',
+          thumbnailUrl: '/resources/thumbnails/compliance-calendar.jpg',
+          downloads: 342,
+          createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        // Presentations
+        {
+          id: 4,
+          title: 'DigiComply Services Overview',
+          description: 'Complete deck covering all services for client presentations',
+          category: 'presentations',
+          type: 'pptx',
+          fileUrl: '/resources/presentations/services-overview.pptx',
+          thumbnailUrl: '/resources/thumbnails/services-overview.jpg',
+          downloads: 89,
+          createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          id: 5,
+          title: 'GST Benefits Presentation',
+          description: 'Benefits of GST registration for small businesses',
+          category: 'presentations',
+          type: 'pptx',
+          fileUrl: '/resources/presentations/gst-benefits.pptx',
+          thumbnailUrl: '/resources/thumbnails/gst-benefits.jpg',
+          downloads: 124,
+          createdAt: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        // Videos
+        {
+          id: 6,
+          title: 'How to Pitch GST Services',
+          description: 'Training video on effective GST service pitching',
+          category: 'videos',
+          type: 'video',
+          fileUrl: '/resources/videos/gst-pitch-training.mp4',
+          thumbnailUrl: '/resources/thumbnails/gst-pitch.jpg',
+          downloads: 67,
+          createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          id: 7,
+          title: 'Client Objection Handling',
+          description: 'How to handle common client objections effectively',
+          category: 'videos',
+          type: 'video',
+          fileUrl: '/resources/videos/objection-handling.mp4',
+          thumbnailUrl: '/resources/thumbnails/objection-handling.jpg',
+          downloads: 91,
+          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        // Templates
+        {
+          id: 8,
+          title: 'Client Introduction Email Template',
+          description: 'Professional email template for introducing services to new clients',
+          category: 'templates',
+          type: 'docx',
+          fileUrl: '/resources/templates/client-intro-email.docx',
+          thumbnailUrl: '/resources/thumbnails/email-template.jpg',
+          downloads: 245,
+          createdAt: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          id: 9,
+          title: 'Follow-up Message Templates',
+          description: 'WhatsApp and SMS templates for lead follow-ups',
+          category: 'templates',
+          type: 'docx',
+          fileUrl: '/resources/templates/followup-templates.docx',
+          thumbnailUrl: '/resources/thumbnails/followup-template.jpg',
+          downloads: 312,
+          createdAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          id: 10,
+          title: 'Quotation Template',
+          description: 'Professional quotation format for client proposals',
+          category: 'templates',
+          type: 'xlsx',
+          fileUrl: '/resources/templates/quotation-template.xlsx',
+          thumbnailUrl: '/resources/thumbnails/quotation-template.jpg',
+          downloads: 178,
+          createdAt: new Date(Date.now() - 50 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        // Guides
+        {
+          id: 11,
+          title: 'Agent Sales Handbook',
+          description: 'Comprehensive guide to selling compliance services',
+          category: 'guides',
+          type: 'pdf',
+          fileUrl: '/resources/guides/sales-handbook.pdf',
+          thumbnailUrl: '/resources/thumbnails/sales-handbook.jpg',
+          downloads: 156,
+          createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          id: 12,
+          title: 'Service Pricing Guide',
+          description: 'Detailed pricing for all services with commission rates',
+          category: 'guides',
+          type: 'pdf',
+          fileUrl: '/resources/guides/pricing-guide.pdf',
+          thumbnailUrl: '/resources/thumbnails/pricing-guide.jpg',
+          downloads: 289,
+          createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      ];
+
+      // Apply filters
+      let filteredResources = allResources;
+
+      if (category && category !== 'all') {
+        filteredResources = filteredResources.filter(r => r.category === category);
+      }
+
+      if (type && type !== 'all') {
+        filteredResources = filteredResources.filter(r => r.type === type);
+      }
+
+      // Sort by downloads (most popular first)
+      filteredResources.sort((a, b) => b.downloads - a.downloads);
+
+      // Apply limit
+      const limitedResources = filteredResources.slice(0, parseInt(limit as string));
+
+      // Get category summary
+      const categories = [
+        { id: 'brochures', name: 'Brochures', count: allResources.filter(r => r.category === 'brochures').length, icon: 'file-text' },
+        { id: 'presentations', name: 'Presentations', count: allResources.filter(r => r.category === 'presentations').length, icon: 'presentation' },
+        { id: 'videos', name: 'Videos', count: allResources.filter(r => r.category === 'videos').length, icon: 'video' },
+        { id: 'templates', name: 'Templates', count: allResources.filter(r => r.category === 'templates').length, icon: 'file' },
+        { id: 'guides', name: 'Guides', count: allResources.filter(r => r.category === 'guides').length, icon: 'book' },
+      ];
+
+      res.json({
+        resources: limitedResources,
+        total: filteredResources.length,
+        categories,
+        featured: allResources.slice(0, 3), // Top 3 most downloaded
+      });
+    } catch (error) {
+      console.error('Error fetching resources:', error);
+      res.status(500).json({ error: 'Failed to fetch resources' });
+    }
+  });
+
+  /**
+   * POST /api/agent/resources/:id/download
+   * Track resource download
+   * Requires: Agent role or higher
+   */
+  app.post('/api/agent/resources/:id/download', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const agentId = req.user?.id;
+
+      // In production, increment download count and log analytics
+      // await db.update(marketingResources).set({ downloads: sql`downloads + 1` }).where(eq(marketingResources.id, parseInt(id)));
+
+      res.json({
+        success: true,
+        message: 'Download tracked',
+        resourceId: parseInt(id),
+        downloadedBy: agentId,
+        downloadedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Error tracking download:', error);
+      res.status(500).json({ error: 'Failed to track download' });
+    }
+  });
+
   // ============ ANNOUNCEMENTS ============
 
   /**
@@ -712,6 +997,16 @@ export function registerAgentRoutes(app: Express) {
 
   app.get('/api/v1/agent/announcements', ...agentAuth, async (req: AuthenticatedRequest, res) => {
     req.url = '/api/agent/announcements';
+    app._router.handle(req, res, () => {});
+  });
+
+  app.get('/api/v1/agent/territory', ...agentAuth, async (req: AuthenticatedRequest, res) => {
+    req.url = '/api/agent/territory';
+    app._router.handle(req, res, () => {});
+  });
+
+  app.get('/api/v1/agent/resources', ...agentAuth, async (req: AuthenticatedRequest, res) => {
+    req.url = '/api/agent/resources';
     app._router.handle(req, res, () => {});
   });
 

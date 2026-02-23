@@ -68,15 +68,24 @@ export function useAuth() {
   };
 
   const logout = async () => {
+    // Get CSRF token from cookie (set during login)
+    const csrfToken = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('csrfToken='))
+      ?.split('=')[1];
+
     await fetch('/api/auth/logout', {
       method: 'POST',
       headers: {
-        'X-Requested-With': 'XMLHttpRequest', // CSRF protection for authenticated requests
+        'X-Requested-With': 'XMLHttpRequest',
+        ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
       },
       credentials: 'include'
     });
 
     await refetch();
+    // Redirect to login page after logout
+    window.location.href = '/login';
   };
 
   return {

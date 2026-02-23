@@ -27,6 +27,8 @@ function parsePagination(query: any, defaultLimit = 20, maxLimit = 100): Paginat
 // Middleware chains for operations routes
 const requireOpsAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE)] as const;
 const requireOpsManager = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_MANAGER)] as const;
+// QC access for delivery handoff - allows QC_EXECUTIVE and higher ops roles
+const requireQcOrOpsAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.QC_EXECUTIVE)] as const;
 
 export function registerOperationsRoutes(app: Express) {
 
@@ -262,8 +264,8 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // ========== QC TO DELIVERY HANDOFF ==========
-  // Requires: ops_executive or higher
-  app.get('/api/ops/delivery-handoff', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+  // Requires: qc_executive or higher (allows QC team to manage delivery handoff)
+  app.get('/api/ops/delivery-handoff', ...requireQcOrOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { tab, search, priority } = req.query;
 
@@ -583,9 +585,9 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Initiate delivery for a service request
-  // Requires: ops_executive or higher
+  // Requires: qc_executive or higher (allows QC team to initiate delivery)
   // USES STATE MACHINE: ready_for_delivery → delivered
-  app.post('/api/ops/delivery-handoff/:handoffId/initiate', ...requireOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/ops/delivery-handoff/:handoffId/initiate', ...requireQcOrOpsAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { handoffId } = req.params;
       const { deliveryMethod, deliveryNotes, includeDocuments, customMessage } = req.body;
@@ -621,34 +623,42 @@ export function registerOperationsRoutes(app: Express) {
         });
       }
 
-      // Generate a unique delivery token for secure confirmation
-      const deliveryToken = `DT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
       // Update notes if provided
       if (deliveryNotes) {
         await db
           .update(serviceRequests)
           .set({
-            notes: `${serviceRequest.notes || ''}\n[Delivery] ${deliveryNotes}`
+            internalNotes: `${serviceRequest.internalNotes || ''}\n[Delivery] ${deliveryNotes}`
           })
           .where(eq(serviceRequests.id, serviceRequestId));
       }
 
-      // Create delivery confirmation record
+      // Get client info and quality review for the delivery record
+      const [entityInfo] = await db
+        .select({ clientId: businessEntities.clientId })
+        .from(businessEntities)
+        .where(eq(businessEntities.id, serviceRequest.businessEntityId!));
+
+      // Get or create a quality review reference (QC review should exist for QC-approved items)
+      const [qcReview] = await db
+        .select({ id: qualityReviews.id })
+        .from(qualityReviews)
+        .where(eq(qualityReviews.serviceRequestId, serviceRequestId))
+        .limit(1);
+
+      // Create delivery confirmation record with correct schema fields
       const [deliveryRecord] = await db
         .insert(deliveryConfirmations)
         .values({
           serviceRequestId: serviceRequestId,
+          qualityReviewId: qcReview?.id || 0,
+          clientId: entityInfo?.clientId || 0,
           deliveryMethod: deliveryMethod || 'email',
-          deliveryStatus: 'initiated',
+          deliveredBy: req.user?.id || 0,
           status: 'pending',
-          deliveryToken: deliveryToken,
-          initiatedBy: req.user?.username || 'ops_team',
-          notes: deliveryNotes || null,
-          documents: includeDocuments ? JSON.stringify(includeDocuments) : null,
-          customMessage: customMessage || null,
-          createdAt: new Date(),
-          updatedAt: new Date()
+          deliveryNotes: deliveryNotes || null,
+          deliverables: includeDocuments || [],
+          clientInstructions: customMessage || null
         })
         .returning();
 
@@ -657,7 +667,6 @@ export function registerOperationsRoutes(app: Express) {
         message: 'Delivery initiated successfully',
         handoffId: serviceRequestId,
         deliveryId: deliveryRecord.id,
-        deliveryToken: deliveryToken,
         deliveryMethod,
         serviceRequestStatus: 'delivered',
         previousStatus: transitionResult.previousStatus,
