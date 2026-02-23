@@ -364,7 +364,9 @@ export interface AuthenticatedRequest extends Request {
     id: number;
     username: string;
     email: string;
+    fullName: string | null;
     role: string;
+    department: string | null;
     isActive: boolean;
   };
 }
@@ -546,7 +548,9 @@ export async function sessionAuthMiddleware(req: AuthenticatedRequest, res: Resp
       id: user.id,
       username: user.username,
       email: user.email,
+      fullName: user.fullName || null,
       role: user.role,
+      department: user.department || null,
       isActive: user.isActive,
     };
 

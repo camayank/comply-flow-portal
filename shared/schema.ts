@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, decimal, json, uuid, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, json, uuid, varchar, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -4668,11 +4668,10 @@ export type TicketAssignment = typeof ticketAssignments.$inferSelect;
 export type InsertTicketAssignment = z.infer<typeof insertTicketAssignmentSchema>;
 /**
  * Database Schema for Compliance State Engine
- * 
+ *
  * Drizzle ORM schema definitions for state tracking tables
+ * Note: pgTable, serial, etc. are already imported at the top of this file
  */
-
-import { pgTable, serial, integer, text, timestamp, boolean, numeric, json } from 'drizzle-orm/pg-core';
 
 // ============================================================================
 // COMPLIANCE STATE TABLE (Current state snapshot)

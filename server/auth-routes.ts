@@ -673,9 +673,10 @@ export async function registerAuthRoutes(app: Express) {
     } catch (error) {
       console.error('OTP cleanup error:', error);
     }
-  }, {
-    scheduled: false // Don't start automatically
   });
+
+  // Stop the job first (it starts automatically), then register with job manager
+  otpCleanupJob.stop();
 
   jobManager.registerCron(
     'otp-cleanup',
