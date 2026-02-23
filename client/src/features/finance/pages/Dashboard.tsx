@@ -3,10 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { getStatusColor, chartColors } from '@/lib/design-system-utils';
 import { DashboardLayout, PageShell } from '@/layouts';
 import {
@@ -32,9 +35,11 @@ import {
   LayoutDashboard,
   CreditCard,
   Building2,
-  Users
+  Users,
+  Loader2
 } from 'lucide-react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { AreaChart, Area, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
@@ -133,8 +138,56 @@ const FinancialManagementDashboard = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [invoiceDialog, setInvoiceDialog] = useState(false);
+  const [createInvoiceDialog, setCreateInvoiceDialog] = useState(false);
+  const [newInvoice, setNewInvoice] = useState({
+    clientName: '',
+    businessEntityId: 1,
+    totalAmount: '',
+    taxAmount: '',
+    description: '',
+    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  });
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Create invoice mutation
+  const createInvoiceMutation = useMutation({
+    mutationFn: async (invoiceData: typeof newInvoice) => {
+      const response = await apiRequest('POST', '/api/financial/invoices', {
+        businessEntityId: invoiceData.businessEntityId,
+        totalAmount: parseFloat(invoiceData.totalAmount) || 0,
+        taxAmount: parseFloat(invoiceData.taxAmount) || 0,
+        subtotal: parseFloat(invoiceData.totalAmount) - (parseFloat(invoiceData.taxAmount) || 0),
+        lineItems: [{ description: invoiceData.description, amount: parseFloat(invoiceData.totalAmount) }],
+        notes: invoiceData.description,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Invoice Created',
+        description: 'New invoice has been created successfully.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/financial/invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/financial/summary'] });
+      setCreateInvoiceDialog(false);
+      setNewInvoice({
+        clientName: '',
+        businessEntityId: 1,
+        totalAmount: '',
+        taxAmount: '',
+        description: '',
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to create invoice',
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Financial data queries
   const { data: financialSummary, isLoading: summaryLoading } = useQuery<FinancialSummary>({
@@ -203,7 +256,7 @@ const FinancialManagementDashboard = () => {
                 <SelectItem value="yearly">Yearly</SelectItem>
               </SelectContent>
             </Select>
-            <Button data-testid="button-create-invoice">
+            <Button data-testid="button-create-invoice" onClick={() => setCreateInvoiceDialog(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Create Invoice
             </Button>
@@ -696,6 +749,90 @@ const FinancialManagementDashboard = () => {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Invoice Dialog */}
+      <Dialog open={createInvoiceDialog} onOpenChange={setCreateInvoiceDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create New Invoice</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="clientName">Client Name</Label>
+              <Input
+                id="clientName"
+                placeholder="Enter client name"
+                value={newInvoice.clientName}
+                onChange={(e) => setNewInvoice({ ...newInvoice, clientName: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="totalAmount">Amount (₹)</Label>
+                <Input
+                  id="totalAmount"
+                  type="number"
+                  placeholder="0.00"
+                  value={newInvoice.totalAmount}
+                  onChange={(e) => setNewInvoice({ ...newInvoice, totalAmount: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="taxAmount">Tax Amount (₹)</Label>
+                <Input
+                  id="taxAmount"
+                  type="number"
+                  placeholder="0.00"
+                  value={newInvoice.taxAmount}
+                  onChange={(e) => setNewInvoice({ ...newInvoice, taxAmount: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="dueDate">Due Date</Label>
+              <Input
+                id="dueDate"
+                type="date"
+                value={newInvoice.dueDate}
+                onChange={(e) => setNewInvoice({ ...newInvoice, dueDate: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                placeholder="Enter invoice description or services..."
+                value={newInvoice.description}
+                onChange={(e) => setNewInvoice({ ...newInvoice, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateInvoiceDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createInvoiceMutation.mutate(newInvoice)}
+              disabled={createInvoiceMutation.isPending || !newInvoice.totalAmount}
+            >
+              {createInvoiceMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Invoice'
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </PageShell>

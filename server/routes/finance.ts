@@ -42,7 +42,7 @@ async function getFinancialSummary() {
 
   // Get client count
   const clientResult = await pool.query(`
-    SELECT COUNT(DISTINCT id) as client_count FROM business_entities WHERE status = 'active'
+    SELECT COUNT(DISTINCT id) as client_count FROM business_entities WHERE is_active = true
   `);
 
   // Calculate average collection days
@@ -122,7 +122,7 @@ async function getFinancialKPIs() {
     FROM business_entities be
     LEFT JOIN service_requests sr ON be.id = sr.business_entity_id
     LEFT JOIN payments p ON sr.id = p.service_request_id AND p.status = 'completed'
-    WHERE be.status = 'active'
+    WHERE be.is_active = true
   `);
 
   const currentRevenue = parseFloat(currentResult.rows[0]?.current_revenue || '0');
@@ -217,7 +217,7 @@ async function getRealInvoices(filters: { status?: string; paymentStatus?: strin
     SELECT
       i.id,
       i.invoice_number,
-      be.company_name as client_name,
+      be.name as client_name,
       i.total_amount::numeric as total_amount,
       i.paid_amount::numeric as paid_amount,
       i.outstanding_amount::numeric as outstanding_amount,
@@ -331,13 +331,13 @@ async function getRealAgingReport() {
 async function getRealClientRevenue() {
   const result = await pool.query(`
     SELECT
-      be.company_name as client,
+      be.name as client,
       COALESCE(SUM(i.total_amount::numeric), 0) as revenue,
       COUNT(i.id) as invoice_count
     FROM business_entities be
     LEFT JOIN invoices i ON i.business_entity_id = be.id
-    WHERE be.status = 'active'
-    GROUP BY be.id, be.company_name
+    WHERE be.is_active = true
+    GROUP BY be.id, be.name
     HAVING SUM(i.total_amount::numeric) > 0
     ORDER BY revenue DESC
     LIMIT 10
@@ -355,9 +355,13 @@ router.get('/summary', async (req: Request, res: Response) => {
   try {
     const summary = await getFinancialSummary();
     res.json(summary);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching financial summary:', error);
-    res.status(500).json({ error: 'Failed to fetch financial summary' });
+    res.status(500).json({
+      error: 'Failed to fetch financial summary',
+      details: error?.message || String(error),
+      stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+    });
   }
 });
 
@@ -397,7 +401,7 @@ router.get('/invoices/:id', async (req: Request, res: Response) => {
       SELECT
         i.id,
         i.invoice_number,
-        be.company_name as client_name,
+        be.name as client_name,
         i.total_amount::numeric as total_amount,
         i.paid_amount::numeric as paid_amount,
         i.outstanding_amount::numeric as outstanding_amount,

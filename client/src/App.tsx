@@ -382,6 +382,7 @@ const AppContent = () => {
                 <Route path="/requests" component={ServiceRequestsHub} />
                 <Route path="/my-requests" component={ServiceRequestsHub} />
                 <Route path="/compliance-calendar" component={ClientComplianceCalendar} />
+                <Route path="/profile" component={ClientProfile} />
                 <Route path="/client-profile" component={ClientProfile} />
                 <Route path="/vault" component={DocumentVault} />
                 <Route path="/referrals" component={ReferralDashboard} />
@@ -560,6 +561,9 @@ const AppContent = () => {
 
                 {/* ========== FINANCE & HR ROUTES ========== */}
                 <Route path="/financial-management" component={FinancialManagementDashboard} />
+                <Route path="/financial-management/invoices" component={FinancialManagementDashboard} />
+                <Route path="/financial-management/revenue" component={FinancialManagementDashboard} />
+                <Route path="/financial-management/reports" component={FinancialManagementDashboard} />
                 <Route path="/financials" component={FinancialManagementDashboard} />
                 <Route path="/revenue-analytics" component={FinancialManagementDashboard} />
                 <Route path="/hr" component={HRDashboard} />
