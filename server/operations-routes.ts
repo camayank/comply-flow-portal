@@ -175,7 +175,7 @@ export function registerOperationsRoutes(app: Express) {
       const assignedResult = await db
         .select({ count: sql`count(*)` })
         .from(serviceRequests)
-        .where(sql`${serviceRequests.assignedTo} IS NOT NULL
+        .where(sql`${serviceRequests.assignedTeamMember} IS NOT NULL
           AND ${serviceRequests.status} NOT IN ('completed', 'delivered', 'cancelled')`);
 
       const opsTeamCount = Number(opsTeamResult[0]?.count || 1);
@@ -277,22 +277,22 @@ export function registerOperationsRoutes(app: Express) {
           status: serviceRequests.status,
           priority: serviceRequests.priority,
           progress: serviceRequests.progress,
-          notes: serviceRequests.notes,
+          notes: serviceRequests.internalNotes,
           createdAt: serviceRequests.createdAt,
           updatedAt: serviceRequests.updatedAt,
           // Client info from businessEntities
-          clientName: businessEntities.companyName,
+          clientName: businessEntities.name,
           clientEmail: businessEntities.contactEmail,
           clientPhone: businessEntities.contactPhone,
           clientId: businessEntities.clientId,
           // Service info
           serviceName: services.name,
           serviceType: services.category,
-          serviceCode: services.code
+          serviceCode: services.serviceId
         })
         .from(serviceRequests)
         .leftJoin(businessEntities, eq(serviceRequests.businessEntityId, businessEntities.id))
-        .leftJoin(services, eq(serviceRequests.serviceId, services.id))
+        .leftJoin(services, eq(serviceRequests.serviceId, services.serviceId))
         .where(sql`${serviceRequests.status} in ('qc_approved', 'ready_for_delivery', 'delivered', 'awaiting_client_confirmation', 'completed')`)
         .orderBy(desc(serviceRequests.updatedAt));
 
@@ -348,7 +348,7 @@ export function registerOperationsRoutes(app: Express) {
       const avgDeliveryTime = deliveredRequests.length > 0
         ? deliveredRequests.reduce((sum, d) => {
             const created = new Date(d.createdAt!);
-            const confirmed = d.confirmedAt ? new Date(d.confirmedAt) : created;
+            const confirmed = d.clientConfirmedAt ? new Date(d.clientConfirmedAt) : created;
             return sum + (confirmed.getTime() - created.getTime()) / (1000 * 60 * 60); // hours
           }, 0) / deliveredRequests.length / 24 // convert to days
         : 2.5;
@@ -759,7 +759,7 @@ export function registerOperationsRoutes(app: Express) {
           serviceName: services.name
         })
         .from(serviceRequests)
-        .leftJoin(services, eq(serviceRequests.serviceId, services.id))
+        .leftJoin(services, eq(serviceRequests.serviceId, services.serviceId))
         .where(eq(serviceRequests.id, delivery.serviceRequestId));
 
       res.json({
@@ -840,7 +840,7 @@ export function registerOperationsRoutes(app: Express) {
         })
         .from(serviceRequests)
         .leftJoin(businessEntities, eq(serviceRequests.businessEntityId, businessEntities.id))
-        .leftJoin(services, eq(serviceRequests.serviceId, services.id))
+        .leftJoin(services, eq(serviceRequests.serviceId, services.serviceId))
         .where(
           and(
             isNull(serviceRequests.assignedTeamMember),

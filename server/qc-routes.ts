@@ -7,6 +7,7 @@ import {
   USER_ROLES,
   type AuthenticatedRequest
 } from './rbac-middleware';
+import { qcWorkflowService } from './services/qc-workflow-service';
 
 // Middleware chains for QC routes
 const requireQCAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.QC_EXECUTIVE)] as const;
@@ -794,9 +795,6 @@ export function registerQCRoutes(app: Application) {
   });
 
   // ========== QC WORKFLOW SERVICE ENDPOINTS ==========
-
-  // Import QC workflow service
-  const { qcWorkflowService } = require('./services/qc-workflow-service');
 
   // Initialize QC review for a service request
   app.post('/api/qc/workflow/initialize/:serviceRequestId', ...requireQCAccess, async (req: AuthenticatedRequest, res: Response) => {

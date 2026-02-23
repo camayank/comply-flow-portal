@@ -134,13 +134,13 @@ export default function StatusManagement() {
 
   // Fetch statuses for selected service
   const { data: statusesData, isLoading: loadingStatuses } = useQuery({
-    queryKey: ['/api/status-management/services', selectedService, 'statuses'],
+    queryKey: [`/api/status-management/services/${selectedService}/statuses`],
     enabled: !!selectedService,
   });
 
   // Fetch transition rules for selected service
   const { data: transitionsData, isLoading: loadingTransitions } = useQuery({
-    queryKey: ['/api/status-management/services', selectedService, 'transitions'],
+    queryKey: [`/api/status-management/services/${selectedService}/transitions`],
     enabled: !!selectedService,
   });
 
@@ -156,7 +156,7 @@ export default function StatusManagement() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/status-management/services', selectedService, 'statuses'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/status-management/services/${selectedService}/statuses`] });
       toast({ title: 'Status created successfully' });
       setShowCreateDialog(false);
     },
@@ -177,7 +177,7 @@ export default function StatusManagement() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/status-management/services', selectedService, 'statuses'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/status-management/services/${selectedService}/statuses`] });
       toast({ title: 'Status updated successfully' });
       setEditingStatus(null);
     },
@@ -196,7 +196,7 @@ export default function StatusManagement() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/status-management/services', selectedService, 'statuses'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/status-management/services/${selectedService}/statuses`] });
       toast({ title: 'Status deactivated' });
     },
     onError: () => {
@@ -214,7 +214,7 @@ export default function StatusManagement() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/status-management/services', selectedService, 'statuses'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/status-management/services/${selectedService}/statuses`] });
       queryClient.invalidateQueries({ queryKey: ['/api/status-management/services/status-summary'] });
       toast({ title: 'Default statuses initialized' });
     },

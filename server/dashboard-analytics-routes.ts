@@ -216,7 +216,10 @@ export function registerDashboardAnalyticsRoutes(app: Express) {
         })),
         
         // Lead Analytics
-        getLeadAnalytics(dateFilter),
+        getLeadAnalytics(dateFilter).catch(() => ({
+          totalLeads: 0, hotLeads: 0, convertedLeads: 0,
+          conversionRate: 0, stageDistribution: {}, sourceAnalysis: {}
+        })),
         
         // Compliance Analytics
         getComplianceAnalytics(dateFilter).catch(() => ({
