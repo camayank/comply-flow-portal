@@ -200,9 +200,14 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 /**
- * POST /api/v1/auth/send-otp
- * Send OTP for verification
+ * OTP SYSTEM - TEMPORARILY DISABLED
+ *
+ * The OTP verification system has been disabled to simplify login.
+ * To re-enable: uncomment the routes below and update the login UI.
+ *
+ * Database table 'otp_store' is preserved for potential future use.
  */
+/*
 router.post('/send-otp', otpLimiter, asyncHandler(async (req: Request, res: Response) => {
   const { email, phone } = req.body;
 
@@ -250,10 +255,6 @@ router.post('/send-otp', otpLimiter, asyncHandler(async (req: Request, res: Resp
   });
 }));
 
-/**
- * POST /api/v1/auth/verify-otp
- * Verify OTP with actual database validation
- */
 router.post('/verify-otp', otpLimiter, asyncHandler(async (req: Request, res: Response) => {
   const { email, phone, otp } = req.body;
 
@@ -323,6 +324,7 @@ router.post('/verify-otp', otpLimiter, asyncHandler(async (req: Request, res: Re
     message: 'OTP verified successfully',
   });
 }));
+*/
 
 /**
  * POST /api/v1/auth/refresh

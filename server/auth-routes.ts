@@ -84,8 +84,108 @@ async function cleanupExpiredOTPs(): Promise<void> {
 
 export async function registerAuthRoutes(app: Express) {
 
-  // CLIENT AUTHENTICATION (OTP-based)
-  
+  // CLIENT AUTHENTICATION (Email/Password-based)
+
+  // Client login with email and password
+  app.post('/api/auth/client/login', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required' });
+      }
+
+      // Get user by email
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      // Check if client
+      if (user.role !== 'client') {
+        return res.status(403).json({ error: 'This login method is for clients only. Staff should use staff login.' });
+      }
+
+      // Verify password
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+
+      if (!isPasswordValid) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      // Check if user is active
+      if (!user.isActive) {
+        return res.status(403).json({ error: 'Account is deactivated. Contact administrator.' });
+      }
+
+      // Create session with fingerprinting and CSRF protection
+      const sessionToken = nanoid(32);
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      const fingerprint = generateSessionFingerprint(req);
+      const csrfToken = generateCSRFToken();
+
+      await db.insert(userSessions).values({
+        userId: user.id,
+        sessionToken,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'] || 'unknown',
+        fingerprint, // Session fingerprinting for hijack detection
+        csrfToken, // CSRF protection token
+        expiresAt,
+        isActive: true,
+        lastActivity: new Date(),
+      });
+
+      // Update last login
+      await db
+        .update(users)
+        .set({ lastLogin: new Date() })
+        .where(eq(users.id, user.id));
+
+      // Set secure session cookie
+      res.cookie('sessionToken', sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+      // Expose CSRF token to client (readable cookie for header usage)
+      res.cookie('csrfToken', csrfToken, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+          role: user.role,
+        },
+      });
+    } catch (error) {
+      console.error('Client login error:', error);
+      res.status(500).json({ error: 'Login failed' });
+    }
+  });
+
+  /**
+   * OTP SYSTEM - TEMPORARILY DISABLED
+   *
+   * The OTP verification system has been disabled to simplify login.
+   * To re-enable: uncomment the routes below and update the login UI.
+   *
+   * Database table 'otp_store' and helper functions are preserved for potential future use.
+   */
+  /*
   // Send OTP to client email
   app.post('/api/auth/client/send-otp', async (req, res) => {
     try {
@@ -158,7 +258,7 @@ export async function registerAuthRoutes(app: Express) {
 
       // Check OTP
       const storedOtp = await getOTP(email);
-      
+
       if (!storedOtp) {
         return res.status(400).json({ error: 'OTP expired or invalid' });
       }
@@ -260,6 +360,7 @@ export async function registerAuthRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to verify OTP' });
     }
   });
+  */
 
   // STAFF AUTHENTICATION (Username/Password)
   

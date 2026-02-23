@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,14 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Shield, Mail, Lock, Smartphone } from "lucide-react";
+import { Shield, Mail, Lock } from "lucide-react";
 import { canAccessRoute, getRoleDashboardRoute } from "@/utils/roleBasedRouting";
 import { PublicLayout } from '@/layouts';
+import type { User } from "@/store/authStore";
 
 export default function Login() {
-  const [, setLocation] = useLocation();
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"client" | "staff">("client");
 
   useEffect(() => {
@@ -87,9 +85,8 @@ export default function Login() {
 }
 
 function ClientLogin() {
-  const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
+  const [password, setPassword] = useState("");
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -106,33 +103,19 @@ function ClientLogin() {
     if (showRegistered) {
       toast({
         title: "Registration successful",
-        description: "Please sign in using OTP sent to your email.",
+        description: "Please sign in with your email and password.",
       });
       sessionStorage.removeItem('showRegisteredMessage');
     }
   }, [toast]);
 
-  const sendOtpMutation = useMutation({
-    mutationFn: (email: string) => apiRequest('/api/auth/client/send-otp', 'POST', { email }),
-    onSuccess: () => {
-      toast({
-        title: "OTP Sent",
-        description: "Check your email for the verification code",
-      });
-      setStep("otp");
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send OTP",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const verifyOtpMutation = useMutation({
-    mutationFn: (data: { email: string; otp: string }) =>
-      apiRequest('/api/auth/client/verify-otp', 'POST', data),
+  const loginMutation = useMutation<
+    { user: User; accessToken: string },
+    Error,
+    { email: string; password: string }
+  >({
+    mutationFn: (data: { email: string; password: string }) =>
+      apiRequest<{ user: User; accessToken: string }>('/api/auth/client/login', 'POST', data),
     onSuccess: (data) => {
       toast({
         title: "Success",
@@ -150,91 +133,28 @@ function ClientLogin() {
     },
     onError: (error: any) => {
       toast({
-        title: "Error",
-        description: error.message || "Invalid OTP",
+        title: "Login Failed",
+        description: error.message || "Invalid credentials",
         variant: "destructive",
       });
     },
   });
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      toast({ title: "Error", description: "Please enter your email", variant: "destructive" });
+    if (!email || !password) {
+      toast({
+        title: "Error",
+        description: "Please enter email and password",
+        variant: "destructive",
+      });
       return;
     }
-    sendOtpMutation.mutate(email);
+    loginMutation.mutate({ email, password });
   };
-
-  const handleVerifyOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!otp) {
-      toast({ title: "Error", description: "Please enter the OTP", variant: "destructive" });
-      return;
-    }
-    verifyOtpMutation.mutate({ email, otp });
-  };
-
-  if (step === "otp") {
-    return (
-      <form onSubmit={handleVerifyOtp} className="space-y-4">
-        <div className="text-center mb-4">
-          <Smartphone className="h-12 w-12 mx-auto text-primary mb-2" />
-          <p className="text-sm text-muted-foreground">
-            Enter the 6-digit code sent to {email}
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="otp">Verification Code</Label>
-          <Input
-            id="otp"
-            type="text"
-            placeholder="000000"
-            value={otp}
-            onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            maxLength={6}
-            className="text-center text-2xl tracking-widest"
-            data-testid="input-otp"
-            autoFocus
-          />
-        </div>
-
-        <Button
-          type="submit"
-          className="w-full"
-          disabled={verifyOtpMutation.isPending || otp.length !== 6}
-          data-testid="button-verify-otp"
-        >
-          {verifyOtpMutation.isPending ? "Verifying..." : "Verify & Login"}
-        </Button>
-
-        <div className="text-center">
-          <Button
-            type="button"
-            variant="link"
-            onClick={() => setStep("email")}
-            className="text-sm"
-          >
-            Use different email
-          </Button>
-          <span className="mx-2">|</span>
-          <Button
-            type="button"
-            variant="link"
-            onClick={() => sendOtpMutation.mutate(email)}
-            disabled={sendOtpMutation.isPending}
-            className="text-sm"
-          >
-            {sendOtpMutation.isPending ? "Sending..." : "Resend OTP"}
-          </Button>
-        </div>
-      </form>
-    );
-  }
 
   return (
-    <form onSubmit={handleSendOtp} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="client-email">Email Address</Label>
         <div className="relative">
@@ -252,17 +172,43 @@ function ClientLogin() {
         </div>
       </div>
 
+      <div className="space-y-2">
+        <Label htmlFor="client-password">Password</Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="client-password"
+            type="password"
+            placeholder="Enter your password"
+            className="pl-10"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            data-testid="input-client-password"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setLocation('/forgot-password')}
+          className="text-sm text-primary hover:underline bg-transparent border-none cursor-pointer"
+        >
+          Forgot password?
+        </button>
+      </div>
+
       <Button
         type="submit"
         className="w-full"
-        disabled={sendOtpMutation.isPending}
-        data-testid="button-send-otp"
+        disabled={loginMutation.isPending}
+        data-testid="button-client-login"
       >
-        {sendOtpMutation.isPending ? "Sending..." : "Send Verification Code"}
+        {loginMutation.isPending ? "Signing in..." : "Sign In"}
       </Button>
 
       <div className="text-center text-sm text-muted-foreground">
-        We'll send a 6-digit code to verify your identity
+        For registered clients only
       </div>
     </form>
   );
@@ -275,9 +221,13 @@ function StaffLogin() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
-  const loginMutation = useMutation({
+  const loginMutation = useMutation<
+    { user: User; accessToken: string },
+    Error,
+    { username: string; password: string }
+  >({
     mutationFn: (data: { username: string; password: string }) =>
-      apiRequest('/api/auth/staff/login', 'POST', data),
+      apiRequest<{ user: User; accessToken: string }>('/api/auth/staff/login', 'POST', data),
     onSuccess: (data) => {
       toast({
         title: "Success",
