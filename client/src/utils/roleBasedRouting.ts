@@ -755,10 +755,17 @@ export function getAllowedRoutes(role: string): string[] {
  * Check if a user role can access a specific route
  */
 export function canAccessRoute(role: string, route: string): boolean {
+  const normalizedRole = role.toLowerCase();
+
+  // Super admin has access to ALL routes - never block
+  if (normalizedRole === USER_ROLES.SUPER_ADMIN) {
+    return true;
+  }
+
   const allowedRoutes = getAllowedRoutes(role);
-  
+
   // Check exact match or if route starts with allowed route
-  return allowedRoutes.some(allowedRoute => 
+  return allowedRoutes.some(allowedRoute =>
     route === allowedRoute || route.startsWith(allowedRoute + '/')
   );
 }

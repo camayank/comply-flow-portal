@@ -307,6 +307,26 @@ app.use((req, res, next) => {
   // const { platformSyncOrchestrator } = await import('./platform-sync-orchestrator');
   console.log('Platform sync orchestrator initialized');
 
+  // API-specific 404 handler - MUST be before Vite to return JSON for missing API routes
+  // This prevents Vite from serving index.html for /api/* routes that don't exist
+  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+    // If we reach here, no route matched - return JSON 404
+    logger.warn('API route not found', {
+      method: req.method,
+      path: req.path,
+      originalUrl: req.originalUrl,
+      requestId: (req as any).requestId || 'unknown'
+    });
+
+    res.status(404).json({
+      error: {
+        code: 'NOT_FOUND',
+        message: `API endpoint ${req.method} ${req.originalUrl} not found`,
+        hint: 'Check the API documentation for available endpoints'
+      }
+    });
+  });
+
   // importantly setup vite in development BEFORE 404/error handlers
   // so the catch-all route works properly
   if (app.get("env") === "development") {
@@ -315,7 +335,7 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // 404 handler (must be before error handler, but after Vite)
+  // 404 handler for non-API routes (must be before error handler, but after Vite)
   app.use(notFoundHandler);
 
   // Global error handler (must be last)

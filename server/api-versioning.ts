@@ -118,6 +118,41 @@ export function createBackwardCompatibilityMiddleware(targetVersion: ApiVersion 
       return next();
     }
 
+    // Skip customer service routes (support tickets, templates)
+    if (path.startsWith('/api/customer-service/')) {
+      return next();
+    }
+
+    // Skip financial routes
+    if (path.startsWith('/api/financial/') || path.startsWith('/api/financials/')) {
+      return next();
+    }
+
+    // Skip agent routes
+    if (path.startsWith('/api/agent/')) {
+      return next();
+    }
+
+    // Skip tenant routes (multi-tenancy management)
+    if (path === '/api/tenants' || path.startsWith('/api/tenants/')) {
+      return next();
+    }
+
+    // Skip super-admin routes
+    if (path.startsWith('/api/super-admin/')) {
+      return next();
+    }
+
+    // Skip leads routes
+    if (path === '/api/leads' || path.startsWith('/api/leads/')) {
+      return next();
+    }
+
+    // Skip users routes
+    if (path === '/api/users' || path.startsWith('/api/users/')) {
+      return next();
+    }
+
     // Only handle /api/* routes (not versioned yet)
     if (path.startsWith('/api/')) {
       // Add deprecation warning header
