@@ -37,15 +37,14 @@ export interface JWTPayload {
  * Generate access token
  */
 export function generateAccessToken(payload: Omit<JWTPayload, 'type'>): string {
-  const options: jwt.SignOptions = {
-    expiresIn: JWT_ACCESS_EXPIRY,
-    issuer: JWT_ISSUER,
-    audience: JWT_AUDIENCE,
-  };
   return jwt.sign(
     { ...payload, type: 'access' },
     JWT_SECRET,
-    options
+    {
+      expiresIn: JWT_ACCESS_EXPIRY as jwt.SignOptions['expiresIn'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    }
   );
 }
 
@@ -53,15 +52,14 @@ export function generateAccessToken(payload: Omit<JWTPayload, 'type'>): string {
  * Generate refresh token
  */
 export function generateRefreshToken(payload: Omit<JWTPayload, 'type'>): string {
-  const options: jwt.SignOptions = {
-    expiresIn: JWT_REFRESH_EXPIRY,
-    issuer: JWT_ISSUER,
-    audience: JWT_AUDIENCE,
-  };
   return jwt.sign(
     { ...payload, type: 'refresh' },
     JWT_SECRET,
-    options
+    {
+      expiresIn: JWT_REFRESH_EXPIRY as jwt.SignOptions['expiresIn'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    }
   );
 }
 

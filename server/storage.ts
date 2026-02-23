@@ -33,10 +33,11 @@ import {
   type TaskExecution, type InsertTaskExecution,
   type ContentSearchIndex, type InsertContentSearchIndex,
   type EnhancedFaq, type InsertEnhancedFaq,
-  // Client contract, communication, and portfolio types
+  // Client contract, communication, portfolio, and invoice types
   type ClientContract, type InsertClientContract,
   type ClientCommunication, type InsertClientCommunication,
-  type ClientPortfolio, type InsertClientPortfolio
+  type ClientPortfolio, type InsertClientPortfolio,
+  type Invoice, type InsertInvoice
 } from "@shared/schema";
 import { db } from "./db";
 import { and, desc, eq, sql } from "drizzle-orm";
@@ -59,9 +60,9 @@ export interface IStorage {
   getServiceRequestsByUser(userId: number): Promise<ServiceRequest[]>;
   
   // Payment methods
-  getPayment(paymentId: string): Promise<Payment | undefined>;
+  getPayment(id: number): Promise<Payment | undefined>;
   createPayment(payment: InsertPayment): Promise<Payment>;
-  updatePayment(paymentId: string, updates: Partial<Payment>): Promise<Payment | undefined>;
+  updatePayment(id: number, updates: Partial<Payment>): Promise<Payment | undefined>;
   
   // Lead methods
   getAllLeads(filters?: {
