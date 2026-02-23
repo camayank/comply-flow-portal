@@ -579,7 +579,7 @@ const FinancialManagementDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {budgetPlans.map((plan: BudgetPlan) => (
+                  {(Array.isArray(budgetPlans) ? budgetPlans : []).map((plan: BudgetPlan) => (
                     <div key={plan.id} className="p-4 border rounded-lg">
                       <div className="flex justify-between items-center">
                         <div>
@@ -595,6 +595,11 @@ const FinancialManagementDashboard = () => {
                       </div>
                     </div>
                   ))}
+                  {(!budgetPlans || budgetPlans.length === 0) && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No budget plans found. Create your first budget plan to get started.
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
