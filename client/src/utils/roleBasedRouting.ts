@@ -584,6 +584,10 @@ export function getAllowedRoutes(role: string): string[] {
         '/documents',
         '/work-queue',
         '/ops/work-queue',
+        // Lead management access (aligned with backend permissions)
+        '/leads',
+        '/lead-management',
+        '/proposals',
         ...commonRoutes,
       ];
 
