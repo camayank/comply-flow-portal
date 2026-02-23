@@ -1,4 +1,4 @@
-import { 
+import {
   users, services, serviceRequests, payments, leads, salesProposals,
   clientHealthScores, upsellOpportunities, loyaltyPrograms, clientLoyaltyStatus, relationshipEvents,
   clientFeedback, qualityMetrics, postSalesManagement,
@@ -32,7 +32,11 @@ import {
   type ServicePerformanceMetrics, type InsertServicePerformanceMetrics,
   type TaskExecution, type InsertTaskExecution,
   type ContentSearchIndex, type InsertContentSearchIndex,
-  type EnhancedFaq, type InsertEnhancedFaq
+  type EnhancedFaq, type InsertEnhancedFaq,
+  // Client contract, communication, and portfolio types
+  type ClientContract, type InsertClientContract,
+  type ClientCommunication, type InsertClientCommunication,
+  type ClientPortfolio, type InsertClientPortfolio
 } from "@shared/schema";
 import { db } from "./db";
 import { and, desc, eq, sql } from "drizzle-orm";

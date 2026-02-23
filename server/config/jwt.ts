@@ -7,13 +7,14 @@ import jwt from 'jsonwebtoken';
 import { logger } from './logger';
 
 // CRITICAL: JWT_SECRET must be set in environment - no default allowed
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
+const JWT_SECRET_RAW = process.env.JWT_SECRET;
+if (!JWT_SECRET_RAW) {
   throw new Error('CRITICAL: JWT_SECRET environment variable is required. Set a secure random string of at least 32 characters.');
 }
-if (JWT_SECRET.length < 32) {
+if (JWT_SECRET_RAW.length < 32) {
   throw new Error('CRITICAL: JWT_SECRET must be at least 32 characters long for security.');
 }
+const JWT_SECRET: string = JWT_SECRET_RAW;
 const JWT_ACCESS_EXPIRY = process.env.JWT_ACCESS_EXPIRY || '15m';
 const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY || '7d';
 const JWT_ISSUER = process.env.JWT_ISSUER || 'comply-flow-portal';
@@ -21,8 +22,14 @@ const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'comply-flow-users';
 
 export interface JWTPayload {
   userId: string;
+  id?: number;
   email: string;
+  username?: string;
+  fullName?: string | null;
+  role?: string;
   roles: string[];
+  department?: string | null;
+  isActive?: boolean;
   type: 'access' | 'refresh';
 }
 
@@ -30,14 +37,15 @@ export interface JWTPayload {
  * Generate access token
  */
 export function generateAccessToken(payload: Omit<JWTPayload, 'type'>): string {
+  const options: jwt.SignOptions = {
+    expiresIn: JWT_ACCESS_EXPIRY,
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
+  };
   return jwt.sign(
     { ...payload, type: 'access' },
     JWT_SECRET,
-    {
-      expiresIn: JWT_ACCESS_EXPIRY,
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-    }
+    options
   );
 }
 
@@ -45,14 +53,15 @@ export function generateAccessToken(payload: Omit<JWTPayload, 'type'>): string {
  * Generate refresh token
  */
 export function generateRefreshToken(payload: Omit<JWTPayload, 'type'>): string {
+  const options: jwt.SignOptions = {
+    expiresIn: JWT_REFRESH_EXPIRY,
+    issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
+  };
   return jwt.sign(
     { ...payload, type: 'refresh' },
     JWT_SECRET,
-    {
-      expiresIn: JWT_REFRESH_EXPIRY,
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-    }
+    options
   );
 }
 

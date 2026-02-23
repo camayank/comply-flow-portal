@@ -444,7 +444,7 @@ class ReportGeneratorService {
     const [workload] = await db
       .select({
         totalRequests: sql<number>`COUNT(*)::int`,
-        completedOnTime: sql<number>`COUNT(CASE WHEN ${serviceRequests.status} = 'completed' AND ${serviceRequests.completedAt} <= ${serviceRequests.dueDate} THEN 1 END)::int`,
+        completedOnTime: sql<number>`COUNT(CASE WHEN ${serviceRequests.status} = 'completed' AND ${serviceRequests.actualCompletion} <= ${serviceRequests.dueDate} THEN 1 END)::int`,
         inProgress: sql<number>`COUNT(CASE WHEN ${serviceRequests.status} = 'in_progress' THEN 1 END)::int`,
         escalated: sql<number>`COUNT(CASE WHEN ${serviceRequests.priority} = 'urgent' THEN 1 END)::int`,
       })

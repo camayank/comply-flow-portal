@@ -15,7 +15,7 @@
  * Date: January 2026
  */
 
-import { pgTable, serial, varchar, text, integer, boolean, timestamp, date, decimal, jsonb, uuid, time, bigserial, index, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, serial, varchar, text, integer, boolean, timestamp, date, decimal, jsonb, uuid, time, bigserial, index, uniqueIndex, type AnyPgColumn } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import { users, businessEntities, serviceRequests, documentsUploads, leads } from './schema';
 
@@ -634,7 +634,7 @@ export const chartOfAccounts = pgTable('chart_of_accounts', {
   accountCode: varchar('account_code', { length: 20 }).notNull(),
   accountName: varchar('account_name', { length: 200 }).notNull(),
   accountType: varchar('account_type', { length: 50 }).notNull(), // 'asset', 'liability', 'equity', 'revenue', 'expense'
-  parentAccountId: integer('parent_account_id').references(() => chartOfAccounts.id),
+  parentAccountId: integer('parent_account_id').references((): AnyPgColumn => chartOfAccounts.id),
   description: text('description'),
   currency: varchar('currency', { length: 3 }).default('INR'),
   isActive: boolean('is_active').default(true),
@@ -1078,7 +1078,7 @@ export const projectTasks = pgTable('project_tasks', {
   id: serial('id').primaryKey(),
   projectId: integer('project_id').references(() => projects.id).notNull(),
   milestoneId: integer('milestone_id').references(() => projectMilestones.id),
-  parentTaskId: integer('parent_task_id').references(() => projectTasks.id),
+  parentTaskId: integer('parent_task_id').references((): AnyPgColumn => projectTasks.id),
   taskId: varchar('task_id', { length: 50 }).notNull(),
   name: varchar('name', { length: 500 }).notNull(),
   description: text('description'),

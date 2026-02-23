@@ -72,15 +72,8 @@ export async function cleanupExpiredTokens(): Promise<number> {
   }
 }
 
-// Extend Express Request type
-declare global {
-  namespace Express {
-    interface Request {
-      user?: JWTPayload;
-      userId?: string;
-    }
-  }
-}
+// Note: Express Request type is extended in auth-middleware.ts
+// This middleware maps JWT payload to the unified user type
 
 /**
  * Authenticate JWT token middleware
@@ -131,9 +124,17 @@ export async function authenticateToken(req: Request, res: Response, next: NextF
       return;
     }
 
-    // Attach user to request
-    req.user = decoded;
-    req.userId = decoded.id || decoded.userId;
+    // Attach user to request (map JWT payload to unified user type)
+    req.user = {
+      id: decoded.id || parseInt(decoded.userId) || 0,
+      username: decoded.username || decoded.email,
+      email: decoded.email,
+      fullName: decoded.fullName || null,
+      role: decoded.role || (decoded.roles?.[0] ?? 'client'),
+      department: decoded.department || null,
+      isActive: decoded.isActive ?? true,
+    };
+    req.userId = (decoded.id || decoded.userId)?.toString();
 
     next();
   } catch (error) {
@@ -157,8 +158,16 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction): v
     if (token) {
       const decoded = verifyToken(token);
       if (decoded && decoded.type === 'access') {
-        req.user = decoded;
-        req.userId = decoded.id || decoded.userId;
+        req.user = {
+          id: decoded.id || parseInt(decoded.userId) || 0,
+          username: decoded.username || decoded.email,
+          email: decoded.email,
+          fullName: decoded.fullName || null,
+          role: decoded.role || (decoded.roles?.[0] ?? 'client'),
+          department: decoded.department || null,
+          isActive: decoded.isActive ?? true,
+        };
+        req.userId = (decoded.id || decoded.userId)?.toString();
       }
     }
 
@@ -203,7 +212,15 @@ export function verifyRefreshToken(req: Request, res: Response, next: NextFuncti
       return;
     }
 
-    req.user = decoded;
+    req.user = {
+      id: decoded.id || parseInt(decoded.userId) || 0,
+      username: decoded.username || decoded.email,
+      email: decoded.email,
+      fullName: decoded.fullName || null,
+      role: decoded.role || (decoded.roles?.[0] ?? 'client'),
+      department: decoded.department || null,
+      isActive: decoded.isActive ?? true,
+    };
     next();
   } catch (error) {
     logger.error('Refresh token verification error:', error);

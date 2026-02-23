@@ -109,22 +109,20 @@ describe('Report Generator Service', () => {
     // Create some test service requests
     await db.insert(serviceRequests).values([
       {
-        entityId: testBusinessEntity.id,
-        serviceId: 1,
-        serviceName: 'GST Registration',
-        category: 'Compliance',
+        businessEntityId: testBusinessEntity.id,
+        serviceId: 'GST001',
         status: 'completed',
-        priority: 'normal',
-        basePrice: '5000',
+        priority: 'medium',
+        totalAmount: 5000,
+        description: 'GST Registration',
       },
       {
-        entityId: testBusinessEntity.id,
-        serviceId: 2,
-        serviceName: 'Annual Filing',
-        category: 'Compliance',
+        businessEntityId: testBusinessEntity.id,
+        serviceId: 'ANN001',
         status: 'in_progress',
         priority: 'high',
-        basePrice: '10000',
+        totalAmount: 10000,
+        description: 'Annual Filing',
       },
     ]);
   });
@@ -132,7 +130,7 @@ describe('Report Generator Service', () => {
   afterAll(async () => {
     // Cleanup test data
     if (testBusinessEntity) {
-      await db.delete(serviceRequests).where(eq(serviceRequests.entityId, testBusinessEntity.id));
+      await db.delete(serviceRequests).where(eq(serviceRequests.businessEntityId, testBusinessEntity.id));
       await db.delete(businessEntities).where(eq(businessEntities.id, testBusinessEntity.id));
     }
     if (opsManagerUser) {

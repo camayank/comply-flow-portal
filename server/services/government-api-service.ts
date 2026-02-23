@@ -323,19 +323,20 @@ class GovernmentApiService {
    */
   async getPendingFilings(clientId?: number): Promise<any[]> {
     try {
-      let query = db
-        .select()
-        .from(governmentFilings)
-        .where(
-          sql`${governmentFilings.status} IN ('pending', 'submitted', 'processing')`
-        )
-        .orderBy(governmentFilings.dueDate);
+      // Build the where conditions
+      const conditions = [
+        sql`${governmentFilings.status} IN ('pending', 'submitted', 'processing')`
+      ];
 
       if (clientId) {
-        query = query.where(eq(governmentFilings.clientId, clientId)) as typeof query;
+        conditions.push(eq(governmentFilings.clientId, clientId));
       }
 
-      return await query;
+      return await db
+        .select()
+        .from(governmentFilings)
+        .where(and(...conditions))
+        .orderBy(governmentFilings.dueDate);
     } catch (error) {
       logger.error('Get pending filings error:', error);
       return [];
@@ -350,23 +351,22 @@ class GovernmentApiService {
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + days);
 
-      let query = db
-        .select()
-        .from(governmentFilings)
-        .where(
-          and(
-            sql`${governmentFilings.dueDate} <= ${futureDate}`,
-            sql`${governmentFilings.dueDate} >= ${new Date()}`,
-            sql`${governmentFilings.status} IN ('pending', 'draft')`
-          )
-        )
-        .orderBy(governmentFilings.dueDate);
+      // Build the where conditions
+      const conditions = [
+        sql`${governmentFilings.dueDate} <= ${futureDate}`,
+        sql`${governmentFilings.dueDate} >= ${new Date()}`,
+        sql`${governmentFilings.status} IN ('pending', 'draft')`
+      ];
 
       if (clientId) {
-        query = query.where(eq(governmentFilings.clientId, clientId)) as typeof query;
+        conditions.push(eq(governmentFilings.clientId, clientId));
       }
 
-      return await query;
+      return await db
+        .select()
+        .from(governmentFilings)
+        .where(and(...conditions))
+        .orderBy(governmentFilings.dueDate);
     } catch (error) {
       logger.error('Get upcoming deadlines error:', error);
       return [];

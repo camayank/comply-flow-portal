@@ -18,6 +18,7 @@ declare global {
         isActive: boolean;
       };
       sessionId?: string;
+      userId?: string; // For JWT-based auth compatibility
     }
   }
 }

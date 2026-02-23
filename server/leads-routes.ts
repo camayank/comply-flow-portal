@@ -97,14 +97,18 @@ router.get('/leads/:id', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async 
 router.post('/leads', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
     const validatedData = insertLeadEnhancedSchema.omit({ leadId: true }).parse(req.body);
-    
+
+    // Generate unique leadId
+    const leadId = await generateLeadId();
+
     const leadData = {
       ...validatedData,
+      leadId,
       leadStage: validatedData.leadStage || 'new',
       priority: validatedData.priority || 'medium',
       status: validatedData.status || 'new'
     };
-    
+
     const newLead = await storage.createLead(leadData);
 
     res.json(newLead);
@@ -222,31 +226,13 @@ router.put('/leads/:id/assign', requireMinimumRole(USER_ROLES.SALES_MANAGER), as
     // Update lead with assignment
     const updatedLead = await storage.updateLead(leadId, {
       assignedTo,
-      assignedToName: assignedToName || null,
       priority: priority || lead.priority,
-      lastActivityDate: new Date(),
-      lastActivityType: 'assigned'
+      remarks: notes ? `Assigned to ${assignedToName || assignedTo}: ${notes}` : `Assigned to ${assignedToName || assignedTo}`,
+      updatedAt: new Date()
     });
 
     // Log the assignment activity
-    try {
-      await storage.createActivityLog({
-        userId: req.user?.id || 0,
-        action: 'lead_assigned',
-        entityType: 'lead',
-        entityId: leadId,
-        details: JSON.stringify({
-          leadId: lead.leadId,
-          assignedTo,
-          assignedToName,
-          assignedBy: req.user?.username,
-          notes
-        }),
-        ipAddress: req.ip || null
-      });
-    } catch (logError) {
-      console.warn('Failed to log assignment activity:', logError);
-    }
+    console.log(`Lead ${lead.leadId} assigned to ${assignedToName || assignedTo} by ${req.user?.username}`);
 
     res.json({
       success: true,
@@ -307,9 +293,8 @@ router.post('/leads/bulk-assign', requireMinimumRole(USER_ROLES.SALES_MANAGER), 
 
         const updatedLead = await storage.updateLead(leadId, {
           assignedTo: targetAssignee,
-          assignedToName: targetAssigneeName,
-          lastActivityDate: new Date(),
-          lastActivityType: 'assigned'
+          remarks: `Assigned to ${targetAssigneeName || targetAssignee}`,
+          updatedAt: new Date()
         });
 
         if (updatedLead) {
@@ -323,24 +308,7 @@ router.post('/leads/bulk-assign', requireMinimumRole(USER_ROLES.SALES_MANAGER), 
     }
 
     // Log bulk assignment
-    try {
-      await storage.createActivityLog({
-        userId: req.user?.id || 0,
-        action: 'leads_bulk_assigned',
-        entityType: 'lead',
-        entityId: 0,
-        details: JSON.stringify({
-          totalLeads: leadIds.length,
-          successCount: results.success.length,
-          failedCount: results.failed.length,
-          distributionType,
-          assignedBy: req.user?.username
-        }),
-        ipAddress: req.ip || null
-      });
-    } catch (logError) {
-      console.warn('Failed to log bulk assignment:', logError);
-    }
+    console.log(`Bulk assigned ${results.success.length}/${leadIds.length} leads by ${req.user?.username} using ${distributionType}`);
 
     res.json({
       success: true,
@@ -369,20 +337,16 @@ router.patch('/leads/:id/approve', requireMinimumRole(USER_ROLES.SALES_MANAGER),
       return res.status(400).json({ error: `Cannot approve a lead that is ${lead.status || lead.leadStage}` });
     }
 
-    const updateData: any = {
+    const updateData: Partial<typeof lead> = {
       status: 'approved',
-      qualityScore: qualityScore || 80,
-      approvedAt: new Date(),
-      approvedBy: req.user?.id,
-      approvalNotes: notes,
-      lastActivityDate: new Date(),
-      lastActivityType: 'approved'
+      conversionProbability: qualityScore || 80,
+      remarks: notes ? `Approved by ${req.user?.username}: ${notes}` : `Approved by ${req.user?.username}`,
+      updatedAt: new Date()
     };
 
     // Optionally assign to executive upon approval
     if (assignToExecutive) {
       updateData.assignedTo = assignToExecutive.id;
-      updateData.assignedToName = assignToExecutive.name;
     }
 
     // Move to qualified stage
@@ -393,23 +357,7 @@ router.patch('/leads/:id/approve', requireMinimumRole(USER_ROLES.SALES_MANAGER),
     const updatedLead = await storage.updateLead(leadId, updateData);
 
     // Log approval
-    try {
-      await storage.createActivityLog({
-        userId: req.user?.id || 0,
-        action: 'lead_approved',
-        entityType: 'lead',
-        entityId: leadId,
-        details: JSON.stringify({
-          leadId: lead.leadId,
-          qualityScore: updateData.qualityScore,
-          approvedBy: req.user?.username,
-          notes
-        }),
-        ipAddress: req.ip || null
-      });
-    } catch (logError) {
-      console.warn('Failed to log approval activity:', logError);
-    }
+    console.log(`Lead ${lead.leadId} approved by ${req.user?.username}`);
 
     res.json({
       success: true,
@@ -445,33 +393,13 @@ router.patch('/leads/:id/reject', requireMinimumRole(USER_ROLES.SALES_MANAGER), 
     const updatedLead = await storage.updateLead(leadId, {
       status: 'rejected',
       leadStage: allowResubmission ? 'new' : 'lost',
-      rejectedAt: new Date(),
-      rejectedBy: req.user?.id,
-      rejectionReason: reason,
-      rejectionFeedback: feedback,
-      lastActivityDate: new Date(),
-      lastActivityType: 'rejected'
+      lostReason: reason,
+      remarks: feedback ? `Rejected: ${feedback}` : `Rejected by ${req.user?.username}`,
+      updatedAt: new Date()
     });
 
-    // Log rejection
-    try {
-      await storage.createActivityLog({
-        userId: req.user?.id || 0,
-        action: 'lead_rejected',
-        entityType: 'lead',
-        entityId: leadId,
-        details: JSON.stringify({
-          leadId: lead.leadId,
-          reason,
-          feedback,
-          allowResubmission,
-          rejectedBy: req.user?.username
-        }),
-        ipAddress: req.ip || null
-      });
-    } catch (logError) {
-      console.warn('Failed to log rejection activity:', logError);
-    }
+    // Log rejection activity
+    console.log(`Lead ${lead.leadId} rejected by ${req.user?.username}. Reason: ${reason}`);
 
     res.json({
       success: true,
@@ -503,34 +431,13 @@ router.post('/leads/:id/request-info', requireMinimumRole(USER_ROLES.SALES_MANAG
 
     const updatedLead = await storage.updateLead(leadId, {
       status: 'info_requested',
-      infoRequestedAt: new Date(),
-      infoRequestedBy: req.user?.id,
-      infoRequestedFields: JSON.stringify(requiredFields),
-      infoRequestMessage: message,
-      infoRequestDeadline: deadline ? new Date(deadline) : null,
-      lastActivityDate: new Date(),
-      lastActivityType: 'info_requested'
+      remarks: `Info requested: ${requiredFields.join(', ')}${message ? ` - ${message}` : ''}`,
+      nextFollowupDate: deadline ? new Date(deadline) : null,
+      updatedAt: new Date()
     });
 
-    // Log info request
-    try {
-      await storage.createActivityLog({
-        userId: req.user?.id || 0,
-        action: 'lead_info_requested',
-        entityType: 'lead',
-        entityId: leadId,
-        details: JSON.stringify({
-          leadId: lead.leadId,
-          requiredFields,
-          message,
-          deadline,
-          requestedBy: req.user?.username
-        }),
-        ipAddress: req.ip || null
-      });
-    } catch (logError) {
-      console.warn('Failed to log info request activity:', logError);
-    }
+    // Log info request activity
+    console.log(`Lead ${lead.leadId} - info requested by ${req.user?.username}: ${requiredFields.join(', ')}`);
 
     res.json({
       success: true,
@@ -556,9 +463,9 @@ router.get('/leads/pending-approval', requireMinimumRole(USER_ROLES.SALES_MANAGE
       offset
     });
 
-    // Filter to only pending approval (no approvedAt and no rejectedAt)
+    // Filter to only pending approval (new leads not yet converted or rejected)
     const pendingLeads = result.leads.filter((lead: any) =>
-      !lead.approvedAt && !lead.rejectedAt && lead.status !== 'rejected'
+      lead.status !== 'converted' && lead.status !== 'rejected' && lead.status !== 'approved'
     );
 
     res.json({
@@ -591,18 +498,18 @@ router.post('/leads/:id/score', requireMinimumRole(USER_ROLES.SALES_EXECUTIVE), 
     const factors: { factor: string; score: number; maxScore: number }[] = [];
 
     // 1. Company information completeness (max 20)
-    if (lead.companyName) { score += 5; factors.push({ factor: 'Company Name', score: 5, maxScore: 5 }); }
-    if (lead.industry) { score += 5; factors.push({ factor: 'Industry', score: 5, maxScore: 5 }); }
-    if (lead.businessType) { score += 5; factors.push({ factor: 'Business Type', score: 5, maxScore: 5 }); }
-    if (lead.website) { score += 5; factors.push({ factor: 'Website', score: 5, maxScore: 5 }); }
+    if (lead.clientName) { score += 5; factors.push({ factor: 'Company Name', score: 5, maxScore: 5 }); }
+    if (lead.state) { score += 5; factors.push({ factor: 'State', score: 5, maxScore: 5 }); }
+    if (lead.entityType) { score += 5; factors.push({ factor: 'Entity Type', score: 5, maxScore: 5 }); }
+    if (lead.serviceInterested) { score += 5; factors.push({ factor: 'Service Interested', score: 5, maxScore: 5 }); }
 
     // 2. Contact information (max 20)
-    if (lead.email) { score += 10; factors.push({ factor: 'Email', score: 10, maxScore: 10 }); }
-    if (lead.phone) { score += 5; factors.push({ factor: 'Phone', score: 5, maxScore: 5 }); }
-    if (lead.contactPerson) { score += 5; factors.push({ factor: 'Contact Person', score: 5, maxScore: 5 }); }
+    if (lead.contactEmail) { score += 10; factors.push({ factor: 'Email', score: 10, maxScore: 10 }); }
+    if (lead.contactPhone) { score += 5; factors.push({ factor: 'Phone', score: 5, maxScore: 5 }); }
+    if (lead.preSalesExecutive) { score += 5; factors.push({ factor: 'Pre-Sales Executive', score: 5, maxScore: 5 }); }
 
     // 3. Budget qualification (max 20)
-    const budget = lead.estimatedBudget || 0;
+    const budget = lead.estimatedValue ? parseFloat(lead.estimatedValue) : 0;
     if (budget >= 100000) { score += 20; factors.push({ factor: 'Budget (₹1L+)', score: 20, maxScore: 20 }); }
     else if (budget >= 50000) { score += 15; factors.push({ factor: 'Budget (₹50K+)', score: 15, maxScore: 20 }); }
     else if (budget >= 25000) { score += 10; factors.push({ factor: 'Budget (₹25K+)', score: 10, maxScore: 20 }); }
@@ -611,17 +518,18 @@ router.post('/leads/:id/score', requireMinimumRole(USER_ROLES.SALES_EXECUTIVE), 
     // 4. Lead source quality (max 20)
     const highQualitySources = ['referral', 'partner', 'existing_client'];
     const mediumQualitySources = ['website', 'linkedin', 'google'];
-    if (highQualitySources.includes(lead.source || '')) {
+    if (highQualitySources.includes(lead.leadSource || '')) {
       score += 20; factors.push({ factor: 'High-Quality Source', score: 20, maxScore: 20 });
-    } else if (mediumQualitySources.includes(lead.source || '')) {
+    } else if (mediumQualitySources.includes(lead.leadSource || '')) {
       score += 12; factors.push({ factor: 'Medium-Quality Source', score: 12, maxScore: 20 });
-    } else if (lead.source) {
+    } else if (lead.leadSource) {
       score += 5; factors.push({ factor: 'Source Specified', score: 5, maxScore: 20 });
     }
 
     // 5. Service interest (max 20)
-    if (lead.interestedServices && Array.isArray(lead.interestedServices) && lead.interestedServices.length > 0) {
-      const serviceScore = Math.min(lead.interestedServices.length * 5, 20);
+    const requiredServices = lead.requiredServices as string[] | null;
+    if (requiredServices && Array.isArray(requiredServices) && requiredServices.length > 0) {
+      const serviceScore = Math.min(requiredServices.length * 5, 20);
       score += serviceScore;
       factors.push({ factor: 'Service Interest', score: serviceScore, maxScore: 20 });
     }
@@ -633,11 +541,11 @@ router.post('/leads/:id/score', requireMinimumRole(USER_ROLES.SALES_EXECUTIVE), 
     else if (score >= 40) qualificationLevel = 'cold';
     else qualificationLevel = 'unqualified';
 
-    // Update lead with score
+    // Update lead with score (using conversionProbability as quality score)
     await storage.updateLead(leadId, {
-      qualityScore: score,
-      qualificationLevel,
-      lastScoredAt: new Date()
+      conversionProbability: score,
+      remarks: `Quality score: ${score}/100 (${qualificationLevel})`,
+      updatedAt: new Date()
     });
 
     res.json({
@@ -688,96 +596,42 @@ router.post('/leads/:id/convert', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE
 
     // 4. Create user account
     const userData = {
-      username: lead.email || `client_${clientId.toLowerCase()}`,
+      username: lead.contactEmail || `client_${clientId.toLowerCase()}`,
       password: tempPassword, // In production, this should be hashed
-      email: lead.email || `${clientId.toLowerCase()}@pending.digicomply.in`,
-      phone: lead.phone || null,
-      fullName: lead.companyName || lead.contactPerson || 'New Client',
+      email: lead.contactEmail || `${clientId.toLowerCase()}@pending.digicomply.in`,
+      phone: lead.contactPhone || null,
+      fullName: lead.clientName || 'New Client',
       role: 'client' as const,
       isActive: true,
       emailVerified: false,
-      leadId: lead.id, // Propagate lead ID for tracking conversion source
     };
 
     const newUser = await storage.createUser(userData);
 
-    // 5. Create business entity
-    const entityData = {
-      clientId: clientId,
-      userId: newUser.id,
-      companyName: lead.companyName || 'New Company',
-      entityType: lead.businessType || 'private_limited',
-      incorporationDate: null,
-      gstin: null,
-      pan: null,
-      cin: null,
-      registeredAddress: lead.city || null,
-      operatingAddress: null,
-      state: lead.state || 'Delhi',
-      pincode: null,
-      industry: lead.industry || null,
-      annualTurnover: lead.estimatedBudget?.toString() || null,
-      employeeCount: null,
-      website: lead.website || null,
-      contactPerson: lead.contactPerson || null,
-      contactEmail: lead.email || null,
-      contactPhone: lead.phone || null,
-      complianceStatus: 'pending',
-      riskLevel: 'low',
-      onboardingStatus: 'pending',
-      assignedManager: null,
-      notes: notes || `Converted from lead ${lead.leadId}`,
-      isActive: true,
-      lifecycleStage: 'onboarding',
-      leadId: lead.id, // Propagate lead ID for tracking conversion source
-    };
-
-    const newEntity = await storage.createBusinessEntity(entityData);
-
-    // 6. Update lead status to converted
+    // 5. Update lead status to converted
     const updatedLead = await storage.updateLead(leadId, {
       leadStage: 'converted',
       status: 'converted',
       convertedAt: new Date(),
-      conversionNotes: `Converted to client ${clientId} by ${convertedBy || req.user?.username || 'system'}`
+      remarks: `Converted to client ${clientId} by ${convertedBy || req.user?.username || 'system'}${notes ? `: ${notes}` : ''}`
     });
 
-    // 7. Optionally create initial service request
+    // 6. Optionally create initial service request
     let serviceRequest = null;
     if (createServiceRequest && selectedServiceId) {
       serviceRequest = await storage.createServiceRequest({
         serviceId: selectedServiceId,
-        businessEntityId: newEntity.id,
+        userId: newUser.id,
         status: 'initiated',
         priority: lead.priority || 'medium',
-        progress: 0,
         currentMilestone: 'initiated',
-        notes: `Auto-created from lead conversion`,
-        assignedTeamMember: null,
-        assignedAgentId: lead.agentId ? Number(lead.agentId) : null,
-        leadId: lead.id, // Propagate lead ID for tracking conversion source
+        internalNotes: `Auto-created from lead conversion`,
+        totalAmount: 0, // Required field, to be updated after pricing
       });
     }
 
-    // 8. Log the conversion activity
-    try {
-      await storage.createActivityLog({
-        userId: req.user?.id || newUser.id,
-        action: 'lead_converted',
-        entityType: 'lead',
-        entityId: leadId,
-        details: JSON.stringify({
-          leadId: lead.leadId,
-          clientId: clientId,
-          userId: newUser.id,
-          entityId: newEntity.id,
-          serviceRequestId: serviceRequest?.id || null
-        }),
-        ipAddress: req.ip || null
-      });
-    } catch (logError) {
-      console.warn('Failed to log conversion activity:', logError);
-    }
+    // Log the conversion activity
+    console.log(`Lead ${lead.leadId} converted to client ${clientId} by ${convertedBy || req.user?.username}`);
 
     res.json({
       success: true,
@@ -790,11 +644,7 @@ router.post('/leads/:id/convert', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE
           email: newUser.email,
           temporaryPassword: tempPassword // Send once for admin to share with client
         },
-        businessEntity: {
-          id: newEntity.id,
-          clientId: clientId,
-          companyName: newEntity.companyName
-        },
+        clientId: clientId,
         serviceRequest: serviceRequest ? {
           id: serviceRequest.id,
           status: serviceRequest.status
