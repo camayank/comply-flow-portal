@@ -67,19 +67,19 @@ export function MobileBottomNav({ role, className }: MobileBottomNavProps) {
           const active = isActive(item.href);
 
           return (
-            <Link key={item.href} href={item.href}>
-              <a
-                className={cn(
-                  "flex flex-col items-center justify-center px-3 py-2 min-w-[64px] transition-colors",
-                  active
-                    ? "text-primary"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-                aria-current={active ? 'page' : undefined}
-              >
-                <Icon className="h-5 w-5" aria-hidden />
-                <span className="text-xs mt-1 font-medium">{item.label}</span>
-              </a>
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex flex-col items-center justify-center px-3 py-2 min-w-[64px] transition-colors",
+                active
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+              aria-current={active ? 'page' : undefined}
+            >
+              <Icon className="h-5 w-5" aria-hidden />
+              <span className="text-xs mt-1 font-medium">{item.label}</span>
             </Link>
           );
         })}

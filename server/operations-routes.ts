@@ -788,38 +788,31 @@ export function registerOperationsRoutes(app: Express) {
   // Requires: ops_manager
   app.get('/api/ops/team-workload', ...requireOpsManager, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      // Get all ops team members with their workload
-      const teamMembers = await db
-        .select({
-          id: users.id,
-          name: users.fullName,
-          email: users.email,
-          role: users.role,
-          avatar: users.avatar,
-        })
-        .from(users)
-        .where(sql`${users.role} IN ('ops_executive', 'ops_manager', 'ops_exec', 'ops_lead')`);
+      // Get all ops team members with their workload using raw query to avoid Drizzle issues
+      const teamMembersRaw = await db.execute(sql`
+        SELECT id, full_name as name, email, role
+        FROM users
+        WHERE role IN ('ops_executive', 'ops_manager', 'ops_exec', 'ops_lead')
+      `);
+      const teamMembers = teamMembersRaw.rows as { id: number; name: string | null; email: string; role: string }[];
 
       // Get workload for each member
       const teamWithWorkload = await Promise.all(
         teamMembers.map(async (member) => {
-          const workloadResult = await db
-            .select({
-              total: sql<number>`count(*)::int`,
-              highPriority: sql<number>`count(case when ${serviceRequests.priority} = 'high' then 1 end)::int`,
-              atRisk: sql<number>`count(case when ${serviceRequests.slaDeadline} <= NOW() + INTERVAL '4 hours' AND ${serviceRequests.slaDeadline} > NOW() then 1 end)::int`,
-              breached: sql<number>`count(case when ${serviceRequests.slaDeadline} < NOW() then 1 end)::int`,
-            })
-            .from(serviceRequests)
-            .where(
-              and(
-                eq(serviceRequests.assignedTeamMember, member.id),
-                sql`${serviceRequests.status} NOT IN ('completed', 'delivered', 'cancelled')`
-              )
-            );
+          const workloadRaw = await db.execute(sql`
+            SELECT
+              count(*)::int as total,
+              count(case when priority = 'high' then 1 end)::int as high_priority,
+              count(case when sla_deadline <= NOW() + INTERVAL '4 hours' AND sla_deadline > NOW() then 1 end)::int as at_risk,
+              count(case when sla_deadline < NOW() then 1 end)::int as breached
+            FROM service_requests
+            WHERE assigned_team_member = ${member.id}
+              AND status NOT IN ('completed', 'delivered', 'cancelled')
+          `);
+          const workloadResult = workloadRaw.rows[0] as { total: number; high_priority: number; at_risk: number; breached: number } | undefined;
 
           const capacity = 10; // Target items per person
-          const currentLoad = workloadResult[0]?.total || 0;
+          const currentLoad = workloadResult?.total || 0;
           const utilizationPercent = Math.min(100, Math.round((currentLoad / capacity) * 100));
 
           return {
@@ -827,39 +820,47 @@ export function registerOperationsRoutes(app: Express) {
             currentLoad,
             capacity,
             utilizationPercent,
-            highPriorityCount: workloadResult[0]?.highPriority || 0,
-            atRiskCount: workloadResult[0]?.atRisk || 0,
-            breachedCount: workloadResult[0]?.breached || 0,
+            highPriorityCount: workloadResult?.high_priority || 0,
+            atRiskCount: workloadResult?.at_risk || 0,
+            breachedCount: workloadResult?.breached || 0,
             status: utilizationPercent >= 90 ? 'overloaded' : utilizationPercent >= 70 ? 'busy' : 'available',
           };
         })
       );
 
-      // Get unassigned items
-      const unassignedResult = await db
-        .select({
-          id: serviceRequests.id,
-          requestId: serviceRequests.requestId,
-          serviceId: serviceRequests.serviceId,
-          priority: serviceRequests.priority,
-          slaDeadline: serviceRequests.slaDeadline,
-          createdAt: serviceRequests.createdAt,
-          entityName: businessEntities.name,
-          serviceName: services.name,
-        })
-        .from(serviceRequests)
-        .leftJoin(businessEntities, eq(serviceRequests.businessEntityId, businessEntities.id))
-        .leftJoin(services, eq(serviceRequests.serviceId, services.serviceId))
-        .where(
-          and(
-            isNull(serviceRequests.assignedTeamMember),
-            sql`${serviceRequests.status} NOT IN ('completed', 'delivered', 'cancelled')`
-          )
-        )
-        .orderBy(desc(serviceRequests.createdAt))
-        .limit(50);
+      // Get unassigned items - use raw SQL to avoid Drizzle issues
+      const unassignedRaw = await db.execute(sql`
+        SELECT
+          sr.id,
+          sr.request_id as "requestId",
+          sr.service_id as "serviceId",
+          sr.priority,
+          sr.sla_deadline as "slaDeadline",
+          sr.created_at as "createdAt",
+          sr.business_entity_id as "businessEntityId",
+          COALESCE(be.name, 'Unknown') as "entityName",
+          COALESCE(s.name, 'Unknown Service') as "serviceName"
+        FROM service_requests sr
+        LEFT JOIN business_entities be ON sr.business_entity_id = be.id
+        LEFT JOIN services s ON sr.service_id = s.service_id
+        WHERE sr.assigned_team_member IS NULL
+          AND sr.status NOT IN ('completed', 'delivered', 'cancelled')
+        ORDER BY sr.created_at DESC
+        LIMIT 50
+      `);
+      const enrichedUnassigned = unassignedRaw.rows as {
+        id: number;
+        requestId: string | null;
+        serviceId: string;
+        priority: string | null;
+        slaDeadline: Date | null;
+        createdAt: Date | null;
+        businessEntityId: number | null;
+        entityName: string;
+        serviceName: string;
+      }[];
 
-      const unassignedItems = unassignedResult.map(item => {
+      const unassignedItems = enrichedUnassigned.map(item => {
         let slaStatus = 'on_track';
         let slaRemaining = null;
         if (item.slaDeadline) {
