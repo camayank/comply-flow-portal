@@ -1153,9 +1153,10 @@ export default function LeadPipeline() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <DashboardLayout>
+      <div className="container mx-auto p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Lead Pipeline</h1>
           <p className="text-muted-foreground">
@@ -1438,6 +1439,7 @@ export default function LeadPipeline() {
           }
         }}
       />
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }
