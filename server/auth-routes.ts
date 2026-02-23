@@ -395,7 +395,7 @@ export async function registerAuthRoutes(app: Express) {
 
       // Check if staff member (not client)
       if (user.role === 'client') {
-        return res.status(403).json({ error: 'Staff login only. Clients should use OTP login.' });
+        return res.status(401).json({ error: 'Invalid credentials' });
       }
 
       // Verify password
