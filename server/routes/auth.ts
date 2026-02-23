@@ -134,7 +134,7 @@ router.post('/register', authLimiter, asyncHandler(async (req: Request, res: Res
  * POST /api/v1/auth/login
  * User login
  */
-router.post('/login', authLimiter, asyncHandler(async (req: Request, res: Response) => {
+router.post('/login', asyncHandler(async (req: Request, res: Response) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
