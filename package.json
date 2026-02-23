@@ -14,12 +14,14 @@
     "test:coverage": "NODE_ENV=test jest --coverage",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "migrate:latest": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "db:push": "drizzle-kit push",
     "db:backfill:document-vault": "node --import tsx scripts/backfill-document-vault-file-urls.ts",
     "db:recalc:compliance-state": "node --import tsx scripts/recalculate-compliance-state.ts",
     "db:seed:compliance-library": "node --import tsx scripts/seed-compliance-library.ts",
     "db:seed:notifications": "node --import tsx scripts/seed-notification-rules.ts",
+    "seed:sops": "node --env-file=.env --import tsx scripts/seed-sop-services-drizzle.ts",
     "db:audit:services": "node --env-file=.env --import tsx scripts/audit-service-config.ts",
     "db:report:services": "node --env-file=.env --import tsx scripts/export-service-config-report.ts",
     "db:cleanup:general-rules": "node --import tsx scripts/deactivate-general-rules.ts",
@@ -177,5 +179,10 @@
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
+  },
+  "overrides": {
+    "minimatch": "^10.2.1",
+    "glob": "^11.0.0",
+    "esbuild": "^0.25.0"
   }
 }
