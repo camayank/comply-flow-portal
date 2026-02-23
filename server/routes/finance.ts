@@ -580,11 +580,8 @@ router.get('/budget-plans', async (req: Request, res: Response) => {
     `);
 
     if (!result.rows[0]?.exists) {
-      // Table doesn't exist yet - return empty with message
-      res.json({
-        plans: [],
-        message: 'Budget planning module not yet configured'
-      });
+      // Table doesn't exist yet - return empty array
+      res.json([]);
       return;
     }
 

@@ -25,13 +25,13 @@ export const apiLimiter = rateLimit({
 });
 
 /**
- * Authentication endpoints rate limiter (stricter)
+ * Authentication endpoints rate limiter (disabled for development)
  */
 export const authLimiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_AUTH_WINDOW || '15') * 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_AUTH_MAX || '10'),
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  max: 1000, // Essentially unlimited for dev
   message: 'Too many authentication attempts, please try again later.',
-  skipSuccessfulRequests: true, // Don't count successful logins
+  skipSuccessfulRequests: true,
   handler: (req: Request, res: Response) => {
     res.status(429).json({
       success: false,
@@ -42,11 +42,11 @@ export const authLimiter = rateLimit({
 });
 
 /**
- * OTP request rate limiter (very strict)
+ * OTP request rate limiter (disabled - OTP system removed)
  */
 export const otpLimiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_OTP_WINDOW || '15') * 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_OTP_MAX || '3'),
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 1000, // Essentially unlimited
   message: 'Too many OTP requests, please try again later.',
   handler: (req: Request, res: Response) => {
     res.status(429).json({

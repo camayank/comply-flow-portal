@@ -245,7 +245,8 @@ const CUSTOMER_SERVICE_NAV: NavSection[] = [
 const ACCOUNTANT_NAV: NavSection[] = [
   {
     items: [
-      { label: 'Dashboard', href: '/financials', icon: Home },
+      { label: 'Dashboard', href: '/financial-management', icon: Home },
+      { label: 'Invoices', href: '/financial-management/invoices', icon: FileText },
       { label: 'Analytics', href: '/revenue-analytics', icon: BarChart3 },
       { label: 'Executive', href: '/executive-dashboard', icon: PieChart },
     ],
