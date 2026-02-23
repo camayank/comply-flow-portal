@@ -11,7 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Shield, Mail, Lock } from "lucide-react";
 import { canAccessRoute, getRoleDashboardRoute } from "@/utils/roleBasedRouting";
 import { PublicLayout } from '@/layouts';
-import type { User } from "@/store/authStore";
+import type { User } from "@/hooks/use-auth";
 
 export default function Login() {
   const [activeTab, setActiveTab] = useState<"client" | "staff">("client");
@@ -150,7 +150,7 @@ function ClientLogin() {
       });
       return;
     }
-    loginMutation.mutate({ email, password });
+    loginMutation.mutate({ email: email.trim(), password: password.trim() });
   };
 
   return (
@@ -262,7 +262,7 @@ function StaffLogin() {
       });
       return;
     }
-    loginMutation.mutate({ username, password });
+    loginMutation.mutate({ username: username.trim(), password: password.trim() });
   };
 
   return (
