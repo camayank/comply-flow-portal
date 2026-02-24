@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'wouter';
 import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,9 +11,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Headphones, 
-  Users, 
+import {
+  Headphones,
+  Users,
   MessageSquare,
   Clock,
   CheckCircle,
@@ -31,7 +32,13 @@ import {
   UserPlus,
   ArrowUpCircle,
   TrendingUp,
-  Award
+  Award,
+  Building2,
+  ExternalLink,
+  FileCheck,
+  Ticket,
+  History,
+  Plus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -62,6 +69,31 @@ interface ResponseTemplate {
   variables?: string[];
 }
 
+interface Client {
+  id: number;
+  clientId: string;
+  companyName: string;
+  contactPerson: string;
+  contactEmail: string;
+  contactPhone: string;
+  entityType: string;
+  complianceStatus: string;
+  onboardingStatus: string;
+  activeServices?: number;
+  openTickets?: number;
+  createdAt: string;
+}
+
+interface ServiceRequest {
+  id: number;
+  requestId: string;
+  serviceName: string;
+  status: string;
+  priority: string;
+  createdAt: string;
+  progress?: number;
+}
+
 export default function CustomerServiceDashboard() {
   const { toast } = useToast();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -74,6 +106,19 @@ export default function CustomerServiceDashboard() {
   const [assignToId, setAssignToId] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
+  const [clientSearch, setClientSearch] = useState('');
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [clientDetailOpen, setClientDetailOpen] = useState(false);
+  const [createTicketOpen, setCreateTicketOpen] = useState(false);
+  const [newTicketData, setNewTicketData] = useState({
+    subject: '',
+    description: '',
+    category: 'general',
+    priority: 'medium'
+  });
+  const [escalateDialogOpen, setEscalateDialogOpen] = useState(false);
+  const [escalationReason, setEscalationReason] = useState('');
+  const [escalationDepartment, setEscalationDepartment] = useState('operations');
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -102,6 +147,24 @@ export default function CustomerServiceDashboard() {
   const { data: ticketDetails } = useQuery({
     queryKey: ['/api/customer-service/tickets', selectedTicket?.id],
     enabled: !!selectedTicket,
+  });
+
+  // Client lookup query - uses customer service client search endpoint
+  const { data: clientsData = [], isLoading: clientsLoading } = useQuery<Client[]>({
+    queryKey: ['/api/customer-service/clients', { search: clientSearch }],
+    enabled: clientSearch.length >= 2,
+  });
+
+  // Selected client's service requests
+  const { data: clientServiceRequests = [] } = useQuery<ServiceRequest[]>({
+    queryKey: [`/api/customer-service/clients/${selectedClient?.id}/service-requests`],
+    enabled: !!selectedClient?.id,
+  });
+
+  // Selected client's tickets
+  const { data: clientTickets = [] } = useQuery<Ticket[]>({
+    queryKey: [`/api/customer-service/clients/${selectedClient?.id}/tickets`],
+    enabled: !!selectedClient?.id,
   });
 
   const updateTicketMutation = useMutation({
@@ -162,6 +225,63 @@ export default function CustomerServiceDashboard() {
     },
   });
 
+  const createTicketMutation = useMutation({
+    mutationFn: async (data: {
+      clientId?: number;
+      clientName: string;
+      subject: string;
+      description: string;
+      category: string;
+      priority: string;
+    }) => {
+      return await apiRequest('/api/customer-service/tickets', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...data,
+          status: 'open',
+          slaStatus: 'on_track',
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/customer-service/tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/customer-service/stats'] });
+      toast({ title: 'Success', description: 'Support ticket created successfully' });
+      setCreateTicketOpen(false);
+      setNewTicketData({ subject: '', description: '', category: 'general', priority: 'medium' });
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to create ticket', variant: 'destructive' });
+    },
+  });
+
+  const escalateTicketMutation = useMutation({
+    mutationFn: async ({ ticketId, department, reason }: { ticketId: number; department: string; reason: string }) => {
+      return await apiRequest(`/api/customer-service/tickets/${ticketId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'escalated',
+          escalatedTo: department,
+          escalationReason: reason,
+          escalatedAt: new Date().toISOString(),
+          priority: 'high', // Auto-escalate priority
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/customer-service/tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/customer-service/stats'] });
+      toast({ title: 'Ticket Escalated', description: 'Ticket has been escalated to the appropriate team' });
+      setEscalateDialogOpen(false);
+      setTicketDetailOpen(false);
+      setEscalationReason('');
+      setEscalationDepartment('operations');
+    },
+    onError: () => {
+      toast({ title: 'Error', description: 'Failed to escalate ticket', variant: 'destructive' });
+    },
+  });
+
   const stats = csStats as any;
   const ticketsData = tickets as Ticket[];
 
@@ -218,6 +338,38 @@ export default function CustomerServiceDashboard() {
       case 'breached': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
       default: return 'bg-gray-100 text-gray-800';
     }
+  };
+
+  const getComplianceStatusColor = (status: string) => {
+    switch (status) {
+      case 'compliant': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'at_risk': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'non_compliant': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'pending': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+    }
+  };
+
+  const getServiceStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'on_hold': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+    }
+  };
+
+  const handleCreateTicketForClient = () => {
+    if (!selectedClient || !newTicketData.subject.trim()) return;
+    createTicketMutation.mutate({
+      clientId: selectedClient.id,
+      clientName: selectedClient.companyName,
+      subject: newTicketData.subject,
+      description: newTicketData.description,
+      category: newTicketData.category,
+      priority: newTicketData.priority,
+    });
   };
 
   return (
@@ -285,6 +437,14 @@ export default function CustomerServiceDashboard() {
                 >
                   <BarChart3 className="h-4 w-4" />
                   Performance
+                </button>
+                <button
+                  onClick={() => {setActiveTab('clients'); setMobileMenuOpen(false);}}
+                  className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-2 ${activeTab === 'clients' ? 'bg-pink-50 dark:bg-pink-900/20 text-pink-600 dark:text-pink-400' : 'text-gray-600 dark:text-gray-400'}`}
+                  data-testid="tab-clients"
+                >
+                  <Building2 className="h-4 w-4" />
+                  Client Lookup
                 </button>
               </nav>
             </div>
@@ -360,6 +520,10 @@ export default function CustomerServiceDashboard() {
             <TabsTrigger value="performance" data-testid="tab-performance-desktop">
               <BarChart3 className="h-4 w-4 mr-2" />
               Performance
+            </TabsTrigger>
+            <TabsTrigger value="clients" data-testid="tab-clients-desktop">
+              <Building2 className="h-4 w-4 mr-2" />
+              Client Lookup
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -639,7 +803,340 @@ export default function CustomerServiceDashboard() {
             </div>
           </div>
         )}
+
+        {activeTab === 'clients' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-xl lg:text-2xl font-bold dark:text-white mb-2">Client Lookup</h2>
+                <p className="text-sm lg:text-base text-gray-600 dark:text-gray-400">Search and view client information</p>
+              </div>
+            </div>
+
+            {/* Search Bar */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search by company name, email, phone, or client ID..."
+                      value={clientSearch}
+                      onChange={(e) => setClientSearch(e.target.value)}
+                      className="pl-10"
+                      data-testid="input-client-search"
+                    />
+                  </div>
+                </div>
+                {clientSearch.length > 0 && clientSearch.length < 2 && (
+                  <p className="text-xs text-gray-500 mt-2">Type at least 2 characters to search</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Search Results */}
+            {clientSearch.length >= 2 && (
+              <div className="space-y-4">
+                {clientsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-gray-600 dark:text-gray-400">Searching clients...</p>
+                  </div>
+                ) : clientsData.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {clientsData.map((client: Client) => (
+                      <Card
+                        key={client.id}
+                        className="hover:shadow-md transition-shadow cursor-pointer"
+                        onClick={() => {
+                          setSelectedClient(client);
+                          setClientDetailOpen(true);
+                        }}
+                        data-testid={`client-card-${client.id}`}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-pink-100 dark:bg-pink-900/30 rounded-lg">
+                                <Building2 className="h-5 w-5 text-pink-600 dark:text-pink-400" />
+                              </div>
+                              <div>
+                                <h3 className="font-semibold dark:text-white">{client.companyName}</h3>
+                                <p className="text-sm text-gray-500">{client.clientId}</p>
+                              </div>
+                            </div>
+                            <Badge className={getComplianceStatusColor(client.complianceStatus)}>
+                              {client.complianceStatus}
+                            </Badge>
+                          </div>
+                          <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4" />
+                              <span>{client.contactPerson}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Mail className="h-4 w-4" />
+                              <span>{client.contactEmail}</span>
+                            </div>
+                            {client.contactPhone && (
+                              <div className="flex items-center gap-2">
+                                <Phone className="h-4 w-4" />
+                                <span>{client.contactPhone}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2 mt-3">
+                            <Badge variant="outline" className="text-xs">
+                              {client.entityType?.replace('_', ' ')}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {client.onboardingStatus}
+                            </Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <Card>
+                    <CardContent className="py-12 text-center">
+                      <Users className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No clients found</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Try a different search term</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+
+            {/* No search state */}
+            {clientSearch.length < 2 && (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Search className="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Search for a client</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Enter a company name, email, phone number, or client ID to find client information
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Client Detail Dialog */}
+      <Dialog open={clientDetailOpen} onOpenChange={setClientDetailOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <Building2 className="h-5 w-5 text-pink-600" />
+              {selectedClient?.companyName}
+            </DialogTitle>
+            <DialogDescription>
+              Client ID: {selectedClient?.clientId} | {selectedClient?.entityType?.replace('_', ' ')}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            {/* Contact Info */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    <Users className="h-4 w-4" />
+                    Contact Person
+                  </div>
+                  <p className="font-medium dark:text-white">{selectedClient?.contactPerson}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    <Mail className="h-4 w-4" />
+                    Email
+                  </div>
+                  <p className="font-medium dark:text-white">{selectedClient?.contactEmail}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mb-1">
+                    <Phone className="h-4 w-4" />
+                    Phone
+                  </div>
+                  <p className="font-medium dark:text-white">{selectedClient?.contactPhone || 'Not provided'}</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => setCreateTicketOpen(true)} size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Support Ticket
+              </Button>
+              <Link href={`/ops/client/${selectedClient?.id}`}>
+                <Button variant="outline" size="sm">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  View Full Profile
+                </Button>
+              </Link>
+            </div>
+
+            {/* Service Requests */}
+            <div>
+              <h4 className="font-semibold dark:text-white mb-3 flex items-center gap-2">
+                <FileCheck className="h-4 w-4" />
+                Active Service Requests
+              </h4>
+              {clientServiceRequests.length > 0 ? (
+                <div className="space-y-2">
+                  {clientServiceRequests.slice(0, 5).map((sr: ServiceRequest) => (
+                    <Card key={sr.id} className="p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-sm dark:text-white">{sr.serviceName}</p>
+                          <p className="text-xs text-gray-500">{sr.requestId}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={getServiceStatusColor(sr.status)}>
+                            {sr.status.replace('_', ' ')}
+                          </Badge>
+                          <Link href={`/service-request/${sr.id}`}>
+                            <Button variant="ghost" size="sm">
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400">No active service requests</p>
+              )}
+            </div>
+
+            {/* Support Tickets */}
+            <div>
+              <h4 className="font-semibold dark:text-white mb-3 flex items-center gap-2">
+                <Ticket className="h-4 w-4" />
+                Support Tickets
+              </h4>
+              {clientTickets.length > 0 ? (
+                <div className="space-y-2">
+                  {clientTickets.slice(0, 5).map((ticket: Ticket) => (
+                    <Card key={ticket.id} className="p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-sm dark:text-white">{ticket.subject}</p>
+                          <p className="text-xs text-gray-500">#{ticket.ticketNumber}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={getTicketStatusColor(ticket.status)}>
+                            {ticket.status.replace('_', ' ')}
+                          </Badge>
+                          <Badge className={getTicketPriorityColor(ticket.priority)}>
+                            {ticket.priority}
+                          </Badge>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400">No support tickets</p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Ticket for Client Dialog */}
+      <Dialog open={createTicketOpen} onOpenChange={setCreateTicketOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Support Ticket</DialogTitle>
+            <DialogDescription>
+              Create a new support ticket for {selectedClient?.companyName}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Subject</Label>
+              <Input
+                value={newTicketData.subject}
+                onChange={(e) => setNewTicketData(prev => ({ ...prev, subject: e.target.value }))}
+                placeholder="Brief description of the issue"
+                data-testid="input-ticket-subject"
+              />
+            </div>
+
+            <div>
+              <Label>Description</Label>
+              <Textarea
+                value={newTicketData.description}
+                onChange={(e) => setNewTicketData(prev => ({ ...prev, description: e.target.value }))}
+                rows={4}
+                placeholder="Detailed description of the support request"
+                data-testid="textarea-ticket-description"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Category</Label>
+                <Select
+                  value={newTicketData.category}
+                  onValueChange={(val) => setNewTicketData(prev => ({ ...prev, category: val }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="billing">Billing</SelectItem>
+                    <SelectItem value="technical">Technical</SelectItem>
+                    <SelectItem value="compliance">Compliance</SelectItem>
+                    <SelectItem value="document">Document Request</SelectItem>
+                    <SelectItem value="service">Service Related</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Priority</Label>
+                <Select
+                  value={newTicketData.priority}
+                  onValueChange={(val) => setNewTicketData(prev => ({ ...prev, priority: val }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateTicketOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleCreateTicketForClient}
+              disabled={!newTicketData.subject.trim() || createTicketMutation.isPending}
+              data-testid="button-create-ticket"
+            >
+              {createTicketMutation.isPending ? 'Creating...' : 'Create Ticket'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={ticketDetailOpen} onOpenChange={setTicketDetailOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -677,13 +1174,93 @@ export default function CustomerServiceDashboard() {
               </div>
             )}
 
-            <div>
-              <Button onClick={() => setNewMessageOpen(true)} className="w-full" data-testid="button-add-message">
+            <div className="flex gap-2">
+              <Button onClick={() => setNewMessageOpen(true)} className="flex-1" data-testid="button-add-message">
                 <Send className="h-4 w-4 mr-2" />
-                Send Message to Client
+                Send Message
               </Button>
+              {selectedTicket && selectedTicket.status !== 'resolved' && selectedTicket.status !== 'closed' && (
+                <Button
+                  variant="destructive"
+                  onClick={() => setEscalateDialogOpen(true)}
+                  data-testid="button-escalate"
+                >
+                  <ArrowUpCircle className="h-4 w-4 mr-2" />
+                  Escalate
+                </Button>
+              )}
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Escalate Ticket Dialog */}
+      <Dialog open={escalateDialogOpen} onOpenChange={setEscalateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <ArrowUpCircle className="h-5 w-5" />
+              Escalate Ticket
+            </DialogTitle>
+            <DialogDescription>
+              Escalate ticket #{selectedTicket?.ticketNumber} to another department
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label>Escalate To</Label>
+              <Select value={escalationDepartment} onValueChange={setEscalationDepartment}>
+                <SelectTrigger data-testid="select-escalation-dept">
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="operations">Operations Team</SelectItem>
+                  <SelectItem value="finance">Finance / Billing</SelectItem>
+                  <SelectItem value="compliance">Compliance Team</SelectItem>
+                  <SelectItem value="technical">Technical Support</SelectItem>
+                  <SelectItem value="management">Management</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Reason for Escalation</Label>
+              <Textarea
+                value={escalationReason}
+                onChange={(e) => setEscalationReason(e.target.value)}
+                rows={4}
+                placeholder="Describe why this ticket needs to be escalated..."
+                data-testid="textarea-escalation-reason"
+              />
+            </div>
+
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                <strong>Note:</strong> Escalating this ticket will automatically set priority to High and notify the target department.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEscalateDialogOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (selectedTicket) {
+                  escalateTicketMutation.mutate({
+                    ticketId: selectedTicket.id,
+                    department: escalationDepartment,
+                    reason: escalationReason,
+                  });
+                }
+              }}
+              disabled={!escalationReason.trim() || escalateTicketMutation.isPending}
+              data-testid="button-confirm-escalate"
+            >
+              {escalateTicketMutation.isPending ? 'Escalating...' : 'Confirm Escalation'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

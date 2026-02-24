@@ -4,6 +4,23 @@ import { db } from './db';
 import { users, userSessions } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 
+// Normalize IP address to handle IPv4, IPv6, and IPv4-mapped IPv6
+function normalizeIP(ip: string | undefined): string {
+  if (!ip) return '';
+
+  // Handle IPv4-mapped IPv6 (::ffff:127.0.0.1)
+  if (ip.startsWith('::ffff:')) {
+    ip = ip.substring(7);
+  }
+
+  // Handle IPv6 localhost
+  if (ip === '::1') {
+    return '127.0.0.1';
+  }
+
+  return ip;
+}
+
 // Extend Express Request to include user
 declare global {
   namespace Express {
@@ -79,7 +96,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     // Validate session fingerprint to detect hijacking
     const userAgent = req.headers['user-agent'] || '';
-    const ipSubnet = (req.ip || '').split('.').slice(0, 3).join('.');
+    const normalizedIP = normalizeIP(req.ip);
+    const ipSubnet = normalizedIP.split('.').slice(0, 3).join('.');
     const fingerprint = crypto
       .createHash('sha256')
       .update(userAgent)

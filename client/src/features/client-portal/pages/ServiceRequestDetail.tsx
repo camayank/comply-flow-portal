@@ -27,6 +27,9 @@ import {
   Info,
   User,
   Calendar,
+  AlertTriangle,
+  CircleDot,
+  Circle,
 } from 'lucide-react';
 
 const ServiceRequestDetail = () => {
@@ -72,6 +75,17 @@ const ServiceRequestDetail = () => {
     queryFn: async () => apiRequest('GET', `/api/service-requests/${requestId}/documents`),
   });
   const documents = (documentsResponse as any)?.documents || documentsResponse || [];
+
+  // Fetch tasks/milestones for progress tracking
+  const { data: tasksData } = useQuery({
+    queryKey: ['service-request', requestId, 'tasks'],
+    enabled: !!requestId,
+    queryFn: async () => apiRequest('GET', `/api/client/service-requests/${requestId}/tasks`),
+  });
+  const tasks = (tasksData as any)?.tasks || [];
+  const milestones = (tasksData as any)?.milestones || [];
+  const pendingClientActions = (tasksData as any)?.pendingClientActions || [];
+  const taskSummary = (tasksData as any)?.summary || { progressPercentage: 0, total: 0, completed: 0 };
 
   // Fetch team members for assignment
   const { data: teamMembers = [], isLoading: isLoadingTeamMembers } = useQuery({
@@ -311,7 +325,12 @@ const ServiceRequestDetail = () => {
     }
   };
 
-  const calculateProgress = (status: string) => {
+  const calculateProgress = (status: string, actualProgress?: number) => {
+    // Use actual task-based progress if available
+    if (actualProgress !== undefined && actualProgress > 0) {
+      return actualProgress;
+    }
+    // Fallback to status-based progress
     switch (status?.toLowerCase()) {
       case 'initiated':
         return 25;
@@ -356,7 +375,7 @@ const ServiceRequestDetail = () => {
     );
   }
 
-  const progress = calculateProgress((request as any).status);
+  const progress = calculateProgress((request as any).status, taskSummary.actualProgress || taskSummary.progressPercentage);
 
   return (
     <DashboardLayout>
@@ -390,7 +409,12 @@ const ServiceRequestDetail = () => {
             <div className="flex justify-between items-start">
               <div>
                 <CardTitle>Service Progress</CardTitle>
-                <CardDescription>Current status: {getStatusText((request as any).status)}</CardDescription>
+                <CardDescription>
+                  {taskSummary.total > 0
+                    ? `${taskSummary.completed} of ${taskSummary.total} tasks completed`
+                    : `Current status: ${getStatusText((request as any).status)}`
+                  }
+                </CardDescription>
               </div>
               <Badge className={getPriorityColor((request as any).priority)}>
                 {(request as any).priority} Priority
@@ -404,27 +428,127 @@ const ServiceRequestDetail = () => {
                 <span className="font-semibold">{progress}%</span>
               </div>
               <Progress value={progress} className="h-3" />
-              <div className="flex justify-between text-xs text-gray-600 mt-4">
-                <div className="text-center">
-                  <div className={`w-3 h-3 rounded-full mx-auto mb-1 ${progress >= 25 ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
-                  <span>Initiated</span>
+
+              {/* Milestone Timeline - show if milestones available */}
+              {milestones.length > 0 ? (
+                <div className="mt-6">
+                  <p className="text-sm font-medium text-gray-700 mb-3">Milestones</p>
+                  <div className="relative">
+                    {/* Progress line */}
+                    <div className="absolute top-3 left-0 right-0 h-0.5 bg-gray-200"></div>
+                    <div
+                      className="absolute top-3 left-0 h-0.5 bg-blue-600 transition-all duration-500"
+                      style={{ width: `${progress}%` }}
+                    ></div>
+
+                    {/* Milestone dots */}
+                    <div className="relative flex justify-between">
+                      {milestones.slice(0, 5).map((milestone: any, index: number) => {
+                        const isCompleted = milestone.status === 'completed';
+                        const isInProgress = milestone.status === 'in_progress';
+                        return (
+                          <div key={milestone.id || index} className="text-center flex-1">
+                            <div className={`w-6 h-6 rounded-full mx-auto mb-2 flex items-center justify-center border-2
+                              ${isCompleted ? 'bg-green-500 border-green-500 text-white' :
+                                isInProgress ? 'bg-blue-500 border-blue-500 text-white' :
+                                'bg-white border-gray-300 text-gray-400'}`}>
+                              {isCompleted ? (
+                                <CheckCircle2 className="h-4 w-4" />
+                              ) : isInProgress ? (
+                                <CircleDot className="h-4 w-4" />
+                              ) : (
+                                <Circle className="h-4 w-4" />
+                              )}
+                            </div>
+                            <span className={`text-xs ${isCompleted ? 'text-green-600 font-medium' :
+                              isInProgress ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
+                              {milestone.name.length > 15 ? milestone.name.substring(0, 15) + '...' : milestone.name}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {milestones.length > 5 && (
+                      <p className="text-xs text-gray-500 mt-2 text-center">
+                        + {milestones.length - 5} more milestones
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className={`w-3 h-3 rounded-full mx-auto mb-1 ${progress >= 50 ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
-                  <span>In Progress</span>
+              ) : (
+                /* Fallback to status-based indicators */
+                <div className="flex justify-between text-xs text-gray-600 mt-4">
+                  <div className="text-center">
+                    <div className={`w-3 h-3 rounded-full mx-auto mb-1 ${progress >= 25 ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
+                    <span>Initiated</span>
+                  </div>
+                  <div className="text-center">
+                    <div className={`w-3 h-3 rounded-full mx-auto mb-1 ${progress >= 50 ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
+                    <span>In Progress</span>
+                  </div>
+                  <div className="text-center">
+                    <div className={`w-3 h-3 rounded-full mx-auto mb-1 ${progress >= 75 ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
+                    <span>Review</span>
+                  </div>
+                  <div className="text-center">
+                    <div className={`w-3 h-3 rounded-full mx-auto mb-1 ${progress >= 100 ? 'bg-green-600' : 'bg-gray-300'}`}></div>
+                    <span>Completed</span>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className={`w-3 h-3 rounded-full mx-auto mb-1 ${progress >= 75 ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
-                  <span>Review</span>
-                </div>
-                <div className="text-center">
-                  <div className={`w-3 h-3 rounded-full mx-auto mb-1 ${progress >= 100 ? 'bg-green-600' : 'bg-gray-300'}`}></div>
-                  <span>Completed</span>
-                </div>
-              </div>
+              )}
             </div>
           </CardContent>
         </Card>
+
+        {/* Action Required - Pending Client Actions */}
+        {pendingClientActions.length > 0 && (
+          <Card className="mb-6 border-amber-300 bg-amber-50">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-600" />
+                <CardTitle className="text-amber-800">Action Required</CardTitle>
+              </div>
+              <CardDescription className="text-amber-700">
+                The following items need your attention
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {pendingClientActions.map((action: any) => (
+                  <div
+                    key={action.id}
+                    className="flex items-center justify-between p-3 bg-white rounded-lg border border-amber-200"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center">
+                        {action.taskType === 'document_upload' ? (
+                          <Upload className="h-4 w-4 text-amber-600" />
+                        ) : (
+                          <FileText className="h-4 w-4 text-amber-600" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{action.name}</p>
+                        {action.description && (
+                          <p className="text-xs text-gray-600">{action.description}</p>
+                        )}
+                      </div>
+                    </div>
+                    {action.dueDate && (
+                      <Badge variant="outline" className="text-amber-700 border-amber-300">
+                        Due: {new Date(action.dueDate).toLocaleDateString()}
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <Button className="w-full mt-4" variant="outline">
+                <Upload className="h-4 w-4 mr-2" />
+                Upload Required Documents
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

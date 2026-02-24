@@ -8,10 +8,28 @@ import * as cron from 'node-cron';
 import crypto from 'crypto';
 import { emailService } from './email-service';
 
+// Normalize IP address to handle IPv4, IPv6, and IPv4-mapped IPv6
+function normalizeIP(ip: string | undefined): string {
+  if (!ip) return '';
+
+  // Handle IPv4-mapped IPv6 (::ffff:127.0.0.1)
+  if (ip.startsWith('::ffff:')) {
+    ip = ip.substring(7);
+  }
+
+  // Handle IPv6 localhost
+  if (ip === '::1') {
+    return '127.0.0.1';
+  }
+
+  return ip;
+}
+
 // Session fingerprinting for hijack detection (Salesforce-level security)
 function generateSessionFingerprint(req: Request): string {
   const userAgent = req.headers['user-agent'] || '';
-  const ipSubnet = (req.ip || '').split('.').slice(0, 3).join('.'); // Allow IP changes within subnet
+  const normalizedIP = normalizeIP(req.ip);
+  const ipSubnet = normalizedIP.split('.').slice(0, 3).join('.'); // Allow IP changes within subnet
 
   return crypto
     .createHash('sha256')

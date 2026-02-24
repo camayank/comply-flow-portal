@@ -16,10 +16,44 @@ import {
   ORDER_TASK_STATUS, ORDER_TASK_TYPE, QC_REVIEW_STATUS,
   type OrderTask, type InsertOrderTask, type ServiceRequest
 } from '@shared/schema';
+import { serviceBlueprints, blueprintWorkflowSteps } from '@shared/blueprints-schema';
 import { eq, and, inArray, sql, desc, asc, isNull, not, or } from 'drizzle-orm';
 import { idGenerator, ID_TYPES } from './id-generator';
 import { workflowEngine, type WorkflowStepTemplate } from '../workflow-engine';
 import { logger } from '../logger';
+import { notificationHub } from './notifications/notification-hub';
+
+// Notification types for workflow events
+const WORKFLOW_NOTIFICATIONS = {
+  SERVICE_REQUEST_CREATED: 'service_request_created',
+  TASK_ASSIGNED: 'task_assigned',
+  QC_REVIEW_NEEDED: 'qc_review_needed',
+  QC_APPROVED: 'qc_approved',
+  QC_REJECTED: 'qc_rejected',
+  SERVICE_COMPLETED: 'service_completed',
+  DOCUMENT_REQUESTED: 'document_requested',
+};
+
+// Blueprint step type for type safety
+interface BlueprintStep {
+  id: string;
+  stepCode: string;
+  stepName: string;
+  stepType: string;
+  description: string | null;
+  defaultAssigneeRole: string | null;
+  slaHours: number | null;
+  requiredDocuments: unknown;
+  sortOrder: number | null;
+  isMilestone: boolean | null;
+  entryConditions: unknown;
+  exitConditions: unknown;
+  skipConditions: unknown;
+  allowedNextSteps: unknown;
+}
+
+// Workflow source for logging
+type WorkflowSource = 'BLUEPRINT_DB' | 'IN_MEMORY_FALLBACK' | 'DEFAULT_WORKFLOW';
 
 // Task type to role mapping
 const TASK_TYPE_ROLE_MAP: Record<string, string> = {
@@ -74,7 +108,233 @@ interface AutoAssignmentResult {
 export class TaskInstantiationService {
 
   /**
+   * Try to load workflow from blueprint system (database)
+   * Returns null if no blueprint exists for this service
+   */
+  private async loadWorkflowFromBlueprint(serviceId: string): Promise<{
+    blueprint: typeof serviceBlueprints.$inferSelect;
+    steps: BlueprintStep[];
+  } | null> {
+    try {
+      // Try to find blueprint by code (serviceId maps to blueprint code)
+      const [blueprint] = await db
+        .select()
+        .from(serviceBlueprints)
+        .where(
+          and(
+            eq(serviceBlueprints.code, serviceId.toUpperCase()),
+            eq(serviceBlueprints.isActive, true),
+            eq(serviceBlueprints.status, 'ACTIVE')
+          )
+        )
+        .limit(1);
+
+      if (!blueprint) {
+        return null;
+      }
+
+      // Load workflow steps for this blueprint
+      const steps = await db
+        .select()
+        .from(blueprintWorkflowSteps)
+        .where(eq(blueprintWorkflowSteps.blueprintId, blueprint.id))
+        .orderBy(asc(blueprintWorkflowSteps.sortOrder));
+
+      if (steps.length === 0) {
+        logger.warn(`[Blueprint DB] Blueprint ${blueprint.code} found but has no workflow steps`);
+        return null;
+      }
+
+      return { blueprint, steps: steps as BlueprintStep[] };
+    } catch (error) {
+      logger.error('Error loading workflow from blueprint:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Map blueprint step type to task type
+   */
+  private mapBlueprintStepTypeToTaskType(stepType: string): string {
+    const typeMap: Record<string, string> = {
+      'DATA_COLLECTION': ORDER_TASK_TYPE.DATA_ENTRY,
+      'DOCUMENT_UPLOAD': ORDER_TASK_TYPE.DOCUMENT_UPLOAD,
+      'DOCUMENT_COLLECTION': ORDER_TASK_TYPE.DOCUMENT_UPLOAD,
+      'VERIFICATION': ORDER_TASK_TYPE.VERIFICATION,
+      'GOVERNMENT_FILING': ORDER_TASK_TYPE.FILING,
+      'FILING': ORDER_TASK_TYPE.FILING,
+      'PAYMENT': ORDER_TASK_TYPE.PAYMENT,
+      'APPROVAL': ORDER_TASK_TYPE.APPROVAL,
+      'QC_REVIEW': ORDER_TASK_TYPE.VERIFICATION,
+      'REVIEW': ORDER_TASK_TYPE.VERIFICATION,
+      'CLIENT_APPROVAL': ORDER_TASK_TYPE.APPROVAL,
+      'DELIVERY': ORDER_TASK_TYPE.APPROVAL,
+      'TASK': ORDER_TASK_TYPE.DATA_ENTRY,
+      'AUTO': ORDER_TASK_TYPE.DATA_ENTRY,
+      'WAIT': ORDER_TASK_TYPE.DATA_ENTRY,
+      'DECISION': ORDER_TASK_TYPE.VERIFICATION,
+      'ACKNOWLEDGMENT': ORDER_TASK_TYPE.APPROVAL,
+      'CALCULATION': ORDER_TASK_TYPE.DATA_ENTRY,
+      'CLIENT_ACTION': ORDER_TASK_TYPE.COMMUNICATION,
+    };
+    return typeMap[stepType] || ORDER_TASK_TYPE.DATA_ENTRY;
+  }
+
+  /**
+   * Create tasks from blueprint workflow steps
+   */
+  private async createTasksFromBlueprint(
+    serviceRequestId: number,
+    serviceRequest: ServiceRequest,
+    blueprint: typeof serviceBlueprints.$inferSelect,
+    steps: BlueprintStep[]
+  ): Promise<TaskInstantiationResult> {
+    const errors: string[] = [];
+    const createdTasks: OrderTask[] = [];
+    const stepCodeToTaskIdMap: Map<string, number> = new Map();
+    const baseDate = serviceRequest.createdAt || new Date();
+
+    logger.info(`[Blueprint DB] Creating ${steps.length} tasks from blueprint: ${blueprint.code}`);
+
+    // First pass: create all tasks
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+
+      try {
+        const taskId = await idGenerator.generateId(ID_TYPES.TASK);
+        const taskType = this.mapBlueprintStepTypeToTaskType(step.stepType);
+        const assignedRole = step.defaultAssigneeRole || TASK_TYPE_ROLE_MAP[taskType] || 'ops_executive';
+
+        // Calculate due date from SLA hours or default
+        const slaHours = step.slaHours || 8;
+        const estimatedDays = Math.ceil(slaHours / 8);
+        const dueDate = new Date(baseDate);
+        dueDate.setDate(dueDate.getDate() + this.calculateCumulativeDaysFromBlueprint(steps, i));
+
+        // Determine if QC is required based on step type
+        const requiresQc = step.stepType === 'QC_REVIEW' ||
+                          step.stepType === 'VERIFICATION' ||
+                          step.stepType === 'APPROVAL' ||
+                          (step.isMilestone === true);
+
+        // Check if has dependencies (from allowedNextSteps on previous steps)
+        const hasDependencies = i > 0; // For now, assume linear dependency
+        const initialStatus = hasDependencies
+          ? ORDER_TASK_STATUS.BLOCKED
+          : ORDER_TASK_STATUS.READY;
+
+        const [task] = await db.insert(orderTasks).values({
+          taskId,
+          serviceRequestId,
+          workflowTemplateId: blueprint.code,
+          stepNumber: i + 1,
+          stepId: step.stepCode,
+          name: step.stepName,
+          description: step.description || `Step ${i + 1}: ${step.stepName}`,
+          taskType,
+          status: initialStatus,
+          assignedRole,
+          assignedTo: null,
+          dependsOn: [],
+          blockedBy: [],
+          requiresQc,
+          estimatedDuration: slaHours,
+          dueDate,
+          priority: step.isMilestone ? 'high' : 'medium',
+          autoAssigned: false,
+          assignmentAttempts: 0,
+          reworkCount: 0,
+        }).returning();
+
+        stepCodeToTaskIdMap.set(step.stepCode, task.id);
+        createdTasks.push(task);
+
+        await this.logTaskActivity(task.id, 'created', null, initialStatus, null, {
+          source: 'BLUEPRINT_DB',
+          blueprintId: blueprint.id,
+          blueprintCode: blueprint.code,
+          stepCode: step.stepCode,
+          stepNumber: i + 1
+        });
+
+      } catch (stepError) {
+        const errorMsg = `[Blueprint DB] Failed to create task for step ${step.stepCode}: ${(stepError as Error).message}`;
+        logger.error(errorMsg);
+        errors.push(errorMsg);
+      }
+    }
+
+    // Second pass: update dependencies (linear for now, or use allowedNextSteps if defined)
+    await this.updateBlueprintTaskDependencies(createdTasks, steps, stepCodeToTaskIdMap);
+
+    // Auto-assign ready tasks
+    for (const task of createdTasks) {
+      if (task.status === ORDER_TASK_STATUS.READY) {
+        await this.autoAssignTask(task.id);
+      }
+    }
+
+    // Update service request progress
+    await this.updateOrderProgress(serviceRequestId);
+
+    logger.info(`[Blueprint DB] Created ${createdTasks.length} tasks for service request ${serviceRequestId} from blueprint ${blueprint.code}`);
+
+    return {
+      success: errors.length === 0,
+      serviceRequestId,
+      tasksCreated: createdTasks.length,
+      tasks: createdTasks,
+      errors: errors.length > 0 ? errors : undefined
+    };
+  }
+
+  /**
+   * Calculate cumulative days for blueprint steps
+   */
+  private calculateCumulativeDaysFromBlueprint(steps: BlueprintStep[], currentIndex: number): number {
+    let total = 0;
+    for (let i = 0; i <= currentIndex; i++) {
+      const slaHours = steps[i].slaHours || 8;
+      total += Math.ceil(slaHours / 8);
+    }
+    return total;
+  }
+
+  /**
+   * Update task dependencies for blueprint-based tasks
+   */
+  private async updateBlueprintTaskDependencies(
+    tasks: OrderTask[],
+    steps: BlueprintStep[],
+    stepCodeToTaskIdMap: Map<string, number>
+  ): Promise<void> {
+    for (let i = 0; i < tasks.length; i++) {
+      const task = tasks[i];
+      const step = steps[i];
+
+      // For linear workflows, each step depends on the previous
+      if (i > 0) {
+        const prevTaskId = tasks[i - 1].id;
+        const prevTask = tasks[i - 1];
+
+        const dependencyTaskIds = [prevTaskId];
+        const blockedByTaskIds = prevTask.status !== ORDER_TASK_STATUS.COMPLETED ? [prevTaskId] : [];
+
+        await db.update(orderTasks)
+          .set({
+            dependsOn: dependencyTaskIds,
+            blockedBy: blockedByTaskIds,
+            status: blockedByTaskIds.length > 0 ? ORDER_TASK_STATUS.BLOCKED : ORDER_TASK_STATUS.READY,
+            updatedAt: new Date()
+          })
+          .where(eq(orderTasks.id, task.id));
+      }
+    }
+  }
+
+  /**
    * STEP 1: Create tasks from workflow template when service request is created
+   * Priority: 1) Blueprint DB  2) In-Memory Templates  3) Default 4-step workflow
    */
   async instantiateTasksForOrder(
     serviceRequestId: number,
@@ -103,14 +363,28 @@ export class TaskInstantiationService {
       // Determine which workflow template to use
       const templateId = workflowTemplateId || serviceRequest.serviceId;
 
-      // Get workflow template
+      // PRIORITY 1: Try to load from Blueprint DB first
+      const blueprintData = await this.loadWorkflowFromBlueprint(templateId);
+      if (blueprintData) {
+        logger.info(`[Blueprint DB] Using blueprint workflow for service: ${templateId}`);
+        return this.createTasksFromBlueprint(
+          serviceRequestId,
+          serviceRequest,
+          blueprintData.blueprint,
+          blueprintData.steps
+        );
+      }
+
+      // PRIORITY 2: Fall back to in-memory workflow engine
       const template = workflowEngine.getTemplate(templateId);
 
       if (!template || !template.steps || template.steps.length === 0) {
-        logger.warn(`No workflow template found for service: ${templateId}, using default 4-step workflow`);
-        // Create default workflow if no template found
+        logger.warn(`[In-Memory Fallback] No workflow template found for service: ${templateId}, using default 4-step workflow`);
+        // PRIORITY 3: Create default workflow if no template found
         return this.createDefaultTasks(serviceRequestId, serviceRequest);
       }
+
+      logger.info(`[In-Memory Fallback] Using in-memory workflow template for service: ${templateId}`);
 
       // Create task ID to step ID mapping for dependency resolution
       const stepToTaskIdMap: Map<string, number> = new Map();
@@ -174,6 +448,7 @@ export class TaskInstantiationService {
 
           // Log task creation
           await this.logTaskActivity(task.id, 'created', null, initialStatus, null, {
+            source: 'IN_MEMORY_FALLBACK',
             templateId,
             stepId: step.id,
             stepNumber: i + 1
@@ -199,7 +474,18 @@ export class TaskInstantiationService {
       // Update service request progress
       await this.updateOrderProgress(serviceRequestId);
 
-      logger.info(`Created ${createdTasks.length} tasks for service request ${serviceRequestId}`);
+      // NOTIFICATION: Service request created - notify client
+      if (serviceRequest.userId) {
+        const serviceName = serviceRequest.serviceId || 'Service';
+        this.notifyServiceRequestCreated(
+          serviceRequestId,
+          serviceRequest.userId,
+          serviceName,
+          serviceRequest.requestId || `SR-${serviceRequestId}`
+        );
+      }
+
+      logger.info(`[In-Memory Fallback] Created ${createdTasks.length} tasks for service request ${serviceRequestId} from template ${templateId}`);
 
       return {
         success: errors.length === 0,
@@ -228,6 +514,8 @@ export class TaskInstantiationService {
     serviceRequestId: number,
     serviceRequest: ServiceRequest
   ): Promise<TaskInstantiationResult> {
+    logger.info(`[Default Workflow] Creating default 4-step workflow for service request ${serviceRequestId}`);
+
     const defaultSteps = [
       { id: 'intake', name: 'Requirement Intake', type: 'documentation', days: 1 },
       { id: 'execution', name: 'Service Execution', type: 'filing', days: 3 },
@@ -282,6 +570,7 @@ export class TaskInstantiationService {
       createdTasks.push(task);
 
       await this.logTaskActivity(task.id, 'created', null, initialStatus, null, {
+        source: 'DEFAULT_WORKFLOW',
         templateId: 'default',
         stepId: step.id,
         stepNumber: i + 1
@@ -294,6 +583,8 @@ export class TaskInstantiationService {
     }
 
     await this.updateOrderProgress(serviceRequestId);
+
+    logger.info(`[Default Workflow] Created ${createdTasks.length} tasks for service request ${serviceRequestId}`);
 
     return {
       success: true,
@@ -660,6 +951,15 @@ export class TaskInstantiationService {
         workload: selectedUser.inProgressCount
       });
 
+      // NOTIFICATION: Task assigned - notify ops executive
+      this.notifyTaskAssigned(
+        taskId,
+        selectedUser.userId,
+        task.name,
+        task.workflowTemplateId || 'Service',
+        'Client' // Will be enhanced to get actual client name
+      );
+
       logger.info(`Auto-assigned task ${taskId} to user ${selectedUser.userId} (${selectedUser.name})`);
 
       return {
@@ -747,6 +1047,14 @@ export class TaskInstantiationService {
         qcReviewId: qcReview.id,
         notes
       });
+
+      // NOTIFICATION: QC review needed - notify QC executives
+      this.notifyQcReviewNeeded(
+        taskId,
+        task.name,
+        task.workflowTemplateId || 'Service',
+        'Client'
+      );
 
       const { progress } = await this.updateOrderProgress(task.serviceRequestId);
 
@@ -869,6 +1177,17 @@ export class TaskInstantiationService {
           reworkCount: (task.reworkCount || 0) + 1
         });
 
+        // NOTIFICATION: QC rejected - notify ops executive with notes
+        if (task.assignedTo) {
+          this.notifyQcRejected(
+            taskId,
+            task.assignedTo,
+            task.name,
+            notes || 'Please review and resubmit.',
+            task.reworkCount || 0
+          );
+        }
+
         const { progress } = await this.updateOrderProgress(task.serviceRequestId);
 
         return {
@@ -937,6 +1256,22 @@ export class TaskInstantiationService {
 
       if (allCompleted) {
         logger.info(`Service request ${serviceRequestId} auto-completed - all tasks finished`);
+
+        // NOTIFICATION: Service completed - notify client
+        const [serviceRequest] = await db
+          .select()
+          .from(serviceRequests)
+          .where(eq(serviceRequests.id, serviceRequestId))
+          .limit(1);
+
+        if (serviceRequest?.userId) {
+          this.notifyServiceCompleted(
+            serviceRequestId,
+            serviceRequest.userId,
+            serviceRequest.serviceId || 'Service',
+            serviceRequest.requestId || `SR-${serviceRequestId}`
+          );
+        }
       }
 
       return { progress: progressPercentage, completed: allCompleted };
@@ -1076,6 +1411,204 @@ export class TaskInstantiationService {
       .limit(1);
 
     return task || null;
+  }
+
+  /**
+   * Send notification for service request created
+   */
+  async notifyServiceRequestCreated(
+    serviceRequestId: number,
+    clientUserId: number,
+    serviceName: string,
+    requestId: string
+  ): Promise<void> {
+    try {
+      await notificationHub.send({
+        userId: clientUserId,
+        type: WORKFLOW_NOTIFICATIONS.SERVICE_REQUEST_CREATED,
+        channels: ['email', 'in_app'],
+        priority: 'normal',
+        subject: `Service Request Created: ${serviceName}`,
+        content: `Your service request ${requestId} for ${serviceName} has been created and is being processed. You can track progress in your portal.`,
+        referenceType: 'service_request',
+        referenceId: serviceRequestId,
+        data: {
+          serviceName,
+          requestId,
+          serviceRequestId,
+        },
+      });
+      logger.info(`[Notification] Service request created notification sent to user ${clientUserId}`);
+    } catch (error) {
+      logger.error(`[Notification] Failed to send service request created notification:`, error);
+    }
+  }
+
+  /**
+   * Send notification for task assigned to ops executive
+   */
+  async notifyTaskAssigned(
+    taskId: number,
+    assignedToUserId: number,
+    taskName: string,
+    serviceName: string,
+    clientName: string
+  ): Promise<void> {
+    try {
+      await notificationHub.send({
+        userId: assignedToUserId,
+        type: WORKFLOW_NOTIFICATIONS.TASK_ASSIGNED,
+        channels: ['in_app'],
+        priority: 'normal',
+        subject: `New Task Assigned: ${taskName}`,
+        content: `You have been assigned a new task "${taskName}" for client ${clientName} (${serviceName}). Please review and start working on it.`,
+        referenceType: 'task',
+        referenceId: taskId,
+        data: {
+          taskId,
+          taskName,
+          serviceName,
+          clientName,
+        },
+      });
+      logger.info(`[Notification] Task assigned notification sent to user ${assignedToUserId}`);
+    } catch (error) {
+      logger.error(`[Notification] Failed to send task assigned notification:`, error);
+    }
+  }
+
+  /**
+   * Send notification for QC review needed
+   */
+  async notifyQcReviewNeeded(
+    taskId: number,
+    taskName: string,
+    serviceName: string,
+    clientName: string
+  ): Promise<void> {
+    try {
+      // Get QC executives
+      const qcUsers = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.role, 'qc_executive'), eq(users.isActive, true)));
+
+      for (const qcUser of qcUsers) {
+        await notificationHub.send({
+          userId: qcUser.id,
+          type: WORKFLOW_NOTIFICATIONS.QC_REVIEW_NEEDED,
+          channels: ['in_app'],
+          priority: 'normal',
+          subject: `QC Review Required: ${taskName}`,
+          content: `Task "${taskName}" for ${clientName} (${serviceName}) is pending QC review. Please review the work and approve or reject.`,
+          referenceType: 'task',
+          referenceId: taskId,
+          data: {
+            taskId,
+            taskName,
+            serviceName,
+            clientName,
+          },
+        });
+      }
+      logger.info(`[Notification] QC review needed notification sent to ${qcUsers.length} QC executives`);
+    } catch (error) {
+      logger.error(`[Notification] Failed to send QC review needed notification:`, error);
+    }
+  }
+
+  /**
+   * Send notification for QC rejected (back to ops with notes)
+   */
+  async notifyQcRejected(
+    taskId: number,
+    assignedToUserId: number,
+    taskName: string,
+    rejectionNotes: string,
+    reworkCount: number
+  ): Promise<void> {
+    try {
+      await notificationHub.send({
+        userId: assignedToUserId,
+        type: WORKFLOW_NOTIFICATIONS.QC_REJECTED,
+        channels: ['email', 'in_app'],
+        priority: 'high',
+        subject: `Task Requires Rework: ${taskName}`,
+        content: `Your task "${taskName}" was rejected by QC and requires rework (Attempt ${reworkCount + 1}). Reason: ${rejectionNotes}. Please review the feedback and resubmit.`,
+        referenceType: 'task',
+        referenceId: taskId,
+        data: {
+          taskId,
+          taskName,
+          rejectionNotes,
+          reworkCount,
+        },
+      });
+      logger.info(`[Notification] QC rejected notification sent to user ${assignedToUserId}`);
+    } catch (error) {
+      logger.error(`[Notification] Failed to send QC rejected notification:`, error);
+    }
+  }
+
+  /**
+   * Send notification for service completed
+   */
+  async notifyServiceCompleted(
+    serviceRequestId: number,
+    clientUserId: number,
+    serviceName: string,
+    requestId: string
+  ): Promise<void> {
+    try {
+      await notificationHub.send({
+        userId: clientUserId,
+        type: WORKFLOW_NOTIFICATIONS.SERVICE_COMPLETED,
+        channels: ['email', 'in_app'],
+        priority: 'normal',
+        subject: `Service Completed: ${serviceName}`,
+        content: `Great news! Your service request ${requestId} for ${serviceName} has been completed. You can download your documents from the portal.`,
+        referenceType: 'service_request',
+        referenceId: serviceRequestId,
+        data: {
+          serviceName,
+          requestId,
+          serviceRequestId,
+        },
+      });
+      logger.info(`[Notification] Service completed notification sent to user ${clientUserId}`);
+    } catch (error) {
+      logger.error(`[Notification] Failed to send service completed notification:`, error);
+    }
+  }
+
+  /**
+   * Send notification for document requested
+   */
+  async notifyDocumentRequested(
+    clientUserId: number,
+    documentList: string[],
+    serviceName: string,
+    requestId: string
+  ): Promise<void> {
+    try {
+      const docListText = documentList.join(', ');
+      await notificationHub.send({
+        userId: clientUserId,
+        type: WORKFLOW_NOTIFICATIONS.DOCUMENT_REQUESTED,
+        channels: ['email'],
+        priority: 'normal',
+        subject: `Documents Required: ${serviceName}`,
+        content: `We need the following documents for your ${serviceName} service (${requestId}): ${docListText}. Please upload them through your portal.`,
+        data: {
+          documentList,
+          serviceName,
+          requestId,
+        },
+      });
+      logger.info(`[Notification] Document requested notification sent to user ${clientUserId}`);
+    } catch (error) {
+      logger.error(`[Notification] Failed to send document requested notification:`, error);
+    }
   }
 }
 

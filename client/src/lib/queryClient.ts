@@ -5,17 +5,21 @@ import { withCsrfHeaders } from './csrf';
 // Auth redirect handler for 401/403 errors
 function handleAuthError(status: number) {
   if (status === 401 || status === 403) {
-    // Clear any stale session data
-    document.cookie.split(';').forEach((c) => {
-      document.cookie = c.replace(/^ +/, '').replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
-    });
-
     // Redirect to login page
     const currentPath = window.location.pathname;
     const loginPath = '/login';
 
-    // Avoid redirect loop if already on login page
-    if (currentPath !== loginPath && !currentPath.startsWith('/login')) {
+    // Avoid redirect loop if already on login page or public pages
+    const publicPaths = ['/login', '/register', '/forgot-password', '/reset-password'];
+    const isPublicPage = publicPaths.some(p => currentPath === p || currentPath.startsWith(p + '/'));
+
+    if (!isPublicPage) {
+      // Only clear cookies and redirect if NOT on a public/auth page
+      // This prevents clearing the session cookie that was just set during login
+      document.cookie.split(';').forEach((c) => {
+        document.cookie = c.replace(/^ +/, '').replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
+      });
+
       // Store current path to redirect back after login
       sessionStorage.setItem('redirectAfterLogin', currentPath);
       window.location.href = loginPath;

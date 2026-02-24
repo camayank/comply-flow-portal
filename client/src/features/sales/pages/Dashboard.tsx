@@ -168,6 +168,217 @@ const navigation = [
   },
 ];
 
+// Lead sources for dropdown
+const leadSources = [
+  { value: 'Website', label: 'Website' },
+  { value: 'Referral', label: 'Referral' },
+  { value: 'LinkedIn', label: 'LinkedIn' },
+  { value: 'Cold Call', label: 'Cold Call' },
+  { value: 'Event', label: 'Event' },
+  { value: 'JustDial', label: 'JustDial' },
+  { value: 'IndiaMART', label: 'IndiaMART' },
+  { value: 'Other', label: 'Other' },
+];
+
+// Entity types
+const entityTypes = [
+  { value: 'Pvt Ltd', label: 'Private Limited' },
+  { value: 'LLP', label: 'LLP' },
+  { value: 'OPC', label: 'One Person Company' },
+  { value: 'Partnership', label: 'Partnership' },
+  { value: 'Proprietorship', label: 'Proprietorship' },
+  { value: 'Individual', label: 'Individual' },
+];
+
+// Reusable Create Lead Dialog Component
+function CreateLeadDialog({
+  open,
+  onClose,
+  onSave,
+  isLoading = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSave: (data: any) => void;
+  isLoading?: boolean;
+}) {
+  const [formData, setFormData] = useState({
+    name: '',
+    company: '',
+    email: '',
+    phone: '',
+    source: 'Website',
+    priority: 'medium',
+    estimatedValue: '',
+    serviceInterested: '',
+    state: '',
+    entityType: '',
+    notes: '',
+  });
+
+  const handleSubmit = () => {
+    if (!formData.name && !formData.company) {
+      return;
+    }
+    if (!formData.phone) {
+      return;
+    }
+    onSave({
+      name: formData.name || formData.company,
+      company: formData.company || formData.name,
+      email: formData.email,
+      phone: formData.phone,
+      source: formData.source,
+      priority: formData.priority,
+      estimatedValue: formData.estimatedValue ? parseFloat(formData.estimatedValue) : null,
+      serviceInterested: formData.serviceInterested || 'General Inquiry',
+      state: formData.state,
+      entityType: formData.entityType,
+      notes: formData.notes,
+    });
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      company: '',
+      email: '',
+      phone: '',
+      source: 'Website',
+      priority: 'medium',
+      estimatedValue: '',
+      serviceInterested: '',
+      state: '',
+      entityType: '',
+      notes: '',
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); resetForm(); } }}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create New Lead</DialogTitle>
+          <DialogDescription>
+            Enter lead details to add to your pipeline
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Contact Name *</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Full name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Company *</Label>
+              <Input
+                value={formData.company}
+                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                placeholder="Company name"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Phone *</Label>
+              <Input
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="9876543210"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="email@company.com"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Lead Source</Label>
+              <Select value={formData.source} onValueChange={(v) => setFormData({ ...formData, source: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select source" />
+                </SelectTrigger>
+                <SelectContent>
+                  {leadSources.map(src => (
+                    <SelectItem key={src.value} value={src.value}>{src.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Entity Type</Label>
+              <Select value={formData.entityType} onValueChange={(v) => setFormData({ ...formData, entityType: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {entityTypes.map(et => (
+                    <SelectItem key={et.value} value={et.value}>{et.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Estimated Value (₹)</Label>
+              <Input
+                type="number"
+                value={formData.estimatedValue}
+                onChange={(e) => setFormData({ ...formData, estimatedValue: e.target.value })}
+                placeholder="50000"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>State</Label>
+              <Input
+                value={formData.state}
+                onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                placeholder="Maharashtra"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Service Interested</Label>
+            <Input
+              value={formData.serviceInterested}
+              onChange={(e) => setFormData({ ...formData, serviceInterested: e.target.value })}
+              placeholder="GST Registration, Company Incorporation..."
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Notes</Label>
+            <Textarea
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="Additional information..."
+              rows={3}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { onClose(); resetForm(); }}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? 'Creating...' : 'Create Lead'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function SalesDashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -232,7 +443,7 @@ export default function SalesDashboard() {
     },
   });
 
-  // Create lead mutation
+  // Create lead mutation with proper error handling
   const createLeadMutation = useMutation({
     mutationFn: async (leadData: Partial<Lead>) => {
       const response = await fetch('/api/sales/leads', {
@@ -241,23 +452,37 @@ export default function SalesDashboard() {
         credentials: 'include',
         body: JSON.stringify(leadData),
       });
-      if (!response.ok) throw new Error('Failed to create lead');
-      return response.json();
+
+      // Check content type to avoid parsing HTML as JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        throw new Error('Server returned an invalid response');
+      }
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || data.message || 'Failed to create lead');
+      }
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/sales/leads'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sales/metrics'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sales/pipeline'] });
-      toast({ title: 'Lead created successfully' });
+      toast({ title: 'Lead Created', description: 'New lead has been added to your pipeline.' });
       setIsCreateLeadOpen(false);
     },
-    onError: () => {
-      toast({ title: 'Failed to create lead', variant: 'destructive' });
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to create lead',
+        description: error.message,
+        variant: 'destructive'
+      });
     },
   });
 
-  // Use API data
-  const leads = leadsData?.data || [];
+  // Use API data with defensive coding - ensure leads is always an array
+  const leads: Lead[] = Array.isArray(leadsData?.data) ? leadsData.data : [];
   const filteredLeads = leads;
   const totalLeads = metrics?.totalLeads || 0;
   const qualifiedLeads = metrics?.qualifiedLeads || 0;
@@ -335,7 +560,7 @@ export default function SalesDashboard() {
           <MetricCard
             label="Qualified Leads"
             value={qualifiedLeads.toString()}
-            trend={{ value: `${Math.round((qualifiedLeads / totalLeads) * 100)}% qualification rate`, direction: 'up' }}
+            trend={{ value: `${totalLeads > 0 ? Math.round((qualifiedLeads / totalLeads) * 100) : 0}% qualification rate`, direction: 'up' }}
             icon={Target}
             accentColor="orange"
           />
@@ -401,7 +626,7 @@ export default function SalesDashboard() {
               </CardContent>
             </Card>
 
-            {/* Recent Activity */}
+            {/* Recent Activity - Dynamic from real lead/proposal data */}
             <Card>
               <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
@@ -409,23 +634,38 @@ export default function SalesDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {[
-                    { icon: UserPlus, text: 'New lead: Rajesh Kumar from Tech Solutions', time: '2 hours ago', color: 'text-blue-500' },
-                    { icon: FileText, text: 'Proposal sent to StartupXYZ', time: '4 hours ago', color: 'text-purple-500' },
-                    { icon: CheckCircle, text: 'Deal closed: FinServ India - ₹5L', time: '1 day ago', color: 'text-green-500' },
-                    { icon: Phone, text: 'Follow-up call with Global Traders', time: '1 day ago', color: 'text-orange-500' },
-                    { icon: Mail, text: 'Email sent to Manufacturing Co', time: '2 days ago', color: 'text-gray-500' },
-                  ].map((activity, idx) => (
-                    <div key={idx} className="flex items-start gap-3">
-                      <div className={`mt-0.5 ${activity.color}`}>
-                        <activity.icon className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm">{activity.text}</p>
-                        <p className="text-xs text-muted-foreground">{activity.time}</p>
-                      </div>
-                    </div>
-                  ))}
+                  {leads.length > 0 || proposals.length > 0 ? (
+                    <>
+                      {/* Show recent leads */}
+                      {leads.slice(0, 3).map((lead: Lead, idx: number) => (
+                        <div key={`lead-${idx}`} className="flex items-start gap-3">
+                          <div className="mt-0.5 text-blue-500">
+                            <UserPlus className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm">New lead: {lead.name || lead.company}</p>
+                            <p className="text-xs text-muted-foreground">{formatDate(lead.createdAt)}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {/* Show recent proposals */}
+                      {proposals.slice(0, 2).map((proposal: Proposal, idx: number) => (
+                        <div key={`proposal-${idx}`} className="flex items-start gap-3">
+                          <div className="mt-0.5 text-purple-500">
+                            <FileText className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm">Proposal: {proposal.title || proposal.client}</p>
+                            <p className="text-xs text-muted-foreground">{formatDate(proposal.createdAt)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No recent activity. Create your first lead to get started!
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -761,76 +1001,13 @@ export default function SalesDashboard() {
         )}
       </Tabs>
 
-      {/* Create Lead Dialog */}
-      <Dialog open={isCreateLeadOpen} onOpenChange={setIsCreateLeadOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create New Lead</DialogTitle>
-            <DialogDescription>
-              Enter lead details to add to your pipeline
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="leadName">Name *</Label>
-                <Input id="leadName" placeholder="Full name" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="company">Company *</Label>
-                <Input id="company" placeholder="Company name" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
-                <Input id="email" type="email" placeholder="email@company.com" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" placeholder="+91 98765 43210" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="source">Lead Source</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select source" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="website">Website</SelectItem>
-                    <SelectItem value="referral">Referral</SelectItem>
-                    <SelectItem value="linkedin">LinkedIn</SelectItem>
-                    <SelectItem value="cold_call">Cold Call</SelectItem>
-                    <SelectItem value="event">Event</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="value">Estimated Value</Label>
-                <Input id="value" type="number" placeholder="0" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea id="notes" placeholder="Additional information..." rows={3} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateLeadOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => {
-              toast({ title: 'Lead Created', description: 'New lead has been added to your pipeline.' });
-              setIsCreateLeadOpen(false);
-            }}>
-              Create Lead
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Create Lead Dialog - Connected to API */}
+      <CreateLeadDialog
+        open={isCreateLeadOpen}
+        onClose={() => setIsCreateLeadOpen(false)}
+        onSave={(data) => createLeadMutation.mutate(data)}
+        isLoading={createLeadMutation.isPending}
+      />
       </PageShell>
     </DashboardLayout>
   );

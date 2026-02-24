@@ -7,9 +7,11 @@ import {
   complianceAlerts,
   complianceRules,
   messages,
-  users
+  users,
+  orderTasks,
+  ORDER_TASK_STATUS
 } from '@shared/schema';
-import { eq, desc, and, gte, lte, or, asc } from 'drizzle-orm';
+import { eq, desc, and, gte, lte, or, asc, sql } from 'drizzle-orm';
 import { COMPLIANCE_KNOWLEDGE_BASE, getComplianceByCode } from './compliance-knowledge-base';
 import { mapComplianceCategory } from './compliance-taxonomy';
 import {
@@ -140,6 +142,110 @@ export function registerClientRoutes(app: Express) {
     } catch (error) {
       console.error('Error fetching service request:', error);
       res.status(500).json({ error: 'Failed to fetch service request' });
+    }
+  });
+
+  // Get tasks/milestones for a service request (client view)
+  app.get('/api/client/service-requests/:id/tasks', ...clientAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+
+      const requestId = parseInt(req.params.id);
+
+      // Get user's entity ID
+      const userEntityId = await getUserEntityId(userId);
+      if (!userEntityId) {
+        return res.status(403).json({ error: 'No entity associated with user' });
+      }
+
+      // Verify ownership of the service request
+      const [request] = await db
+        .select()
+        .from(serviceRequests)
+        .where(and(
+          eq(serviceRequests.id, requestId),
+          eq(serviceRequests.businessEntityId, userEntityId)
+        ));
+
+      if (!request) {
+        return res.status(404).json({ error: 'Service request not found or access denied' });
+      }
+
+      // Fetch tasks for this service request (client-visible info only)
+      const tasks = await db
+        .select({
+          id: orderTasks.id,
+          taskId: orderTasks.taskId,
+          stepNumber: orderTasks.stepNumber,
+          name: orderTasks.name,
+          description: orderTasks.description,
+          taskType: orderTasks.taskType,
+          status: orderTasks.status,
+          completedAt: orderTasks.completedAt,
+          dueDate: orderTasks.dueDate,
+          assignedRole: orderTasks.assignedRole,
+        })
+        .from(orderTasks)
+        .where(eq(orderTasks.serviceRequestId, requestId))
+        .orderBy(orderTasks.stepNumber);
+
+      // Transform tasks for client display - show all but with friendly names
+      const clientVisibleTasks = tasks.map(task => ({
+        id: task.id,
+        taskId: task.taskId,
+        stepNumber: task.stepNumber,
+        name: task.name,
+        description: task.description,
+        taskType: task.taskType,
+        status: task.status,
+        isCompleted: task.status === ORDER_TASK_STATUS.COMPLETED || task.status === ORDER_TASK_STATUS.SKIPPED,
+        isPending: task.status === ORDER_TASK_STATUS.PENDING || task.status === ORDER_TASK_STATUS.BLOCKED,
+        isInProgress: task.status === ORDER_TASK_STATUS.READY || task.status === ORDER_TASK_STATUS.IN_PROGRESS || task.status === ORDER_TASK_STATUS.QC_PENDING,
+        completedAt: task.completedAt,
+        dueDate: task.dueDate,
+        // Flag for tasks requiring client action (assigned to client role or document upload type)
+        requiresClientAction: task.assignedRole === 'client' || task.taskType === 'CLIENT_ACTION' || task.taskType === 'client_action' || task.taskType === 'document_upload',
+      }));
+
+      // Calculate progress
+      const completedCount = clientVisibleTasks.filter(t => t.isCompleted).length;
+      const totalCount = clientVisibleTasks.length;
+      const progressPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+      // Identify pending client actions
+      const pendingClientActions = clientVisibleTasks.filter(
+        t => t.requiresClientAction && !t.isCompleted
+      );
+
+      // Build milestone summary
+      const milestones = clientVisibleTasks.map(task => ({
+        id: task.id,
+        name: task.name,
+        status: task.isCompleted ? 'completed' : task.isInProgress ? 'in_progress' : 'pending',
+        completedAt: task.completedAt,
+        stepNumber: task.stepNumber,
+      }));
+
+      res.json({
+        tasks: clientVisibleTasks,
+        milestones,
+        pendingClientActions,
+        summary: {
+          total: totalCount,
+          completed: completedCount,
+          inProgress: clientVisibleTasks.filter(t => t.isInProgress).length,
+          pending: clientVisibleTasks.filter(t => t.isPending).length,
+          progressPercentage,
+          // Use the actual progress from service_requests if available
+          actualProgress: request.progress ?? progressPercentage,
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching service request tasks:', error);
+      res.status(500).json({ error: 'Failed to fetch tasks' });
     }
   });
 

@@ -12,16 +12,16 @@
 
 import { Router, Request, Response } from 'express';
 import { pool } from '../config/database';
-import { authenticateToken } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { requireAuth, requireMinRole } from '../auth-middleware';
 import { apiLimiter } from '../middleware/rateLimiter';
 import { asyncHandler, NotFoundError, ValidationError } from '../middleware/errorHandler';
 
 const router = Router();
 
-// Apply authentication and role-based access to all routes
-router.use(authenticateToken);
-router.use(requireRole('sales_manager', 'sales_executive', 'admin', 'super_admin'));
+// Apply session-based authentication and role-based access to all routes
+// Use requireAuth for session-based auth (cookies) instead of JWT
+router.use(requireAuth);
+router.use(requireMinRole('agent')); // Agents and above can access sales dashboard
 router.use(apiLimiter);
 
 // GET /api/sales/leads - Get all leads with optional filtering
@@ -448,6 +448,306 @@ router.get('/forecasts', asyncHandler(async (req: Request, res: Response) => {
       high: Math.round(weightedForecast * 1.2)
     }
   });
+}));
+
+// GET /api/sales/analytics - Sales analytics data
+router.get('/analytics', asyncHandler(async (req: Request, res: Response) => {
+  // Get lead source distribution
+  const sourceResult = await pool.query(`
+    SELECT
+      lead_source as source,
+      COUNT(*) as count,
+      COUNT(CASE WHEN COALESCE(lead_stage, status) = 'converted' THEN 1 END) as converted,
+      COALESCE(SUM(estimated_value::numeric), 0) as value
+    FROM leads
+    WHERE lead_source IS NOT NULL
+    GROUP BY lead_source
+    ORDER BY count DESC
+  `);
+
+  // Get monthly lead trend
+  const trendResult = await pool.query(`
+    SELECT
+      TO_CHAR(created_at, 'Mon') as month,
+      COUNT(*) as leads,
+      COUNT(CASE WHEN COALESCE(lead_stage, status) = 'converted' THEN 1 END) as conversions,
+      COALESCE(SUM(CASE WHEN COALESCE(lead_stage, status) = 'converted' THEN estimated_value::numeric ELSE 0 END), 0) as revenue
+    FROM leads
+    WHERE created_at >= NOW() - INTERVAL '6 months'
+    GROUP BY TO_CHAR(created_at, 'Mon'), DATE_TRUNC('month', created_at)
+    ORDER BY DATE_TRUNC('month', created_at)
+  `);
+
+  // Get conversion funnel
+  const funnelResult = await pool.query(`
+    SELECT
+      COALESCE(lead_stage, status) as stage,
+      COUNT(*) as count
+    FROM leads
+    GROUP BY COALESCE(lead_stage, status)
+  `);
+
+  // Get team performance
+  const teamResult = await pool.query(`
+    SELECT
+      pre_sales_executive as name,
+      COUNT(*) as leads,
+      COUNT(CASE WHEN COALESCE(lead_stage, status) = 'converted' THEN 1 END) as conversions,
+      COALESCE(SUM(CASE WHEN COALESCE(lead_stage, status) = 'converted' THEN estimated_value::numeric ELSE 0 END), 0) as revenue
+    FROM leads
+    WHERE pre_sales_executive IS NOT NULL
+    GROUP BY pre_sales_executive
+    ORDER BY revenue DESC
+    LIMIT 10
+  `);
+
+  res.json({
+    leadSources: sourceResult.rows.map(row => ({
+      source: row.source,
+      count: parseInt(row.count),
+      converted: parseInt(row.converted),
+      value: parseFloat(row.value) || 0,
+      conversionRate: parseInt(row.count) > 0 ? Math.round((parseInt(row.converted) / parseInt(row.count)) * 100) : 0
+    })),
+    monthlyTrend: trendResult.rows.map(row => ({
+      month: row.month,
+      leads: parseInt(row.leads),
+      conversions: parseInt(row.conversions),
+      revenue: parseFloat(row.revenue) || 0
+    })),
+    conversionFunnel: funnelResult.rows.map(row => ({
+      stage: row.stage,
+      count: parseInt(row.count)
+    })),
+    teamPerformance: teamResult.rows.map((row, idx) => ({
+      rank: idx + 1,
+      name: row.name,
+      leads: parseInt(row.leads),
+      conversions: parseInt(row.conversions),
+      revenue: parseFloat(row.revenue) || 0
+    }))
+  });
+}));
+
+// GET /api/sales/executive-dashboard - Executive summary for managers
+router.get('/executive-dashboard', asyncHandler(async (req: Request, res: Response) => {
+  // Get overall KPIs
+  const kpiResult = await pool.query(`
+    SELECT
+      COUNT(*) as total_leads,
+      COUNT(CASE WHEN COALESCE(lead_stage, status) = 'converted' THEN 1 END) as won_deals,
+      COUNT(CASE WHEN COALESCE(lead_stage, status) NOT IN ('converted', 'lost') THEN 1 END) as active_leads,
+      COALESCE(SUM(CASE WHEN COALESCE(lead_stage, status) = 'converted' THEN estimated_value::numeric ELSE 0 END), 0) as total_revenue,
+      COALESCE(SUM(CASE WHEN COALESCE(lead_stage, status) NOT IN ('converted', 'lost') THEN estimated_value::numeric ELSE 0 END), 0) as pipeline_value
+    FROM leads
+  `);
+
+  // Get this month's performance
+  const monthResult = await pool.query(`
+    SELECT
+      COUNT(*) as new_leads,
+      COUNT(CASE WHEN COALESCE(lead_stage, status) = 'converted' THEN 1 END) as conversions,
+      COALESCE(SUM(CASE WHEN COALESCE(lead_stage, status) = 'converted' THEN estimated_value::numeric ELSE 0 END), 0) as revenue
+    FROM leads
+    WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE)
+  `);
+
+  // Get team summary
+  const teamSummary = await pool.query(`
+    SELECT COUNT(DISTINCT pre_sales_executive) as team_size
+    FROM leads WHERE pre_sales_executive IS NOT NULL
+  `);
+
+  // Get pipeline health (leads in each critical stage)
+  const pipelineHealth = await pool.query(`
+    SELECT
+      COALESCE(lead_stage, status) as stage,
+      COUNT(*) as count,
+      COALESCE(SUM(estimated_value::numeric), 0) as value
+    FROM leads
+    WHERE COALESCE(lead_stage, status) IN ('new', 'contacted', 'qualified', 'proposal', 'negotiation')
+    GROUP BY COALESCE(lead_stage, status)
+  `);
+
+  // Get recent wins
+  const recentWins = await pool.query(`
+    SELECT
+      client_name as client,
+      estimated_value as value,
+      updated_at as closed_date
+    FROM leads
+    WHERE COALESCE(lead_stage, status) = 'converted'
+    ORDER BY updated_at DESC
+    LIMIT 5
+  `);
+
+  const kpi = kpiResult.rows[0];
+  const month = monthResult.rows[0];
+  const teamSize = parseInt(teamSummary.rows[0].team_size) || 1;
+
+  res.json({
+    kpis: {
+      totalLeads: parseInt(kpi.total_leads),
+      wonDeals: parseInt(kpi.won_deals),
+      activeLeads: parseInt(kpi.active_leads),
+      totalRevenue: parseFloat(kpi.total_revenue) || 0,
+      pipelineValue: parseFloat(kpi.pipeline_value) || 0,
+      conversionRate: parseInt(kpi.total_leads) > 0
+        ? Math.round((parseInt(kpi.won_deals) / parseInt(kpi.total_leads)) * 100)
+        : 0
+    },
+    thisMonth: {
+      newLeads: parseInt(month.new_leads),
+      conversions: parseInt(month.conversions),
+      revenue: parseFloat(month.revenue) || 0
+    },
+    team: {
+      size: teamSize,
+      avgRevenuePerRep: Math.round((parseFloat(kpi.total_revenue) || 0) / teamSize)
+    },
+    pipelineHealth: pipelineHealth.rows.map(row => ({
+      stage: row.stage,
+      count: parseInt(row.count),
+      value: parseFloat(row.value) || 0
+    })),
+    recentWins: recentWins.rows.map(row => ({
+      client: row.client,
+      value: parseFloat(row.value) || 0,
+      closedDate: row.closed_date
+    }))
+  });
+}));
+
+// GET /api/sales/services - Get available services for proposals
+router.get('/services', asyncHandler(async (req: Request, res: Response) => {
+  // Try to get services from service_configurations or services table
+  try {
+    const result = await pool.query(`
+      SELECT
+        id, service_code as code, service_name as name, base_price as price,
+        category, description
+      FROM service_configurations
+      WHERE is_active = true
+      ORDER BY category, service_name
+    `);
+
+    if (result.rows.length > 0) {
+      return res.json(result.rows);
+    }
+  } catch (e) {
+    // Table might not exist, use fallback
+  }
+
+  // Fallback: Return standard compliance services
+  const defaultServices = [
+    { id: 1, code: 'GST-REG', name: 'GST Registration', price: 2999, category: 'Tax Compliance' },
+    { id: 2, code: 'GST-FILE', name: 'GST Monthly Filing', price: 1499, category: 'Tax Compliance' },
+    { id: 3, code: 'COMP-INC', name: 'Company Incorporation', price: 14999, category: 'Company Formation' },
+    { id: 4, code: 'LLP-REG', name: 'LLP Registration', price: 9999, category: 'Company Formation' },
+    { id: 5, code: 'OPC-REG', name: 'OPC Registration', price: 12999, category: 'Company Formation' },
+    { id: 6, code: 'TDS-FILE', name: 'TDS Quarterly Returns', price: 1999, category: 'Tax Compliance' },
+    { id: 7, code: 'ROC-FILE', name: 'ROC Annual Filing', price: 4999, category: 'Compliance' },
+    { id: 8, code: 'FEMA-COMP', name: 'FEMA Compliance', price: 24999, category: 'Compliance' },
+    { id: 9, code: 'TM-REG', name: 'Trademark Registration', price: 7999, category: 'IP & Legal' },
+    { id: 10, code: 'AUDIT-INT', name: 'Internal Audit', price: 19999, category: 'Audit' },
+  ];
+
+  res.json(defaultServices);
+}));
+
+// POST /api/sales/referrals/generate-code - Generate referral code for sales user
+router.post('/referrals/generate-code', asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id || req.userId;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'User not authenticated' });
+  }
+
+  // Check if user already has a referral code
+  const existingResult = await pool.query(
+    'SELECT * FROM referral_codes WHERE client_id = $1 LIMIT 1',
+    [userId]
+  );
+
+  if (existingResult.rows.length > 0) {
+    return res.json({
+      code: existingResult.rows[0].code,
+      stats: {
+        totalReferrals: existingResult.rows[0].total_referrals || 0,
+        successfulReferrals: existingResult.rows[0].successful_referrals || 0,
+        totalCreditsEarned: existingResult.rows[0].total_credits_earned || '0.00'
+      }
+    });
+  }
+
+  // Generate new code
+  const code = `SALES${new Date().getFullYear()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+  try {
+    const result = await pool.query(`
+      INSERT INTO referral_codes (client_id, code, is_active, total_referrals, successful_referrals)
+      VALUES ($1, $2, true, 0, 0)
+      RETURNING *
+    `, [userId, code]);
+
+    res.status(201).json({
+      code: result.rows[0].code,
+      message: 'Referral code generated successfully',
+      stats: {
+        totalReferrals: 0,
+        successfulReferrals: 0,
+        totalCreditsEarned: '0.00'
+      }
+    });
+  } catch (error: any) {
+    // If referral_codes table doesn't exist, return a generated code anyway
+    res.json({
+      code: code,
+      message: 'Referral code generated (demo mode)',
+      stats: {
+        totalReferrals: 0,
+        successfulReferrals: 0,
+        totalCreditsEarned: '0.00'
+      }
+    });
+  }
+}));
+
+// GET /api/sales/referrals/my-stats - Get referral stats for current user
+router.get('/referrals/my-stats', asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.user?.id || req.userId;
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM referral_codes WHERE client_id = $1 LIMIT 1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({
+        hasCode: false,
+        code: null,
+        stats: null
+      });
+    }
+
+    res.json({
+      hasCode: true,
+      code: result.rows[0].code,
+      stats: {
+        totalReferrals: result.rows[0].total_referrals || 0,
+        successfulReferrals: result.rows[0].successful_referrals || 0,
+        totalCreditsEarned: result.rows[0].total_credits_earned || '0.00'
+      }
+    });
+  } catch (error) {
+    res.json({
+      hasCode: false,
+      code: null,
+      stats: null,
+      message: 'Referral system not available'
+    });
+  }
 }));
 
 export default router;

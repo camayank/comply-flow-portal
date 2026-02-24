@@ -24,6 +24,10 @@ await initializeEncryption();
 
 const app = express();
 
+// Trust proxy for correct IP detection (important for rate limiting and session fingerprinting)
+// In production, set TRUST_PROXY env var to a specific number or 'loopback'
+app.set('trust proxy', process.env.TRUST_PROXY || 1);
+
 // Parse cookies before security middleware (CSRF/session checks use cookies)
 app.use(cookieParser());
 
