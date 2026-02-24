@@ -5,7 +5,8 @@
  * Works with session-based auth from the backend.
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useRef } from 'react';
 
 export interface User {
   id: number;
@@ -18,7 +19,10 @@ export interface User {
 }
 
 export function useAuth() {
-  const { data: user, isLoading, error, refetch } = useQuery<User | null>({
+  const queryClient = useQueryClient();
+  const isRedirecting = useRef(false);
+
+  const { data: user, isLoading, error, refetch, isFetching } = useQuery<User | null>({
     queryKey: ['auth', 'user'],
     queryFn: async () => {
       try {
@@ -41,56 +45,72 @@ export function useAuth() {
     },
     retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    refetchOnWindowFocus: false, // Prevent unnecessary refetches
   });
 
   const isAuthenticated = !!user;
 
-  const login = async (username: string, password: string) => {
+  const login = useCallback(async (username: string, password: string) => {
     // Use staff login endpoint (username/password authentication)
     const response = await fetch('/api/auth/staff/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // No CSRF header needed - this endpoint is excluded from CSRF check
       },
       credentials: 'include',
       body: JSON.stringify({ username, password })
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Login failed');
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Login failed');
     }
 
     const data = await response.json();
+
+    // Immediately set the user data in cache to prevent race conditions
+    if (data.user) {
+      queryClient.setQueryData(['auth', 'user'], data.user);
+    }
+
+    // Also refetch to ensure we have the complete user data
     await refetch();
     return data;
-  };
+  }, [queryClient, refetch]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
+    if (isRedirecting.current) return;
+    isRedirecting.current = true;
+
     // Get CSRF token from cookie (set during login)
     const csrfToken = document.cookie
       .split('; ')
       .find(row => row.startsWith('csrfToken='))
       ?.split('=')[1];
 
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
-      },
-      credentials: 'include'
-    });
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
+        },
+        credentials: 'include'
+      });
 
-    await refetch();
-    // Redirect to login page after logout
-    window.location.href = '/login';
-  };
+      // Clear the auth cache immediately
+      queryClient.setQueryData(['auth', 'user'], null);
+      queryClient.invalidateQueries({ queryKey: ['auth'] });
+    } finally {
+      // Redirect to login page after logout
+      window.location.href = '/login';
+    }
+  }, [queryClient]);
 
   return {
     user,
-    isLoading,
+    isLoading: isLoading || isFetching,
     error,
     isAuthenticated,
     login,

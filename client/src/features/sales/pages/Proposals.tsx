@@ -114,15 +114,15 @@ export default function ProposalManagement() {
     queryKey: ['/api/proposals'],
   });
 
-  // Extract proposals array from paginated response
-  const proposals = proposalsResponse?.proposals ?? [];
+  // Extract proposals array from paginated response with defensive coding
+  const proposals = Array.isArray(proposalsResponse?.proposals) ? proposalsResponse.proposals : [];
 
   const { data: leadsResponse } = useQuery<LeadApiResponse>({
     queryKey: ['/api/leads'],
   });
 
-  // Extract leads array from paginated response
-  const leads = leadsResponse?.leads ?? [];
+  // Extract leads array from paginated response with defensive coding
+  const leads = Array.isArray(leadsResponse?.leads) ? leadsResponse.leads : [];
 
   const { data: services = [] } = useQuery<ServiceOption[]>({
     queryKey: ['/api/services'],

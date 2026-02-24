@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -218,6 +218,19 @@ const isPublicRoute = (path: string) =>
 const AppContent = () => {
   const [location, setLocation] = useLocation();
   const { user, isAuthenticated, isLoading } = useAuth();
+  const lastRedirectTime = useRef<number>(0);
+  const [authStable, setAuthStable] = useState(false);
+
+  // Stabilize auth state - wait for initial load to complete
+  useEffect(() => {
+    if (!isLoading) {
+      // Add a small delay to ensure auth state is stable
+      const timer = setTimeout(() => {
+        setAuthStable(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
 
   // Scroll to top and focus main content on route change
   useEffect(() => {
@@ -231,9 +244,16 @@ const AppContent = () => {
     }
   }, [location]);
 
-  // PRODUCTION READY: Full route protection enabled
+  // PRODUCTION READY: Full route protection enabled with loop prevention
   useEffect(() => {
-    if (isLoading) {
+    // Wait for auth state to be stable
+    if (isLoading || !authStable) {
+      return;
+    }
+
+    // Prevent rapid redirects (debounce 500ms)
+    const now = Date.now();
+    if (now - lastRedirectTime.current < 500) {
       return;
     }
 
@@ -241,7 +261,11 @@ const AppContent = () => {
 
     // Redirect unauthenticated users to login for protected routes
     if (!isAuthenticated && !isPublic) {
-      sessionStorage.setItem('redirectAfterLogin', location);
+      // Don't save /login as redirect target
+      if (location !== '/login') {
+        sessionStorage.setItem('redirectAfterLogin', location);
+      }
+      lastRedirectTime.current = now;
       setLocation('/login');
       return;
     }
@@ -251,8 +275,10 @@ const AppContent = () => {
       // Redirect away from auth pages to dashboard
       if (['/login', '/signin', '/select-role', '/role-selection'].includes(location)) {
         const redirectUrl = sessionStorage.getItem('redirectAfterLogin');
-        if (redirectUrl && canAccessRoute(user.role, redirectUrl)) {
-          sessionStorage.removeItem('redirectAfterLogin');
+        sessionStorage.removeItem('redirectAfterLogin'); // Always clear to prevent stale redirects
+
+        lastRedirectTime.current = now;
+        if (redirectUrl && redirectUrl !== '/login' && canAccessRoute(user.role, redirectUrl)) {
           setLocation(redirectUrl);
         } else {
           setLocation(getRoleDashboardRoute(user.role));
@@ -263,10 +289,11 @@ const AppContent = () => {
       // Redirect users who don't have access to the current route
       if (!isPublic && !canAccessRoute(user.role, location)) {
         console.warn(`[RBAC] Access denied for role "${user.role}" to route "${location}"`);
+        lastRedirectTime.current = now;
         setLocation(getRoleDashboardRoute(user.role));
       }
     }
-  }, [isAuthenticated, isLoading, location, setLocation, user]);
+  }, [isAuthenticated, isLoading, authStable, location, setLocation, user]);
 
   // Show loading state for protected routes while auth is being checked
   const showAuthLoading = isLoading && !isPublicRoute(location);

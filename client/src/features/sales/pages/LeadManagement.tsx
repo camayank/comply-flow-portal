@@ -139,8 +139,8 @@ export default function LeadManagement() {
     queryKey: ['/api/leads', filterStage],
   });
 
-  // Extract leads array from paginated response
-  const leads = leadsResponse?.leads ?? [];
+  // Extract leads array from paginated response with defensive coding
+  const leads = Array.isArray(leadsResponse?.leads) ? leadsResponse.leads : [];
 
   const { data: leadStatsResponse } = useQuery<{ stageDistribution: Record<string, number>; totalLeads: number; recentLeads: number; conversionRate: number }>({
     queryKey: ['/api/stats/dashboard'],
