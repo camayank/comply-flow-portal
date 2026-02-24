@@ -8,7 +8,7 @@ import { requireAuth } from "./auth-middleware";
 import { EnhancedSlaSystem, SlaMonitoringService } from "./enhanced-sla-system";
 import { WorkflowValidator, WorkflowExecutor } from "./workflow-validator";
 import {
-  insertServiceRequestSchema,
+  createServiceRequestApiSchema,
   insertPaymentSchema,
   type Service,
   leads as leadsTable,
@@ -80,7 +80,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SECURITY: Clients can only create for themselves, ops/admin can create for any client
   app.post("/api/service-requests", sessionAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const validatedData = insertServiceRequestSchema.parse(req.body);
+      const validatedData = createServiceRequestApiSchema.parse(req.body);
 
       // Verify role-based access and ownership
       const userRole = req.user?.role || req.user?.roles?.[0];
@@ -124,6 +124,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ? validatedData.serviceId[0]
           : validatedData.serviceId;
         await setSLADeadline(serviceRequest.id, serviceId);
+
+        // AUTO-TASK INSTANTIATION: Create workflow tasks for this order
+        try {
+          const { taskInstantiationService } = await import('./services/task-instantiation-service');
+          const taskResult = await taskInstantiationService.instantiateTasksForOrder(
+            serviceRequest.id,
+            serviceId // Use service ID as workflow template ID
+          );
+
+          if (taskResult.success) {
+            console.log(`✅ Auto-created ${taskResult.tasksCreated} tasks for SR ${serviceRequest.id}`);
+          } else {
+            console.warn(`⚠️ Task instantiation had errors for SR ${serviceRequest.id}:`, taskResult.errors);
+          }
+        } catch (taskError) {
+          // Don't fail the request if task creation fails - log and continue
+          console.error(`⚠️ Task instantiation failed for SR ${serviceRequest.id}:`, taskError);
+        }
 
         // Fetch updated service request with SLA
         const updatedRequest = await storage.getServiceRequest(serviceRequest.id);
@@ -2356,10 +2374,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { registerOperationsRoutes } = await import('./operations-routes');
   registerOperationsRoutes(app);
   
+  // Register QC routes for Quality Control and Delivery System (BEFORE leads/proposals routers)
+  const { registerQCRoutes } = await import('./qc-routes');
+  registerQCRoutes(app);
+
+  // Register Delivery routes for Client Delivery Confirmation
+  const { registerDeliveryRoutes } = await import('./delivery-routes');
+  registerDeliveryRoutes(app);
+
+  // Register Task routes for Auto-Task Instantiation System
+  const { registerTaskRoutes } = await import('./task-routes');
+  const requireQCAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.QC_EXECUTIVE)] as const;
+  registerTaskRoutes(app, [sessionAuthMiddleware], requireOpsAccess as any, requireQCAccess as any);
+
   // Register client portal routes
   const { registerClientRoutes } = await import('./client-routes');
   registerClientRoutes(app);
-  
+
   // Register leads management routes for Practice Management System
   const { registerLeadsRoutes } = await import('./leads-routes');
   registerLeadsRoutes(app);
@@ -2393,14 +2424,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register proposal management routes for Sales Proposal System
   registerProposalRoutes(app);
-
-  // Register QC routes for Quality Control and Delivery System
-  const { registerQCRoutes } = await import('./qc-routes');
-  registerQCRoutes(app);
-
-  // Register Delivery routes for Client Delivery Confirmation
-  const { registerDeliveryRoutes } = await import('./delivery-routes');
-  registerDeliveryRoutes(app);
 
   // Register HR Management routes for Human Resources System
   const { registerHRRoutes } = await import('./hr-routes');

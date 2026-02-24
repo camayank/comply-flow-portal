@@ -1205,6 +1205,12 @@ export const insertServiceRequestSchema = createInsertSchema(serviceRequests).om
   updatedAt: true,
 });
 
+// API request schema - totalAmount and status are set server-side
+export const createServiceRequestApiSchema = insertServiceRequestSchema.extend({
+  totalAmount: z.number().optional(),
+  status: z.string().optional(),
+});
+
 export const insertPaymentSchema = createInsertSchema(payments).omit({
   id: true,
   createdAt: true,

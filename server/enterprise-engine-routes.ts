@@ -356,7 +356,7 @@ router.get('/blueprints/code/:code', async (req: Request, res: Response) => {
 // SECURITY: Requires admin role to create blueprints
 router.post('/blueprints', requireAdmin, async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
     const createdBy = (req as any).user?.id || 'system';
 
     const data = createBlueprintSchema.parse(req.body);
@@ -842,7 +842,7 @@ router.delete('/blueprints/:blueprintId/compliance-rules/:ruleId', async (req: R
 router.post('/blueprints/:blueprintId/subscriptions', async (req: Request, res: Response) => {
   try {
     const { blueprintId } = req.params;
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
     const createdBy = (req as any).user?.id;
 
     const data = subscribeClientSchema.parse(req.body);
@@ -905,7 +905,7 @@ router.post('/subscriptions/:subscriptionId/cancel', async (req: Request, res: R
 // Get upcoming deadlines
 router.get('/calendar/upcoming', async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
     const { daysAhead = '30', clientId } = req.query;
 
     const deadlines = await complianceCalendarService.getUpcomingDeadlines(
@@ -924,7 +924,7 @@ router.get('/calendar/upcoming', async (req: Request, res: Response) => {
 // Get overdue deadlines
 router.get('/calendar/overdue', async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
     const { clientId } = req.query;
 
     const overdue = await complianceCalendarService.getOverdueDeadlines(
@@ -963,7 +963,7 @@ router.get('/calendar/client/:clientId', async (req: Request, res: Response) => 
 // Generate calendar for client
 router.post('/calendar/generate', async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
     const data = generateCalendarSchema.parse(req.body);
 
     const entries = await complianceCalendarService.generateCalendarForBlueprints({
@@ -1091,7 +1091,7 @@ router.post('/calendar/:entryId/extension', async (req: Request, res: Response) 
 // Get dashboard stats
 router.get('/calendar/dashboard', async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
     const { fiscalYear } = req.query;
 
     const stats = await complianceCalendarService.getDashboardStats(
@@ -1567,7 +1567,7 @@ router.get('/jurisdictions/:jurisdictionId/pt-rates', async (req: Request, res: 
 // Get custom field definitions
 router.get('/custom-fields', async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
     const { entityType, search, includeInactive } = req.query;
 
     let conditions = [eq(customFieldDefinitions.tenantId, tenantId)];
@@ -1624,7 +1624,7 @@ router.get('/custom-fields/:id', async (req: Request, res: Response) => {
 // Create custom field definition
 router.post('/custom-fields', async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
     const createdBy = (req as any).user?.id;
 
     const data = createCustomFieldSchema.parse(req.body);
@@ -1718,7 +1718,7 @@ router.delete('/custom-fields/:id', async (req: Request, res: Response) => {
 router.get('/custom-fields/values/:entityType/:entityId', async (req: Request, res: Response) => {
   try {
     const { entityType, entityId } = req.params;
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
 
     const values = await db
       .select({
@@ -1822,7 +1822,7 @@ router.get('/custom-fields/values/:valueId/history', async (req: Request, res: R
 // Get automation rules
 router.get('/automation-rules', async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
     const { triggerEntity, triggerType, isActive } = req.query;
 
     let conditions = [eq(automationRules.tenantId, tenantId)];
@@ -1874,7 +1874,7 @@ router.get('/automation-rules/:id', async (req: Request, res: Response) => {
 // Create automation rule
 router.post('/automation-rules', async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
     const createdBy = (req as any).user?.id;
 
     const data = createAutomationRuleSchema.parse(req.body);
@@ -2042,7 +2042,7 @@ router.post('/ai/extraction-templates', async (req: Request, res: Response) => {
 // Get AI predictions
 router.get('/ai/predictions', async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
     const { entityType, entityId, predictionType, limit = '50' } = req.query;
 
     let conditions = [eq(aiPredictions.tenantId, tenantId)];
@@ -2074,7 +2074,7 @@ router.get('/ai/predictions', async (req: Request, res: Response) => {
 // Get smart recommendations
 router.get('/ai/recommendations', async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
     const { entityType, entityId, category, status } = req.query;
 
     let conditions = [eq(smartRecommendations.tenantId, tenantId)];
@@ -2168,7 +2168,7 @@ router.post('/ai/recommendations/:id/accept', async (req: Request, res: Response
 // Get page layouts
 router.get('/page-layouts', async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
     const { entityType, layoutType, isActive } = req.query;
 
     let conditions = [eq(pageLayouts.tenantId, tenantId)];
@@ -2199,7 +2199,7 @@ router.get('/page-layouts', async (req: Request, res: Response) => {
 // Create page layout
 router.post('/page-layouts', async (req: Request, res: Response) => {
   try {
-    const tenantId = (req as any).user?.tenantId || 'default';
+    const tenantId = (req as any).user?.tenantId || null;
     const createdBy = (req as any).user?.id || 'system';
 
     const {
