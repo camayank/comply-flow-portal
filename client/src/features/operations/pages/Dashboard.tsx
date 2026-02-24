@@ -126,9 +126,10 @@ const MobileOperationsPanelRefactored = () => {
   };
 
   // Fetch operations dashboard data
+  // Note: The API returns data directly (not wrapped in { data: ... })
   const statsQuery = useStandardQuery<DashboardStats>({
     queryKey: ['/api/ops/dashboard-stats'],
-    queryFn: () => get<{ data: DashboardStats }>('/api/ops/dashboard-stats').then(res => res.data),
+    queryFn: () => get<DashboardStats>('/api/ops/dashboard-stats'),
   });
 
   // Fetch task data from new task API
@@ -146,23 +147,31 @@ const MobileOperationsPanelRefactored = () => {
     });
   };
 
-  // Main navigation - routes to other Operations screens
-  const navigation = [
+  // Role-based navigation - ops_manager sees Team Assignment, ops_executive doesn't
+  const isManager = authUser?.role === 'ops_manager' || authUser?.role === 'admin' || authUser?.role === 'super_admin';
+
+  const baseNavigation = [
     { label: 'Dashboard', href: '/operations', icon: BarChart3 },
     { label: 'Work Queue', href: '/work-queue', icon: ListTodo },
     { label: 'Document Review', href: '/ops/document-review', icon: FileSearch },
     { label: 'Escalations', href: '/escalations', icon: AlertTriangle },
     { label: 'Service Requests', href: '/ops/service-requests', icon: FileText },
-    { label: 'Team Performance', href: '/operations/team', icon: Users },
   ];
+
+  // Manager-only navigation items
+  const managerNavigation = [
+    ...baseNavigation,
+    { label: 'Team Assignment', href: '/ops/team-assignment', icon: Users },
+    { label: 'Team Performance', href: '/operations/team', icon: BarChart3 },
+  ];
+
+  const navigation = isManager ? managerNavigation : baseNavigation;
 
   return (
     <DashboardLayout
       title="Operations"
       navigation={navigation}
       user={user}
-      profileHref="/operations/profile"
-      settingsHref="/operations/settings"
     >
       <div className="space-y-6 p-4 lg:p-6">
         <div>

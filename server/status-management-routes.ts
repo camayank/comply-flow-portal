@@ -20,7 +20,12 @@ const router = Router();
 // ============================================================================
 // UNIFIED STATUS MANAGEMENT ROUTES
 // Admin routes for configuring workflow statuses per service
+// SECURITY: All routes require admin authentication
 // ============================================================================
+
+// Apply authentication and admin role to all status management routes
+router.use(sessionAuthMiddleware);
+router.use(requireMinimumRole(USER_ROLES.OPS_MANAGER));
 
 // ============================================================================
 // WORKFLOW STATUS CRUD
@@ -178,8 +183,8 @@ router.post('/services/:serviceKey/statuses', async (req: Request, res: Response
   }
 });
 
-// Update a workflow status
-router.put('/statuses/:statusId', async (req: Request, res: Response) => {
+// Update a workflow status (supports both PUT and PATCH for compatibility)
+router.patch('/statuses/:statusId', async (req: Request, res: Response) => {
   try {
     const { statusId } = req.params;
     const updateData = req.body;
