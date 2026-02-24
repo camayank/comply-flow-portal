@@ -14,7 +14,7 @@ export function useWorkflowSteps(blueprintId: string) {
     queryKey,
     queryFn: async () => {
       const response = await fetch(
-        `/api/enterprise/blueprints/${blueprintId}/workflow-steps`,
+        `/api/v2/enterprise/blueprints/${blueprintId}/workflow-steps`,
         { credentials: 'include' }
       );
       if (!response.ok) throw new Error('Failed to fetch workflow steps');
@@ -28,7 +28,7 @@ export function useWorkflowSteps(blueprintId: string) {
   const createMutation = useMutation({
     mutationFn: async (formData: WorkflowStepFormData) => {
       const response = await fetch(
-        `/api/enterprise/blueprints/${blueprintId}/workflow-steps`,
+        `/api/v2/enterprise/blueprints/${blueprintId}/workflow-steps`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -52,7 +52,7 @@ export function useWorkflowSteps(blueprintId: string) {
   const updateMutation = useMutation({
     mutationFn: async ({ stepId, data }: { stepId: string; data: Partial<WorkflowStepFormData> }) => {
       const response = await fetch(
-        `/api/enterprise/blueprints/${blueprintId}/workflow-steps/${stepId}`,
+        `/api/v2/enterprise/blueprints/${blueprintId}/workflow-steps/${stepId}`,
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -76,7 +76,7 @@ export function useWorkflowSteps(blueprintId: string) {
   const deleteMutation = useMutation({
     mutationFn: async (stepId: string) => {
       const response = await fetch(
-        `/api/enterprise/blueprints/${blueprintId}/workflow-steps/${stepId}`,
+        `/api/v2/enterprise/blueprints/${blueprintId}/workflow-steps/${stepId}`,
         {
           method: 'DELETE',
           credentials: 'include',
