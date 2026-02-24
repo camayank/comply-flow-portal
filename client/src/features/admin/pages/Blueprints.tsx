@@ -89,6 +89,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import { WorkflowStepEditor } from '../components/WorkflowStepEditor';
 import {
   FileText,
   Plus,
@@ -1497,6 +1498,7 @@ export default function BlueprintManagement() {
 
         {/* Workflows Tab */}
         <TabsContent value="workflows" className="space-y-4">
+          {/* Blueprint Selector */}
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -1506,139 +1508,35 @@ export default function BlueprintManagement() {
                     Define the step-by-step process for each service blueprint
                   </CardDescription>
                 </div>
-                <div className="flex items-center gap-4">
-                  <Select value={workflowBlueprintId} onValueChange={setWorkflowBlueprintId}>
-                    <SelectTrigger className="w-[300px]">
-                      <SelectValue placeholder="Select a blueprint" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {blueprints.map((bp: Blueprint) => (
-                        <SelectItem key={bp.id} value={bp.id}>
-                          {bp.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {workflowBlueprintId && (
-                    <Button onClick={() => {
-                      resetWorkflowStepForm();
-                      setEditingWorkflowStep(null);
-                      setIsWorkflowStepDialogOpen(true);
-                    }}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Step
-                    </Button>
-                  )}
-                </div>
+                <Select value={workflowBlueprintId} onValueChange={setWorkflowBlueprintId}>
+                  <SelectTrigger className="w-[300px]">
+                    <SelectValue placeholder="Select a blueprint" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {blueprints.map((bp: Blueprint) => (
+                      <SelectItem key={bp.id} value={bp.id}>
+                        {bp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </CardHeader>
-            <CardContent>
-              {!workflowBlueprintId ? (
-                <div className="text-center py-8">
-                  <Workflow className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground">
-                    Select a blueprint to view and manage its workflow steps
-                  </p>
-                </div>
-              ) : loadingWorkflowSteps ? (
-                <div className="text-center py-8">
-                  <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2" />
-                  Loading workflow steps...
-                </div>
-              ) : workflowSteps.length === 0 ? (
-                <div className="text-center py-8">
-                  <Workflow className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground mb-4">No workflow steps defined</p>
-                  <Button variant="outline" onClick={() => {
-                    resetWorkflowStepForm();
-                    setEditingWorkflowStep(null);
-                    setIsWorkflowStepDialogOpen(true);
-                  }}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add first step
-                  </Button>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">#</TableHead>
-                      <TableHead>Step</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead>Assignee</TableHead>
-                      <TableHead>Client Facing</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {workflowSteps.sort((a, b) => a.sequence - b.sequence).map((step) => (
-                      <TableRow key={step.id}>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <GripVertical className="h-4 w-4 text-muted-foreground" />
-                            <span>{step.sequence}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <div className="font-medium">{step.stepName}</div>
-                            <div className="text-sm text-muted-foreground">{step.stepCode}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {STEP_TYPES.find(t => t.value === step.stepType)?.label || step.stepType}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {step.estimatedMinutes ? `${step.estimatedMinutes} min` : '-'}
-                        </TableCell>
-                        <TableCell>{step.assigneeRole || '-'}</TableCell>
-                        <TableCell>
-                          {step.isClientFacing ? (
-                            <Badge variant="default">Yes</Badge>
-                          ) : (
-                            <Badge variant="secondary">No</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEditWorkflowStep(step)}>
-                                <Edit2 className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => {
-                                  if (confirm('Delete this workflow step?')) {
-                                    deleteWorkflowStepMutation.mutate({
-                                      blueprintId: workflowBlueprintId,
-                                      stepId: step.id,
-                                    });
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
           </Card>
+
+          {/* Workflow Step Editor */}
+          {!workflowBlueprintId ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <Workflow className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                <p className="text-muted-foreground">
+                  Select a blueprint from the dropdown above to manage its workflow steps
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <WorkflowStepEditor blueprintId={workflowBlueprintId} />
+          )}
         </TabsContent>
 
         {/* Pricing Tab */}

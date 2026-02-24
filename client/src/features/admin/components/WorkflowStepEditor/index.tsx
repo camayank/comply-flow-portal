@@ -177,5 +177,4 @@ export function WorkflowStepEditor({ blueprintId }: WorkflowStepEditorProps) {
   );
 }
 
-export { WorkflowStepEditor };
 export type { WorkflowStepEditorProps };
