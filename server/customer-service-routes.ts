@@ -2,6 +2,12 @@ import { Router, Request, Response } from 'express';
 import { db } from './db';
 import { requireAuth } from './auth-middleware';
 import {
+  sessionAuthMiddleware,
+  requireMinimumRole,
+  USER_ROLES,
+  type AuthenticatedRequest
+} from './rbac-middleware';
+import {
   supportTickets,
   responseTemplates,
   ticketMessages,
@@ -17,12 +23,15 @@ import { parseIdParam } from './middleware/id-validator';
 
 const router = Router();
 
+// Middleware for customer service access - requires customer_service role or higher
+const requireCSAccess = [sessionAuthMiddleware, requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE)] as const;
+
 // Use centralized ID generator for ticket numbers
 async function generateTicketNumber(): Promise<string> {
   return generateTicketId();
 }
 
-router.get('/stats', async (req: Request, res: Response) => {
+router.get('/stats', ...requireCSAccess, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const openTickets = await db.select({ count: count() })
       .from(supportTickets)
@@ -66,7 +75,7 @@ router.get('/stats', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/tickets', async (req: Request, res: Response) => {
+router.get('/tickets', ...requireCSAccess, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { status, priority, assignedTo } = req.query;
     
@@ -105,7 +114,7 @@ router.get('/tickets', async (req: Request, res: Response) => {
 });
 
 // Supports both numeric ID and readable ID (TKT26000001)
-router.get('/tickets/:id', async (req: Request, res: Response) => {
+router.get('/tickets/:id', ...requireCSAccess, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const parsed = parseIdParam(req.params.id);
     let ticketId: number;
@@ -144,7 +153,7 @@ router.get('/tickets/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/tickets', async (req: Request, res: Response) => {
+router.post('/tickets', ...requireCSAccess, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const ticketNumber = await generateTicketNumber();
     
@@ -176,7 +185,7 @@ router.post('/tickets', async (req: Request, res: Response) => {
 });
 
 // Supports both numeric ID and readable ID (TKT26000001)
-router.patch('/tickets/:id', async (req: Request, res: Response) => {
+router.patch('/tickets/:id', ...requireCSAccess, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const parsed = parseIdParam(req.params.id);
     let ticketId: number;
@@ -223,7 +232,7 @@ router.patch('/tickets/:id', async (req: Request, res: Response) => {
 });
 
 // Supports both numeric ID and readable ID (TKT26000001)
-router.post('/tickets/:id/assign', requireAuth, async (req: Request, res: Response) => {
+router.post('/tickets/:id/assign', ...requireCSAccess, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const parsed = parseIdParam(req.params.id);
     let ticketId: number;
@@ -277,7 +286,7 @@ router.post('/tickets/:id/assign', requireAuth, async (req: Request, res: Respon
 });
 
 // Supports both numeric ID and readable ID (TKT26000001)
-router.post('/tickets/:id/messages', requireAuth, async (req: Request, res: Response) => {
+router.post('/tickets/:id/messages', ...requireCSAccess, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const parsed = parseIdParam(req.params.id);
     let ticketId: number;
@@ -326,10 +335,72 @@ router.post('/tickets/:id/messages', requireAuth, async (req: Request, res: Resp
   }
 });
 
-router.get('/templates', async (req: Request, res: Response) => {
+router.get('/templates', ...requireCSAccess, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { category } = req.query;
-    
+
+    // Check if templates exist, if not seed defaults
+    const existingCount = await db.select({ count: sql<number>`count(*)::int` })
+      .from(responseTemplates);
+
+    if (existingCount[0]?.count === 0) {
+      // Seed default templates
+      const defaultTemplates = [
+        {
+          templateCode: 'WELCOME_MESSAGE',
+          title: 'Welcome Message',
+          category: 'greeting',
+          subject: 'Welcome to DigiComply!',
+          body: `Dear {{client_name}},\n\nThank you for reaching out to DigiComply. We're here to help you with your compliance needs.\n\nI've reviewed your inquiry and will assist you further. Please let me know if you have any additional questions.\n\nBest regards,\n{{agent_name}}\nCustomer Success Team`,
+          variables: ['client_name', 'agent_name'],
+          isActive: true,
+          usageCount: 0,
+        },
+        {
+          templateCode: 'DOC_REQUEST',
+          title: 'Document Request',
+          category: 'document',
+          subject: 'Documents Required for Your Service Request',
+          body: `Dear {{client_name}},\n\nTo proceed with your {{service_name}} request, we need the following documents:\n\n{{document_list}}\n\nPlease upload these documents through your portal or reply to this email with the attachments.\n\nBest regards,\n{{agent_name}}`,
+          variables: ['client_name', 'service_name', 'document_list', 'agent_name'],
+          isActive: true,
+          usageCount: 0,
+        },
+        {
+          templateCode: 'SERVICE_UPDATE',
+          title: 'Service Update',
+          category: 'update',
+          subject: 'Update on Your {{service_name}} Request',
+          body: `Dear {{client_name}},\n\nI wanted to provide you with an update on your {{service_name}} request.\n\nCurrent Status: {{status}}\nProgress: {{progress}}%\n\nIf you have any questions, please don't hesitate to reach out.\n\nBest regards,\n{{agent_name}}`,
+          variables: ['client_name', 'service_name', 'status', 'progress', 'agent_name'],
+          isActive: true,
+          usageCount: 0,
+        },
+        {
+          templateCode: 'PAYMENT_REMINDER',
+          title: 'Payment Reminder',
+          category: 'payment',
+          subject: 'Payment Reminder for {{service_name}}',
+          body: `Dear {{client_name}},\n\nThis is a friendly reminder that payment of {{amount}} is due for your {{service_name}} service.\n\nPlease complete the payment through your portal to avoid any delays.\n\nBest regards,\n{{agent_name}}`,
+          variables: ['client_name', 'service_name', 'amount', 'agent_name'],
+          isActive: true,
+          usageCount: 0,
+        },
+        {
+          templateCode: 'COMPLETION_NOTICE',
+          title: 'Service Completion Notice',
+          category: 'completion',
+          subject: 'Your {{service_name}} Has Been Completed',
+          body: `Dear {{client_name}},\n\nWe're pleased to inform you that your {{service_name}} request has been successfully completed.\n\nYou can download the final documents from your portal.\n\nThank you for choosing DigiComply!\n\nBest regards,\n{{agent_name}}`,
+          variables: ['client_name', 'service_name', 'agent_name'],
+          isActive: true,
+          usageCount: 0,
+        },
+      ];
+
+      await db.insert(responseTemplates).values(defaultTemplates);
+    }
+
     const conditions = [eq(responseTemplates.isActive, true)];
     if (category) {
       conditions.push(eq(responseTemplates.category, category as string));
@@ -347,7 +418,7 @@ router.get('/templates', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/templates', requireAuth, async (req: Request, res: Response) => {
+router.post('/templates', ...requireCSAccess, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const validatedData = insertResponseTemplateSchema.parse({
       ...req.body,
@@ -365,7 +436,7 @@ router.post('/templates', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/templates/:id', async (req: Request, res: Response) => {
+router.patch('/templates/:id', ...requireCSAccess, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const templateId = parseInt(req.params.id);
     const updates = { ...req.body, updatedAt: new Date() };
@@ -420,7 +491,7 @@ router.post('/tickets/:id/satisfaction', async (req: Request, res: Response) => 
   }
 });
 
-router.get('/satisfaction-stats', async (req: Request, res: Response) => {
+router.get('/satisfaction-stats', ...requireCSAccess, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const avgRating = await db.select({
       avg: sql<number>`AVG(${supportTickets.satisfactionRating})`
@@ -451,7 +522,7 @@ router.get('/satisfaction-stats', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/cs-team', async (req: Request, res: Response) => {
+router.get('/cs-team', ...requireCSAccess, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const csTeam = await db.select({
       id: users.id,

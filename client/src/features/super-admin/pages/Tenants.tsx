@@ -82,7 +82,7 @@ export default function TenantManagement() {
   });
 
   // Fetch tenants
-  const { data: tenants = [], isLoading } = useQuery<Tenant[]>({
+  const { data: tenantsResponse, isLoading } = useQuery<{ tenants: Tenant[]; total: number }>({
     queryKey: [
       "super-admin-tenants",
       searchQuery,
@@ -96,19 +96,20 @@ export default function TenantManagement() {
         params.append("status", statusFilter);
       if (planFilter && planFilter !== "all")
         params.append("plan", planFilter);
-      const response = await apiRequest(
+      return apiRequest<{ tenants: Tenant[]; total: number }>(
         "GET",
         `/api/super-admin/tenants?${params.toString()}`
       );
-      return response.json();
     },
   });
+
+  // Extract tenants array with defensive coding
+  const tenants = Array.isArray(tenantsResponse?.tenants) ? tenantsResponse.tenants : [];
 
   // Create tenant mutation
   const createTenantMutation = useMutation({
     mutationFn: async (data: TenantFormData) => {
-      const response = await apiRequest("POST", "/api/super-admin/tenants", data);
-      return response.json();
+      return apiRequest<Tenant>("POST", "/api/super-admin/tenants", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["super-admin-tenants"] });
@@ -131,12 +132,11 @@ export default function TenantManagement() {
   // Update tenant mutation
   const updateTenantMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: TenantFormData }) => {
-      const response = await apiRequest(
+      return apiRequest<Tenant>(
         "PUT",
         `/api/super-admin/tenants/${id}`,
         data
       );
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["super-admin-tenants"] });
@@ -160,11 +160,10 @@ export default function TenantManagement() {
   // Suspend tenant mutation
   const suspendMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest(
+      return apiRequest<Tenant>(
         "POST",
         `/api/super-admin/tenants/${id}/suspend`
       );
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["super-admin-tenants"] });
@@ -185,11 +184,10 @@ export default function TenantManagement() {
   // Activate tenant mutation
   const activateMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest(
+      return apiRequest<Tenant>(
         "POST",
         `/api/super-admin/tenants/${id}/activate`
       );
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["super-admin-tenants"] });

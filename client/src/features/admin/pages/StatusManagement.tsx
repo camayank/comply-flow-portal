@@ -150,9 +150,13 @@ export default function StatusManagement() {
       const response = await fetch(`/api/status-management/services/${selectedService}/statuses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(newStatus),
       });
-      if (!response.ok) throw new Error('Failed to create status');
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to create status' }));
+        throw new Error(error.error || 'Failed to create status');
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -171,9 +175,13 @@ export default function StatusManagement() {
       const response = await fetch(`/api/status-management/statuses/${status.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(status),
       });
-      if (!response.ok) throw new Error('Failed to update status');
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to update status' }));
+        throw new Error(error.error || 'Failed to update status');
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -191,8 +199,12 @@ export default function StatusManagement() {
     mutationFn: async (statusId: number) => {
       const response = await fetch(`/api/status-management/statuses/${statusId}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
-      if (!response.ok) throw new Error('Failed to delete status');
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to delete status' }));
+        throw new Error(error.error || 'Failed to delete status');
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -209,8 +221,12 @@ export default function StatusManagement() {
     mutationFn: async (serviceKey: string) => {
       const response = await fetch(`/api/status-management/services/${serviceKey}/initialize-defaults`, {
         method: 'POST',
+        credentials: 'include',
       });
-      if (!response.ok) throw new Error('Failed to initialize defaults');
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to initialize defaults' }));
+        throw new Error(error.error || 'Failed to initialize defaults');
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -228,8 +244,12 @@ export default function StatusManagement() {
     mutationFn: async ({ source, target }: { source: string; target: string }) => {
       const response = await fetch(`/api/status-management/services/${source}/copy-to/${target}`, {
         method: 'POST',
+        credentials: 'include',
       });
-      if (!response.ok) throw new Error('Failed to copy statuses');
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to copy statuses' }));
+        throw new Error(error.error || 'Failed to copy statuses');
+      }
       return response.json();
     },
     onSuccess: () => {
