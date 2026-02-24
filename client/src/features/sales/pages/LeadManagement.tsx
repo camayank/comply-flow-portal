@@ -53,6 +53,17 @@ interface LeadStats {
   conversionRate: number;
 }
 
+interface LeadApiResponse {
+  leads: Lead[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  stats: Record<string, number>;
+}
+
 interface UpdateLeadInput {
   id: number;
   stage: LeadStageKey;
@@ -124,13 +135,24 @@ export default function LeadManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: leads = [], isLoading } = useQuery<Lead[]>({
+  const { data: leadsResponse, isLoading } = useQuery<LeadApiResponse>({
     queryKey: ['/api/leads', filterStage],
   });
 
-  const { data: leadStats } = useQuery<LeadStats>({
-    queryKey: ['/api/leads/stats'],
+  // Extract leads array from paginated response
+  const leads = leadsResponse?.leads ?? [];
+
+  const { data: leadStatsResponse } = useQuery<{ stageDistribution: Record<string, number>; totalLeads: number; recentLeads: number; conversionRate: number }>({
+    queryKey: ['/api/stats/dashboard'],
   });
+
+  // Map the stats response to the expected format
+  const leadStats: LeadStats | undefined = leadStatsResponse ? {
+    total: leadStatsResponse.totalLeads,
+    hotLeads: (leadStatsResponse.stageDistribution?.hot_lead || 0),
+    converted: (leadStatsResponse.stageDistribution?.converted || 0),
+    conversionRate: leadStatsResponse.conversionRate
+  } : undefined;
 
   const createLeadMutation = useMutation({
     mutationFn: (data: CreateLeadInput) => apiRequest<Lead>('POST', '/api/leads', data),

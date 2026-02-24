@@ -82,19 +82,47 @@ interface ProposalCardProps {
   onClick?: () => void;
   onUpdate: (input: UpdateProposalInput) => void;
 }
+
+interface ProposalApiResponse {
+  proposals: Proposal[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  stats: Record<string, number>;
+}
+
+interface LeadApiResponse {
+  leads: LeadOption[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+  stats: Record<string, number>;
+}
 export default function ProposalManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: proposals = [], isLoading } = useQuery<Proposal[]>({
+  const { data: proposalsResponse, isLoading } = useQuery<ProposalApiResponse>({
     queryKey: ['/api/proposals'],
   });
 
-  const { data: leads = [] } = useQuery<LeadOption[]>({
+  // Extract proposals array from paginated response
+  const proposals = proposalsResponse?.proposals ?? [];
+
+  const { data: leadsResponse } = useQuery<LeadApiResponse>({
     queryKey: ['/api/leads'],
   });
+
+  // Extract leads array from paginated response
+  const leads = leadsResponse?.leads ?? [];
 
   const { data: services = [] } = useQuery<ServiceOption[]>({
     queryKey: ['/api/services'],

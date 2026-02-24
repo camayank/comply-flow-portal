@@ -33,11 +33,12 @@ import {
   type TaskExecution, type InsertTaskExecution,
   type ContentSearchIndex, type InsertContentSearchIndex,
   type EnhancedFaq, type InsertEnhancedFaq,
-  // Client contract, communication, portfolio, and invoice types
+  // Client contract, communication, portfolio, invoice, and business entity types
   type ClientContract, type InsertClientContract,
   type ClientCommunication, type InsertClientCommunication,
   type ClientPortfolio, type InsertClientPortfolio,
-  type Invoice, type InsertInvoice
+  type Invoice, type InsertInvoice,
+  type BusinessEntity, type InsertBusinessEntity
 } from "@shared/schema";
 import { db } from "./db";
 import { and, desc, eq, sql } from "drizzle-orm";
@@ -1194,8 +1195,12 @@ export class MemStorage implements IStorage {
   }
 
   // Payment methods
-  async getPayment(paymentId: string): Promise<Payment | undefined> {
-    return this.payments.get(paymentId);
+  async getPayment(id: number): Promise<Payment | undefined> {
+    // Find payment by numeric id
+    for (const payment of this.payments.values()) {
+      if (payment.id === id) return payment;
+    }
+    return undefined;
   }
 
   async createPayment(payment: InsertPayment): Promise<Payment> {
@@ -1213,16 +1218,24 @@ export class MemStorage implements IStorage {
     return fullPayment;
   }
 
-  async updatePayment(paymentId: string, updates: Partial<Payment>): Promise<Payment | undefined> {
-    const existing = this.payments.get(paymentId);
-    if (!existing) return undefined;
-    
+  async updatePayment(id: number, updates: Partial<Payment>): Promise<Payment | undefined> {
+    // Find payment by numeric id
+    let paymentKey: string | undefined;
+    for (const [key, payment] of this.payments.entries()) {
+      if (payment.id === id) {
+        paymentKey = key;
+        break;
+      }
+    }
+    if (!paymentKey) return undefined;
+
+    const existing = this.payments.get(paymentKey)!;
     const updated: Payment = {
       ...existing,
       ...updates,
       completedAt: updates.status === 'completed' ? new Date() : existing.completedAt,
     };
-    this.payments.set(paymentId, updated);
+    this.payments.set(paymentKey, updated);
     return updated;
   }
 

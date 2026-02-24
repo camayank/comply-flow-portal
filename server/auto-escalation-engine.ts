@@ -208,7 +208,6 @@ class AutoEscalationEngine extends EventEmitter {
         FROM service_requests sr
         LEFT JOIN business_entities be ON sr.entity_id = be.id
         WHERE sr.status NOT IN ('completed', 'cancelled', 'Completed', 'Cancelled')
-          AND sr.is_active = true
       `) as { rows: any[] };
 
       // Upsert each request into work queue

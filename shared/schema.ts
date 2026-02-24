@@ -921,6 +921,136 @@ export const deliveryConfirmations = pgTable("delivery_confirmations", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// ============================================================================
+// ORDER TASKS - Auto-instantiated workflow tasks for service requests
+// ============================================================================
+
+// Task status constants
+export const ORDER_TASK_STATUS = {
+  PENDING: 'pending',       // Not yet started, dependencies not met
+  BLOCKED: 'blocked',       // Has unmet dependencies
+  READY: 'ready',           // All dependencies met, ready to be picked up
+  IN_PROGRESS: 'in_progress', // Currently being worked on
+  QC_PENDING: 'qc_pending', // Submitted for QC review
+  QC_REJECTED: 'qc_rejected', // QC rejected, needs rework
+  COMPLETED: 'completed',   // Successfully completed
+  SKIPPED: 'skipped',       // Skipped (not applicable for this order)
+  CANCELLED: 'cancelled',   // Cancelled
+} as const;
+
+export const ORDER_TASK_TYPE = {
+  DOCUMENT_UPLOAD: 'document_upload',
+  DOCUMENT_REVIEW: 'document_review',
+  DATA_ENTRY: 'data_entry',
+  VERIFICATION: 'verification',
+  FILING: 'filing',
+  APPROVAL: 'approval',
+  PAYMENT: 'payment',
+  COMMUNICATION: 'communication',
+  DELIVERY: 'delivery',
+  QC_REVIEW: 'qc_review',
+} as const;
+
+// Order Tasks Table - Individual workflow step instances
+export const orderTasks = pgTable("order_tasks", {
+  id: serial("id").primaryKey(),
+  taskId: text("task_id").unique(), // TK26000001 - human-readable ID
+
+  // Parent references
+  serviceRequestId: integer("service_request_id").notNull(), // FK to service_requests.id
+  workflowTemplateId: text("workflow_template_id"), // Which template this came from
+
+  // Step information (from workflow template)
+  stepNumber: integer("step_number").notNull(), // Order of execution
+  stepId: text("step_id").notNull(), // Original step ID from template
+  name: text("name").notNull(),
+  description: text("description"),
+  taskType: text("task_type").notNull(), // document_upload, review, approval, filing, etc.
+
+  // Status management
+  status: text("status").notNull().default(ORDER_TASK_STATUS.PENDING),
+  statusReason: text("status_reason"), // Why it's in current status
+
+  // Assignment
+  assignedRole: text("assigned_role").notNull(), // ops_executive, qc_reviewer, etc.
+  assignedTo: integer("assigned_to"), // FK to users.id - null if unassigned
+  assignedAt: timestamp("assigned_at"),
+  assignmentNotes: text("assignment_notes"),
+
+  // Dependencies (array of task IDs this depends on)
+  dependsOn: json("depends_on").$type<number[]>().default([]),
+  blockedBy: json("blocked_by").$type<number[]>().default([]), // Currently unmet dependencies
+
+  // QC Integration
+  requiresQc: boolean("requires_qc").default(false),
+  qcReviewId: integer("qc_review_id"), // FK to quality_reviews.id when in QC
+  qcStatus: text("qc_status"), // pending, approved, rejected
+  qcNotes: text("qc_notes"),
+
+  // Timing
+  estimatedDuration: integer("estimated_duration"), // in hours
+  dueDate: timestamp("due_date"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+
+  // SLA tracking
+  slaDeadline: timestamp("sla_deadline"),
+  isOverdue: boolean("is_overdue").default(false),
+
+  // Work details
+  workNotes: text("work_notes"),
+  internalNotes: text("internal_notes"),
+  outputData: json("output_data"), // Task outputs (document IDs, form data, etc.)
+
+  // Rework tracking (for QC rejections)
+  reworkCount: integer("rework_count").default(0),
+  lastReworkReason: text("last_rework_reason"),
+
+  // Auto-assignment tracking
+  autoAssigned: boolean("auto_assigned").default(false),
+  assignmentAttempts: integer("assignment_attempts").default(0),
+
+  // Priority
+  priority: text("priority").default("medium"), // low, medium, high, urgent
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Order Task Activity Log - Track all status changes and actions for order tasks
+export const orderTaskActivityLog = pgTable("order_task_activity_log", {
+  id: serial("id").primaryKey(),
+  taskId: integer("task_id").notNull(), // FK to order_tasks.id
+
+  activityType: text("activity_type").notNull(), // status_change, assignment, qc_submit, qc_result, note_added, etc.
+  fromStatus: text("from_status"),
+  toStatus: text("to_status"),
+
+  performedBy: integer("performed_by"), // FK to users.id
+  performedAt: timestamp("performed_at").defaultNow(),
+
+  details: json("details"), // Additional context for this activity
+  notes: text("notes"),
+});
+
+// Insert schemas for order tasks
+export const insertOrderTaskSchema = createInsertSchema(orderTasks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertOrderTaskActivityLogSchema = createInsertSchema(orderTaskActivityLog).omit({
+  id: true,
+  performedAt: true,
+});
+
+// Type exports for order tasks
+export type OrderTask = typeof orderTasks.$inferSelect;
+export type InsertOrderTask = z.infer<typeof insertOrderTaskSchema>;
+export type OrderTaskActivityLog = typeof orderTaskActivityLog.$inferSelect;
+export type InsertOrderTaskActivityLog = z.infer<typeof insertOrderTaskActivityLogSchema>;
+
 // Quality Metrics and Analytics
 export const qualityMetrics = pgTable("quality_metrics", {
   id: serial("id").primaryKey(),

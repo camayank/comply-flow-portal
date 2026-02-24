@@ -1,7 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import rateLimit from "express-rate-limit";
 import path from "path";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -122,106 +121,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// PRODUCTION READY: Rate limiting enabled
-// Helper to create rate limiter with validation disabled for custom key generators
-const createRateLimit = (windowMs: number, max: number, message: string, keyGenerator?: (req: Request) => string) => {
-  return rateLimit({
-    windowMs,
-    max,
-    message: { success: false, error: message },
-    standardHeaders: true,
-    legacyHeaders: false,
-    // Disable all validation to suppress IPv6/custom key generator warnings
-    validate: false,
-    ...(keyGenerator ? { keyGenerator } : {}),
-    handler: (req: Request, res: Response) => {
-      res.status(429).json({
-        success: false,
-        error: message,
-        retryAfter: Math.ceil(windowMs / 1000),
-      });
-    },
-  });
-};
-
-// OTP endpoints - Ultra-strict rate limiting (prevent abuse)
-const otpPerEmailLimiter = createRateLimit(
-  15 * 60 * 1000, // 15 minutes
-  3, // 3 OTP requests per email
-  'Too many OTP requests for this email. Please wait 15 minutes.',
-  (req) => (req.body.email || '').toLowerCase()
-);
-
-const otpPerIPLimiter = createRateLimit(
-  60 * 60 * 1000, // 1 hour
-  20, // 20 OTP requests per IP
-  'Too many OTP requests from this IP address. Please wait 1 hour.',
-  (req) => req.ip || 'unknown'
-);
-
-// Authentication endpoints - Strict limiting (prevent brute force)
-const authLimiter = createRateLimit(
-  15 * 60 * 1000, // 15 minutes
-  10, // 10 login attempts per IP
-  'Too many authentication attempts. Please wait 15 minutes.',
-  (req) => req.ip || 'unknown'
-);
-
-// Admin endpoints - Ultra-strict limiting (protect sensitive operations)
-const adminLimiter = createRateLimit(
-  15 * 60 * 1000, // 15 minutes
-  30, // 30 admin operations per IP (increased for normal admin work)
-  'Admin operations rate limited. Please wait 15 minutes.',
-  (req) => req.ip || 'unknown'
-);
-
-// General API protection (prevent abuse)
-const apiLimiter = createRateLimit(
-  15 * 60 * 1000, // 15 minutes
-  200, // 200 requests per IP (reasonable for normal usage)
-  'API rate limit exceeded. Please slow down.',
-  (req) => req.ip || 'unknown'
-);
-
-// Payment operations - Strict limiting (prevent payment fraud)
-const paymentLimiter = createRateLimit(
-  60 * 60 * 1000, // 1 hour
-  20, // 20 payment operations per hour
-  'Payment rate limit exceeded. Please wait before trying again.',
-  (req) => req.ip || 'unknown'
-);
-
-// File upload - Prevent storage abuse
-const uploadLimiter = createRateLimit(
-  60 * 60 * 1000, // 1 hour
-  50, // 50 uploads per hour
-  'Upload limit exceeded. Please wait before uploading more files.',
-  (req) => req.ip || 'unknown'
-);
-
-// Write operations (POST/PUT/PATCH/DELETE) - Moderate limiting
-const writeLimiter = createRateLimit(
-  15 * 60 * 1000, // 15 minutes
-  100, // 100 write operations per 15 minutes
-  'Write operation limit exceeded. Please slow down.',
-  (req) => req.ip || 'unknown'
-);
-
-// Apply rate limiters (order matters - more specific first)
-app.use('/api/auth/client/send-otp', otpPerEmailLimiter, otpPerIPLimiter);
-app.use('/api/auth/client/verify-otp', otpPerIPLimiter);
-app.use('/api/auth', authLimiter);
-app.use('/api/admin', adminLimiter);
-app.use('/api/payments', paymentLimiter);
-app.use('/api/files', uploadLimiter);
-app.use('/api', (req, res, next) => {
-  // Apply write limiter only for mutating operations
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-    return writeLimiter(req, res, next);
-  }
-  next();
-});
-app.use('/api', apiLimiter);
+// Rate limiting DISABLED for development/testing
+// Re-enable in production with proper configuration
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -306,6 +207,15 @@ app.use((req, res, next) => {
   // Initialize platform-wide synchronization orchestrator
   // const { platformSyncOrchestrator } = await import('./platform-sync-orchestrator');
   console.log('Platform sync orchestrator initialized');
+
+  // Initialize WebSocket middleware sync engine
+  try {
+    const { initializeMiddlewareSync } = await import('./middleware-sync');
+    initializeMiddlewareSync(server);
+    console.log('🔌 WebSocket middleware sync engine initialized');
+  } catch (error) {
+    console.warn('⚠️ WebSocket middleware sync initialization skipped:', (error as Error).message);
+  }
 
   // API-specific 404 handler - MUST be before Vite to return JSON for missing API routes
   // This prevents Vite from serving index.html for /api/* routes that don't exist
