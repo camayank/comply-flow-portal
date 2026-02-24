@@ -42,12 +42,14 @@ export const STEP_TYPES = [
   { value: 'TASK', label: 'General Task' },
 ] as const;
 
-// Roles matching the backend TASK_TYPE_ROLE_MAP and operations_team roles
+// Roles matching USER_ROLES from server/rbac-middleware.ts
 export const ROLES = [
   { value: 'ops_executive', label: 'Operations Executive' },
-  { value: 'ops_lead', label: 'Operations Lead' },
-  { value: 'qc_reviewer', label: 'QC Reviewer' },
+  { value: 'ops_manager', label: 'Operations Manager' },
+  { value: 'qc_executive', label: 'QC Executive' },
+  { value: 'customer_service', label: 'Customer Service' },
   { value: 'admin', label: 'Admin' },
+  { value: 'super_admin', label: 'Super Admin' },
 ] as const;
 
 export const DEFAULT_FORM_DATA: WorkflowStepFormData = {
