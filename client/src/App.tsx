@@ -111,6 +111,8 @@ const OpsClientDashboard = lazy(() => import("@/features/operations/pages/Client
 const OpsTeamAssignment = lazy(() => import("@/features/operations/pages/TeamAssignment"));
 const OpsPerformanceMetrics = lazy(() => import("@/features/operations/pages/PerformanceMetrics"));
 const OpsClientCommunicationHub = lazy(() => import("@/features/operations/pages/CommunicationHub"));
+const OpsTasksView = lazy(() => import("@/features/operations/pages/TasksView"));
+const OpsTaskDetail = lazy(() => import("@/features/operations/pages/TaskDetail"));
 
 // --- Admin Pages ---
 const MobileAdminPanelRefactored = lazy(() => import("@/features/admin/pages/Dashboard"));
@@ -447,6 +449,10 @@ const AppContent = () => {
                 <Route path="/ops/performance-metrics" component={OpsPerformanceMetrics} />
                 <Route path="/ops/communications" component={OpsClientCommunicationHub} />
                 <Route path="/ops/communication-hub" component={OpsClientCommunicationHub} />
+                <Route path="/ops/tasks" component={OpsTasksView} />
+                <Route path="/ops/tasks/:taskId" component={OpsTaskDetail} />
+                <Route path="/operations/tasks" component={OpsTasksView} />
+                <Route path="/operations/tasks/:taskId" component={OpsTaskDetail} />
 
                 {/* ========== ADMIN ROUTES ========== */}
                 <Route path="/admin" component={MobileAdminPanelRefactored} />

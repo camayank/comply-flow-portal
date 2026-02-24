@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -22,6 +23,12 @@ import {
   Settings,
   Loader2,
   AlertCircle,
+  CheckCircle,
+  PlayCircle,
+  ClipboardCheck,
+  XCircle,
+  Timer,
+  ListTodo,
 } from 'lucide-react';
 import {
   FilingStatusCard,
@@ -29,6 +36,8 @@ import {
   SlaCard,
   InternalNotesTab,
 } from '@/components/ops';
+import { useOrderTasks, OrderTask } from '@/features/operations/hooks';
+import { format } from 'date-fns';
 
 export default function CaseDashboard() {
   const [, params] = useRoute('/ops/case/:id');
@@ -250,10 +259,7 @@ export default function CaseDashboard() {
           </CardHeader>
           <CardContent className="pt-4">
             <TabsContent value="timeline" className="mt-0">
-              <div className="text-center py-8 text-gray-500">
-                <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p className="text-sm">Timeline coming soon</p>
-              </div>
+              <TaskTimeline orderId={Number(caseId)} />
             </TabsContent>
 
             <TabsContent value="notes" className="mt-0">
@@ -292,5 +298,150 @@ export default function CaseDashboard() {
         </Tabs>
       </Card>
     </DashboardLayout>
+  );
+}
+
+// Task Timeline Component
+function TaskTimeline({ orderId }: { orderId: number }) {
+  const orderTasksQuery = useOrderTasks(orderId);
+
+  const getStatusConfig = (status: string) => {
+    const configs: Record<string, { icon: typeof CheckCircle; color: string; bgColor: string }> = {
+      completed: { icon: CheckCircle, color: 'text-green-600', bgColor: 'bg-green-100' },
+      in_progress: { icon: PlayCircle, color: 'text-yellow-600', bgColor: 'bg-yellow-100' },
+      ready: { icon: Clock, color: 'text-blue-600', bgColor: 'bg-blue-100' },
+      qc_pending: { icon: ClipboardCheck, color: 'text-purple-600', bgColor: 'bg-purple-100' },
+      qc_rejected: { icon: XCircle, color: 'text-red-600', bgColor: 'bg-red-100' },
+      blocked: { icon: Timer, color: 'text-gray-400', bgColor: 'bg-gray-100' },
+      skipped: { icon: XCircle, color: 'text-gray-400', bgColor: 'bg-gray-100' },
+      cancelled: { icon: XCircle, color: 'text-gray-400', bgColor: 'bg-gray-100' },
+    };
+    return configs[status] || configs.blocked;
+  };
+
+  if (orderTasksQuery.isLoading) {
+    return (
+      <div className="py-8 text-center text-gray-500">
+        <Loader2 className="h-8 w-8 mx-auto animate-spin mb-2" />
+        <p className="text-sm">Loading task timeline...</p>
+      </div>
+    );
+  }
+
+  if (orderTasksQuery.error || !orderTasksQuery.data?.tasks?.length) {
+    return (
+      <div className="py-8 text-center text-gray-500">
+        <ListTodo className="h-8 w-8 mx-auto mb-2 opacity-50" />
+        <p className="text-sm">No tasks found for this order</p>
+        <p className="text-xs mt-1">Tasks will appear here once they are created</p>
+      </div>
+    );
+  }
+
+  const { tasks, summary } = orderTasksQuery.data;
+
+  return (
+    <div className="space-y-6">
+      {/* Progress Overview */}
+      <div className="bg-gray-50 rounded-lg p-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-medium">Overall Progress</span>
+          <span className="text-sm font-bold">{summary.progressPercentage}%</span>
+        </div>
+        <Progress value={summary.progressPercentage} className="h-2" />
+        <div className="flex justify-between mt-2 text-xs text-gray-500">
+          <span>{summary.completed} of {summary.total} tasks completed</span>
+          <span>
+            {summary.inProgress > 0 && `${summary.inProgress} in progress`}
+            {summary.inProgress > 0 && summary.pending > 0 && ' • '}
+            {summary.pending > 0 && `${summary.pending} pending`}
+          </span>
+        </div>
+      </div>
+
+      {/* Task Timeline */}
+      <div className="relative">
+        {tasks.map((task, index) => {
+          const config = getStatusConfig(task.status);
+          const Icon = config.icon;
+          const isLast = index === tasks.length - 1;
+
+          return (
+            <div key={task.id} className="relative pb-8 last:pb-0">
+              {/* Vertical line */}
+              {!isLast && (
+                <span
+                  className={`absolute left-5 top-10 -ml-px h-full w-0.5 ${
+                    task.status === 'completed' ? 'bg-green-300' : 'bg-gray-200'
+                  }`}
+                  aria-hidden="true"
+                />
+              )}
+
+              <div className="relative flex items-start space-x-4">
+                {/* Status Icon */}
+                <div className={`relative flex h-10 w-10 items-center justify-center rounded-full ${config.bgColor}`}>
+                  <Icon className={`h-5 w-5 ${config.color}`} />
+                </div>
+
+                {/* Task Details */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        Step {task.stepNumber}: {task.name}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {task.assignedRole?.replace(/_/g, ' ')}
+                        {task.assignedToName && ` • ${task.assignedToName}`}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={`${config.bgColor} ${config.color} border-0 text-xs`}
+                    >
+                      {task.status.replace(/_/g, ' ')}
+                    </Badge>
+                  </div>
+
+                  {/* Timestamps */}
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                    {task.startedAt && (
+                      <span>Started: {format(new Date(task.startedAt), 'MMM d, h:mm a')}</span>
+                    )}
+                    {task.completedAt && (
+                      <span className="text-green-600">
+                        Completed: {format(new Date(task.completedAt), 'MMM d, h:mm a')}
+                      </span>
+                    )}
+                    {task.dueDate && !task.completedAt && (
+                      <span className={new Date(task.dueDate) < new Date() ? 'text-red-600' : ''}>
+                        Due: {format(new Date(task.dueDate), 'MMM d, h:mm a')}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* QC Rejection Notes */}
+                  {task.status === 'qc_rejected' && task.qcRejectionNotes && (
+                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                      <strong>QC Rejected:</strong> {task.qcRejectionNotes}
+                    </div>
+                  )}
+
+                  {/* View Task Link */}
+                  <div className="mt-2">
+                    <Link href={`/ops/tasks/${task.taskId || task.id}`}>
+                      <Button variant="link" size="sm" className="px-0 h-auto text-xs">
+                        View Task Details →
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

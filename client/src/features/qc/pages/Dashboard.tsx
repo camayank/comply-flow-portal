@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'wouter';
 import { DashboardLayout } from '@/layouts';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMyTasks, useTaskQcResult, OrderTask } from '@/features/operations/hooks';
 import { 
   Card, 
   CardContent, 
@@ -440,7 +442,10 @@ export default function QCDashboard() {
 
         {/* QC Review Tabs */}
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="task-qc" data-testid="tab-task-qc" className="text-purple-600">
+              Task QC Reviews
+            </TabsTrigger>
             <TabsTrigger value="pending" data-testid="tab-pending">
               Pending Reviews ({dashboardData?.pendingReviews.length || 0})
             </TabsTrigger>
@@ -452,25 +457,29 @@ export default function QCDashboard() {
             </TabsTrigger>
           </TabsList>
 
+          <TabsContent value="task-qc" className="space-y-4">
+            <TaskQCReviewList />
+          </TabsContent>
+
           <TabsContent value="pending" className="space-y-4">
-            <QCReviewList 
-              reviews={dashboardData?.pendingReviews || []} 
+            <QCReviewList
+              reviews={dashboardData?.pendingReviews || []}
               onStartReview={handleStartReview}
               type="pending"
             />
           </TabsContent>
 
           <TabsContent value="assigned" className="space-y-4">
-            <QCReviewList 
-              reviews={dashboardData?.myReviews || []} 
+            <QCReviewList
+              reviews={dashboardData?.myReviews || []}
               onStartReview={handleStartReview}
               type="assigned"
             />
           </TabsContent>
 
           <TabsContent value="completed" className="space-y-4">
-            <QCReviewList 
-              reviews={dashboardData?.completed || []} 
+            <QCReviewList
+              reviews={dashboardData?.completed || []}
               onStartReview={handleStartReview}
               type="completed"
             />
@@ -745,5 +754,191 @@ function QCReviewList({ reviews, onStartReview, type }: QCReviewListProps) {
         </Card>
       ))}
     </div>
+  );
+}
+
+// Task QC Review List Component - For the new auto-task system
+function TaskQCReviewList() {
+  const [selectedTask, setSelectedTask] = useState<OrderTask | null>(null);
+  const [qcNotes, setQcNotes] = useState('');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [qcDecision, setQcDecision] = useState<'approve' | 'reject' | null>(null);
+
+  // Fetch tasks that are in qc_pending status
+  const myTasksQuery = useMyTasks(['qc_pending']);
+  const submitQcResult = useTaskQcResult();
+  const queryClient = useQueryClient();
+
+  const qcPendingTasks = myTasksQuery.data?.byStatus?.qcPending || [];
+
+  const handleOpenQcDialog = (task: OrderTask, decision: 'approve' | 'reject') => {
+    setSelectedTask(task);
+    setQcDecision(decision);
+    setQcNotes('');
+    setIsDialogOpen(true);
+  };
+
+  const handleSubmitQcResult = () => {
+    if (!selectedTask || !qcDecision) return;
+
+    submitQcResult.mutate(
+      {
+        taskId: selectedTask.id,
+        approved: qcDecision === 'approve',
+        notes: qcNotes,
+      },
+      {
+        onSuccess: () => {
+          setIsDialogOpen(false);
+          setSelectedTask(null);
+          setQcNotes('');
+          setQcDecision(null);
+          myTasksQuery.refetch();
+        },
+      }
+    );
+  };
+
+  if (myTasksQuery.isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <RefreshCw className="h-8 w-8 text-gray-400 mx-auto mb-4 animate-spin" />
+          <p className="text-gray-600">Loading task QC reviews...</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (qcPendingTasks.length === 0) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            No pending task QC reviews
+          </h3>
+          <p className="text-gray-600 dark:text-gray-300">
+            All task QC reviews are complete. Great job!
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <div className="space-y-4">
+        {qcPendingTasks.map((task) => (
+          <Card key={task.id} className="hover:shadow-md transition-shadow border-purple-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-semibold text-lg">{task.name}</h3>
+                    <Badge className="bg-purple-100 text-purple-800 border-purple-200">
+                      QC Pending
+                    </Badge>
+                  </div>
+                  <p className="text-gray-600 dark:text-gray-300">
+                    {task.serviceName} {task.entityName && `- ${task.entityName}`}
+                  </p>
+                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <User className="h-4 w-4" />
+                      {task.assignedToName || 'Unassigned'}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <FileText className="h-4 w-4" />
+                      Task ID: {task.taskId}
+                    </span>
+                    {task.dueDate && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4" />
+                        Due: {new Date(task.dueDate).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => handleOpenQcDialog(task, 'approve')}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <ThumbsUp className="h-4 w-4 mr-2" />
+                    Approve
+                  </Button>
+                  <Button
+                    onClick={() => handleOpenQcDialog(task, 'reject')}
+                    size="sm"
+                    variant="destructive"
+                  >
+                    <ThumbsDown className="h-4 w-4 mr-2" />
+                    Reject
+                  </Button>
+                  <Link href={`/ops/tasks/${task.taskId || task.id}`}>
+                    <Button variant="outline" size="sm">
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Task
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* QC Decision Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {qcDecision === 'approve' ? 'Approve Task' : 'Reject Task'}
+            </DialogTitle>
+            <DialogDescription>
+              {qcDecision === 'approve'
+                ? `Confirm approval of "${selectedTask?.name}". The task will be marked as complete.`
+                : `Reject "${selectedTask?.name}" and send back for revision.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>
+                {qcDecision === 'approve' ? 'Notes (optional)' : 'Rejection Reason (required)'}
+              </Label>
+              <Textarea
+                value={qcNotes}
+                onChange={(e) => setQcNotes(e.target.value)}
+                placeholder={
+                  qcDecision === 'approve'
+                    ? 'Add any approval notes...'
+                    : 'Explain what needs to be fixed...'
+                }
+                rows={4}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant={qcDecision === 'approve' ? 'default' : 'destructive'}
+              onClick={handleSubmitQcResult}
+              disabled={submitQcResult.isPending || (qcDecision === 'reject' && !qcNotes)}
+              className={qcDecision === 'approve' ? 'bg-green-600 hover:bg-green-700' : ''}
+            >
+              {submitQcResult.isPending
+                ? 'Submitting...'
+                : qcDecision === 'approve'
+                ? 'Approve Task'
+                : 'Reject Task'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

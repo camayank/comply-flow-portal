@@ -648,6 +648,282 @@ export function useOperationsPerformanceMetrics(userId?: string, period?: string
 }
 
 // ============================================================================
+// Order Task Types (New Auto-Task System)
+// ============================================================================
+
+export interface OrderTask {
+  id: number;
+  taskId: string; // Readable ID like "TASK-INC-1001-001"
+  serviceRequestId: number;
+  name: string;
+  description?: string;
+  status: 'blocked' | 'ready' | 'in_progress' | 'qc_pending' | 'qc_rejected' | 'completed' | 'skipped' | 'cancelled';
+  stepNumber: number;
+  assignedTo?: number;
+  assignedToName?: string;
+  assignedRole: string;
+  estimatedMinutes?: number;
+  dueDate?: string;
+  requiresQc: boolean;
+  dependencies?: string[];
+  qcReviewId?: number;
+  qcRejectionNotes?: string;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+  serviceName?: string;
+  entityName?: string;
+}
+
+export interface TasksByStatus {
+  ready: OrderTask[];
+  inProgress: OrderTask[];
+  qcPending: OrderTask[];
+  qcRejected: OrderTask[];
+  completed: OrderTask[];
+}
+
+export interface TaskCounts {
+  total: number;
+  actionRequired: number;
+  inProgress: number;
+  awaitingQc: number;
+}
+
+export interface TaskStats {
+  byStatus: Record<string, number>;
+  total: number;
+  unassigned: number;
+  overdue: number;
+}
+
+// ============================================================================
+// Order Task Hooks (New Auto-Task System)
+// ============================================================================
+
+/**
+ * Fetch current user's assigned tasks
+ */
+export function useMyTasks(statusFilter?: string[]) {
+  return useQuery<{ tasks: OrderTask[]; byStatus: TasksByStatus; counts: TaskCounts }>({
+    queryKey: ['tasks', 'my-tasks', statusFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (statusFilter) {
+        statusFilter.forEach(s => params.append('status', s));
+      }
+      const url = `/api/tasks/my-tasks${params.toString() ? `?${params}` : ''}`;
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch tasks');
+      const json = await res.json();
+      return json.data;
+    },
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+}
+
+/**
+ * Fetch unassigned tasks ready for pickup
+ */
+export function useUnassignedTasks(role?: string) {
+  return useQuery<{ tasks: OrderTask[]; count: number }>({
+    queryKey: ['tasks', 'unassigned', role],
+    queryFn: async () => {
+      const url = role ? `/api/tasks/unassigned?role=${role}` : '/api/tasks/unassigned';
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch unassigned tasks');
+      const json = await res.json();
+      return json.data;
+    },
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+}
+
+/**
+ * Fetch task statistics for dashboard
+ */
+export function useTaskStats() {
+  return useQuery<TaskStats>({
+    queryKey: ['tasks', 'stats'],
+    queryFn: async () => {
+      const res = await fetch('/api/tasks/stats', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch task stats');
+      const json = await res.json();
+      return json.data;
+    },
+    staleTime: 30000,
+  });
+}
+
+/**
+ * Fetch all tasks for a specific order
+ */
+export function useOrderTasks(orderId: number) {
+  return useQuery<{
+    tasks: OrderTask[];
+    summary: {
+      total: number;
+      completed: number;
+      inProgress: number;
+      pending: number;
+      progressPercentage: number;
+    };
+  }>({
+    queryKey: ['orders', orderId, 'tasks'],
+    queryFn: async () => {
+      const res = await fetch(`/api/orders/${orderId}/tasks`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch order tasks');
+      const json = await res.json();
+      return json.data;
+    },
+    enabled: !!orderId,
+    staleTime: 30000,
+  });
+}
+
+/**
+ * Fetch single task details
+ */
+export function useTask(taskId: string | number) {
+  return useQuery<OrderTask>({
+    queryKey: ['tasks', taskId],
+    queryFn: async () => {
+      const res = await fetch(`/api/tasks/${taskId}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch task');
+      const json = await res.json();
+      return json.data;
+    },
+    enabled: !!taskId,
+    staleTime: 30000,
+  });
+}
+
+/**
+ * Update task status (start, complete, etc.)
+ */
+export function useUpdateTaskStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      status,
+      notes,
+    }: {
+      taskId: string | number;
+      status: string;
+      notes?: string;
+    }) => {
+      const res = await fetch(`/api/tasks/${taskId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status, notes }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || 'Failed to update task status');
+      }
+      return res.json();
+    },
+    onSuccess: (_, { taskId }) => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+  });
+}
+
+/**
+ * Submit task QC result (approve/reject)
+ */
+export function useTaskQcResult() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      approved,
+      notes,
+    }: {
+      taskId: string | number;
+      approved: boolean;
+      notes?: string;
+    }) => {
+      const res = await fetch(`/api/tasks/${taskId}/qc-result`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ approved, notes }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || 'Failed to submit QC result');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+  });
+}
+
+/**
+ * Assign task to a user
+ */
+export function useAssignTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      assignToUserId,
+    }: {
+      taskId: string | number;
+      assignToUserId: number;
+    }) => {
+      const res = await fetch(`/api/tasks/${taskId}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ assignToUserId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || 'Failed to assign task');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
+/**
+ * Fetch pending QC tasks (tasks awaiting QC review)
+ */
+export function usePendingQcTasks() {
+  return useQuery<{ tasks: OrderTask[]; count: number }>({
+    queryKey: ['tasks', 'qc-pending'],
+    queryFn: async () => {
+      // Use my-tasks with qc_pending filter for supervisors
+      const res = await fetch('/api/tasks/my-tasks?status=qc_pending', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch QC pending tasks');
+      const json = await res.json();
+      return {
+        tasks: json.data.byStatus?.qcPending || [],
+        count: json.data.byStatus?.qcPending?.length || 0,
+      };
+    },
+    staleTime: 30000,
+    refetchInterval: 30000, // More frequent for QC reviews
+  });
+}
+
+// ============================================================================
 // Query Keys for External Use
 // ============================================================================
 
@@ -669,4 +945,12 @@ export const operationsKeys = {
   dashboard: () => [...operationsKeys.all, 'dashboard'] as const,
   tasks: () => [...operationsKeys.all, 'tasks'] as const,
   metrics: () => [...operationsKeys.all, 'metrics'] as const,
+  // New task system keys
+  orderTasks: () => ['tasks'] as const,
+  myTasks: () => ['tasks', 'my-tasks'] as const,
+  unassignedTasks: () => ['tasks', 'unassigned'] as const,
+  taskStats: () => ['tasks', 'stats'] as const,
+  task: (id: string | number) => ['tasks', id] as const,
+  orderTaskList: (orderId: number) => ['orders', orderId, 'tasks'] as const,
+  qcPendingTasks: () => ['tasks', 'qc-pending'] as const,
 };
