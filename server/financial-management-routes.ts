@@ -220,45 +220,44 @@ export function registerFinancialManagementRoutes(app: Express) {
   // GET /api/financial/invoices - List invoices
   app.get('/api/financial/invoices', ...requireFinancialAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { status, paymentStatus, limit = 50 } = req.query;
+      const { limit = 50 } = req.query;
 
-      let query = db
+      // Join payments -> serviceRequests -> businessEntities to get client info
+      const invoices = await db
         .select({
           id: payments.id,
-          invoiceNumber: sql<string>`CONCAT('INV-', ${payments.id})`,
-          clientId: payments.businessEntityId,
+          paymentId: payments.paymentId,
+          serviceRequestId: payments.serviceRequestId,
           amount: payments.amount,
           status: payments.status,
           paymentMethod: payments.paymentMethod,
           createdAt: payments.createdAt,
           completedAt: payments.completedAt,
-          description: payments.description,
+          clientId: serviceRequests.businessEntityId,
+          clientName: businessEntities.name,
         })
         .from(payments)
+        .leftJoin(serviceRequests, eq(payments.serviceRequestId, serviceRequests.id))
+        .leftJoin(businessEntities, eq(serviceRequests.businessEntityId, businessEntities.id))
         .orderBy(desc(payments.createdAt))
         .limit(Number(limit));
 
-      const invoices = await query;
-
-      // Enrich with client names
-      const enrichedInvoices = await Promise.all(
-        invoices.map(async (inv) => {
-          let clientName = 'Unknown Client';
-          if (inv.clientId) {
-            const client = await db
-              .select({ name: businessEntities.name })
-              .from(businessEntities)
-              .where(eq(businessEntities.id, inv.clientId))
-              .limit(1);
-            clientName = client[0]?.name || 'Unknown Client';
-          }
-          return {
-            ...inv,
-            clientName,
-            dueDate: inv.createdAt ? new Date(new Date(inv.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() : null,
-          };
-        })
-      );
+      // Transform to expected format
+      const enrichedInvoices = invoices.map(inv => ({
+        id: inv.id,
+        invoiceNumber: inv.paymentId || `INV-${inv.id}`,
+        clientId: inv.clientId,
+        clientName: inv.clientName || 'Unknown Client',
+        totalAmount: Number(inv.amount || 0),
+        paidAmount: inv.status === 'completed' ? Number(inv.amount || 0) : 0,
+        outstandingAmount: inv.status === 'completed' ? 0 : Number(inv.amount || 0),
+        status: inv.status,
+        paymentStatus: inv.status,
+        paymentMethod: inv.paymentMethod,
+        invoiceDate: inv.createdAt?.toISOString(),
+        dueDate: inv.createdAt ? new Date(new Date(inv.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() : null,
+        completedAt: inv.completedAt?.toISOString(),
+      }));
 
       res.json(enrichedInvoices);
     } catch (error) {
@@ -270,11 +269,11 @@ export function registerFinancialManagementRoutes(app: Express) {
   // POST /api/financial/invoices - Create invoice
   app.post('/api/financial/invoices', ...requireFinancialAccess, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { clientId, amount, description, dueDate, items } = req.body;
+      const { clientId, amount, description, serviceRequestId } = req.body;
 
       // Validate required fields
-      if (!clientId) {
-        return res.status(400).json({ error: 'Client ID is required' });
+      if (!clientId && !serviceRequestId) {
+        return res.status(400).json({ error: 'Client ID or Service Request ID is required' });
       }
 
       const parsedAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -282,24 +281,46 @@ export function registerFinancialManagementRoutes(app: Express) {
         return res.status(400).json({ error: 'Valid amount is required (must be a positive number)' });
       }
 
-      // Verify client exists
-      const [client] = await db
-        .select({ id: businessEntities.id })
-        .from(businessEntities)
-        .where(eq(businessEntities.id, parseInt(clientId)))
-        .limit(1);
+      let srId = serviceRequestId;
 
-      if (!client) {
-        return res.status(400).json({ error: 'Client not found' });
+      // If serviceRequestId not provided, find or create one for the client
+      if (!srId && clientId) {
+        // Verify client exists
+        const [client] = await db
+          .select({ id: businessEntities.id, name: businessEntities.name })
+          .from(businessEntities)
+          .where(eq(businessEntities.id, parseInt(clientId)))
+          .limit(1);
+
+        if (!client) {
+          return res.status(400).json({ error: 'Client not found' });
+        }
+
+        // Create a service request for this invoice
+        const [newSR] = await db
+          .insert(serviceRequests)
+          .values({
+            businessEntityId: parseInt(clientId),
+            serviceId: 'invoice',
+            status: 'initiated',
+            totalAmount: Math.round(parsedAmount),
+            createdAt: new Date(),
+          })
+          .returning();
+
+        srId = newSR.id;
       }
+
+      // Generate a unique payment ID
+      const paymentId = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       const [newPayment] = await db
         .insert(payments)
         .values({
-          businessEntityId: parseInt(clientId),
-          amount: String(parsedAmount),
+          paymentId,
+          serviceRequestId: srId,
+          amount: Math.round(parsedAmount),
           status: 'pending',
-          description: description || 'Invoice',
           paymentMethod: 'invoice',
           createdAt: new Date(),
         })
@@ -307,8 +328,11 @@ export function registerFinancialManagementRoutes(app: Express) {
 
       res.status(201).json({
         id: newPayment.id,
-        invoiceNumber: `INV-${newPayment.id}`,
-        ...newPayment,
+        invoiceNumber: newPayment.paymentId,
+        amount: newPayment.amount,
+        status: newPayment.status,
+        description: description || 'Invoice',
+        createdAt: newPayment.createdAt,
       });
     } catch (error: any) {
       console.error('Create invoice error:', error);
@@ -403,6 +427,159 @@ export function registerFinancialManagementRoutes(app: Express) {
     } catch (error) {
       console.error('Get collection metrics error:', error);
       res.status(500).json({ error: 'Failed to fetch collection metrics' });
+    }
+  });
+
+  // PUT /api/financial/invoices/:id - Update invoice / Record payment
+  app.put('/api/financial/invoices/:id', ...requireFinancialAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const invoiceId = parseInt(req.params.id);
+      const { paymentMethod, referenceNumber, status } = req.body;
+
+      if (!invoiceId || isNaN(invoiceId)) {
+        return res.status(400).json({ error: 'Valid invoice ID is required' });
+      }
+
+      // Check if payment/invoice exists
+      const [existingPayment] = await db
+        .select()
+        .from(payments)
+        .where(eq(payments.id, invoiceId))
+        .limit(1);
+
+      if (!existingPayment) {
+        return res.status(404).json({ error: 'Invoice not found' });
+      }
+
+      // Build update data - only include fields that exist in the schema
+      const updateData: Record<string, any> = {};
+
+      if (status) {
+        updateData.status = status;
+        if (status === 'completed') {
+          updateData.completedAt = new Date();
+        }
+      }
+
+      if (paymentMethod) {
+        updateData.paymentMethod = paymentMethod;
+      }
+
+      if (referenceNumber) {
+        updateData.transactionId = referenceNumber;
+      }
+
+      const [updatedPayment] = await db
+        .update(payments)
+        .set(updateData)
+        .where(eq(payments.id, invoiceId))
+        .returning();
+
+      res.json({
+        id: updatedPayment.id,
+        invoiceNumber: updatedPayment.paymentId || `INV-${updatedPayment.id}`,
+        amount: updatedPayment.amount,
+        status: updatedPayment.status,
+        paymentMethod: updatedPayment.paymentMethod,
+        completedAt: updatedPayment.completedAt,
+        message: 'Payment recorded successfully',
+      });
+    } catch (error: any) {
+      console.error('Update invoice error:', error);
+      res.status(500).json({ error: error.message || 'Failed to update invoice' });
+    }
+  });
+
+  // GET /api/financial/aging-report - Accounts receivable aging report
+  app.get('/api/financial/aging-report', ...requireFinancialAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const now = new Date();
+      const day30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const day60 = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+      const day90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+      // Current (0-30 days)
+      const currentQuery = await db
+        .select({ count: sql<number>`COUNT(*)`, amount: sql<number>`COALESCE(SUM(${payments.amount}), 0)` })
+        .from(payments)
+        .where(and(
+          eq(payments.status, 'pending'),
+          gte(payments.createdAt, day30)
+        ));
+
+      // 30-60 days
+      const days30_60Query = await db
+        .select({ count: sql<number>`COUNT(*)`, amount: sql<number>`COALESCE(SUM(${payments.amount}), 0)` })
+        .from(payments)
+        .where(and(
+          eq(payments.status, 'pending'),
+          lte(payments.createdAt, day30),
+          gte(payments.createdAt, day60)
+        ));
+
+      // 60-90 days
+      const days60_90Query = await db
+        .select({ count: sql<number>`COUNT(*)`, amount: sql<number>`COALESCE(SUM(${payments.amount}), 0)` })
+        .from(payments)
+        .where(and(
+          eq(payments.status, 'pending'),
+          lte(payments.createdAt, day60),
+          gte(payments.createdAt, day90)
+        ));
+
+      // Over 90 days
+      const over90Query = await db
+        .select({ count: sql<number>`COUNT(*)`, amount: sql<number>`COALESCE(SUM(${payments.amount}), 0)` })
+        .from(payments)
+        .where(and(
+          eq(payments.status, 'pending'),
+          lte(payments.createdAt, day90)
+        ));
+
+      const [current] = currentQuery;
+      const [days30_60] = days30_60Query;
+      const [days60_90] = days60_90Query;
+      const [over90] = over90Query;
+
+      res.json({
+        current: { count: Number(current?.count || 0), amount: Number(current?.amount || 0) },
+        days30_60: { count: Number(days30_60?.count || 0), amount: Number(days30_60?.amount || 0) },
+        days60_90: { count: Number(days60_90?.count || 0), amount: Number(days60_90?.amount || 0) },
+        over90: { count: Number(over90?.count || 0), amount: Number(over90?.amount || 0) },
+      });
+    } catch (error) {
+      console.error('Get aging report error:', error);
+      res.status(500).json({ error: 'Failed to fetch aging report' });
+    }
+  });
+
+  // GET /api/financial/client-revenue - Revenue by client
+  app.get('/api/financial/client-revenue', ...requireFinancialAccess, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      // Join payments -> serviceRequests -> businessEntities to get client info
+      const clientRevenue = await db
+        .select({
+          clientId: businessEntities.id,
+          client: businessEntities.name,
+          revenue: sql<number>`COALESCE(SUM(${payments.amount}), 0)`,
+          invoiceCount: sql<number>`COUNT(${payments.id})`,
+        })
+        .from(payments)
+        .innerJoin(serviceRequests, eq(payments.serviceRequestId, serviceRequests.id))
+        .innerJoin(businessEntities, eq(serviceRequests.businessEntityId, businessEntities.id))
+        .where(eq(payments.status, 'completed'))
+        .groupBy(businessEntities.id, businessEntities.name)
+        .orderBy(desc(sql`SUM(${payments.amount})`))
+        .limit(10);
+
+      res.json(clientRevenue.map(item => ({
+        client: item.client || `Client ${item.clientId}`,
+        revenue: Number(item.revenue || 0),
+        invoiceCount: Number(item.invoiceCount || 0),
+      })));
+    } catch (error) {
+      console.error('Get client revenue error:', error);
+      res.status(500).json({ error: 'Failed to fetch client revenue' });
     }
   });
 

@@ -549,24 +549,33 @@ export async function registerAuthRoutes(app: Express) {
     try {
       const sessionToken = req.cookies?.sessionToken;
 
-      if (!sessionToken) {
-        return res.status(400).json({ error: 'Session cookie required' });
+      // Deactivate session if token exists (don't require it)
+      if (sessionToken) {
+        await db
+          .update(userSessions)
+          .set({ isActive: false })
+          .where(eq(userSessions.sessionToken, sessionToken));
       }
 
-      // Deactivate session
-      await db
-        .update(userSessions)
-        .set({ isActive: false })
-        .where(eq(userSessions.sessionToken, sessionToken));
+      // Always clear cookies with explicit options to ensure they're removed
+      const cookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax' as const,
+        path: '/',
+      };
 
-      // Clear session cookie
-      res.clearCookie('sessionToken');
-      res.clearCookie('csrfToken');
+      res.clearCookie('sessionToken', cookieOptions);
+      res.clearCookie('csrfToken', { ...cookieOptions, httpOnly: false });
 
+      // Always return success - logout should never fail from user's perspective
       res.json({ success: true, message: 'Logged out successfully' });
     } catch (error) {
       console.error('Logout error:', error);
-      res.status(500).json({ error: 'Logout failed' });
+      // Still clear cookies even on error
+      res.clearCookie('sessionToken', { path: '/' });
+      res.clearCookie('csrfToken', { path: '/' });
+      res.json({ success: true, message: 'Logged out successfully' });
     }
   });
 

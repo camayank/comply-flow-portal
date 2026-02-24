@@ -100,6 +100,31 @@ interface BudgetPlan {
   status: string;
 }
 
+interface AgingReport {
+  current: { count: number; amount: number };
+  days30_60: { count: number; amount: number };
+  days60_90: { count: number; amount: number };
+  over90: { count: number; amount: number };
+}
+
+interface ClientRevenue {
+  client: string;
+  revenue: number;
+  invoiceCount: number;
+}
+
+interface Payment {
+  id: number;
+  invoiceId: number;
+  invoiceNumber: string;
+  clientName: string;
+  amount: number;
+  paymentMethod: string;
+  paymentDate: string;
+  referenceNumber: string;
+  status: string;
+}
+
 // Finance navigation configuration
 const financeNavigation = [
   {
@@ -119,10 +144,10 @@ const financeNavigation = [
     ],
   },
   {
-    title: "Settings",
+    title: "Account",
     items: [
-      { label: "Payment Methods", href: "/settings/payments", icon: CreditCard },
-      { label: "Team", href: "/settings/team", icon: Users },
+      { label: "Profile", href: "/profile", icon: Users },
+      { label: "Settings", href: "/settings", icon: CreditCard },
     ],
   },
 ];
@@ -139,6 +164,15 @@ const FinancialManagementDashboard = () => {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [invoiceDialog, setInvoiceDialog] = useState(false);
   const [createInvoiceDialog, setCreateInvoiceDialog] = useState(false);
+  const [recordPaymentDialog, setRecordPaymentDialog] = useState(false);
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [newPayment, setNewPayment] = useState({
+    amount: '',
+    paymentMethod: 'bank_transfer',
+    referenceNumber: '',
+    notes: '',
+  });
   const [newInvoice, setNewInvoice] = useState({
     clientName: '',
     businessEntityId: 1,
@@ -212,6 +246,59 @@ const FinancialManagementDashboard = () => {
 
   const { data: collectionMetrics } = useQuery({
     queryKey: ['/api/financial/collection-metrics'],
+  });
+
+  const { data: agingReport } = useQuery<AgingReport>({
+    queryKey: ['/api/financial/aging-report'],
+  });
+
+  const { data: clientRevenue = [] } = useQuery<ClientRevenue[]>({
+    queryKey: ['/api/financial/client-revenue'],
+  });
+
+  // Record payment mutation
+  const recordPaymentMutation = useMutation({
+    mutationFn: async (paymentData: { invoiceId: number; amount: number; paymentMethod: string; referenceNumber: string; notes: string }) => {
+      const response = await apiRequest('PUT', `/api/financial/invoices/${paymentData.invoiceId}`, {
+        paidAmount: paymentData.amount,
+        paymentStatus: 'partial',
+        notes: paymentData.notes,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Payment Recorded',
+        description: 'Payment has been recorded successfully.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/financial/invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/financial/summary'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/financial/aging-report'] });
+      setRecordPaymentDialog(false);
+      setPaymentInvoice(null);
+      setNewPayment({
+        amount: '',
+        paymentMethod: 'bank_transfer',
+        referenceNumber: '',
+        notes: '',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to record payment',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Filter invoices based on search and status
+  const filteredInvoices = invoices.filter((invoice: Invoice) => {
+    const matchesSearch = !searchTerm ||
+      invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invoice.clientName.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'all' || invoice.status === filterStatus;
+    return matchesSearch && matchesStatus;
   });
 
   // Chart colors using design system
@@ -537,37 +624,214 @@ const FinancialManagementDashboard = () => {
                     Invoice Management
                   </div>
                   <div className="flex gap-2">
+                    <Input
+                      placeholder="Search invoices..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-64"
+                    />
                     <Select value={filterStatus} onValueChange={setFilterStatus}>
                       <SelectTrigger className="w-40" data-testid="select-invoice-status">
                         <SelectValue placeholder="Filter by status" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="sent">Sent</SelectItem>
                         <SelectItem value="paid">Paid</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="overdue">Overdue</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Button data-testid="button-export-invoices">
+                    <Button variant="outline" data-testid="button-export-invoices">
                       <Download className="h-4 w-4 mr-2" />
                       Export
+                    </Button>
+                    <Button onClick={() => setCreateInvoiceDialog(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      New Invoice
                     </Button>
                   </div>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-500 mb-4">Complete invoice management system will be implemented here.</p>
-                {/* Full invoice management interface will be implemented */}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Invoice #</TableHead>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Invoice Date</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Paid</TableHead>
+                        <TableHead className="text-right">Outstanding</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invoicesLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="text-center py-8">
+                            <RefreshCw className="h-6 w-6 animate-spin mx-auto text-gray-400" />
+                            <p className="mt-2 text-gray-500">Loading invoices...</p>
+                          </TableCell>
+                        </TableRow>
+                      ) : filteredInvoices.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={9} className="text-center py-8">
+                            <FileText className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                            <p className="text-gray-500">No invoices found</p>
+                          </TableCell>
+                        </TableRow>
+                      ) : filteredInvoices.map((invoice: Invoice) => (
+                        <TableRow key={invoice.id} data-testid={`invoice-row-${invoice.invoiceNumber}`}>
+                          <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                          <TableCell>{invoice.clientName}</TableCell>
+                          <TableCell>{invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString() : '-'}</TableCell>
+                          <TableCell>
+                            <span className={new Date(invoice.dueDate) < new Date() && invoice.status !== 'paid' ? 'text-red-600 font-medium' : ''}>
+                              {new Date(invoice.dueDate).toLocaleDateString()}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">{formatCurrency(invoice.totalAmount)}</TableCell>
+                          <TableCell className="text-right text-green-600">{formatCurrency(invoice.paidAmount)}</TableCell>
+                          <TableCell className="text-right text-orange-600">{formatCurrency(invoice.outstandingAmount)}</TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(invoice.status)}>
+                              {invoice.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedInvoice(invoice);
+                                  setInvoiceDialog(true);
+                                }}
+                                title="View Details"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setPaymentInvoice(invoice);
+                                    setNewPayment({
+                                      amount: String(invoice.outstandingAmount),
+                                      paymentMethod: 'bank_transfer',
+                                      referenceNumber: '',
+                                      notes: '',
+                                    });
+                                    setRecordPaymentDialog(true);
+                                  }}
+                                  title="Record Payment"
+                                  className="text-green-600 hover:text-green-700"
+                                >
+                                  <DollarSign className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Edit Invoice"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Invoice Summary Stats */}
+                <div className="grid grid-cols-4 gap-4 mt-6 pt-4 border-t">
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">Total Invoices</p>
+                    <p className="text-xl font-bold">{filteredInvoices.length}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">Total Value</p>
+                    <p className="text-xl font-bold">{formatCurrency(filteredInvoices.reduce((sum: number, inv: Invoice) => sum + inv.totalAmount, 0))}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">Total Paid</p>
+                    <p className="text-xl font-bold text-green-600">{formatCurrency(filteredInvoices.reduce((sum: number, inv: Invoice) => sum + inv.paidAmount, 0))}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground">Total Outstanding</p>
+                    <p className="text-xl font-bold text-orange-600">{formatCurrency(filteredInvoices.reduce((sum: number, inv: Invoice) => sum + inv.outstandingAmount, 0))}</p>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="analytics" className="space-y-6">
+            {/* Aging Report */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Accounts Receivable Aging Report
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                    <p className="text-sm text-green-600 font-medium">Current (0-30 days)</p>
+                    <p className="text-2xl font-bold text-green-700">{formatCurrency(agingReport?.current.amount || 0)}</p>
+                    <p className="text-sm text-green-600">{agingReport?.current.count || 0} invoices</p>
+                  </div>
+                  <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                    <p className="text-sm text-yellow-600 font-medium">30-60 Days</p>
+                    <p className="text-2xl font-bold text-yellow-700">{formatCurrency(agingReport?.days30_60.amount || 0)}</p>
+                    <p className="text-sm text-yellow-600">{agingReport?.days30_60.count || 0} invoices</p>
+                  </div>
+                  <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                    <p className="text-sm text-orange-600 font-medium">60-90 Days</p>
+                    <p className="text-2xl font-bold text-orange-700">{formatCurrency(agingReport?.days60_90.amount || 0)}</p>
+                    <p className="text-sm text-orange-600">{agingReport?.days60_90.count || 0} invoices</p>
+                  </div>
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                    <p className="text-sm text-red-600 font-medium">Over 90 Days</p>
+                    <p className="text-2xl font-bold text-red-700">{formatCurrency(agingReport?.over90.amount || 0)}</p>
+                    <p className="text-sm text-red-600">{agingReport?.over90.count || 0} invoices</p>
+                  </div>
+                </div>
+
+                {/* Aging Bar Chart */}
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={[
+                      { period: 'Current', amount: agingReport?.current.amount || 0, count: agingReport?.current.count || 0 },
+                      { period: '30-60 Days', amount: agingReport?.days30_60.amount || 0, count: agingReport?.days30_60.count || 0 },
+                      { period: '60-90 Days', amount: agingReport?.days60_90.amount || 0, count: agingReport?.days60_90.count || 0 },
+                      { period: '90+ Days', amount: agingReport?.over90.amount || 0, count: agingReport?.over90.count || 0 },
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="period" />
+                      <YAxis tickFormatter={(value) => `₹${(value/1000)}k`} />
+                      <Tooltip formatter={(value: any) => [formatCurrency(value), 'Amount']} />
+                      <Bar dataKey="amount" fill="#F59E0B" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Profit Margin Analysis */}
+              {/* Revenue by Month */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Profit Margin Analysis</CardTitle>
+                  <CardTitle>Revenue vs Expenses Trend</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-64">
@@ -575,51 +839,76 @@ const FinancialManagementDashboard = () => {
                       <BarChart data={revenueData}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="period" />
-                        <YAxis />
-                        <Tooltip />
-                        <Bar dataKey="revenue" fill="#10B981" />
+                        <YAxis tickFormatter={(value) => `₹${(value/1000)}k`} />
+                        <Tooltip formatter={(value: any) => [formatCurrency(value), '']} />
+                        <Legend />
+                        <Bar dataKey="revenue" name="Revenue" fill="#10B981" />
+                        <Bar dataKey="expenses" name="Expenses" fill="#EF4444" />
+                        <Bar dataKey="profit" name="Profit" fill="#3B82F6" />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Client Revenue Distribution */}
+              {/* Top Clients by Revenue */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Client Revenue Distribution</CardTitle>
+                  <CardTitle>Top Clients by Revenue</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RechartsPieChart>
-                        <Pie
-                          data={[
-                            { name: 'High Value', value: 40, color: '#8B5CF6' },
-                            { name: 'Medium Value', value: 35, color: '#06B6D4' },
-                            { name: 'Low Value', value: 25, color: '#84CC16' }
-                          ]}
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          dataKey="value"
-                        >
-                          {[
-                            { name: 'High Value', value: 40, color: '#8B5CF6' },
-                            { name: 'Medium Value', value: 35, color: '#06B6D4' },
-                            { name: 'Low Value', value: 25, color: '#84CC16' }
-                          ].map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                        <Legend />
-                      </RechartsPieChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {clientRevenue.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No client revenue data available
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {clientRevenue.slice(0, 8).map((client, index) => {
+                        const maxRevenue = clientRevenue[0]?.revenue || 1;
+                        const percentage = (client.revenue / maxRevenue) * 100;
+                        return (
+                          <div key={index} className="space-y-1">
+                            <div className="flex justify-between text-sm">
+                              <span className="font-medium truncate max-w-[200px]">{client.client}</span>
+                              <span className="text-muted-foreground">{formatCurrency(client.revenue)}</span>
+                            </div>
+                            <Progress value={percentage} className="h-2" />
+                            <p className="text-xs text-muted-foreground">{client.invoiceCount} invoices</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
+
+            {/* Collection Performance */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Collection Performance Metrics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-4 border rounded-lg text-center">
+                    <p className="text-3xl font-bold text-green-600">{collectionMetrics?.collectionRate || 0}%</p>
+                    <p className="text-sm text-muted-foreground">Collection Rate</p>
+                  </div>
+                  <div className="p-4 border rounded-lg text-center">
+                    <p className="text-3xl font-bold text-blue-600">{collectionMetrics?.avgCollectionDays || 0}</p>
+                    <p className="text-sm text-muted-foreground">Avg Collection Days</p>
+                  </div>
+                  <div className="p-4 border rounded-lg text-center">
+                    <p className="text-3xl font-bold text-green-600">{collectionMetrics?.onTimePayments || 0}%</p>
+                    <p className="text-sm text-muted-foreground">On-Time Payments</p>
+                  </div>
+                  <div className="p-4 border rounded-lg text-center">
+                    <p className="text-3xl font-bold text-orange-600">{collectionMetrics?.latePayments || 0}%</p>
+                    <p className="text-sm text-muted-foreground">Late Payments</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="budgeting" className="space-y-6">
@@ -830,6 +1119,135 @@ const FinancialManagementDashboard = () => {
                 </>
               ) : (
                 'Create Invoice'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Record Payment Dialog */}
+      <Dialog open={recordPaymentDialog} onOpenChange={setRecordPaymentDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+          </DialogHeader>
+
+          {paymentInvoice && (
+            <div className="space-y-4 py-4">
+              {/* Invoice Summary */}
+              <div className="p-4 bg-muted rounded-lg space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Invoice</span>
+                  <span className="font-medium">{paymentInvoice.invoiceNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Client</span>
+                  <span className="font-medium">{paymentInvoice.clientName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Total Amount</span>
+                  <span className="font-medium">{formatCurrency(paymentInvoice.totalAmount)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Already Paid</span>
+                  <span className="font-medium text-green-600">{formatCurrency(paymentInvoice.paidAmount)}</span>
+                </div>
+                <div className="flex justify-between border-t pt-2">
+                  <span className="text-sm font-medium">Outstanding</span>
+                  <span className="font-bold text-orange-600">{formatCurrency(paymentInvoice.outstandingAmount)}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="paymentAmount">Payment Amount (₹)</Label>
+                <Input
+                  id="paymentAmount"
+                  type="number"
+                  placeholder="0.00"
+                  value={newPayment.amount}
+                  onChange={(e) => setNewPayment({ ...newPayment, amount: e.target.value })}
+                  max={paymentInvoice.outstandingAmount}
+                />
+                {parseFloat(newPayment.amount) > paymentInvoice.outstandingAmount && (
+                  <p className="text-xs text-red-500">Amount exceeds outstanding balance</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="paymentMethod">Payment Method</Label>
+                <Select
+                  value={newPayment.paymentMethod}
+                  onValueChange={(value) => setNewPayment({ ...newPayment, paymentMethod: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select payment method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="upi">UPI</SelectItem>
+                    <SelectItem value="cheque">Cheque</SelectItem>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="credit_card">Credit Card</SelectItem>
+                    <SelectItem value="debit_card">Debit Card</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="referenceNumber">Reference / Transaction ID</Label>
+                <Input
+                  id="referenceNumber"
+                  placeholder="Enter transaction reference"
+                  value={newPayment.referenceNumber}
+                  onChange={(e) => setNewPayment({ ...newPayment, referenceNumber: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="paymentNotes">Notes (Optional)</Label>
+                <Textarea
+                  id="paymentNotes"
+                  placeholder="Any additional notes..."
+                  value={newPayment.notes}
+                  onChange={(e) => setNewPayment({ ...newPayment, notes: e.target.value })}
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setRecordPaymentDialog(false);
+              setPaymentInvoice(null);
+            }}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (paymentInvoice) {
+                  recordPaymentMutation.mutate({
+                    invoiceId: paymentInvoice.id,
+                    amount: parseFloat(newPayment.amount) || 0,
+                    paymentMethod: newPayment.paymentMethod,
+                    referenceNumber: newPayment.referenceNumber,
+                    notes: newPayment.notes,
+                  });
+                }
+              }}
+              disabled={recordPaymentMutation.isPending || !newPayment.amount || parseFloat(newPayment.amount) <= 0}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {recordPaymentMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Recording...
+                </>
+              ) : (
+                <>
+                  <DollarSign className="mr-2 h-4 w-4" />
+                  Record Payment
+                </>
               )}
             </Button>
           </DialogFooter>
