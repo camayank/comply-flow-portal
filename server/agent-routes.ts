@@ -13,7 +13,8 @@
 
 import type { Express, Request, Response } from "express";
 import { db } from './db';
-import { leads, users, commissions, serviceRequests, services, businessEntities, agentProfiles } from '@shared/schema';
+import { leads, users, commissions, serviceRequests, services, businessEntities, agentProfiles, orderTasks, qualityReviews } from '@shared/schema';
+import { agentKycStatus, agentKycDocuments, documents, kycVerificationLog } from './db/schema/agent-kyc';
 import { eq, and, desc, sql, gte, lte } from 'drizzle-orm';
 import { sessionAuthMiddleware, requireMinimumRole, requireRole, USER_ROLES, type AuthenticatedRequest } from './rbac-middleware';
 
@@ -310,6 +311,196 @@ export function registerAgentRoutes(app: Express) {
     }
   });
 
+  /**
+   * GET /api/agent/leads/:id/lifecycle
+   * Get complete lifecycle of a lead after conversion
+   * Shows: lead status, service request progress, tasks, QC status, delivery status
+   * Requires: Agent role or higher + ownership check
+   */
+  app.get('/api/agent/leads/:id/lifecycle', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const agentId = req.user?.id;
+      const userRole = req.user?.role;
+
+      // Fetch the lead
+      const [lead] = await db.select().from(leads).where(eq(leads.id, parseInt(id)));
+
+      if (!lead) {
+        return res.status(404).json({ error: 'Lead not found' });
+      }
+
+      // Verify ownership (unless admin) - agentId in leads is integer
+      if (userRole === 'agent' && lead.agentId !== agentId) {
+        return res.status(403).json({ error: 'You can only view your own leads' });
+      }
+
+      // Build lifecycle response
+      const lifecycle: {
+        lead: {
+          id: number;
+          status: string;
+          createdAt: Date | null;
+          convertedAt: Date | null;
+          clientName: string;
+        };
+        serviceRequest: {
+          id: number;
+          requestId: string | null;
+          status: string | null;
+          progress: number;
+          serviceName: string;
+          serviceId: string;
+          createdAt: Date | null;
+        } | null;
+        tasks: {
+          total: number;
+          completed: number;
+          currentStep: string | null;
+          currentStepNumber: number | null;
+        };
+        qcStatus: 'pending' | 'approved' | 'rejected' | null;
+        deliveryStatus: 'pending' | 'delivered' | 'confirmed' | null;
+      } = {
+        lead: {
+          id: lead.id,
+          status: lead.leadStage || lead.status || 'new',
+          createdAt: lead.createdAt,
+          convertedAt: lead.convertedAt || null,
+          clientName: lead.clientName || 'Unknown',
+        },
+        serviceRequest: null,
+        tasks: {
+          total: 0,
+          completed: 0,
+          currentStep: null,
+          currentStepNumber: null,
+        },
+        qcStatus: null,
+        deliveryStatus: null,
+      };
+
+      // If lead is converted, find associated service request
+      if (lead.leadStage === 'converted' || lead.status === 'converted') {
+        // Find service request linked to this lead
+        let serviceRequest = null;
+
+        // Use serviceRequests.leadId to find the service request
+        const [sr] = await db
+          .select({
+            id: serviceRequests.id,
+            requestId: serviceRequests.requestId,
+            status: serviceRequests.status,
+            progress: serviceRequests.progress,
+            serviceId: serviceRequests.serviceId,
+            createdAt: serviceRequests.createdAt,
+          })
+          .from(serviceRequests)
+          .where(eq(serviceRequests.leadId, lead.id))
+          .limit(1);
+        serviceRequest = sr;
+
+        // Fallback: find by agent assignment near conversion time
+        if (!serviceRequest && lead.contactEmail) {
+          const [srFallback] = await db
+            .select({
+              id: serviceRequests.id,
+              requestId: serviceRequests.requestId,
+              status: serviceRequests.status,
+              progress: serviceRequests.progress,
+              serviceId: serviceRequests.serviceId,
+              createdAt: serviceRequests.createdAt,
+            })
+            .from(serviceRequests)
+            .where(
+              and(
+                eq(serviceRequests.assignedAgentId, agentId || 0),
+                sql`created_at >= ${lead.convertedAt || lead.updatedAt || new Date()}`
+              )
+            )
+            .orderBy(serviceRequests.createdAt)
+            .limit(1);
+          serviceRequest = srFallback;
+        }
+
+        if (serviceRequest) {
+          // Get service name by matching serviceId (text) to service code or id
+          let serviceName = 'Unknown Service';
+          if (serviceRequest.serviceId) {
+            // Try to find by service code first, then by numeric id
+            const [service] = await db
+              .select({ name: services.name })
+              .from(services)
+              .where(sql`${services.code} = ${serviceRequest.serviceId} OR CAST(${services.id} AS TEXT) = ${serviceRequest.serviceId}`)
+              .limit(1);
+            serviceName = service?.name || lead.serviceInterested || serviceName;
+          }
+
+          lifecycle.serviceRequest = {
+            id: serviceRequest.id,
+            requestId: serviceRequest.requestId,
+            status: serviceRequest.status,
+            progress: serviceRequest.progress || 0,
+            serviceName,
+            serviceId: serviceRequest.serviceId,
+            createdAt: serviceRequest.createdAt,
+          };
+
+          // Get task statistics
+          const tasks = await db
+            .select({
+              id: orderTasks.id,
+              name: orderTasks.name,
+              status: orderTasks.status,
+              stepNumber: orderTasks.stepNumber,
+              qcStatus: orderTasks.qcStatus,
+            })
+            .from(orderTasks)
+            .where(eq(orderTasks.serviceRequestId, serviceRequest.id))
+            .orderBy(orderTasks.stepNumber);
+
+          const completedTasks = tasks.filter(t => t.status === 'completed');
+          const inProgressTask = tasks.find(t => t.status === 'in_progress' || t.status === 'ready');
+
+          lifecycle.tasks = {
+            total: tasks.length,
+            completed: completedTasks.length,
+            currentStep: inProgressTask?.name || (completedTasks.length === tasks.length ? 'All Complete' : null),
+            currentStepNumber: inProgressTask?.stepNumber || null,
+          };
+
+          // Determine QC status from tasks
+          const qcPendingTask = tasks.find(t => t.status === 'qc_pending');
+          const rejectedTask = tasks.find(t => t.qcStatus === 'rejected');
+          const allQcApproved = tasks.filter(t => t.qcStatus === 'approved').length > 0;
+
+          if (qcPendingTask) {
+            lifecycle.qcStatus = 'pending';
+          } else if (rejectedTask) {
+            lifecycle.qcStatus = 'rejected';
+          } else if (allQcApproved) {
+            lifecycle.qcStatus = 'approved';
+          }
+
+          // Determine delivery status from service request status
+          const srStatus = serviceRequest.status?.toLowerCase();
+          if (srStatus === 'completed' || srStatus === 'delivered') {
+            lifecycle.deliveryStatus = 'delivered';
+          } else if (srStatus === 'confirmed' || srStatus === 'client_confirmed') {
+            lifecycle.deliveryStatus = 'confirmed';
+          } else if (tasks.length > 0 && completedTasks.length < tasks.length) {
+            lifecycle.deliveryStatus = 'pending';
+          }
+        }
+      }
+
+      res.json(lifecycle);
+    } catch (error) {
+      console.error('Error fetching lead lifecycle:', error);
+      res.status(500).json({ error: 'Failed to fetch lead lifecycle' });
+    }
+  });
+
   // ============ COMMISSION TRACKING ============
 
   /**
@@ -514,7 +705,7 @@ export function registerAgentRoutes(app: Express) {
       }
 
       const allLeads = await leadsQuery;
-      const commissions = await commissionsQuery;
+      const agentCommissions = await commissionsQuery;
 
       // Calculate monthly data for the last 6 months
       const monthlyData = [];
@@ -529,7 +720,7 @@ export function registerAgentRoutes(app: Express) {
                  created.getFullYear() === date.getFullYear();
         });
 
-        const monthCommissions = commissions.filter(c => {
+        const monthCommissions = agentCommissions.filter(c => {
           const created = new Date(c.createdAt || Date.now());
           return created.getMonth() === date.getMonth() &&
                  created.getFullYear() === date.getFullYear();
@@ -544,6 +735,86 @@ export function registerAgentRoutes(app: Express) {
       }
 
       const convertedLeads = allLeads.filter(l => l.stage === 'converted');
+      const currentAgentTotalCommission = agentCommissions.reduce((sum, c) => sum + (Number(c.commissionAmount) || 0), 0);
+
+      // Get all agents and calculate their performance for rankings
+      const allAgents = await db.select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+      }).from(users).where(eq(users.role, 'agent'));
+
+      // Get all leads and commissions for leaderboard calculation
+      const allLeadsForRanking = await db.select().from(leads);
+      const allCommissionsForRanking = await db.select().from(commissions);
+
+      // Calculate each agent's performance
+      const agentPerformances = allAgents.map(agent => {
+        const agentLeads = allLeadsForRanking.filter(l => l.agentId === String(agent.id));
+        const agentConversions = agentLeads.filter(l => l.stage === 'converted').length;
+        const agentTotalCommission = allCommissionsForRanking
+          .filter(c => c.agentId === agent.id)
+          .reduce((sum, c) => sum + (Number(c.commissionAmount) || 0), 0);
+
+        return {
+          id: agent.id,
+          name: `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || 'Agent',
+          conversions: agentConversions,
+          commission: agentTotalCommission,
+          isCurrentAgent: agent.id === agentId,
+        };
+      });
+
+      // Sort by commission (descending) for ranking
+      agentPerformances.sort((a, b) => b.commission - a.commission);
+
+      // Calculate rank and percentile
+      const totalAgents = agentPerformances.length || 1;
+      const currentAgentRank = agentPerformances.findIndex(a => a.isCurrentAgent) + 1;
+      const percentile = totalAgents > 1
+        ? Math.round(((totalAgents - currentAgentRank) / (totalAgents - 1)) * 100)
+        : 100;
+
+      // Build leaderboard (top 5 + current agent if not in top 5)
+      const leaderboard = agentPerformances.slice(0, 5).map((agent, index) => ({
+        rank: index + 1,
+        name: agent.isCurrentAgent ? 'You' : agent.name,
+        conversions: agent.conversions,
+        commission: agent.commission,
+        isCurrentAgent: agent.isCurrentAgent,
+      }));
+
+      // If current agent not in top 5, add them
+      if (currentAgentRank > 5) {
+        const currentAgent = agentPerformances.find(a => a.isCurrentAgent);
+        if (currentAgent) {
+          leaderboard.push({
+            rank: currentAgentRank,
+            name: 'You',
+            conversions: currentAgent.conversions,
+            commission: currentAgent.commission,
+            isCurrentAgent: true,
+          });
+        }
+      }
+
+      // Calculate badges based on actual performance
+      const badges = [];
+      if (currentAgentRank === 1) {
+        badges.push({ name: 'Top Performer', icon: '🏆', earnedAt: new Date().toISOString().split('T')[0] });
+      }
+      if (convertedLeads.length >= 10) {
+        badges.push({ name: '10+ Conversions', icon: '🎯', earnedAt: new Date().toISOString().split('T')[0] });
+      }
+      if (convertedLeads.length >= 25) {
+        badges.push({ name: '25+ Conversions', icon: '⭐', earnedAt: new Date().toISOString().split('T')[0] });
+      }
+      if (currentAgentTotalCommission >= 100000) {
+        badges.push({ name: '₹1L+ Earned', icon: '💰', earnedAt: new Date().toISOString().split('T')[0] });
+      }
+      if (percentile >= 90) {
+        badges.push({ name: 'Top 10%', icon: '🔥', earnedAt: new Date().toISOString().split('T')[0] });
+      }
 
       const performance = {
         // Overall metrics
@@ -552,12 +823,12 @@ export function registerAgentRoutes(app: Express) {
         conversionRate: allLeads.length > 0
           ? Math.round((convertedLeads.length / allLeads.length) * 100)
           : 0,
-        totalRevenue: commissions.reduce((sum, c) => sum + (Number(c.commissionAmount) || 0), 0),
+        totalRevenue: currentAgentTotalCommission,
 
-        // Rankings
-        rank: 5,
-        totalAgents: 47,
-        percentile: 89,
+        // Rankings (real data)
+        rank: currentAgentRank || totalAgents,
+        totalAgents,
+        percentile,
 
         // Monthly trend
         monthlyData,
@@ -566,21 +837,11 @@ export function registerAgentRoutes(app: Express) {
         monthlyGoal: 10,
         monthlyAchieved: monthlyData[monthlyData.length - 1]?.leads || 0,
 
-        // Badges earned
-        badges: [
-          { name: 'Top Performer', icon: '🏆', earnedAt: '2025-12-15' },
-          { name: 'Fast Closer', icon: '⚡', earnedAt: '2025-11-20' },
-          { name: '10+ Conversions', icon: '🎯', earnedAt: '2025-10-10' },
-        ],
+        // Badges earned (based on real performance)
+        badges,
 
-        // Leaderboard position
-        leaderboard: [
-          { rank: 1, name: 'Agent A', conversions: 45, commission: 225000 },
-          { rank: 2, name: 'Agent B', conversions: 38, commission: 190000 },
-          { rank: 3, name: 'Agent C', conversions: 32, commission: 160000 },
-          { rank: 4, name: 'Agent D', conversions: 28, commission: 140000 },
-          { rank: 5, name: 'You', conversions: convertedLeads.length, commission: commissions.reduce((sum, c) => sum + (Number(c.amount) || 0), 0), isCurrentAgent: true },
-        ],
+        // Leaderboard position (real data)
+        leaderboard,
       };
 
       res.json(performance);
@@ -598,22 +859,66 @@ export function registerAgentRoutes(app: Express) {
   app.get('/api/agent/leaderboard', ...agentAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { period = 'this_month' } = req.query;
+      const currentAgentId = req.user?.id;
 
-      // In production, this would aggregate real data from leads and commissions
-      const agents = [
-        { id: 1, rank: 1, name: 'Priya Sharma', territory: 'Mumbai', commissionEarned: 225000, leadsConverted: 45, isCurrentUser: false },
-        { id: 2, rank: 2, name: 'Rahul Verma', territory: 'Delhi NCR', commissionEarned: 190000, leadsConverted: 38, isCurrentUser: false },
-        { id: 3, rank: 3, name: 'Amit Patel', territory: 'Ahmedabad', commissionEarned: 160000, leadsConverted: 32, isCurrentUser: false },
-        { id: 4, rank: 4, name: 'Sneha Gupta', territory: 'Bangalore', commissionEarned: 140000, leadsConverted: 28, isCurrentUser: false },
-        { id: 5, rank: 5, name: 'You', territory: 'Mumbai Metropolitan', commissionEarned: 125000, leadsConverted: 25, isCurrentUser: true },
-        { id: 6, rank: 6, name: 'Vikram Singh', territory: 'Pune', commissionEarned: 110000, leadsConverted: 22, isCurrentUser: false },
-        { id: 7, rank: 7, name: 'Anjali Reddy', territory: 'Hyderabad', commissionEarned: 95000, leadsConverted: 19, isCurrentUser: false },
-        { id: 8, rank: 8, name: 'Karan Malhotra', territory: 'Chennai', commissionEarned: 85000, leadsConverted: 17, isCurrentUser: false },
-        { id: 9, rank: 9, name: 'Neha Kapoor', territory: 'Kolkata', commissionEarned: 75000, leadsConverted: 15, isCurrentUser: false },
-        { id: 10, rank: 10, name: 'Arjun Das', territory: 'Jaipur', commissionEarned: 65000, leadsConverted: 13, isCurrentUser: false },
-      ];
+      // Get all agents
+      const allAgents = await db.select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+      }).from(users).where(eq(users.role, 'agent'));
 
-      res.json({ agents, period, totalAgents: 47 });
+      // Get agent profiles for territory info
+      const profiles = await db.select().from(agentProfiles);
+      const profileMap = new Map(profiles.map(p => [p.userId, p]));
+
+      // Get all leads and commissions
+      const allLeads = await db.select().from(leads);
+      const allCommissions = await db.select().from(commissions);
+
+      // Calculate each agent's performance
+      const agentPerformances = allAgents.map(agent => {
+        const agentLeads = allLeads.filter(l => l.agentId === String(agent.id));
+        const leadsConverted = agentLeads.filter(l => l.stage === 'converted').length;
+        const commissionEarned = allCommissions
+          .filter(c => c.agentId === agent.id)
+          .reduce((sum, c) => sum + (Number(c.commissionAmount) || 0), 0);
+        const profile = profileMap.get(agent.id);
+
+        return {
+          id: agent.id,
+          name: `${agent.firstName || ''} ${agent.lastName || ''}`.trim() || 'Agent',
+          territory: profile?.assignedTerritory || 'Unassigned',
+          commissionEarned,
+          leadsConverted,
+          isCurrentUser: agent.id === currentAgentId,
+        };
+      });
+
+      // Sort by commission (descending) for ranking
+      agentPerformances.sort((a, b) => b.commissionEarned - a.commissionEarned);
+
+      // Add rank and limit to top 10
+      const agents = agentPerformances.slice(0, 10).map((agent, index) => ({
+        ...agent,
+        rank: index + 1,
+        name: agent.isCurrentUser ? 'You' : agent.name,
+      }));
+
+      // If current user is not in top 10, add them
+      const currentUserRank = agentPerformances.findIndex(a => a.isCurrentUser) + 1;
+      if (currentUserRank > 10) {
+        const currentUser = agentPerformances.find(a => a.isCurrentUser);
+        if (currentUser) {
+          agents.push({
+            ...currentUser,
+            rank: currentUserRank,
+            name: 'You',
+          });
+        }
+      }
+
+      res.json({ agents, period, totalAgents: allAgents.length });
     } catch (error) {
       console.error('Error fetching leaderboard:', error);
       res.status(500).json({ error: 'Failed to fetch leaderboard' });
@@ -1037,57 +1342,56 @@ export function registerAgentRoutes(app: Express) {
         { id: 'experience_letter', name: 'Experience Letter', description: 'Previous experience in financial/compliance services', mandatory: false },
       ];
 
-      // Mock KYC data - In production, fetch from agentKycDocuments table
-      const uploadedDocuments = [
-        {
-          id: 1,
-          documentType: 'pan_card',
-          fileName: 'pan_card_ABCDE1234F.pdf',
-          fileSize: 245000,
-          uploadedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-          status: 'verified',
-          verifiedBy: 'KYC Team',
-          verifiedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
-          extractedData: { panNumber: 'ABCDE1234F', name: 'Agent Name' },
-          rejectionReason: null,
-        },
-        {
-          id: 2,
-          documentType: 'aadhaar',
-          fileName: 'aadhaar_masked.pdf',
-          fileSize: 320000,
-          uploadedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-          status: 'verified',
-          verifiedBy: 'KYC Team',
-          verifiedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-          extractedData: { maskedAadhaar: 'XXXX XXXX 1234' },
-          rejectionReason: null,
-        },
-        {
-          id: 3,
-          documentType: 'address_proof',
-          fileName: 'utility_bill_jan2026.pdf',
-          fileSize: 180000,
-          uploadedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-          status: 'pending_review',
-          verifiedBy: null,
-          verifiedAt: null,
-          extractedData: null,
-          rejectionReason: null,
-        },
-        {
-          id: 4,
-          documentType: 'bank_details',
-          fileName: 'cancelled_cheque.jpg',
-          fileSize: 450000,
-          uploadedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-          status: 'rejected',
-          verifiedBy: 'KYC Team',
-          verifiedAt: null,
-          extractedData: null,
-          rejectionReason: 'Image is blurry. Please upload a clear, high-resolution image of the cancelled cheque.',
-        },
-      ];
+      // Fetch real KYC documents from database
+      const kycDocs = await db
+        .select({
+          id: agentKycDocuments.id,
+          documentType: agentKycDocuments.documentType,
+          fileName: documents.fileName,
+          fileSize: documents.fileSize,
+          uploadedAt: agentKycDocuments.createdAt,
+          status: agentKycDocuments.verificationStatus,
+          verifiedBy: agentKycDocuments.verifiedBy,
+          verifiedAt: agentKycDocuments.verifiedAt,
+          extractedData: agentKycDocuments.ocrExtractedData,
+          rejectionReason: agentKycDocuments.rejectionReason,
+        })
+        .from(agentKycDocuments)
+        .leftJoin(documents, eq(agentKycDocuments.documentId, documents.id))
+        .where(eq(agentKycDocuments.agentId, agentId));
+
+      // Map document types to match frontend expectations (e.g., 'pan' -> 'pan_card')
+      const typeMapping: Record<string, string> = {
+        'pan': 'pan_card',
+        'aadhaar': 'aadhaar',
+        'bank_statement': 'bank_details',
+        'cancelled_cheque': 'bank_details',
+        'address_proof': 'address_proof',
+        'photo': 'photo',
+        'signature': 'photo',
+      };
+
+      // Map status to match frontend expectations
+      const statusMapping: Record<string, string> = {
+        'pending': 'pending_review',
+        'auto_verified': 'verified',
+        'manual_review': 'pending_review',
+        'verified': 'verified',
+        'rejected': 'rejected',
+      };
+
+      const uploadedDocuments = kycDocs.map(doc => ({
+        id: doc.id,
+        documentType: typeMapping[doc.documentType] || doc.documentType,
+        fileName: doc.fileName || `${doc.documentType}_document`,
+        fileSize: doc.fileSize || 0,
+        uploadedAt: doc.uploadedAt || new Date(),
+        status: statusMapping[doc.status || 'pending'] || 'pending_review',
+        verifiedBy: doc.verifiedBy ? 'KYC Team' : null,
+        verifiedAt: doc.verifiedAt,
+        extractedData: doc.extractedData,
+        rejectionReason: doc.rejectionReason,
+      }));
 
       // Calculate KYC status
       const mandatoryDocs = requiredDocuments.filter(d => d.mandatory);
@@ -1145,16 +1449,8 @@ export function registerAgentRoutes(app: Express) {
 
         uploadedDocuments,
 
-        // Timeline of KYC progress
-        timeline: [
-          { date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), event: 'KYC process initiated', status: 'completed' },
-          { date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), event: 'PAN Card uploaded', status: 'completed' },
-          { date: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000), event: 'PAN Card verified', status: 'completed' },
-          { date: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), event: 'Aadhaar uploaded', status: 'completed' },
-          { date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), event: 'Aadhaar verified', status: 'completed' },
-          { date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), event: 'Address proof uploaded', status: 'pending' },
-          { date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), event: 'Bank details rejected', status: 'action_required' },
-        ],
+        // Timeline of KYC progress - built from actual document history
+        timeline: buildKycTimeline(uploadedDocuments),
 
         // Benefits unlocked with verified KYC
         benefits: {
@@ -1203,110 +1499,87 @@ export function registerAgentRoutes(app: Express) {
         return res.status(401).json({ error: 'User not authenticated' });
       }
 
-      // Mock data - In production, query from database
-      let documents = [
-        {
-          id: 1,
-          documentType: 'pan_card',
-          documentName: 'PAN Card',
-          fileName: 'pan_card_ABCDE1234F.pdf',
-          originalFileName: 'my_pan.pdf',
-          fileSize: 245000,
-          mimeType: 'application/pdf',
-          uploadedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-          status: 'verified',
-          verifiedBy: 'Amit Kumar',
-          verifiedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
-          extractedData: { panNumber: 'ABCDE1234F', name: 'Agent Name', dob: '1990-05-15' },
-          rejectionReason: null,
-          version: 1,
-          downloadUrl: '/api/agent/kyc/documents/1/download',
-        },
-        {
-          id: 2,
-          documentType: 'aadhaar',
-          documentName: 'Aadhaar Card',
-          fileName: 'aadhaar_masked.pdf',
-          originalFileName: 'aadhaar.pdf',
-          fileSize: 320000,
-          mimeType: 'application/pdf',
-          uploadedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-          status: 'verified',
-          verifiedBy: 'Priya Sharma',
-          verifiedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-          extractedData: { maskedAadhaar: 'XXXX XXXX 1234', name: 'Agent Name' },
-          rejectionReason: null,
-          version: 1,
-          downloadUrl: '/api/agent/kyc/documents/2/download',
-        },
-        {
-          id: 3,
-          documentType: 'address_proof',
-          documentName: 'Address Proof',
-          fileName: 'utility_bill_jan2026.pdf',
-          originalFileName: 'electricity_bill.pdf',
-          fileSize: 180000,
-          mimeType: 'application/pdf',
-          uploadedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-          status: 'pending_review',
-          verifiedBy: null,
-          verifiedAt: null,
-          extractedData: null,
-          rejectionReason: null,
-          version: 1,
-          downloadUrl: '/api/agent/kyc/documents/3/download',
-        },
-        {
-          id: 4,
-          documentType: 'bank_details',
-          documentName: 'Bank Account Proof',
-          fileName: 'cancelled_cheque.jpg',
-          originalFileName: 'cheque.jpg',
-          fileSize: 450000,
-          mimeType: 'image/jpeg',
-          uploadedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-          status: 'rejected',
-          verifiedBy: 'Amit Kumar',
-          verifiedAt: null,
-          extractedData: null,
-          rejectionReason: 'Image is blurry. Please upload a clear, high-resolution image of the cancelled cheque.',
-          version: 1,
-          downloadUrl: '/api/agent/kyc/documents/4/download',
-        },
-        {
-          id: 5,
-          documentType: 'photo',
-          documentName: 'Passport Photo',
-          fileName: 'passport_photo.jpg',
-          originalFileName: 'photo.jpg',
-          fileSize: 125000,
-          mimeType: 'image/jpeg',
-          uploadedAt: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000),
-          status: 'verified',
-          verifiedBy: 'System',
-          verifiedAt: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000),
-          extractedData: { faceDetected: true, backgroundValid: true },
-          rejectionReason: null,
-          version: 1,
-          downloadUrl: '/api/agent/kyc/documents/5/download',
-        },
-      ];
+      // Fetch real KYC documents from database
+      const kycDocsQuery = db
+        .select({
+          id: agentKycDocuments.id,
+          documentType: agentKycDocuments.documentType,
+          documentName: agentKycDocuments.documentName,
+          fileName: documents.fileName,
+          originalFileName: documents.originalName,
+          fileSize: documents.fileSize,
+          mimeType: documents.mimeType,
+          uploadedAt: agentKycDocuments.createdAt,
+          status: agentKycDocuments.verificationStatus,
+          verifiedBy: agentKycDocuments.verifiedBy,
+          verifiedAt: agentKycDocuments.verifiedAt,
+          extractedData: agentKycDocuments.ocrExtractedData,
+          rejectionReason: agentKycDocuments.rejectionReason,
+          version: agentKycDocuments.version,
+        })
+        .from(agentKycDocuments)
+        .leftJoin(documents, eq(agentKycDocuments.documentId, documents.id))
+        .where(eq(agentKycDocuments.agentId, agentId));
+
+      const kycDocsResult = await kycDocsQuery;
+
+      // Map document types and status to match frontend expectations
+      const documentTypeNames: Record<string, string> = {
+        'pan': 'PAN Card',
+        'pan_card': 'PAN Card',
+        'aadhaar': 'Aadhaar Card',
+        'bank_statement': 'Bank Account Proof',
+        'cancelled_cheque': 'Bank Account Proof',
+        'bank_details': 'Bank Account Proof',
+        'address_proof': 'Address Proof',
+        'photo': 'Passport Photo',
+        'signature': 'Signature',
+        'gst_certificate': 'GST Certificate',
+        'professional_cert': 'Professional Certificate',
+        'experience_letter': 'Experience Letter',
+      };
+
+      const statusMapping: Record<string, string> = {
+        'pending': 'pending_review',
+        'auto_verified': 'verified',
+        'manual_review': 'pending_review',
+        'verified': 'verified',
+        'rejected': 'rejected',
+      };
+
+      let kycDocuments = kycDocsResult.map(doc => ({
+        id: doc.id,
+        documentType: doc.documentType,
+        documentName: documentTypeNames[doc.documentType] || doc.documentName || doc.documentType,
+        fileName: doc.fileName || `${doc.documentType}_document`,
+        originalFileName: doc.originalFileName || doc.fileName,
+        fileSize: doc.fileSize || 0,
+        mimeType: doc.mimeType || 'application/octet-stream',
+        uploadedAt: doc.uploadedAt || new Date(),
+        status: statusMapping[doc.status || 'pending'] || 'pending_review',
+        verifiedBy: doc.verifiedBy ? 'KYC Team' : null,
+        verifiedAt: doc.verifiedAt,
+        extractedData: doc.extractedData,
+        rejectionReason: doc.rejectionReason,
+        version: doc.version || 1,
+        downloadUrl: `/api/agent/kyc/documents/${doc.id}/download`,
+      }));
 
       // Apply filters
       if (status && status !== 'all') {
-        documents = documents.filter(d => d.status === status);
+        kycDocuments = kycDocuments.filter(d => d.status === status);
       }
       if (documentType && documentType !== 'all') {
-        documents = documents.filter(d => d.documentType === documentType);
+        kycDocuments = kycDocuments.filter(d => d.documentType === documentType);
       }
 
       res.json({
-        documents,
-        total: documents.length,
+        documents: kycDocuments,
+        total: kycDocuments.length,
         summary: {
-          verified: documents.filter(d => d.status === 'verified').length,
-          pending: documents.filter(d => d.status === 'pending_review').length,
-          rejected: documents.filter(d => d.status === 'rejected').length,
+          verified: kycDocuments.filter(d => d.status === 'verified').length,
+          pending: kycDocuments.filter(d => d.status === 'pending_review').length,
+          rejected: kycDocuments.filter(d => d.status === 'rejected').length,
         },
       });
     } catch (error) {
@@ -1636,53 +1909,117 @@ export function registerAgentRoutes(app: Express) {
   app.get('/api/admin/agent-kyc/pending', ...adminAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { page = 1, limit = 20 } = req.query;
+      const pageNum = parseInt(page as string) || 1;
+      const limitNum = parseInt(limit as string) || 20;
+      const offset = (pageNum - 1) * limitNum;
 
-      // Mock data - In production, query agents with pending KYC documents
-      const pendingVerifications = [
-        {
-          agentId: 1,
-          agentCode: 'AGT001',
-          agentName: 'Rahul Verma',
-          email: 'rahul@example.com',
-          phone: '+91-98765-43210',
-          territory: 'Delhi NCR',
-          joiningDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
-          kycStatus: 'pending_verification',
-          pendingDocuments: [
-            { documentType: 'address_proof', uploadedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) },
-          ],
-          totalDocuments: 5,
-          verifiedDocuments: 4,
-          lastActivity: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-        },
-        {
-          agentId: 2,
-          agentCode: 'AGT002',
-          agentName: 'Priya Sharma',
-          email: 'priya@example.com',
-          phone: '+91-98765-43211',
-          territory: 'Mumbai',
-          joiningDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
-          kycStatus: 'action_required',
-          pendingDocuments: [
-            { documentType: 'bank_details', uploadedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), resubmission: true },
-          ],
-          totalDocuments: 5,
-          verifiedDocuments: 3,
-          lastActivity: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-        },
-      ];
+      // Get agents with pending KYC documents from database
+      const pendingDocsQuery = await db
+        .select({
+          agentId: agentKycDocuments.agentId,
+          documentType: agentKycDocuments.documentType,
+          uploadedAt: agentKycDocuments.createdAt,
+          version: agentKycDocuments.version,
+        })
+        .from(agentKycDocuments)
+        .where(eq(agentKycDocuments.verificationStatus, 'pending'));
+
+      // Get unique agent IDs with pending docs
+      const agentIdsWithPending = [...new Set(pendingDocsQuery.map(d => d.agentId))];
+
+      if (agentIdsWithPending.length === 0) {
+        return res.json({
+          agents: [],
+          total: 0,
+          page: pageNum,
+          limit: limitNum,
+          statistics: {
+            totalPending: 0,
+            awaitingInitialVerification: 0,
+            awaitingResubmission: 0,
+            avgVerificationTime: 'N/A',
+          },
+        });
+      }
+
+      // Get agent details and their document counts
+      const agentDetails = await Promise.all(
+        agentIdsWithPending.slice(offset, offset + limitNum).map(async (agentId) => {
+          // Get agent user info
+          const [agent] = await db
+            .select({
+              id: users.id,
+              fullName: users.fullName,
+              email: users.email,
+              phone: users.phone,
+              createdAt: users.createdAt,
+            })
+            .from(users)
+            .where(eq(users.id, agentId));
+
+          if (!agent) return null;
+
+          // Get agent profile if exists
+          const [profile] = await db
+            .select({
+              agentCode: agentProfiles.agentCode,
+              territory: agentProfiles.territory,
+            })
+            .from(agentProfiles)
+            .where(eq(agentProfiles.userId, agentId));
+
+          // Get all KYC documents for this agent
+          const allDocs = await db
+            .select({
+              id: agentKycDocuments.id,
+              documentType: agentKycDocuments.documentType,
+              verificationStatus: agentKycDocuments.verificationStatus,
+              createdAt: agentKycDocuments.createdAt,
+              version: agentKycDocuments.version,
+            })
+            .from(agentKycDocuments)
+            .where(eq(agentKycDocuments.agentId, agentId));
+
+          const pendingDocs = allDocs.filter(d => d.verificationStatus === 'pending');
+          const verifiedDocs = allDocs.filter(d => d.verificationStatus === 'verified');
+          const lastActivity = allDocs.length > 0
+            ? new Date(Math.max(...allDocs.map(d => new Date(d.createdAt || 0).getTime())))
+            : null;
+
+          return {
+            agentId: agent.id,
+            agentCode: profile?.agentCode || `AGT${String(agent.id).padStart(3, '0')}`,
+            agentName: agent.fullName || 'Unknown',
+            email: agent.email,
+            phone: agent.phone || 'N/A',
+            territory: profile?.territory || 'Unassigned',
+            joiningDate: agent.createdAt,
+            kycStatus: pendingDocs.some(d => (d.version || 1) > 1) ? 'action_required' : 'pending_verification',
+            pendingDocuments: pendingDocs.map(d => ({
+              documentType: d.documentType,
+              uploadedAt: d.createdAt,
+              resubmission: (d.version || 1) > 1,
+            })),
+            totalDocuments: allDocs.length,
+            verifiedDocuments: verifiedDocs.length,
+            lastActivity,
+          };
+        })
+      );
+
+      const validAgents = agentDetails.filter(a => a !== null);
+      const awaitingResubmission = validAgents.filter(a => a.kycStatus === 'action_required').length;
 
       res.json({
-        agents: pendingVerifications,
-        total: pendingVerifications.length,
-        page: parseInt(page as string),
-        limit: parseInt(limit as string),
+        agents: validAgents,
+        total: agentIdsWithPending.length,
+        page: pageNum,
+        limit: limitNum,
         statistics: {
-          totalPending: pendingVerifications.length,
-          awaitingInitialVerification: 1,
-          awaitingResubmission: 1,
-          avgVerificationTime: '1.5 days',
+          totalPending: agentIdsWithPending.length,
+          awaitingInitialVerification: agentIdsWithPending.length - awaitingResubmission,
+          awaitingResubmission,
+          avgVerificationTime: 'N/A',
         },
       });
     } catch (error) {
@@ -1698,62 +2035,144 @@ export function registerAgentRoutes(app: Express) {
    */
   app.get('/api/admin/agent-kyc/:agentId', ...adminAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { agentId } = req.params;
+      const agentId = parseInt(req.params.agentId);
 
-      // Mock data - In production, fetch from database
-      const agentKyc = {
+      if (isNaN(agentId)) {
+        return res.status(400).json({ error: 'Invalid agent ID' });
+      }
+
+      // Get agent user info
+      const [agent] = await db
+        .select({
+          id: users.id,
+          fullName: users.fullName,
+          email: users.email,
+          phone: users.phone,
+          createdAt: users.createdAt,
+        })
+        .from(users)
+        .where(eq(users.id, agentId));
+
+      if (!agent) {
+        return res.status(404).json({ error: 'Agent not found' });
+      }
+
+      // Get agent profile if exists
+      const [profile] = await db
+        .select({
+          agentCode: agentProfiles.agentCode,
+          territory: agentProfiles.territory,
+        })
+        .from(agentProfiles)
+        .where(eq(agentProfiles.userId, agentId));
+
+      // Get all KYC documents for this agent with document file info
+      const kycDocs = await db
+        .select({
+          id: agentKycDocuments.id,
+          documentType: agentKycDocuments.documentType,
+          documentName: agentKycDocuments.documentName,
+          verificationStatus: agentKycDocuments.verificationStatus,
+          createdAt: agentKycDocuments.createdAt,
+          verifiedBy: agentKycDocuments.verifiedBy,
+          verifiedAt: agentKycDocuments.verifiedAt,
+          ocrExtractedData: agentKycDocuments.ocrExtractedData,
+          rejectionReason: agentKycDocuments.rejectionReason,
+          version: agentKycDocuments.version,
+          documentId: agentKycDocuments.documentId,
+          fileName: documents.fileName,
+        })
+        .from(agentKycDocuments)
+        .leftJoin(documents, eq(agentKycDocuments.documentId, documents.id))
+        .where(eq(agentKycDocuments.agentId, agentId))
+        .orderBy(desc(agentKycDocuments.createdAt));
+
+      // Get verifier names for documents
+      const verifierIds = [...new Set(kycDocs.filter(d => d.verifiedBy).map(d => d.verifiedBy))];
+      const verifiers = verifierIds.length > 0
+        ? await db
+            .select({ id: users.id, fullName: users.fullName })
+            .from(users)
+            .where(sql`${users.id} IN ${verifierIds}`)
+        : [];
+      const verifierMap = new Map(verifiers.map(v => [v.id, v.fullName]));
+
+      // Format documents
+      const formattedDocs = kycDocs.map(doc => ({
+        id: doc.id,
+        documentType: doc.documentType,
+        documentName: doc.documentName || doc.documentType?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        status: doc.verificationStatus,
+        fileName: doc.fileName || 'document.pdf',
+        uploadedAt: doc.createdAt,
+        verifiedBy: doc.verifiedBy ? verifierMap.get(doc.verifiedBy) || 'Admin' : null,
+        verifiedAt: doc.verifiedAt,
+        extractedData: doc.ocrExtractedData,
+        rejectionReason: doc.rejectionReason,
+        version: doc.version,
+      }));
+
+      // Get verification history from log
+      const docIds = kycDocs.map(d => d.id);
+      const historyLogs = docIds.length > 0
+        ? await db
+            .select({
+              action: kycVerificationLog.action,
+              kycDocumentId: kycVerificationLog.kycDocumentId,
+              performedBy: kycVerificationLog.performedBy,
+              notes: kycVerificationLog.notes,
+              createdAt: kycVerificationLog.createdAt,
+            })
+            .from(kycVerificationLog)
+            .where(sql`${kycVerificationLog.kycDocumentId} IN ${docIds}`)
+            .orderBy(desc(kycVerificationLog.createdAt))
+        : [];
+
+      // Get performer names
+      const performerIds = [...new Set(historyLogs.filter(l => l.performedBy).map(l => l.performedBy))];
+      const performers = performerIds.length > 0
+        ? await db
+            .select({ id: users.id, fullName: users.fullName })
+            .from(users)
+            .where(sql`${users.id} IN ${performerIds}`)
+        : [];
+      const performerMap = new Map(performers.map(p => [p.id, p.fullName]));
+
+      // Map doc IDs to document types
+      const docTypeMap = new Map(kycDocs.map(d => [d.id, d.documentType]));
+
+      const verificationHistory = historyLogs.map(log => ({
+        action: log.action,
+        documentType: docTypeMap.get(log.kycDocumentId) || 'unknown',
+        by: log.performedBy ? performerMap.get(log.performedBy) || 'Admin' : 'System',
+        at: log.createdAt,
+        notes: log.notes,
+      }));
+
+      // Determine overall KYC status
+      const hasPending = formattedDocs.some(d => d.status === 'pending' || d.status === 'pending_review');
+      const hasRejected = formattedDocs.some(d => d.status === 'rejected');
+      const allVerified = formattedDocs.length > 0 && formattedDocs.every(d => d.status === 'verified');
+      let overallStatus = 'not_started';
+      if (allVerified) overallStatus = 'verified';
+      else if (hasRejected) overallStatus = 'action_required';
+      else if (hasPending) overallStatus = 'pending_verification';
+      else if (formattedDocs.length > 0) overallStatus = 'documents_pending';
+
+      res.json({
         agent: {
-          id: parseInt(agentId),
-          agentCode: 'AGT001',
-          name: 'Rahul Verma',
-          email: 'rahul@example.com',
-          phone: '+91-98765-43210',
-          territory: 'Delhi NCR',
-          joiningDate: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
+          id: agent.id,
+          agentCode: profile?.agentCode || `AGT${String(agent.id).padStart(3, '0')}`,
+          name: agent.fullName || 'Unknown',
+          email: agent.email,
+          phone: agent.phone || 'N/A',
+          territory: profile?.territory || 'Unassigned',
+          joiningDate: agent.createdAt,
         },
-        kycStatus: 'pending_verification',
-        documents: [
-          {
-            id: 1,
-            documentType: 'pan_card',
-            documentName: 'PAN Card',
-            status: 'verified',
-            fileName: 'pan_card.pdf',
-            uploadedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-            verifiedBy: 'Admin User',
-            verifiedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
-            extractedData: { panNumber: 'ABCDE1234F', name: 'Rahul Verma' },
-          },
-          {
-            id: 2,
-            documentType: 'aadhaar',
-            documentName: 'Aadhaar Card',
-            status: 'verified',
-            fileName: 'aadhaar.pdf',
-            uploadedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-            verifiedBy: 'Admin User',
-            verifiedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-            extractedData: { maskedAadhaar: 'XXXX XXXX 1234' },
-          },
-          {
-            id: 3,
-            documentType: 'address_proof',
-            documentName: 'Address Proof',
-            status: 'pending_review',
-            fileName: 'utility_bill.pdf',
-            uploadedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-            verifiedBy: null,
-            verifiedAt: null,
-            extractedData: null,
-          },
-        ],
-        verificationHistory: [
-          { action: 'verified', documentType: 'pan_card', by: 'Admin User', at: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000), notes: 'All details verified' },
-          { action: 'verified', documentType: 'aadhaar', by: 'Admin User', at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), notes: 'Aadhaar verified via DigiLocker' },
-        ],
-      };
-
-      res.json(agentKyc);
+        kycStatus: overallStatus,
+        documents: formattedDocs,
+        verificationHistory,
+      });
     } catch (error) {
       console.error('Error fetching agent KYC:', error);
       res.status(500).json({ error: 'Failed to fetch agent KYC details' });
@@ -1767,24 +2186,63 @@ export function registerAgentRoutes(app: Express) {
    */
   app.patch('/api/admin/agent-kyc/:agentId/documents/:documentId/verify', ...adminAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { agentId, documentId } = req.params;
+      const agentId = parseInt(req.params.agentId);
+      const documentId = parseInt(req.params.documentId);
       const { extractedData, notes } = req.body;
-      const verifiedBy = req.user?.fullName || req.user?.username || 'Admin';
+      const verifierId = req.user?.id;
 
-      // Mock verification - In production, update database
-      const verifiedDocument = {
-        id: parseInt(documentId),
-        agentId: parseInt(agentId),
-        status: 'verified',
-        verifiedBy,
-        verifiedAt: new Date(),
-        extractedData,
+      if (isNaN(agentId) || isNaN(documentId)) {
+        return res.status(400).json({ error: 'Invalid agent or document ID' });
+      }
+
+      // Verify the document belongs to the agent
+      const [existingDoc] = await db
+        .select()
+        .from(agentKycDocuments)
+        .where(and(
+          eq(agentKycDocuments.id, documentId),
+          eq(agentKycDocuments.agentId, agentId)
+        ));
+
+      if (!existingDoc) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      // Update document verification status
+      const [updatedDoc] = await db
+        .update(agentKycDocuments)
+        .set({
+          verificationStatus: 'verified',
+          verifiedBy: verifierId,
+          verifiedAt: new Date(),
+          ocrExtractedData: extractedData || existingDoc.ocrExtractedData,
+          verificationNotes: notes,
+          updatedAt: new Date(),
+        })
+        .where(eq(agentKycDocuments.id, documentId))
+        .returning();
+
+      // Log the verification action
+      await db.insert(kycVerificationLog).values({
+        kycDocumentId: documentId,
+        action: 'approved',
+        performedBy: verifierId,
+        performedByRole: req.user?.role || 'admin',
+        previousStatus: existingDoc.verificationStatus,
+        newStatus: 'verified',
         notes,
-      };
+      });
 
       res.json({
         message: 'Document verified successfully',
-        document: verifiedDocument,
+        document: {
+          id: updatedDoc.id,
+          agentId: updatedDoc.agentId,
+          status: updatedDoc.verificationStatus,
+          verifiedBy: req.user?.fullName || 'Admin',
+          verifiedAt: updatedDoc.verifiedAt,
+          extractedData: updatedDoc.ocrExtractedData,
+        },
       });
     } catch (error) {
       console.error('Error verifying document:', error);
@@ -1799,28 +2257,65 @@ export function registerAgentRoutes(app: Express) {
    */
   app.patch('/api/admin/agent-kyc/:agentId/documents/:documentId/reject', ...adminAuth, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { agentId, documentId } = req.params;
+      const agentId = parseInt(req.params.agentId);
+      const documentId = parseInt(req.params.documentId);
       const { reason, notes } = req.body;
-      const rejectedBy = req.user?.fullName || req.user?.username || 'Admin';
+      const rejectedById = req.user?.id;
+
+      if (isNaN(agentId) || isNaN(documentId)) {
+        return res.status(400).json({ error: 'Invalid agent or document ID' });
+      }
 
       if (!reason) {
         return res.status(400).json({ error: 'Rejection reason is required' });
       }
 
-      // Mock rejection - In production, update database and notify agent
-      const rejectedDocument = {
-        id: parseInt(documentId),
-        agentId: parseInt(agentId),
-        status: 'rejected',
-        rejectedBy,
-        rejectedAt: new Date(),
-        rejectionReason: reason,
-        notes,
-      };
+      // Verify the document belongs to the agent
+      const [existingDoc] = await db
+        .select()
+        .from(agentKycDocuments)
+        .where(and(
+          eq(agentKycDocuments.id, documentId),
+          eq(agentKycDocuments.agentId, agentId)
+        ));
+
+      if (!existingDoc) {
+        return res.status(404).json({ error: 'Document not found' });
+      }
+
+      // Update document with rejection
+      const [updatedDoc] = await db
+        .update(agentKycDocuments)
+        .set({
+          verificationStatus: 'rejected',
+          rejectionReason: reason,
+          verificationNotes: notes,
+          updatedAt: new Date(),
+        })
+        .where(eq(agentKycDocuments.id, documentId))
+        .returning();
+
+      // Log the rejection action
+      await db.insert(kycVerificationLog).values({
+        kycDocumentId: documentId,
+        action: 'rejected',
+        performedBy: rejectedById,
+        performedByRole: req.user?.role || 'admin',
+        previousStatus: existingDoc.verificationStatus,
+        newStatus: 'rejected',
+        notes: `Reason: ${reason}${notes ? `. Notes: ${notes}` : ''}`,
+      });
 
       res.json({
         message: 'Document rejected. Agent will be notified to resubmit.',
-        document: rejectedDocument,
+        document: {
+          id: updatedDoc.id,
+          agentId: updatedDoc.agentId,
+          status: updatedDoc.verificationStatus,
+          rejectedBy: req.user?.fullName || 'Admin',
+          rejectedAt: updatedDoc.updatedAt,
+          rejectionReason: updatedDoc.rejectionReason,
+        },
       });
     } catch (error) {
       console.error('Error rejecting document:', error);
@@ -1995,4 +2490,70 @@ function getNextSteps(status: string, uploadedDocs: any[], requiredDocs: any[]):
   }
 
   return steps;
+}
+
+function buildKycTimeline(uploadedDocs: any[]): Array<{ date: Date; event: string; status: string }> {
+  const timeline: Array<{ date: Date; event: string; status: string }> = [];
+
+  // If no documents uploaded, return empty timeline
+  if (!uploadedDocs || uploadedDocs.length === 0) {
+    return timeline;
+  }
+
+  // Find earliest upload date as KYC initiation
+  const sortedByDate = [...uploadedDocs].sort((a, b) =>
+    new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime()
+  );
+
+  if (sortedByDate.length > 0) {
+    timeline.push({
+      date: new Date(sortedByDate[0].uploadedAt),
+      event: 'KYC process initiated',
+      status: 'completed',
+    });
+  }
+
+  // Add events for each document
+  for (const doc of uploadedDocs) {
+    const docName = getDocumentTypeName(doc.documentType);
+
+    // Upload event
+    timeline.push({
+      date: new Date(doc.uploadedAt),
+      event: `${docName} uploaded`,
+      status: 'completed',
+    });
+
+    // Verification event (if verified)
+    if (doc.status === 'verified' && doc.verifiedAt) {
+      timeline.push({
+        date: new Date(doc.verifiedAt),
+        event: `${docName} verified`,
+        status: 'completed',
+      });
+    }
+
+    // Rejection event (if rejected)
+    if (doc.status === 'rejected') {
+      timeline.push({
+        date: new Date(doc.uploadedAt),
+        event: `${docName} rejected`,
+        status: 'action_required',
+      });
+    }
+
+    // Pending event
+    if (doc.status === 'pending_review') {
+      timeline.push({
+        date: new Date(doc.uploadedAt),
+        event: `${docName} awaiting review`,
+        status: 'pending',
+      });
+    }
+  }
+
+  // Sort timeline by date (newest first)
+  timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return timeline;
 }

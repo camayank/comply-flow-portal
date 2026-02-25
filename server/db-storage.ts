@@ -363,6 +363,14 @@ export class DbServiceRequestsStorage {
     await db.delete(serviceRequests).where(eq(serviceRequests.id, id));
     return true;
   }
+
+  async getServiceRequestsByUser(userId: number): Promise<ServiceRequest[]> {
+    const requests = await db.select()
+      .from(serviceRequests)
+      .where(eq(serviceRequests.userId, userId))
+      .orderBy(desc(serviceRequests.createdAt));
+    return requests;
+  }
 }
 
 // Business Entities (Clients) Storage

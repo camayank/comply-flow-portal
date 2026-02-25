@@ -94,7 +94,7 @@ router.post('/service-requests/:serviceRequestId/documents', upload.array('files
           path: uploadResult.path,
           sizeBytes: uploadResult.size,
           mimeType: uploadResult.mimetype,
-          uploader: 'client', // TODO: Get from authenticated user
+          uploader: req.user?.id ? String(req.user.id) : 'unknown',
           status: 'pending_review',
           version: 1,
           uploadedAt: new Date()

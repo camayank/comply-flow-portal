@@ -504,7 +504,8 @@ export function registerClientAccountRoutes(app: Express) {
       }
 
       const security = {
-        passwordLastChanged: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // TODO: Track actual password change
+        // Use updatedAt as proxy for password change (actual password_changed_at column would be better)
+        passwordLastChanged: user?.updatedAt || user?.createdAt || new Date(),
         twoFactorEnabled,
         twoFactorMethod: twoFactorEnabled ? 'authenticator' : null,
         trustedDevices: [

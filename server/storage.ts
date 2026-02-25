@@ -2744,6 +2744,10 @@ class HybridStorage extends MemStorage {
     return dbServiceRequestsStorage.deleteServiceRequest(id);
   }
 
+  async getServiceRequestsByUser(userId: number): Promise<ServiceRequest[]> {
+    return dbServiceRequestsStorage.getServiceRequestsByUser(userId);
+  }
+
   // Override business entity methods to use database
   async getAllBusinessEntities(filters?: {
     search?: string;

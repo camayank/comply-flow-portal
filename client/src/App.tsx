@@ -36,6 +36,7 @@ const SyncDashboard = lazy(() => import("@/features/shared/pages/SyncDashboard")
 const SmartSuggestionsEngine = lazy(() => import("@/features/shared/pages/SmartSuggestions"));
 const WhatsAppOnboarding = lazy(() => import("@/features/shared/pages/WhatsAppOnboarding"));
 const KnowledgeBase = lazy(() => import("@/features/shared/pages/KnowledgeBase"));
+const SharedProfileSettings = lazy(() => import("@/features/shared/pages/ProfileSettings"));
 const DesignSystemShowcase = lazy(() => import("./components/DesignSystemShowcase"));
 const DigiComplyWorkflowDashboard = lazy(() => import("./components/DigiComplyWorkflowDashboard"));
 
@@ -71,7 +72,7 @@ const ServiceRequestDetail = lazy(() => import("@/features/client-portal/pages/S
 const ClientComplianceCalendar = lazy(() => import("@/features/client-portal/pages/ComplianceCalendar"));
 const ClientProfile = lazy(() => import("@/features/client-portal/pages/Profile"));
 const DocumentVault = lazy(() => import("@/features/client-portal/pages/DocumentVault"));
-const ReferralDashboard = lazy(() => import("@/features/client-portal/pages/Referrals"));
+// const ReferralDashboard = lazy(() => import("@/features/client-portal/pages/Referrals")); // Hidden for MVP
 const RetainershipPlans = lazy(() => import("@/features/client-portal/pages/RetainershipPlans"));
 const LifecycleDashboard = lazy(() => import("@/features/client-portal/pages/LifecycleDashboard"));
 const ComplianceDetail = lazy(() => import("@/features/compliance/pages/Detail"));
@@ -153,6 +154,7 @@ const SalesDashboard = lazy(() => import("@/features/sales/pages/Dashboard"));
 const MobileAgentPortal = lazy(() => import("@/features/agent/pages/Portal"));
 const AgentDashboard = lazy(() => import("@/features/agent/pages/Dashboard"));
 const AgentLeadManagement = lazy(() => import("@/features/agent/pages/LeadManagement"));
+const AgentLeadDetail = lazy(() => import("@/features/agent/pages/LeadDetail"));
 const AgentCommissionTracker = lazy(() => import("@/features/agent/pages/CommissionTracker"));
 const AgentPerformance = lazy(() => import("@/features/agent/pages/Performance"));
 const AgentProfileSettings = lazy(() => import("@/features/agent/pages/ProfileSettings"));
@@ -414,9 +416,11 @@ const AppContent = () => {
                 <Route path="/profile" component={ClientProfile} />
                 <Route path="/client-profile" component={ClientProfile} />
                 <Route path="/vault" component={DocumentVault} />
+                {/* Wallet/Referrals hidden for MVP - features not yet backed by real data
                 <Route path="/referrals" component={ReferralDashboard} />
                 <Route path="/referral-dashboard" component={ReferralDashboard} />
                 <Route path="/wallet" component={ReferralDashboard} />
+                */}
                 <Route path="/retainership" component={RetainershipPlans} />
                 <Route path="/lifecycle" component={LifecycleDashboard} />
                 <Route path="/lifecycle-dashboard" component={LifecycleDashboard} />
@@ -480,6 +484,8 @@ const AppContent = () => {
                 <Route path="/ops/tasks/:taskId" component={OpsTaskDetail} />
                 <Route path="/operations/tasks" component={OpsTasksView} />
                 <Route path="/operations/tasks/:taskId" component={OpsTaskDetail} />
+                <Route path="/operations/profile" component={SharedProfileSettings} />
+                <Route path="/operations/settings" component={SharedProfileSettings} />
 
                 {/* ========== ADMIN ROUTES ========== */}
                 <Route path="/admin" component={MobileAdminPanelRefactored} />
@@ -516,6 +522,8 @@ const AppContent = () => {
                 <Route path="/client-management" component={ClientMasterDashboard} />
                 <Route path="/admin/webhooks" component={WebhookManagement} />
                 <Route path="/admin/api-keys" component={APIKeyManagement} />
+                <Route path="/admin/profile" component={SharedProfileSettings} />
+                <Route path="/admin/settings" component={SharedProfileSettings} />
                 <Route path="/developer/api-keys" component={APIKeyManagement} />
 
                 {/* ========== SUPER ADMIN ROUTES ========== */}
@@ -528,6 +536,8 @@ const AppContent = () => {
                 <Route path="/super-admin/operations" component={Operations} />
                 <Route path="/super-admin/analytics" component={Analytics} />
                 <Route path="/super-admin/services" component={SuperAdminServices} />
+                <Route path="/super-admin/profile" component={SharedProfileSettings} />
+                <Route path="/super-admin/settings" component={SharedProfileSettings} />
 
                 {/* ========== SALES ROUTES ========== */}
                 <Route path="/leads" component={LeadManagement} />
@@ -545,15 +555,19 @@ const AppContent = () => {
                 <Route path="/sales/team" component={SalesDashboard} />
                 <Route path="/sales/forecasts" component={SalesDashboard} />
                 <Route path="/sales/targets" component={SalesDashboard} />
+                <Route path="/sales/profile" component={SharedProfileSettings} />
+                <Route path="/sales/settings" component={SharedProfileSettings} />
 
                 {/* ========== AGENT ROUTES ========== */}
                 <Route path="/agent" component={MobileAgentPortal} />
                 <Route path="/agent/dashboard" component={AgentDashboard} />
                 <Route path="/agent/leads" component={AgentLeadManagement} />
+                <Route path="/agent/leads/:id" component={AgentLeadDetail} />
                 <Route path="/agent/clients" component={AgentLeadManagement} />
                 <Route path="/agent/commissions" component={AgentCommissionTracker} />
                 <Route path="/agent/performance" component={AgentPerformance} />
                 <Route path="/agent/profile" component={AgentProfileSettings} />
+                <Route path="/agent/settings" component={SharedProfileSettings} />
                 <Route path="/agent/disputes" component={CommissionDisputes} />
                 <Route path="/agent/kyc" component={AgentKYC} />
                 <Route path="/agent/commission-disputes" component={CommissionDisputes} />
@@ -566,6 +580,8 @@ const AppContent = () => {
                 {/* ========== QC ROUTES ========== */}
                 <Route path="/qc" component={QCDashboard} />
                 <Route path="/qc/queue" component={QCDashboard} />
+                <Route path="/qc/profile" component={SharedProfileSettings} />
+                <Route path="/qc/settings" component={SharedProfileSettings} />
                 <Route path="/qc-dashboard" component={QCDashboard} />
                 <Route path="/quality-control" component={QCDashboard} />
                 <Route path="/qc-delivery-handoff" component={QCDeliveryHandoff} />
@@ -576,6 +592,8 @@ const AppContent = () => {
 
                 {/* ========== CUSTOMER SUCCESS ROUTES ========== */}
                 <Route path="/customer-service" component={CustomerServiceDashboard} />
+                <Route path="/customer-service/profile" component={SharedProfileSettings} />
+                <Route path="/customer-service/settings" component={SharedProfileSettings} />
                 <Route path="/customer-success/playbooks" component={PlaybookManagement} />
                 <Route path="/playbooks" component={PlaybookManagement} />
                 <Route path="/customer-success/renewals" component={RenewalPipeline} />
@@ -597,9 +615,13 @@ const AppContent = () => {
                 <Route path="/financial-management/invoices" component={FinancialManagementDashboard} />
                 <Route path="/financial-management/revenue" component={FinancialManagementDashboard} />
                 <Route path="/financial-management/reports" component={FinancialManagementDashboard} />
+                <Route path="/financial-management/profile" component={SharedProfileSettings} />
+                <Route path="/financial-management/settings" component={SharedProfileSettings} />
                 <Route path="/financials" component={FinancialManagementDashboard} />
                 <Route path="/revenue-analytics" component={FinancialManagementDashboard} />
                 <Route path="/hr" component={HRDashboard} />
+                <Route path="/hr/profile" component={SharedProfileSettings} />
+                <Route path="/hr/settings" component={SharedProfileSettings} />
                 <Route path="/hr-dashboard" component={HRDashboard} />
                 <Route path="/human-resources" component={HRDashboard} />
 

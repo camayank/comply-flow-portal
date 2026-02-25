@@ -12,7 +12,7 @@
 import { db } from '../db';
 import {
   orderTasks, orderTaskActivityLog, serviceRequests, qualityReviews, users,
-  operationsTeam, workflowTemplates,
+  operationsTeam, workflowTemplates, commissions,
   ORDER_TASK_STATUS, ORDER_TASK_TYPE, QC_REVIEW_STATUS,
   type OrderTask, type InsertOrderTask, type ServiceRequest
 } from '@shared/schema';
@@ -1272,6 +1272,11 @@ export class TaskInstantiationService {
             serviceRequest.requestId || `SR-${serviceRequestId}`
           );
         }
+
+        // COMMISSION: Calculate and credit agent commission
+        if (serviceRequest?.assignedAgentId && serviceRequest?.price) {
+          await this.calculateAndCreditCommission(serviceRequest);
+        }
       }
 
       return { progress: progressPercentage, completed: allCompleted };
@@ -1608,6 +1613,40 @@ export class TaskInstantiationService {
       logger.info(`[Notification] Document requested notification sent to user ${clientUserId}`);
     } catch (error) {
       logger.error(`[Notification] Failed to send document requested notification:`, error);
+    }
+  }
+
+  /**
+   * Calculate and credit commission to agent on service completion
+   */
+  async calculateAndCreditCommission(serviceRequest: ServiceRequest): Promise<void> {
+    try {
+      const agentId = serviceRequest.assignedAgentId;
+      const baseAmount = parseFloat(serviceRequest.price || '0');
+
+      if (!agentId || baseAmount <= 0) {
+        logger.info(`[Commission] Skipping - no agent or zero amount for SR ${serviceRequest.id}`);
+        return;
+      }
+
+      // Default 5% commission rate (can be customized based on agent tier/rules later)
+      const commissionRate = 5;
+      const commissionAmount = baseAmount * (commissionRate / 100);
+
+      // Create commission record
+      await db.insert(commissions).values({
+        agentId,
+        serviceRequestId: serviceRequest.id,
+        commissionType: 'service',
+        baseAmount: baseAmount.toString(),
+        commissionRate: commissionRate.toString(),
+        commissionAmount: commissionAmount.toString(),
+        status: 'pending',
+      });
+
+      logger.info(`[Commission] Created commission of ₹${commissionAmount.toFixed(2)} for agent ${agentId} on SR ${serviceRequest.id}`);
+    } catch (error) {
+      logger.error(`[Commission] Failed to create commission for SR ${serviceRequest.id}:`, error);
     }
   }
 }

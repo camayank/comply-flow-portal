@@ -247,7 +247,7 @@ complianceStateRoutes.post('/alerts/:alertId/acknowledge', requireAuth, async (r
  */
 complianceStateRoutes.post('/recalculate-all', requireAuth, async (req: Request, res: Response) => {
   try {
-    // TODO: Add admin check
+    // Admin check - only super_admin and admin can trigger bulk recalculation
     const userRole = (req as any).user?.role;
     if (userRole !== 'super_admin' && userRole !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
