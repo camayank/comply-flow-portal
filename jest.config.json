@@ -15,6 +15,7 @@
   ],
   "transform": {
     "^.+\\.ts$": ["ts-jest", {
+      "diagnostics": false,
       "tsconfig": {
         "module": "commonjs",
         "moduleResolution": "node",
@@ -30,6 +31,9 @@
     "^@shared/(.*)$": "<rootDir>/shared/$1"
   },
   "moduleFileExtensions": ["ts", "js", "json", "node"],
+  "transformIgnorePatterns": [
+    "node_modules/(?!(nanoid)/)"
+  ],
   "collectCoverageFrom": [
     "server/**/*.ts",
     "shared/**/*.ts",

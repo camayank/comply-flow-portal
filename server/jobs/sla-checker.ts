@@ -52,6 +52,19 @@ export async function getSLASummary(): Promise<{
   }
 }
 
+/**
+ * Check for SLA breaches - lightweight wrapper for setInterval registration.
+ * Used by server/index.ts to register the periodic SLA check job.
+ */
+export async function checkSlaBreaches(): Promise<void> {
+  try {
+    const result = await slaService.checkBreachesAndEscalate();
+    logger.info('SLA breach check completed', result);
+  } catch (error) {
+    logger.error('SLA breach check failed:', error);
+  }
+}
+
 // Export for use as standalone script
 if (require.main === module) {
   runSLACheck()

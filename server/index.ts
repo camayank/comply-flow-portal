@@ -15,6 +15,7 @@ import { sanitizeRequest, globalErrorHandler, trackRequest } from "./robustness-
 import { jobManager } from "./job-lifecycle-manager";
 import { apmMiddleware } from "./monitoring";
 import './compliance-state-scheduler'; // Auto-start compliance state scheduler
+import { checkSlaBreaches } from './jobs/sla-checker';
 
 // Validate environment variables on startup
 const env = validateEnv();
@@ -63,6 +64,10 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// XSS input sanitization (after body parser, before routes)
+import { sanitizeInput } from './middleware/sanitize';
+app.use(sanitizeInput);
 app.use(express.static('public'));
 
 // Request logging and correlation
@@ -125,8 +130,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rate limiting DISABLED for development/testing
-// Re-enable in production with proper configuration
+// Rate limiting
+import { apiLimiter, authLimiter } from './middleware/rateLimiter';
+app.use('/api/auth/', authLimiter);
+app.use('/api/', apiLimiter);
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -267,6 +274,12 @@ app.use((req, res, next) => {
     log(`serving on port ${port}`);
     logStartup(port);
   });
+
+  // Register SLA checker job (every 15 minutes)
+  if (process.env.NODE_ENV !== 'test') {
+    setInterval(() => checkSlaBreaches(), 15 * 60 * 1000);
+    logger.info('SLA checker job registered (every 15 minutes)');
+  }
 
   // Graceful shutdown handler
   const shutdown = async (signal: string) => {

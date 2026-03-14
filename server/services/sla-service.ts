@@ -71,6 +71,12 @@ const BUSINESS_HOURS = {
   workDays: [1, 2, 3, 4, 5] // Monday to Friday
 };
 
+// IST timezone constants for environment-agnostic business hour calculations
+const IST_OFFSET_MS = 330 * 60 * 1000; // UTC + 5:30 (330 minutes)
+const MS_PER_HOUR = 60 * 60 * 1000;
+const MS_PER_MINUTE = 60 * 1000;
+const MS_PER_DAY = 24 * MS_PER_HOUR;
+
 // ============================================
 // SLA SERVICE CLASS
 // ============================================
@@ -131,51 +137,46 @@ class SLAService {
   }
 
   /**
-   * Add business hours to a date
-   * Only counts hours during business days (Mon-Fri) and business hours (9 AM - 6 PM)
+   * Add business hours to a date, using IST (UTC+05:30) millisecond arithmetic.
+   * Environment-agnostic: never uses getHours/setHours/getDay which depend on local TZ.
+   * Only counts hours during business days (Mon-Fri) and business hours (9 AM - 6 PM IST).
    */
   addBusinessHours(startDate: Date, hours: number): Date {
-    const result = new Date(startDate);
-    let remainingHours = hours;
+    let istMs = startDate.getTime() + IST_OFFSET_MS;
+    let remaining = hours;
+    const BUSINESS_START = 9;
+    const BUSINESS_END = 18;
 
-    while (remainingHours > 0) {
-      const dayOfWeek = result.getDay();
-      const currentHour = result.getHours();
+    while (remaining > 0) {
+      const msInDay = ((istMs % MS_PER_DAY) + MS_PER_DAY) % MS_PER_DAY;
+      const hour = Math.floor(msInDay / MS_PER_HOUR);
+      const minute = Math.floor((msInDay % MS_PER_HOUR) / MS_PER_MINUTE);
+      const dayOfWeek = new Date(istMs).getUTCDay();
+      const dayStart = istMs - msInDay;
 
-      // Check if it's a business day
-      if (BUSINESS_HOURS.workDays.includes(dayOfWeek)) {
-        // If before business hours, move to start of business hours
-        if (currentHour < BUSINESS_HOURS.start) {
-          result.setHours(BUSINESS_HOURS.start, 0, 0, 0);
-        }
-        // If during business hours
-        else if (currentHour >= BUSINESS_HOURS.start && currentHour < BUSINESS_HOURS.end) {
-          const hoursLeftToday = BUSINESS_HOURS.end - currentHour;
+      // Skip weekends
+      if (dayOfWeek === 0) { istMs = dayStart + MS_PER_DAY + BUSINESS_START * MS_PER_HOUR; continue; }
+      if (dayOfWeek === 6) { istMs = dayStart + 2 * MS_PER_DAY + BUSINESS_START * MS_PER_HOUR; continue; }
 
-          if (remainingHours <= hoursLeftToday) {
-            result.setHours(result.getHours() + remainingHours);
-            remainingHours = 0;
-          } else {
-            remainingHours -= hoursLeftToday;
-            result.setDate(result.getDate() + 1);
-            result.setHours(BUSINESS_HOURS.start, 0, 0, 0);
-          }
-          continue;
-        }
-        // If after business hours, move to next day
-        else {
-          result.setDate(result.getDate() + 1);
-          result.setHours(BUSINESS_HOURS.start, 0, 0, 0);
-        }
+      // Before business hours -> snap to start
+      if (hour < BUSINESS_START) { istMs = dayStart + BUSINESS_START * MS_PER_HOUR; continue; }
+
+      // After business hours -> snap to next day start
+      if (hour >= BUSINESS_END) { istMs = dayStart + MS_PER_DAY + BUSINESS_START * MS_PER_HOUR; continue; }
+
+      const availableMs = (BUSINESS_END * MS_PER_HOUR) - (hour * MS_PER_HOUR + minute * MS_PER_MINUTE);
+      const remainingMs = remaining * MS_PER_HOUR;
+
+      if (remainingMs <= availableMs) {
+        istMs += remainingMs;
+        remaining = 0;
       } else {
-        // Weekend - move to next Monday
-        const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
-        result.setDate(result.getDate() + daysUntilMonday);
-        result.setHours(BUSINESS_HOURS.start, 0, 0, 0);
+        remaining -= availableMs / MS_PER_HOUR;
+        istMs = dayStart + MS_PER_DAY + BUSINESS_START * MS_PER_HOUR;
       }
     }
 
-    return result;
+    return new Date(istMs - IST_OFFSET_MS);
   }
 
   /**
@@ -437,10 +438,15 @@ class SLAService {
       }
 
       // Update escalation level on the request
-      // Note: This assumes the field exists; if not, it won't update but won't fail
+      // BUG: The serviceRequests table (shared/schema.ts) does NOT have an
+      // escalationLevel column. This .set() only updates updatedAt, meaning
+      // escalation level is never persisted. To fix properly, add an
+      // "escalation_level" integer column to the serviceRequests table schema,
+      // run a migration, then uncomment the escalationLevel line below.
       await db
         .update(serviceRequests)
         .set({
+          // escalationLevel: level, // TODO: uncomment after adding column to serviceRequests schema
           updatedAt: new Date()
         })
         .where(eq(serviceRequests.id, requestId));
