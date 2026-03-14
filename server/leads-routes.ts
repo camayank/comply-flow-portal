@@ -1,10 +1,12 @@
 import express from 'express';
+import bcrypt from 'bcrypt';
 import { storage } from './storage';
 import {
   insertLeadEnhancedSchema,
   insertSalesProposalSchema,
   LeadEnhanced,
-  SalesProposal
+  SalesProposal,
+  businessEntities
 } from '../shared/schema';
 import { z } from 'zod';
 import {
@@ -16,8 +18,35 @@ import {
 import { generateClientId, generateLeadId } from './services/id-generator';
 import { generateTempPassword } from './security-utils';
 import { leadAssignmentService } from './services/lead-assignment-service';
+import { ok, created, fail } from './utils/api-response';
 
 const router = express.Router();
+
+function cleanLeadPayload(body: Record<string, unknown>) {
+  const cleaned = { ...body } as Record<string, unknown>;
+  const emptyOptionalFields = [
+    'estimatedValue',
+    'nextFollowupDate',
+    'contactEmail',
+    'directorName',
+    'directorEmail',
+    'directorPhone',
+    'state',
+    'preSalesExecutive',
+    'entityType',
+    'remarks',
+  ];
+
+  for (const field of emptyOptionalFields) {
+    if (cleaned[field] === '' || cleaned[field] === undefined) delete cleaned[field];
+  }
+
+  if (cleaned.nextFollowupDate && typeof cleaned.nextFollowupDate === 'string') {
+    cleaned.nextFollowupDate = new Date(cleaned.nextFollowupDate);
+  }
+
+  return cleaned;
+}
 
 // Lead ID generation is now handled by storage layer
 
@@ -55,7 +84,7 @@ router.get('/leads', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req
     // Get stats for dashboard
     const stats = await storage.getLeadStats();
 
-    res.json({
+    return ok(res, {
       leads: result.leads,
       pagination: {
         total: result.total,
@@ -67,7 +96,7 @@ router.get('/leads', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req
     });
   } catch (error) {
     console.error('Error fetching leads:', error);
-    res.status(500).json({ error: 'Failed to fetch leads' });
+    return fail(res, 500, { code: 'LEADS_FETCH_FAILED', message: 'Failed to fetch leads' });
   }
 });
 
@@ -77,26 +106,28 @@ router.get('/leads/:id', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async 
     const lead = await storage.getLead(parseInt(req.params.id));
 
     if (!lead) {
-      return res.status(404).json({ error: 'Lead not found' });
+      return fail(res, 404, { code: 'LEAD_NOT_FOUND', message: 'Lead not found' });
     }
 
     // Get related proposals if any
     const proposals = await storage.getSalesProposalsByLead(lead.leadId);
 
-    res.json({
+    return ok(res, {
       lead,
       proposals
     });
   } catch (error) {
     console.error('Error fetching lead:', error);
-    res.status(500).json({ error: 'Failed to fetch lead' });
+    return fail(res, 500, { code: 'LEAD_FETCH_FAILED', message: 'Failed to fetch lead' });
   }
 });
 
 // POST /api/leads - Create new lead
 router.post('/leads', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
-    const validatedData = insertLeadEnhancedSchema.omit({ leadId: true }).parse(req.body);
+    const body = cleanLeadPayload(req.body as Record<string, unknown>);
+
+    const validatedData = insertLeadEnhancedSchema.omit({ leadId: true }).parse(body);
 
     // Generate unique leadId
     const leadId = await generateLeadId();
@@ -111,34 +142,36 @@ router.post('/leads', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (re
 
     const newLead = await storage.createLead(leadData);
 
-    res.json(newLead);
+    return created(res, newLead);
   } catch (error) {
     console.error('Error creating lead:', error);
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Validation error', details: error.errors });
+      return fail(res, 400, { code: 'VALIDATION_ERROR', message: 'Validation error', details: error.errors });
     }
-    res.status(500).json({ error: 'Failed to create lead' });
+    return fail(res, 500, { code: 'LEAD_CREATE_FAILED', message: 'Failed to create lead' });
   }
 });
 
 // PUT /api/leads/:id - Update lead
 router.put('/leads/:id', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async (req: AuthenticatedRequest, res) => {
   try {
-    const validatedData = insertLeadEnhancedSchema.omit({ leadId: true }).partial().parse(req.body);
+    const body = cleanLeadPayload(req.body as Record<string, unknown>);
+
+    const validatedData = insertLeadEnhancedSchema.omit({ leadId: true }).partial().parse(body);
     
     const updatedLead = await storage.updateLead(parseInt(req.params.id), validatedData);
 
     if (!updatedLead) {
-      return res.status(404).json({ error: 'Lead not found' });
+      return fail(res, 404, { code: 'LEAD_NOT_FOUND', message: 'Lead not found' });
     }
 
-    res.json(updatedLead);
+    return ok(res, updatedLead);
   } catch (error) {
     console.error('Error updating lead:', error);
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: 'Validation error', details: error.errors });
+      return fail(res, 400, { code: 'VALIDATION_ERROR', message: 'Validation error', details: error.errors });
     }
-    res.status(500).json({ error: 'Failed to update lead' });
+    return fail(res, 500, { code: 'LEAD_UPDATE_FAILED', message: 'Failed to update lead' });
   }
 });
 
@@ -148,13 +181,13 @@ router.delete('/leads/:id', requireMinimumRole(USER_ROLES.ADMIN), async (req: Au
     const deleted = await storage.deleteLead(parseInt(req.params.id));
 
     if (!deleted) {
-      return res.status(404).json({ error: 'Lead not found' });
+      return fail(res, 404, { code: 'LEAD_NOT_FOUND', message: 'Lead not found' });
     }
 
-    res.json({ message: 'Lead deleted successfully' });
+    return ok(res, { message: 'Lead deleted successfully' });
   } catch (error) {
     console.error('Error deleting lead:', error);
-    res.status(500).json({ error: 'Failed to delete lead' });
+    return fail(res, 500, { code: 'LEAD_DELETE_FAILED', message: 'Failed to delete lead' });
   }
 });
 
@@ -170,13 +203,13 @@ router.post('/leads/:id/interaction', requireMinimumRole(USER_ROLES.CUSTOMER_SER
     });
 
     if (!updatedLead) {
-      return res.status(404).json({ error: 'Lead not found' });
+      return fail(res, 404, { code: 'LEAD_NOT_FOUND', message: 'Lead not found' });
     }
 
-    res.json(updatedLead);
+    return ok(res, updatedLead);
   } catch (error) {
     console.error('Error adding interaction:', error);
-    res.status(500).json({ error: 'Failed to add interaction' });
+    return fail(res, 500, { code: 'LEAD_INTERACTION_FAILED', message: 'Failed to add interaction' });
   }
 });
 
@@ -185,10 +218,10 @@ router.get('/stats/dashboard', requireMinimumRole(USER_ROLES.OPS_EXECUTIVE), asy
   try {
     const stats = await storage.getLeadStats();
 
-    res.json(stats);
+    return ok(res, stats);
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
-    res.status(500).json({ error: 'Failed to fetch dashboard stats' });
+    return fail(res, 500, { code: 'LEAD_STATS_FETCH_FAILED', message: 'Failed to fetch dashboard stats' });
   }
 });
 
@@ -197,10 +230,10 @@ router.get('/executives', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE), async
   try {
     const executives = await storage.getPreSalesExecutives();
 
-    res.json(executives);
+    return ok(res, executives);
   } catch (error) {
     console.error('Error fetching executives:', error);
-    res.status(500).json({ error: 'Failed to fetch executives' });
+    return fail(res, 500, { code: 'LEAD_EXECUTIVES_FETCH_FAILED', message: 'Failed to fetch executives' });
   }
 });
 
@@ -215,12 +248,12 @@ router.put('/leads/:id/assign', requireMinimumRole(USER_ROLES.SALES_MANAGER), as
     const { assignedTo, assignedToName, priority, notes } = req.body;
 
     if (!assignedTo) {
-      return res.status(400).json({ error: 'assignedTo is required' });
+      return fail(res, 400, { code: 'ASSIGNED_TO_REQUIRED', message: 'assignedTo is required' });
     }
 
     const lead = await storage.getLead(leadId);
     if (!lead) {
-      return res.status(404).json({ error: 'Lead not found' });
+      return fail(res, 404, { code: 'LEAD_NOT_FOUND', message: 'Lead not found' });
     }
 
     // Update lead with assignment
@@ -234,14 +267,14 @@ router.put('/leads/:id/assign', requireMinimumRole(USER_ROLES.SALES_MANAGER), as
     // Log the assignment activity
     console.log(`Lead ${lead.leadId} assigned to ${assignedToName || assignedTo} by ${req.user?.username}`);
 
-    res.json({
+    return ok(res, {
       success: true,
       message: 'Lead assigned successfully',
       lead: updatedLead
     });
   } catch (error) {
     console.error('Error assigning lead:', error);
-    res.status(500).json({ error: 'Failed to assign lead' });
+    return fail(res, 500, { code: 'LEAD_ASSIGN_FAILED', message: 'Failed to assign lead' });
   }
 });
 
@@ -251,11 +284,11 @@ router.post('/leads/bulk-assign', requireMinimumRole(USER_ROLES.SALES_MANAGER), 
     const { leadIds, assignedTo, assignedToName, distributionType = 'manual' } = req.body;
 
     if (!leadIds || !Array.isArray(leadIds) || leadIds.length === 0) {
-      return res.status(400).json({ error: 'leadIds array is required' });
+      return fail(res, 400, { code: 'LEAD_IDS_REQUIRED', message: 'leadIds array is required' });
     }
 
     if (distributionType === 'manual' && !assignedTo) {
-      return res.status(400).json({ error: 'assignedTo is required for manual distribution' });
+      return fail(res, 400, { code: 'ASSIGNED_TO_REQUIRED', message: 'assignedTo is required for manual distribution' });
     }
 
     const results: { success: any[]; failed: any[] } = { success: [], failed: [] };
@@ -265,7 +298,7 @@ router.post('/leads/bulk-assign', requireMinimumRole(USER_ROLES.SALES_MANAGER), 
     if (distributionType === 'round_robin' || distributionType === 'load_balanced') {
       executives = await storage.getPreSalesExecutives();
       if (executives.length === 0) {
-        return res.status(400).json({ error: 'No sales executives available for distribution' });
+        return fail(res, 400, { code: 'NO_SALES_EXECUTIVES', message: 'No sales executives available for distribution' });
       }
     }
 
@@ -310,14 +343,14 @@ router.post('/leads/bulk-assign', requireMinimumRole(USER_ROLES.SALES_MANAGER), 
     // Log bulk assignment
     console.log(`Bulk assigned ${results.success.length}/${leadIds.length} leads by ${req.user?.username} using ${distributionType}`);
 
-    res.json({
+    return ok(res, {
       success: true,
       message: `Assigned ${results.success.length} of ${leadIds.length} leads`,
       results
     });
   } catch (error) {
     console.error('Error bulk assigning leads:', error);
-    res.status(500).json({ error: 'Failed to bulk assign leads' });
+    return fail(res, 500, { code: 'LEADS_BULK_ASSIGN_FAILED', message: 'Failed to bulk assign leads' });
   }
 });
 
@@ -329,12 +362,12 @@ router.patch('/leads/:id/approve', requireMinimumRole(USER_ROLES.SALES_MANAGER),
 
     const lead = await storage.getLead(leadId);
     if (!lead) {
-      return res.status(404).json({ error: 'Lead not found' });
+      return fail(res, 404, { code: 'LEAD_NOT_FOUND', message: 'Lead not found' });
     }
 
     // Cannot approve already converted or rejected leads
     if (lead.leadStage === 'converted' || lead.status === 'rejected') {
-      return res.status(400).json({ error: `Cannot approve a lead that is ${lead.status || lead.leadStage}` });
+      return fail(res, 400, { code: 'LEAD_APPROVE_INVALID_STATE', message: `Cannot approve a lead that is ${lead.status || lead.leadStage}` });
     }
 
     const updateData: Partial<typeof lead> = {
@@ -359,14 +392,14 @@ router.patch('/leads/:id/approve', requireMinimumRole(USER_ROLES.SALES_MANAGER),
     // Log approval
     console.log(`Lead ${lead.leadId} approved by ${req.user?.username}`);
 
-    res.json({
+    return ok(res, {
       success: true,
       message: 'Lead approved successfully',
       lead: updatedLead
     });
   } catch (error) {
     console.error('Error approving lead:', error);
-    res.status(500).json({ error: 'Failed to approve lead' });
+    return fail(res, 500, { code: 'LEAD_APPROVE_FAILED', message: 'Failed to approve lead' });
   }
 });
 
@@ -377,17 +410,17 @@ router.patch('/leads/:id/reject', requireMinimumRole(USER_ROLES.SALES_MANAGER), 
     const { reason, feedback, allowResubmission = false } = req.body;
 
     if (!reason) {
-      return res.status(400).json({ error: 'Rejection reason is required' });
+      return fail(res, 400, { code: 'REJECTION_REASON_REQUIRED', message: 'Rejection reason is required' });
     }
 
     const lead = await storage.getLead(leadId);
     if (!lead) {
-      return res.status(404).json({ error: 'Lead not found' });
+      return fail(res, 404, { code: 'LEAD_NOT_FOUND', message: 'Lead not found' });
     }
 
     // Cannot reject already converted leads
     if (lead.leadStage === 'converted') {
-      return res.status(400).json({ error: 'Cannot reject a converted lead' });
+      return fail(res, 400, { code: 'LEAD_REJECT_INVALID_STATE', message: 'Cannot reject a converted lead' });
     }
 
     const updatedLead = await storage.updateLead(leadId, {
@@ -401,7 +434,7 @@ router.patch('/leads/:id/reject', requireMinimumRole(USER_ROLES.SALES_MANAGER), 
     // Log rejection activity
     console.log(`Lead ${lead.leadId} rejected by ${req.user?.username}. Reason: ${reason}`);
 
-    res.json({
+    return ok(res, {
       success: true,
       message: allowResubmission
         ? 'Lead returned for more information'
@@ -410,7 +443,7 @@ router.patch('/leads/:id/reject', requireMinimumRole(USER_ROLES.SALES_MANAGER), 
     });
   } catch (error) {
     console.error('Error rejecting lead:', error);
-    res.status(500).json({ error: 'Failed to reject lead' });
+    return fail(res, 500, { code: 'LEAD_REJECT_FAILED', message: 'Failed to reject lead' });
   }
 });
 
@@ -421,12 +454,12 @@ router.post('/leads/:id/request-info', requireMinimumRole(USER_ROLES.SALES_MANAG
     const { requiredFields, message, deadline } = req.body;
 
     if (!requiredFields || !Array.isArray(requiredFields) || requiredFields.length === 0) {
-      return res.status(400).json({ error: 'requiredFields array is required' });
+      return fail(res, 400, { code: 'REQUIRED_FIELDS_REQUIRED', message: 'requiredFields array is required' });
     }
 
     const lead = await storage.getLead(leadId);
     if (!lead) {
-      return res.status(404).json({ error: 'Lead not found' });
+      return fail(res, 404, { code: 'LEAD_NOT_FOUND', message: 'Lead not found' });
     }
 
     const updatedLead = await storage.updateLead(leadId, {
@@ -439,14 +472,14 @@ router.post('/leads/:id/request-info', requireMinimumRole(USER_ROLES.SALES_MANAG
     // Log info request activity
     console.log(`Lead ${lead.leadId} - info requested by ${req.user?.username}: ${requiredFields.join(', ')}`);
 
-    res.json({
+    return ok(res, {
       success: true,
       message: 'Information requested from lead submitter',
       lead: updatedLead
     });
   } catch (error) {
     console.error('Error requesting lead info:', error);
-    res.status(500).json({ error: 'Failed to request lead information' });
+    return fail(res, 500, { code: 'LEAD_REQUEST_INFO_FAILED', message: 'Failed to request lead information' });
   }
 });
 
@@ -456,30 +489,28 @@ router.get('/leads/pending-approval', requireMinimumRole(USER_ROLES.SALES_MANAGE
     const { page = '1', limit = '20' } = req.query;
     const offset = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    // Get leads that need approval (new leads without approval status)
     const result = await storage.getAllLeads({
       stage: 'new',
       limit: parseInt(limit as string),
-      offset
+      offset,
     });
 
-    // Filter to only pending approval (new leads not yet converted or rejected)
     const pendingLeads = result.leads.filter((lead: any) =>
       lead.status !== 'converted' && lead.status !== 'rejected' && lead.status !== 'approved'
     );
 
-    res.json({
+    return ok(res, {
       leads: pendingLeads,
       pagination: {
         total: pendingLeads.length,
         page: parseInt(page as string),
         limit: parseInt(limit as string),
-        totalPages: Math.ceil(pendingLeads.length / parseInt(limit as string))
-      }
+        totalPages: Math.ceil(pendingLeads.length / parseInt(limit as string)),
+      },
     });
   } catch (error) {
     console.error('Error fetching pending leads:', error);
-    res.status(500).json({ error: 'Failed to fetch pending leads' });
+    return fail(res, 500, { code: 'PENDING_LEADS_FETCH_FAILED', message: 'Failed to fetch pending leads' });
   }
 });
 
@@ -490,7 +521,7 @@ router.post('/leads/:id/score', requireMinimumRole(USER_ROLES.SALES_EXECUTIVE), 
     const lead = await storage.getLead(leadId);
 
     if (!lead) {
-      return res.status(404).json({ error: 'Lead not found' });
+      return fail(res, 404, { code: 'LEAD_NOT_FOUND', message: 'Lead not found' });
     }
 
     // Calculate lead quality score based on multiple factors
@@ -548,7 +579,7 @@ router.post('/leads/:id/score', requireMinimumRole(USER_ROLES.SALES_EXECUTIVE), 
       updatedAt: new Date()
     });
 
-    res.json({
+    return ok(res, {
       leadId: lead.leadId,
       score,
       maxScore: 100,
@@ -562,7 +593,7 @@ router.post('/leads/:id/score', requireMinimumRole(USER_ROLES.SALES_EXECUTIVE), 
     });
   } catch (error) {
     console.error('Error scoring lead:', error);
-    res.status(500).json({ error: 'Failed to score lead' });
+    return fail(res, 500, { code: 'LEAD_SCORE_FAILED', message: 'Failed to score lead' });
   }
 });
 
@@ -574,30 +605,25 @@ router.post('/leads/:id/convert', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE
       createServiceRequest = false,
       selectedServiceId,
       notes,
-      convertedBy
+      convertedBy,
     } = req.body;
 
-    // 1. Get the lead
     const lead = await storage.getLead(leadId);
     if (!lead) {
-      return res.status(404).json({ error: 'Lead not found' });
+      return fail(res, 404, { code: 'LEAD_NOT_FOUND', message: 'Lead not found' });
     }
 
-    // Check if already converted
     if (lead.leadStage === 'converted' || lead.status === 'converted') {
-      return res.status(400).json({ error: 'Lead has already been converted' });
+      return fail(res, 400, { code: 'LEAD_ALREADY_CONVERTED', message: 'Lead has already been converted' });
     }
 
-    // 2. Generate unique client ID using centralized ID generator
     const clientId = await generateClientId();
-
-    // 3. Generate cryptographically secure temporary password (should be changed on first login)
     const tempPassword = generateTempPassword();
+    const hashedPassword = await bcrypt.hash(tempPassword, 12);
 
-    // 4. Create user account
     const userData = {
       username: lead.contactEmail || `client_${clientId.toLowerCase()}`,
-      password: tempPassword, // In production, this should be hashed
+      password: hashedPassword,
       email: lead.contactEmail || `${clientId.toLowerCase()}@pending.digicomply.in`,
       phone: lead.contactPhone || null,
       fullName: lead.clientName || 'New Client',
@@ -608,15 +634,32 @@ router.post('/leads/:id/convert', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE
 
     const newUser = await storage.createUser(userData);
 
-    // 5. Update lead status to converted
+    // Create business entity record for the converted lead
+    const businessEntity = await storage.createBusinessEntity({
+      ownerId: newUser.id,
+      clientId: clientId,
+      name: lead.clientName || 'New Client',
+      entityType: lead.entityType || 'proprietorship',
+      pan: null,
+      gstin: null,
+      contactEmail: lead.contactEmail || null,
+      contactPhone: lead.contactPhone || null,
+      state: lead.state || null,
+      leadSource: lead.leadSource || null,
+      onboardingStage: 'pending',
+      clientStatus: 'active',
+      isActive: true,
+      leadId: lead.id,
+      notes: `Auto-created from lead conversion of ${lead.leadId}`,
+    });
+
     const updatedLead = await storage.updateLead(leadId, {
       leadStage: 'converted',
       status: 'converted',
       convertedAt: new Date(),
-      remarks: `Converted to client ${clientId} by ${convertedBy || req.user?.username || 'system'}${notes ? `: ${notes}` : ''}`
+      remarks: `Converted to client ${clientId} by ${convertedBy || req.user?.username || 'system'}${notes ? `: ${notes}` : ''}`,
     });
 
-    // 6. Optionally create initial service request
     let serviceRequest = null;
     if (createServiceRequest && selectedServiceId) {
       serviceRequest = await storage.createServiceRequest({
@@ -625,35 +668,39 @@ router.post('/leads/:id/convert', requireMinimumRole(USER_ROLES.CUSTOMER_SERVICE
         status: 'initiated',
         priority: lead.priority || 'medium',
         currentMilestone: 'initiated',
-        internalNotes: `Auto-created from lead conversion`,
-        totalAmount: 0, // Required field, to be updated after pricing
+        internalNotes: 'Auto-created from lead conversion',
+        totalAmount: 0,
       });
     }
 
-    // Log the conversion activity
     console.log(`Lead ${lead.leadId} converted to client ${clientId} by ${convertedBy || req.user?.username}`);
 
-    res.json({
+    return ok(res, {
       success: true,
       message: 'Lead converted to client successfully',
-      data: {
-        lead: updatedLead,
-        user: {
-          id: newUser.id,
-          username: newUser.username,
-          email: newUser.email,
-          temporaryPassword: tempPassword // Send once for admin to share with client
-        },
-        clientId: clientId,
-        serviceRequest: serviceRequest ? {
-          id: serviceRequest.id,
-          status: serviceRequest.status
-        } : null
-      }
+      lead: updatedLead,
+      user: {
+        id: newUser.id,
+        username: newUser.username,
+        email: newUser.email,
+        temporaryPassword: tempPassword,
+      },
+      clientId,
+      businessEntity: {
+        id: businessEntity.id,
+        clientId: businessEntity.clientId,
+        name: businessEntity.name,
+      },
+      serviceRequest: serviceRequest
+        ? {
+            id: serviceRequest.id,
+            status: serviceRequest.status,
+          }
+        : null,
     });
   } catch (error) {
     console.error('Error converting lead:', error);
-    res.status(500).json({ error: 'Failed to convert lead to client' });
+    return fail(res, 500, { code: 'LEAD_CONVERT_FAILED', message: 'Failed to convert lead to client' });
   }
 });
 
@@ -674,10 +721,10 @@ router.post('/leads/:id/auto-assign', requireMinimumRole(USER_ROLES.SALES_MANAGE
     });
 
     if (!result.success) {
-      return res.status(400).json({ error: result.reason });
+      return fail(res, 400, { code: 'LEAD_ASSIGNMENT_REJECTED', message: result.reason || 'Lead assignment failed' });
     }
 
-    res.json({
+    return ok(res, {
       success: true,
       message: 'Lead auto-assigned successfully',
       assignedTo: result.assignedTo,
@@ -686,7 +733,7 @@ router.post('/leads/:id/auto-assign', requireMinimumRole(USER_ROLES.SALES_MANAGE
     });
   } catch (error) {
     console.error('Error auto-assigning lead:', error);
-    res.status(500).json({ error: 'Failed to auto-assign lead' });
+    return fail(res, 500, { code: 'LEAD_AUTO_ASSIGN_FAILED', message: 'Failed to auto-assign lead' });
   }
 });
 
@@ -697,7 +744,7 @@ router.post('/leads/:id/manual-assign', requireMinimumRole(USER_ROLES.SALES_MANA
     const { assignToUserId, notes } = req.body;
 
     if (!assignToUserId) {
-      return res.status(400).json({ error: 'assignToUserId is required' });
+      return fail(res, 400, { code: 'ASSIGN_TO_USER_REQUIRED', message: 'assignToUserId is required' });
     }
 
     const result = await leadAssignmentService.manualAssign(
@@ -708,10 +755,10 @@ router.post('/leads/:id/manual-assign', requireMinimumRole(USER_ROLES.SALES_MANA
     );
 
     if (!result.success) {
-      return res.status(400).json({ error: result.reason });
+      return fail(res, 400, { code: 'LEAD_ASSIGNMENT_REJECTED', message: result.reason || 'Lead assignment failed' });
     }
 
-    res.json({
+    return ok(res, {
       success: true,
       message: 'Lead manually assigned',
       assignedTo: result.assignedTo,
@@ -719,7 +766,7 @@ router.post('/leads/:id/manual-assign', requireMinimumRole(USER_ROLES.SALES_MANA
     });
   } catch (error) {
     console.error('Error manually assigning lead:', error);
-    res.status(500).json({ error: 'Failed to manually assign lead' });
+    return fail(res, 500, { code: 'LEAD_MANUAL_ASSIGN_FAILED', message: 'Failed to manually assign lead' });
   }
 });
 
@@ -730,7 +777,7 @@ router.post('/leads/:id/reassign', requireMinimumRole(USER_ROLES.SALES_MANAGER),
     const { newAssigneeId, reason } = req.body;
 
     if (!newAssigneeId || !reason) {
-      return res.status(400).json({ error: 'newAssigneeId and reason are required' });
+      return fail(res, 400, { code: 'NEW_ASSIGNEE_AND_REASON_REQUIRED', message: 'newAssigneeId and reason are required' });
     }
 
     const result = await leadAssignmentService.reassign(
@@ -741,10 +788,10 @@ router.post('/leads/:id/reassign', requireMinimumRole(USER_ROLES.SALES_MANAGER),
     );
 
     if (!result.success) {
-      return res.status(400).json({ error: result.reason });
+      return fail(res, 400, { code: 'LEAD_ASSIGNMENT_REJECTED', message: result.reason || 'Lead assignment failed' });
     }
 
-    res.json({
+    return ok(res, {
       success: true,
       message: 'Lead reassigned successfully',
       assignedTo: result.assignedTo,
@@ -752,7 +799,7 @@ router.post('/leads/:id/reassign', requireMinimumRole(USER_ROLES.SALES_MANAGER),
     });
   } catch (error) {
     console.error('Error reassigning lead:', error);
-    res.status(500).json({ error: 'Failed to reassign lead' });
+    return fail(res, 500, { code: 'LEAD_REASSIGN_FAILED', message: 'Failed to reassign lead' });
   }
 });
 
@@ -764,10 +811,10 @@ router.post('/leads/:id/round-robin-assign', requireMinimumRole(USER_ROLES.SALES
     const result = await leadAssignmentService.roundRobinAssign(leadId);
 
     if (!result.success) {
-      return res.status(400).json({ error: result.reason });
+      return fail(res, 400, { code: 'LEAD_ASSIGNMENT_REJECTED', message: result.reason || 'Lead assignment failed' });
     }
 
-    res.json({
+    return ok(res, {
       success: true,
       message: 'Lead assigned via round-robin',
       assignedTo: result.assignedTo,
@@ -775,7 +822,7 @@ router.post('/leads/:id/round-robin-assign', requireMinimumRole(USER_ROLES.SALES
     });
   } catch (error) {
     console.error('Error round-robin assigning lead:', error);
-    res.status(500).json({ error: 'Failed to round-robin assign lead' });
+    return fail(res, 500, { code: 'LEAD_ROUND_ROBIN_ASSIGN_FAILED', message: 'Failed to round-robin assign lead' });
   }
 });
 
@@ -786,14 +833,14 @@ router.post('/leads/bulk-auto-assign', requireMinimumRole(USER_ROLES.SALES_MANAG
 
     const result = await leadAssignmentService.bulkAutoAssign(leadIds, rules);
 
-    res.json({
+    return ok(res, {
       success: true,
       message: `Assigned ${result.assigned} of ${result.total} leads`,
       ...result,
     });
   } catch (error) {
     console.error('Error bulk auto-assigning leads:', error);
-    res.status(500).json({ error: 'Failed to bulk auto-assign leads' });
+    return fail(res, 500, { code: 'LEAD_BULK_AUTO_ASSIGN_FAILED', message: 'Failed to bulk auto-assign leads' });
   }
 });
 
@@ -801,10 +848,10 @@ router.post('/leads/bulk-auto-assign', requireMinimumRole(USER_ROLES.SALES_MANAG
 router.get('/leads/workload-summary', requireMinimumRole(USER_ROLES.SALES_MANAGER), async (req: AuthenticatedRequest, res) => {
   try {
     const summary = await leadAssignmentService.getWorkloadSummary();
-    res.json(summary);
+    return ok(res, summary);
   } catch (error) {
     console.error('Error fetching workload summary:', error);
-    res.status(500).json({ error: 'Failed to fetch workload summary' });
+    return fail(res, 500, { code: 'LEAD_WORKLOAD_SUMMARY_FETCH_FAILED', message: 'Failed to fetch workload summary' });
   }
 });
 
