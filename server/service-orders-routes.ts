@@ -4,6 +4,8 @@ import {
   serviceRequests,
   businessEntities
 } from '@shared/schema';
+import { pipelineEvents } from '@shared/pipeline-schema';
+import { createPipelineEvent, PIPELINE_EVENTS } from './services/pipeline/pipeline-events';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { executeStatusTransition, getAvailableTransitions, getTransitionHistory } from './status-transition-handler';
 
@@ -185,6 +187,20 @@ export function registerServiceOrdersRoutes(app: Express) {
           description
         })
         .returning();
+
+      // Emit pipeline event for service request creation
+      try {
+        await db.insert(pipelineEvents).values(createPipelineEvent({
+          eventType: PIPELINE_EVENTS.SERVICE_CREATED,
+          entityType: 'service_request',
+          entityId: newOrder.id,
+          payload: { serviceType, entityId, priority: normalizedPriority, periodLabel },
+          triggeredBy: req.user?.id,
+          newState: 'initiated',
+        }));
+      } catch (pipelineError) {
+        console.error('Pipeline event emission failed (service.created):', pipelineError);
+      }
 
       res.json(newOrder);
     } catch (error) {

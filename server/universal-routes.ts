@@ -5,7 +5,10 @@ import { registerTeamManagementRoutes } from './team-management-routes';
 import { requireAuth } from './auth-middleware';
 import { db } from "./db";
 import { sessionAuthMiddleware, requireMinimumRole, USER_ROLES } from './rbac-middleware';
-import { eq, and, desc, asc, like, inArray, isNull, sql, or } from "drizzle-orm";
+import { eq, and, desc, asc, like, inArray, isNull, sql, or, gte } from "drizzle-orm";
+import { payments, operationsTeam } from "@shared/schema";
+import { pipelineEvents } from "@shared/pipeline-schema";
+import { createPipelineEvent, PIPELINE_EVENTS } from "./services/pipeline/pipeline-events";
 import {
   users,
   entities,
@@ -258,7 +261,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Client Messages
-  app.post("/api/client/messages", async (req, res) => {
+  app.post("/api/client/messages", sessionAuthMiddleware, async (req, res) => {
     try {
       const [message] = await db.insert(messages).values({
         ...req.body,
@@ -274,7 +277,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Client Notifications
-  app.get("/api/client/notifications", async (req, res) => {
+  app.get("/api/client/notifications", sessionAuthMiddleware, async (req, res) => {
     try {
       const userNotifications = await db.select()
         .from(notifications)
@@ -290,7 +293,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Client Metrics
-  app.get("/api/client/metrics", async (req, res) => {
+  app.get("/api/client/metrics", sessionAuthMiddleware, async (req, res) => {
     try {
       const { entity_id } = req.query;
       
@@ -309,10 +312,23 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
       const completionRate = totalOrders.count > 0 ? 
         Math.round((completedOrders.count / totalOrders.count) * 100) : 0;
 
+      // Calculate outstanding payments
+      const [outstandingResult] = await db.select({
+        total: sql<number>`COALESCE(SUM(amount::numeric), 0)::int`
+      }).from(payments).where(eq(payments.status, 'pending'));
+
+      // Calculate monthly spend (completed payments this month)
+      const [monthlyResult] = await db.select({
+        total: sql<number>`COALESCE(SUM(amount::numeric), 0)::int`
+      }).from(payments).where(and(
+        eq(payments.status, 'completed'),
+        gte(payments.completedAt, sql`date_trunc('month', NOW())`)
+      ));
+
       const metrics = {
         completionRate,
-        totalOutstanding: 25000, // TODO: Calculate from billing
-        monthlySpend: 15000 // TODO: Calculate from actual spending
+        totalOutstanding: outstandingResult?.total || 0,
+        monthlySpend: monthlyResult?.total || 0
       };
 
       res.json(metrics);
@@ -325,7 +341,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   // ===== OPERATIONS ROUTES =====
 
   // Operations Tasks
-  app.get("/api/ops/tasks", async (req, res) => {
+  app.get("/api/ops/tasks", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE), async (req, res) => {
     try {
       const { filter, priority, assignee, search } = req.query;
       
@@ -402,18 +418,34 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Update Task Status
-  app.put("/api/ops/tasks/:id/status", async (req, res) => {
+  app.put("/api/ops/tasks/:id/status", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE), async (req, res) => {
     try {
       const taskId = parseInt(req.params.id);
       const { status, notes } = req.body;
       
       await UniversalServiceEngine.updateTaskStatus(
-        taskId, 
-        status, 
+        taskId,
+        status,
         req.user!.id, // Authenticated user ID
         notes
       );
-      
+
+      // Emit pipeline event for task completion
+      if (status === 'completed') {
+        try {
+          await db.insert(pipelineEvents).values(createPipelineEvent({
+            eventType: PIPELINE_EVENTS.SERVICE_TASK_COMPLETED,
+            entityType: 'task',
+            entityId: taskId,
+            payload: { status, notes },
+            triggeredBy: req.user?.id,
+            newState: 'completed',
+          }));
+        } catch (pipelineError) {
+          console.error('Pipeline event emission failed (service.task_completed):', pipelineError);
+        }
+      }
+
       res.json({ success: true });
     } catch (error) {
       console.error("Error updating task status:", error);
@@ -422,7 +454,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Assign Task
-  app.put("/api/ops/tasks/:id/assign", async (req, res) => {
+  app.put("/api/ops/tasks/:id/assign", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE), async (req, res) => {
     try {
       const taskId = parseInt(req.params.id);
       const { assignee_id } = req.body;
@@ -439,7 +471,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Add Task Comment
-  app.post("/api/ops/tasks/:id/comments", async (req, res) => {
+  app.post("/api/ops/tasks/:id/comments", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE), async (req, res) => {
     try {
       const taskId = parseInt(req.params.id);
       const { body, visibility } = req.body;
@@ -466,7 +498,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Operations Service Orders
-  app.get("/api/ops/service-orders", async (req, res) => {
+  app.get("/api/ops/service-orders", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE), async (req, res) => {
     try {
       const orders = await db.select({
         id: service_orders.id,
@@ -489,15 +521,15 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
         return { ...order, tasks: orderTasks };
       }));
 
-      res.json(ordersWithTasks);
+      return ok(res, ordersWithTasks);
     } catch (error) {
       console.error("Error fetching service orders:", error);
-      res.status(500).json({ error: "Failed to fetch service orders" });
+      return fail(res, 500, { message: "Failed to fetch service orders" });
     }
   });
 
   // Team Members
-  app.get("/api/ops/team-members", async (req, res) => {
+  app.get("/api/ops/team-members", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_MANAGER), async (req, res) => {
     try {
       const teamMembers = await db.select({
         id: users.id,
@@ -539,7 +571,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Operations Metrics
-  app.get("/api/ops/metrics", async (req, res) => {
+  app.get("/api/ops/metrics", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE), async (req, res) => {
     try {
       const [
         completedTodayResult,
@@ -566,13 +598,28 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
           .where(inArray(users.role, ["ops_exec", "ops_lead"]))
       ]);
 
+      // Calculate real team utilization from operations_team table
+      const [utilizationData] = await db.select({
+        avgUtilization: sql<number>`COALESCE(AVG(current_workload * 100.0 / NULLIF(workload_capacity, 0)), 0)::int`
+      }).from(operationsTeam).where(eq(operationsTeam.isActive, true));
+
+      // Calculate SLA compliance from completed tasks
+      const [slaData] = await db.select({
+        total: sql<number>`count(*)::int`,
+        onTime: sql<number>`count(*) filter (where actual_completion <= sla_deadline OR (actual_completion IS NOT NULL AND sla_deadline IS NULL))::int`
+      }).from(sql`service_orders`).where(sql`actual_completion IS NOT NULL`);
+
+      const slaCompliance = slaData?.total > 0
+        ? Math.round((slaData.onTime / slaData.total) * 100)
+        : 100;
+
       const metrics = {
         completedToday: completedTodayResult[0]?.count || 0,
         avgHandleTime: avgHandleTimeResult[0]?.avg || 0,
-        reworkRate: reworkRateResult[0]?.total > 0 ? 
+        reworkRate: reworkRateResult[0]?.total > 0 ?
           Math.round((reworkRateResult[0]?.rework / reworkRateResult[0]?.total) * 100) : 0,
-        teamUtilization: 85, // TODO: Calculate real utilization
-        slaCompliance: 87
+        teamUtilization: utilizationData?.avgUtilization || 0,
+        slaCompliance
       };
 
       res.json(metrics);
@@ -583,7 +630,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // SLA Metrics
-  app.get("/api/ops/sla-metrics", async (req, res) => {
+  app.get("/api/ops/sla-metrics", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.OPS_EXECUTIVE), async (req, res) => {
     try {
       const [
         totalTimersResult,
@@ -623,7 +670,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   // ===== AGENT ROUTES =====
 
   // Agent Leads
-  app.get("/api/agent/leads", async (req, res) => {
+  app.get("/api/agent/leads", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.AGENT), async (req, res) => {
     try {
       // TODO: Filter by agent ID from auth
       const agentLeads = await db.select().from(leads)
@@ -644,6 +691,19 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
         created_at: new Date()
       }).returning();
 
+      // Emit pipeline event for lead creation
+      try {
+        await db.insert(pipelineEvents).values(createPipelineEvent({
+          eventType: PIPELINE_EVENTS.LEAD_CREATED,
+          entityType: 'lead',
+          entityId: lead.id,
+          payload: { leadName: lead.name, agentId, source: req.body.source },
+          triggeredBy: req.user?.id,
+        }));
+      } catch (pipelineError) {
+        console.error('Pipeline event emission failed (lead.created):', pipelineError);
+      }
+
       res.json(lead);
     } catch (error) {
       console.error("Error creating lead:", error);
@@ -652,7 +712,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Agent Commissions
-  app.get("/api/agent/commissions", async (req, res) => {
+  app.get("/api/agent/commissions", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.AGENT), async (req, res) => {
     try {
       // TODO: Filter by agent ID from auth
       const agentCommissions = await db.select().from(commissions)
@@ -664,218 +724,14 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Agent Commission Statements - Monthly/Quarterly summary of commissions
-  app.get("/api/agent/commission-statements", async (req, res) => {
-    try {
-      const agentId = req.user?.id || 1;
-
-      // Generate commission statements by period
-      const generateStatements = () => {
-        const statements = [];
-        const now = new Date();
-
-        for (let i = 0; i < 6; i++) {
-          const periodDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          const periodKey = `${periodDate.getFullYear()}-${String(periodDate.getMonth() + 1).padStart(2, '0')}`;
-          const periodLabel = periodDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-
-          const totalCommission = Math.floor(Math.random() * 100000) + 50000;
-          const totalPaid = i > 1 ? totalCommission : Math.floor(totalCommission * 0.7);
-          const totalDisputed = Math.floor(Math.random() * 10000);
-
-          const lineItems = [];
-          const itemCount = Math.floor(Math.random() * 8) + 3;
-
-          for (let j = 0; j < itemCount; j++) {
-            const serviceValue = Math.floor(Math.random() * 50000) + 10000;
-            const commissionRate = [5, 7.5, 10, 12.5, 15][Math.floor(Math.random() * 5)];
-            const commissionAmount = Math.floor(serviceValue * commissionRate / 100);
-            const statuses = ['approved', 'pending', 'disputed', 'adjusted'];
-
-            lineItems.push({
-              id: `li-${periodKey}-${j}`,
-              statementId: `stmt-${periodKey}`,
-              clientName: ['Reliance Industries', 'Tata Motors', 'Infosys Ltd', 'Wipro Technologies', 'HCL Tech'][Math.floor(Math.random() * 5)],
-              clientId: `client-${j + 100}`,
-              serviceType: ['GST Registration', 'Company Incorporation', 'Tax Filing', 'Compliance Audit', 'ROC Filing'][Math.floor(Math.random() * 5)],
-              serviceRequestId: `sr-${Date.now()}-${j}`,
-              serviceRequestNumber: `SR-2026-${String(i * 100 + j).padStart(5, '0')}`,
-              serviceValue,
-              commissionRate,
-              commissionAmount,
-              status: statuses[Math.floor(Math.random() * statuses.length)],
-              completedAt: new Date(periodDate.getTime() + Math.random() * 28 * 24 * 60 * 60 * 1000).toISOString()
-            });
-          }
-
-          statements.push({
-            id: `stmt-${periodKey}`,
-            period: periodKey,
-            periodLabel,
-            totalCommission,
-            totalPaid,
-            totalPending: totalCommission - totalPaid - totalDisputed,
-            totalDisputed,
-            lineItems,
-            status: i > 1 ? 'paid' : i === 1 ? 'finalized' : 'draft',
-            generatedAt: new Date(periodDate.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
-          });
-        }
-
-        return statements;
-      };
-
-      res.json(generateStatements());
-    } catch (error) {
-      console.error("Error fetching commission statements:", error);
-      res.status(500).json({ error: "Failed to fetch commission statements" });
-    }
-  });
-
-  // Agent Commission Disputes - Disputes raised on commissions
-  app.get("/api/agent/commission-disputes", async (req, res) => {
-    try {
-      const { status } = req.query;
-      const agentId = req.user?.id || 1;
-
-      const generateDisputes = (statusFilter?: string) => {
-        const disputes = [];
-        const categories = ['missing_commission', 'incorrect_rate', 'wrong_calculation', 'missing_service', 'other'];
-        const statuses = ['submitted', 'under_review', 'info_requested', 'approved', 'partially_approved', 'rejected'];
-
-        for (let i = 0; i < 12; i++) {
-          const disputeStatus = statuses[Math.floor(Math.random() * statuses.length)];
-
-          if (statusFilter && statusFilter !== 'all' && disputeStatus !== statusFilter) {
-            continue;
-          }
-
-          const originalAmount = Math.floor(Math.random() * 15000) + 5000;
-          const disputedAmount = originalAmount + Math.floor(Math.random() * 5000);
-          const isResolved = ['approved', 'partially_approved', 'rejected'].includes(disputeStatus);
-
-          disputes.push({
-            id: `disp-${i + 1}`,
-            disputeNumber: `DIS-2026-${String(i + 1).padStart(4, '0')}`,
-            statementId: `stmt-2026-0${(i % 3) + 1}`,
-            lineItemId: `li-2026-0${(i % 3) + 1}-${i % 5}`,
-            clientName: ['Reliance Industries', 'Tata Motors', 'Infosys Ltd', 'Wipro Technologies', 'HCL Tech'][i % 5],
-            serviceRequestNumber: `SR-2026-${String(10000 + i).padStart(5, '0')}`,
-            originalAmount,
-            disputedAmount,
-            reason: [
-              'Commission rate should be 12.5% not 10% as per agreement',
-              'Missing commission for renewal service',
-              'Calculation error in base amount',
-              'Service not included in statement',
-              'Wrong client attributed to different agent'
-            ][i % 5],
-            category: categories[i % 5],
-            status: disputeStatus,
-            approvedAmount: isResolved && disputeStatus !== 'rejected'
-              ? Math.floor(disputedAmount * (disputeStatus === 'approved' ? 1 : 0.6))
-              : null,
-            resolution: isResolved
-              ? disputeStatus === 'rejected'
-                ? 'Dispute rejected - commission rate was correctly applied as per standard terms'
-                : 'Dispute resolved - adjusted amount credited to next statement'
-              : null,
-            submittedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-            resolvedAt: isResolved ? new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString() : null,
-            resolvedBy: isResolved ? 'Finance Admin' : null,
-            attachments: Math.random() > 0.5 ? ['commission_agreement.pdf', 'service_invoice.pdf'] : [],
-            timeline: [
-              {
-                id: `tl-${i}-1`,
-                action: 'dispute_submitted',
-                description: 'Dispute submitted for review',
-                actorName: 'Agent User',
-                actorRole: 'agent',
-                createdAt: new Date(Date.now() - (25 + i) * 24 * 60 * 60 * 1000).toISOString()
-              },
-              {
-                id: `tl-${i}-2`,
-                action: 'under_review',
-                description: 'Dispute assigned to finance team',
-                actorName: 'System',
-                actorRole: 'system',
-                createdAt: new Date(Date.now() - (23 + i) * 24 * 60 * 60 * 1000).toISOString()
-              },
-              ...(isResolved ? [{
-                id: `tl-${i}-3`,
-                action: disputeStatus,
-                description: disputeStatus === 'rejected'
-                  ? 'Dispute rejected after review'
-                  : 'Dispute approved and adjustment processed',
-                actorName: 'Finance Admin',
-                actorRole: 'admin',
-                createdAt: new Date(Date.now() - (5 + i) * 24 * 60 * 60 * 1000).toISOString()
-              }] : [])
-            ]
-          });
-        }
-
-        return disputes;
-      };
-
-      res.json(generateDisputes(status as string));
-    } catch (error) {
-      console.error("Error fetching commission disputes:", error);
-      res.status(500).json({ error: "Failed to fetch commission disputes" });
-    }
-  });
-
-  // Create a new commission dispute
-  app.post("/api/agent/commission-disputes", async (req, res) => {
-    try {
-      const { lineItemId, statementId, reason, category, expectedAmount, details } = req.body;
-      const agentId = req.user?.id || 1;
-
-      if (!lineItemId || !statementId || !reason || !category) {
-        return res.status(400).json({ error: "Missing required fields: lineItemId, statementId, reason, category" });
-      }
-
-      const newDispute = {
-        id: `disp-${Date.now()}`,
-        disputeNumber: `DIS-2026-${String(Date.now()).slice(-4)}`,
-        statementId,
-        lineItemId,
-        clientName: 'Client Name',
-        serviceRequestNumber: 'SR-2026-XXXXX',
-        originalAmount: 0,
-        disputedAmount: parseFloat(expectedAmount) || 0,
-        reason,
-        category,
-        status: 'submitted',
-        approvedAmount: null,
-        resolution: null,
-        submittedAt: new Date().toISOString(),
-        resolvedAt: null,
-        resolvedBy: null,
-        attachments: [],
-        timeline: [
-          {
-            id: `tl-new-1`,
-            action: 'dispute_submitted',
-            description: 'Dispute submitted for review',
-            actorName: 'Agent User',
-            actorRole: 'agent',
-            createdAt: new Date().toISOString()
-          }
-        ]
-      };
-
-      res.status(201).json(newDispute);
-    } catch (error) {
-      console.error("Error creating commission dispute:", error);
-      res.status(500).json({ error: "Failed to create commission dispute" });
-    }
-  });
+  // NOTE: Commission statements and disputes endpoints are implemented in payment-routes.ts
+  // with proper authentication and real database queries.
+  // See: /api/agent/commission-statements, /api/agent/commission-disputes (GET and POST)
 
   // ===== SEARCH & ANALYTICS =====
 
   // Global Search
-  app.get("/api/search", async (req, res) => {
+  app.get("/api/search", sessionAuthMiddleware, async (req, res) => {
     try {
       const { q, scope } = req.query;
       if (!q) {
@@ -899,7 +755,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   // ===== DOCUMENT MANAGEMENT =====
 
   // Approve Document
-  app.post("/api/documents/:id/approve", async (req, res) => {
+  app.post("/api/documents/:id/approve", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.QC_EXECUTIVE), async (req, res) => {
     try {
       const documentId = parseInt(req.params.id);
       const { notes } = req.body;
@@ -918,7 +774,7 @@ export async function registerUniversalRoutes(app: Express): Promise<Server> {
   });
 
   // Reject Document
-  app.post("/api/documents/:id/reject", async (req, res) => {
+  app.post("/api/documents/:id/reject", sessionAuthMiddleware, requireMinimumRole(USER_ROLES.QC_EXECUTIVE), async (req, res) => {
     try {
       const documentId = parseInt(req.params.id);
       const { reason } = req.body;

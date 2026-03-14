@@ -1,6 +1,8 @@
 import type { Express, Response } from "express";
 import { db } from './db';
 import { payments, serviceRequests, businessEntities, users, commissions, commissionDisputes, services, leads, agentPartners } from '@shared/schema';
+import { pipelineEvents } from '@shared/pipeline-schema';
+import { createPipelineEvent, PIPELINE_EVENTS } from './services/pipeline/pipeline-events';
 import { eq, and, desc, or, sql, inArray, gte, lte } from 'drizzle-orm';
 import Stripe from 'stripe';
 import {
@@ -169,7 +171,7 @@ export function registerPaymentRoutes(app: Express) {
     try {
       const userId = req.user?.id;
       if (!userId) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return fail(res, 401, { message: 'Authentication required' });
       }
 
       const entityId = await getUserEntityId(userId);
@@ -206,7 +208,7 @@ export function registerPaymentRoutes(app: Express) {
     try {
       const userId = req.user?.id;
       if (!userId) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return fail(res, 401, { message: 'Authentication required' });
       }
 
       const entityId = await getUserEntityId(userId);
@@ -244,7 +246,7 @@ export function registerPaymentRoutes(app: Express) {
     try {
       const userId = req.user?.id;
       if (!userId) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return fail(res, 401, { message: 'Authentication required' });
       }
 
       const { serviceRequestId, amount, paymentMethod = 'card' } = req.body;
@@ -339,7 +341,7 @@ export function registerPaymentRoutes(app: Express) {
       const paymentId = parseInt(req.params.id);
 
       if (!userId) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return fail(res, 401, { message: 'Authentication required' });
       }
 
       // Get payment
@@ -381,6 +383,20 @@ export function registerPaymentRoutes(app: Express) {
         await maybeCreateCommissionForServiceRequest(payment.serviceRequestId, Number(payment.amount));
       }
 
+      // Emit pipeline event for payment confirmation
+      try {
+        await db.insert(pipelineEvents).values(createPipelineEvent({
+          eventType: PIPELINE_EVENTS.FINANCE_PAYMENT_RECEIVED,
+          entityType: 'payment',
+          entityId: payment.id,
+          payload: { amount: payment.amount, paymentMethod: payment.paymentMethod, serviceRequestId: payment.serviceRequestId, mode: 'simulation' },
+          triggeredBy: userId,
+          newState: 'completed',
+        }));
+      } catch (pipelineError) {
+        console.error('Pipeline event emission failed (finance.payment_received):', pipelineError);
+      }
+
       res.json({
         success: true,
         message: 'Payment simulated successfully',
@@ -400,7 +416,7 @@ export function registerPaymentRoutes(app: Express) {
       const paymentId = parseInt(req.params.id);
 
       if (!userId) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return fail(res, 401, { message: 'Authentication required' });
       }
 
       const entityId = await getUserEntityId(userId);
@@ -575,7 +591,22 @@ export function registerPaymentRoutes(app: Express) {
           } else if (serviceRequestId && serviceRequestId !== 'direct') {
             await maybeCreateCommissionForServiceRequest(parseInt(serviceRequestId), paymentIntent.amount ? paymentIntent.amount / 100 : undefined);
           }
-          
+
+          // Emit pipeline event for payment confirmation via Stripe webhook
+          if (payment) {
+            try {
+              await db.insert(pipelineEvents).values(createPipelineEvent({
+                eventType: PIPELINE_EVENTS.FINANCE_PAYMENT_RECEIVED,
+                entityType: 'payment',
+                entityId: payment.id,
+                payload: { amount: payment.amount, paymentMethod: payment.paymentMethod, serviceRequestId: payment.serviceRequestId, mode: 'stripe' },
+                newState: 'completed',
+              }));
+            } catch (pipelineError) {
+              console.error('Pipeline event emission failed (finance.payment_received via webhook):', pipelineError);
+            }
+          }
+
           break;
         }
         case 'payment_intent.payment_failed': {
@@ -712,7 +743,7 @@ export function registerPaymentRoutes(app: Express) {
       const { format = 'json' } = req.query;
 
       if (!userId) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return fail(res, 401, { message: 'Authentication required' });
       }
 
       // Verify payment belongs to user
@@ -895,7 +926,7 @@ export function registerPaymentRoutes(app: Express) {
       // Non-managers can only see their own commissions
       if (!['sales_manager', 'admin', 'super_admin', 'accountant'].includes(userRole || '')) {
         if (!userId) {
-          return res.status(401).json({ error: 'Authentication required' });
+          return fail(res, 401, { message: 'Authentication required' });
         }
         filters.push(eq(commissions.agentId, Number(userId)));
       } else if (earnerId) {
@@ -1024,7 +1055,7 @@ export function registerPaymentRoutes(app: Express) {
         .returning();
 
       if (!updated) {
-        return res.status(404).json({ error: 'Commission not found' });
+        return fail(res, 404, { message: 'Commission not found' });
       }
 
       res.json({
@@ -1064,7 +1095,7 @@ export function registerPaymentRoutes(app: Express) {
         .returning();
 
       if (!updated) {
-        return res.status(404).json({ error: 'Commission not found' });
+        return fail(res, 404, { message: 'Commission not found' });
       }
 
       res.json({
@@ -1154,7 +1185,7 @@ export function registerPaymentRoutes(app: Express) {
         .where(eq(commissions.id, commissionId));
 
       if (!commission) {
-        return res.status(404).json({ error: 'Commission not found' });
+        return fail(res, 404, { message: 'Commission not found' });
       }
 
       if (req.user?.role === USER_ROLES.AGENT && commission.agentId !== disputedBy) {
@@ -1282,7 +1313,7 @@ export function registerPaymentRoutes(app: Express) {
       });
     } catch (error) {
       console.error('Error fetching disputes:', error);
-      res.status(500).json({ error: 'Failed to fetch disputes' });
+      return fail(res, 500, { message: 'Failed to fetch disputes' });
     }
   });
 
@@ -1392,7 +1423,7 @@ export function registerPaymentRoutes(app: Express) {
       const { period = 'current_month' } = req.query;
 
       if (!userId) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return fail(res, 401, { message: 'Authentication required' });
       }
 
       // Calculate period dates
@@ -1496,7 +1527,7 @@ export function registerPaymentRoutes(app: Express) {
     try {
       const userId = req.user?.id;
       if (!userId) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return fail(res, 401, { message: 'Authentication required' });
       }
 
       const commissionRows = await db
@@ -1615,10 +1646,10 @@ export function registerPaymentRoutes(app: Express) {
 
       statements.sort((a, b) => b.period.localeCompare(a.period));
 
-      res.json(statements);
+      return ok(res, statements);
     } catch (error) {
       console.error('Error fetching commission statements:', error);
-      res.status(500).json({ error: 'Failed to fetch commission statements' });
+      return fail(res, 500, { message: 'Failed to fetch commission statements' });
     }
   });
 
@@ -1629,7 +1660,7 @@ export function registerPaymentRoutes(app: Express) {
       const { status = 'all' } = req.query;
 
       if (!userId) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return fail(res, 401, { message: 'Authentication required' });
       }
 
       const filters = [eq(commissions.agentId, Number(userId))];
@@ -1697,10 +1728,10 @@ export function registerPaymentRoutes(app: Express) {
         };
       });
 
-      res.json(disputes);
+      return ok(res, disputes);
     } catch (error) {
       console.error('Error fetching agent disputes:', error);
-      res.status(500).json({ error: 'Failed to fetch disputes' });
+      return fail(res, 500, { message: 'Failed to fetch disputes' });
     }
   });
 
@@ -1711,11 +1742,11 @@ export function registerPaymentRoutes(app: Express) {
       const { commissionId, lineItemId, reason, category, expectedAmount, evidence } = req.body;
 
       if (!userId) {
-        return res.status(401).json({ error: 'Authentication required' });
+        return fail(res, 401, { message: 'Authentication required' });
       }
 
       if (!reason || !category) {
-        return res.status(400).json({ error: 'Reason and category are required' });
+        return fail(res, 400, { message: 'Reason and category are required' });
       }
 
       const rawId = commissionId ?? lineItemId;
@@ -1724,7 +1755,7 @@ export function registerPaymentRoutes(app: Express) {
         : Number(rawId);
 
       if (!parsedId || Number.isNaN(parsedId)) {
-        return res.status(400).json({ error: 'Invalid commission id' });
+        return fail(res, 400, { message: 'Invalid commission id' });
       }
 
       const [commission] = await db
@@ -1734,7 +1765,7 @@ export function registerPaymentRoutes(app: Express) {
         .limit(1);
 
       if (!commission) {
-        return res.status(404).json({ error: 'Commission not found' });
+        return fail(res, 404, { message: 'Commission not found' });
       }
 
       const disputeNumber = `DISP-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;

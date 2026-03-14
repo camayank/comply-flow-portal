@@ -16,6 +16,8 @@ import {
   DELIVERY_STATUS,
   QC_REVIEW_STATUS
 } from "@shared/schema";
+import { pipelineEvents } from "@shared/pipeline-schema";
+import { createPipelineEvent, PIPELINE_EVENTS } from "./services/pipeline/pipeline-events";
 import { resolveDownloadUrl } from "./storage-url";
 
 export function registerDeliveryRoutes(app: Application) {
@@ -204,9 +206,22 @@ export function registerDeliveryRoutes(app: Application) {
         });
       }
 
-      res.json({ 
-        success: true, 
-        message: 'Delivery confirmation recorded successfully' 
+      // Emit pipeline event for delivery confirmation
+      try {
+        await db.insert(pipelineEvents).values(createPipelineEvent({
+          eventType: PIPELINE_EVENTS.SERVICE_CONFIRMED,
+          entityType: 'service_request',
+          entityId: delivery?.serviceRequestId ?? parseInt(deliveryId),
+          payload: { deliveryId: parseInt(deliveryId), confirmationMethod: confirmationMethod || 'portal_click', clientId: delivery?.clientId },
+          newState: 'completed',
+        }));
+      } catch (pipelineError) {
+        console.error('Pipeline event emission failed (service.confirmed):', pipelineError);
+      }
+
+      res.json({
+        success: true,
+        message: 'Delivery confirmation recorded successfully'
       });
 
     } catch (error) {
