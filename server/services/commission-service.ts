@@ -511,8 +511,11 @@ class CommissionService {
     originalSaleAmount: number,
     reason: string
   ): Promise<{ success: boolean; deductionAmount: number }> {
-    // Get applicable rule for clawback calculation
-    const rule = await this.findApplicableRule('silver'); // Use base tier for clawback
+    // Get applicable rule for clawback calculation — resolve agent's actual tier
+    const [agent] = await db.select({ tier: agents.tier }).from(agents)
+      .where(eq(agents.userId, agentId)).limit(1);
+    const agentTier = agent?.tier || 'silver';
+    const rule = await this.findApplicableRule(agentTier);
 
     let clawbackPercentage = 100; // Default: full commission clawback
 
