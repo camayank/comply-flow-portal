@@ -35,10 +35,8 @@ async function handleDeadlineApproaching(event: PipelineEvent, ctx: HandlerConte
   const { entityId, payload } = event;
 
   try {
-    const { notificationHub } = await import('../../../notification-engine');
-    await notificationHub.emit('compliance_deadline_approaching', {
-      entityId, ruleName: (payload as any).ruleName,
-    });
+    const { notificationHub } = await import('../../notifications/notification-hub');
+    await notificationHub.send({ type: 'compliance_deadline_approaching', channels: ['in_app'], content: `Compliance deadline approaching for entity ${entityId}`, data: { entityId, ruleName: (payload as any).ruleName } });
   } catch (err) {
     logger.warn(`Deadline notification failed for entity ${entityId}:`, err);
   }
@@ -54,10 +52,8 @@ async function handleDeadlineOverdue(event: PipelineEvent, ctx: HandlerContext) 
   const { entityId, payload } = event;
 
   try {
-    const { notificationHub } = await import('../../../notification-engine');
-    await notificationHub.emit('compliance_deadline_overdue', {
-      entityId, ruleName: (payload as any).ruleName,
-    });
+    const { notificationHub } = await import('../../notifications/notification-hub');
+    await notificationHub.send({ type: 'compliance_deadline_overdue', channels: ['in_app'], content: `Compliance deadline overdue for entity ${entityId}`, data: { entityId, ruleName: (payload as any).ruleName } });
   } catch (err) {
     logger.warn(`Overdue notification failed for entity ${entityId}:`, err);
   }
@@ -125,8 +121,8 @@ async function handleGapDetected(event: PipelineEvent, ctx: HandlerContext) {
   const { entityId, payload } = event;
   logger.warn(`Compliance gap for entity ${entityId}: ${(payload as any).description || 'missing coverage'}`);
   try {
-    const { notificationHub } = await import('../../../notification-engine');
-    await notificationHub.emit('compliance_gap', { entityId });
+    const { notificationHub } = await import('../../notifications/notification-hub');
+    await notificationHub.send({ type: 'compliance_gap', channels: ['in_app'], content: `Compliance gap detected for entity ${entityId}`, data: { entityId } });
   } catch (err) {
     logger.warn(`Gap notification failed:`, err);
   }

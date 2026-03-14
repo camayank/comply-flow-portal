@@ -1,5 +1,6 @@
 import { db } from '../../../db';
 import { invoices } from '@shared/pipeline-schema';
+import { serviceRequests } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '../../../logger';
 import { PIPELINE_EVENTS } from '../pipeline-events';
@@ -16,8 +17,8 @@ async function handleInvoiceCreated(event: PipelineEvent, ctx: HandlerContext) {
 
   // Notify client
   try {
-    const { notificationHub } = await import('../../../notification-engine');
-    await notificationHub.emit('invoice_sent', { invoiceId: entityId, serviceRequestId });
+    const { notificationHub } = await import('../../notifications/notification-hub');
+    await notificationHub.send({ type: 'invoice_sent', channels: ['in_app'], content: `Invoice ${entityId} sent`, data: { invoiceId: entityId, serviceRequestId } });
   } catch (err) {
     logger.warn(`Invoice notification failed for invoice ${entityId}:`, err);
   }
@@ -47,9 +48,13 @@ async function handlePaymentReceived(event: PipelineEvent, ctx: HandlerContext) 
   await db.update(invoices).set({ status: 'paid', paidAt: new Date(), paymentId, updatedAt: new Date() })
     .where(eq(invoices.serviceRequestId, serviceRequestId));
 
-  // DELEGATE commission calculation to existing service
+  // Look up the agent linked to this service request
+  const [sr] = await db.select().from(serviceRequests)
+    .where(eq(serviceRequests.id, serviceRequestId)).limit(1);
+
+  // DELEGATE commission calculation to existing service (requires agentId, not serviceRequestId)
   const { commissionService } = await import('../../commission-service');
-  const commission = await commissionService.calculateCommission(serviceRequestId, amount);
+  const commission = await commissionService.calculateCommission(sr?.assignedAgentId || 0, amount, undefined, serviceRequestId);
 
   ctx.emitEvent({
     eventType: PIPELINE_EVENTS.FINANCE_COMMISSION_CALCULATED,
@@ -90,8 +95,8 @@ async function handleCommissionPaid(event: PipelineEvent, ctx: HandlerContext) {
   const { payload } = event;
   const { agentId, amount } = payload as any;
   try {
-    const { notificationHub } = await import('../../../notification-engine');
-    await notificationHub.emit('commission_paid', { agentId, amount });
+    const { notificationHub } = await import('../../notifications/notification-hub');
+    await notificationHub.send({ type: 'commission_paid', channels: ['in_app'], content: `Commission paid to agent ${agentId}`, data: { agentId, amount }, userId: agentId });
   } catch (err) {
     logger.warn(`Commission payout notification failed:`, err);
   }

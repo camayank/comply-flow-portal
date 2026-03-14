@@ -38,8 +38,8 @@ async function handleServiceCreated(event: PipelineEvent, ctx: HandlerContext) {
 async function handlePaymentPending(event: PipelineEvent, ctx: HandlerContext) {
   const { entityId } = event;
   try {
-    const { notificationHub } = await import('../../../notification-engine');
-    await notificationHub.emit('payment_pending', { serviceRequestId: entityId });
+    const { notificationHub } = await import('../../notifications/notification-hub');
+    await notificationHub.send({ type: 'payment_pending', channels: ['in_app'], content: `Payment pending for SR ${entityId}`, data: { serviceRequestId: entityId } });
   } catch (err) {
     logger.warn(`Payment pending notification failed for SR ${entityId}:`, err);
   }
@@ -121,8 +121,8 @@ async function handleQcRejected(event: PipelineEvent, ctx: HandlerContext) {
 async function handleDelivered(event: PipelineEvent, ctx: HandlerContext) {
   const { entityId } = event;
   try {
-    const { notificationHub } = await import('../../../notification-engine');
-    await notificationHub.emit('service_delivered', { serviceRequestId: entityId });
+    const { notificationHub } = await import('../../notifications/notification-hub');
+    await notificationHub.send({ type: 'service_delivered', channels: ['in_app'], content: `Service delivered for SR ${entityId}`, data: { serviceRequestId: entityId } });
   } catch (err) {
     logger.warn(`Delivery notification failed for SR ${entityId}:`, err);
   }
@@ -193,8 +193,8 @@ async function handleServiceConfirmed(event: PipelineEvent, ctx: HandlerContext)
 async function handleSlaWarning(event: PipelineEvent, ctx: HandlerContext) {
   const { entityId } = event;
   try {
-    const { notificationHub } = await import('../../../notification-engine');
-    await notificationHub.emit('sla_breach', { serviceRequestId: entityId, level: 1 });
+    const { notificationHub } = await import('../../notifications/notification-hub');
+    await notificationHub.send({ type: 'sla_warning', channels: ['in_app'], content: `SLA warning for SR ${entityId}`, data: { serviceRequestId: entityId, level: 1 } });
   } catch (err) {
     logger.warn(`SLA warning notification failed for SR ${entityId}:`, err);
   }
@@ -207,8 +207,8 @@ async function handleSlaBreached(event: PipelineEvent, ctx: HandlerContext) {
   const { stateMachine } = await import('../../service-request-state-machine');
   await stateMachine.transitionStatus(entityId, 'SLA_BREACHED', { triggeredBy: 'sla_checker' });
   try {
-    const { notificationHub } = await import('../../../notification-engine');
-    await notificationHub.emit('sla_breach', { serviceRequestId: entityId, level: 2 });
+    const { notificationHub } = await import('../../notifications/notification-hub');
+    await notificationHub.send({ type: 'sla_breach', channels: ['in_app'], content: `SLA breached for SR ${entityId}`, data: { serviceRequestId: entityId, level: 2 } });
   } catch (err) {
     logger.warn(`SLA breach notification failed for SR ${entityId}:`, err);
   }
@@ -220,8 +220,8 @@ async function handleEscalated(event: PipelineEvent, ctx: HandlerContext) {
   const { entityId, payload } = event;
   logger.warn(`SR ${entityId} escalated: ${(payload as any).reason || 'unknown'}`);
   try {
-    const { notificationHub } = await import('../../../notification-engine');
-    await notificationHub.emit('service_escalated', { serviceRequestId: entityId });
+    const { notificationHub } = await import('../../notifications/notification-hub');
+    await notificationHub.send({ type: 'service_escalated', channels: ['in_app'], content: `SR ${entityId} escalated`, data: { serviceRequestId: entityId } });
   } catch (err) {
     logger.warn(`Escalation notification failed for SR ${entityId}:`, err);
   }

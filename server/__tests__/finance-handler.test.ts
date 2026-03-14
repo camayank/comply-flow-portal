@@ -7,7 +7,7 @@ jest.mock('../db', () => ({
     select: jest.fn().mockReturnThis(),
     from: jest.fn().mockReturnThis(),
     where: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockResolvedValue([{ id: 1, serviceRequestId: 10, status: 'draft' }]),
+    limit: jest.fn().mockResolvedValue([{ id: 1, serviceRequestId: 10, status: 'draft', assignedAgentId: 7 }]),
     update: jest.fn().mockReturnThis(),
     set: jest.fn().mockReturnThis(),
   },
@@ -52,7 +52,7 @@ describe('Finance Handler', () => {
     };
 
     const { bufferedEvents } = await orchestrator.processEvent(event as any);
-    expect(mockCalculateCommission).toHaveBeenCalledWith(10, 5000);
+    expect(mockCalculateCommission).toHaveBeenCalledWith(7, 5000, undefined, 10);
     expect(bufferedEvents.some(e => e.eventType === PIPELINE_EVENTS.FINANCE_COMMISSION_CALCULATED)).toBe(true);
   });
 
