@@ -195,7 +195,7 @@ export const services = pgTable("services", {
   name: text("name").notNull(),
   type: text("type").notNull(),
   category: text("category").notNull(),
-  price: integer("price").notNull(),
+  price: decimal("price", { precision: 12, scale: 2 }).notNull(),
   deadline: text("deadline"),
   description: text("description"),
   requiredDocs: json("required_docs"),
@@ -221,7 +221,7 @@ export const serviceRequests = pgTable("service_requests", {
   documentHash: text("document_hash"),
   signatureData: json("signature_data"),
   paymentId: text("payment_id"),
-  totalAmount: integer("total_amount").notNull(),
+  totalAmount: decimal("total_amount", { precision: 12, scale: 2 }).notNull(),
   slaDeadline: timestamp("sla_deadline"),
   dueDate: timestamp("due_date"),
   expectedCompletion: timestamp("expected_completion"),
@@ -253,7 +253,7 @@ export const payments = pgTable("payments", {
   id: serial("id").primaryKey(),
   paymentId: text("payment_id").notNull().unique(),
   serviceRequestId: integer("service_request_id").notNull(),
-  amount: integer("amount").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
   paymentMethod: text("payment_method"),
   transactionId: text("transaction_id"),
@@ -328,7 +328,7 @@ export const complianceTracking = pgTable("compliance_tracking", {
   nextDueDate: timestamp("next_due_date"),
   remindersSent: integer("reminders_sent").default(0),
   penaltyRisk: boolean("penalty_risk").default(false),
-  estimatedPenalty: integer("estimated_penalty").default(0),
+  estimatedPenalty: decimal("estimated_penalty", { precision: 10, scale: 2 }).default('0'),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -453,8 +453,8 @@ export const retainershipPlans = pgTable("retainership_plans", {
   planId: text("plan_id").notNull().unique(),
   name: text("name").notNull(),
   category: text("category").notNull(), // basic, standard, premium, enterprise
-  monthlyFee: integer("monthly_fee").notNull(),
-  yearlyFee: integer("yearly_fee"),
+  monthlyFee: decimal("monthly_fee", { precision: 10, scale: 2 }).notNull(),
+  yearlyFee: decimal("yearly_fee", { precision: 10, scale: 2 }),
   discountPercentage: integer("discount_percentage").default(0),
   maxServices: integer("max_services"), // null for unlimited
   includedServices: json("included_services").notNull(),
@@ -489,7 +489,7 @@ export const smartSuggestions = pgTable("smart_suggestions", {
   title: text("title").notNull(),
   description: text("description").notNull(),
   suggestedServices: json("suggested_services"),
-  potentialSavings: integer("potential_savings").default(0),
+  potentialSavings: decimal("potential_savings", { precision: 10, scale: 2 }).default('0'),
   confidenceScore: integer("confidence_score").default(0), // 0-100
   priority: text("priority").notNull().default("medium"), // low, medium, high
   status: text("status").notNull().default("pending"), // pending, accepted, dismissed, expired
@@ -737,7 +737,7 @@ export const serviceHistory = pgTable("service_history", {
   startDate: timestamp("start_date").notNull(),
   completedDate: timestamp("completed_date"),
   duration: integer("duration"), // days taken
-  totalAmount: integer("total_amount"),
+  totalAmount: decimal("total_amount", { precision: 12, scale: 2 }),
   deliverables: json("deliverables"), // list of delivered documents/certificates
   clientSatisfaction: integer("client_satisfaction"), // 1-5 rating
   feedbackNotes: text("feedback_notes"),
@@ -2012,6 +2012,9 @@ export const leads = pgTable("leads", {
   clientName: text("client_name").notNull(),
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone").notNull(),
+  directorName: text("director_name"),
+  directorEmail: text("director_email"),
+  directorPhone: text("director_phone"),
   state: text("state"),
   entityType: text("entity_type"), // pvt_ltd, partnership, proprietorship, etc
   requiredServices: json("required_services"), // array of service codes
@@ -5688,3 +5691,8 @@ export type IdType = typeof ID_TYPES[keyof typeof ID_TYPES];
 // SUPER ADMIN SCHEMA EXPORTS
 // ============================================================================
 export * from "./super-admin-schema";
+
+// ============================================================================
+// PIPELINE SCHEMA EXPORTS
+// ============================================================================
+export * from "./pipeline-schema";
