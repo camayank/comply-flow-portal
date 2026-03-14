@@ -34,45 +34,32 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run database migrations
-        env:
-          TEST_DATABASE_URL: postgresql://test:test@localhost:5432/comply_flow_test
-        run: |
-          # Run migrations (when added)
-          # npm run db:migrate:test
-
       - name: Run TypeScript type checking
         run: npm run typecheck
-        continue-on-error: true  # Non-blocking until codebase achieves full strict compliance
+        continue-on-error: true
 
       - name: TypeScript error count (tracking progress)
         if: always()
         run: |
           echo "## TypeScript Status" >> $GITHUB_STEP_SUMMARY
-          ERROR_COUNT=$(npx tsc --noEmit 2>&1 | grep "error TS" | wc -l || echo "0")
+          ERROR_COUNT=$(NODE_OPTIONS="--max-old-space-size=4096" npx tsc --noEmit 2>&1 | grep -c "error TS" || echo "0")
           echo "**${ERROR_COUNT} type errors remaining**" >> $GITHUB_STEP_SUMMARY
           echo "Target: 0 errors for strict mode enforcement" >> $GITHUB_STEP_SUMMARY
 
-      - name: Run tests with coverage
+      - name: Run tests
         env:
           NODE_ENV: test
+          NODE_OPTIONS: --max-old-space-size=4096
           TEST_DATABASE_URL: postgresql://test:test@localhost:5432/comply_flow_test
           SESSION_SECRET: test-session-secret-for-ci-minimum-32-chars
           CREDENTIAL_ENCRYPTION_KEY: test-encryption-key-for-ci-minimum-32-chars
-        run: npm test -- --coverage
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./coverage/lcov.info
-          flags: unittests
-          fail_ci_if_error: false
+        run: npm test
 
   # Build and verify
   build:
@@ -87,7 +74,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
@@ -137,7 +124,6 @@ jobs:
         run: |
           echo "Deploying to staging environment..."
           # Add your deployment commands here
-          # Example: npm run deploy:staging
 
   # Deploy to production (only on tags)
   deploy-production:
@@ -154,4 +140,3 @@ jobs:
         run: |
           echo "Deploying to production..."
           # Add your production deployment commands here
-          # Example: npm run deploy:production
