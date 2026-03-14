@@ -9,6 +9,7 @@
 import { db } from '../db';
 import { serviceRequests, users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { logger } from '../logger';
 
 // Valid service request statuses
 export const SERVICE_REQUEST_STATUSES = {
@@ -300,7 +301,7 @@ export interface TransitionContext {
 export function isValidTransition(fromStatus: string, toStatus: string): boolean {
   const allowedTransitions = VALID_TRANSITIONS[fromStatus];
   if (!allowedTransitions) {
-    console.warn(`Unknown status: ${fromStatus}`);
+    logger.warn(`Unknown status: ${fromStatus}`);
     return false;
   }
   return allowedTransitions.includes(toStatus);
@@ -384,7 +385,7 @@ export async function transitionStatus(
       .where(eq(serviceRequests.id, serviceRequestId));
 
     // Log the transition (in production, log to audit table)
-    console.log(`[STATE MACHINE] Service Request ${serviceRequestId}: ${fromStatus} -> ${toStatus} by ${context.performedBy.username}`);
+    logger.info(`[STATE MACHINE] Service Request ${serviceRequestId}: ${fromStatus} -> ${toStatus} by ${context.performedBy.username}`);
 
     return {
       success: true,
@@ -396,7 +397,7 @@ export async function transitionStatus(
     };
 
   } catch (error: any) {
-    console.error('State machine transition error:', error);
+    logger.error('State machine transition error:', error);
     return {
       success: false,
       previousStatus: '',
