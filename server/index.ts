@@ -18,6 +18,9 @@ import './compliance-state-scheduler'; // Auto-start compliance state scheduler
 import { checkSlaBreaches } from './jobs/sla-checker';
 import { pipelineOrchestrator } from './services/pipeline/pipeline-orchestrator';
 import { registerAllHandlers } from './services/pipeline/register-handlers';
+import pipelineAdminRoutes from './pipeline-admin-routes';
+import { checkComplianceDeadlines } from './jobs/compliance-deadline-checker';
+import { checkApprovalTimeouts } from './jobs/approval-timeout-checker';
 
 // Validate environment variables on startup
 const env = validateEnv();
@@ -175,7 +178,11 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
-  
+
+  // Pipeline admin API (auth required)
+  const { requireAuth } = await import('./auth-middleware');
+  app.use('/api/admin/pipeline', requireAuth, pipelineAdminRoutes);
+
   // Initialize service spawner and seeder
   console.log('🌱 Initializing service management systems...');
   const { serviceSpawner } = await import('./service-spawner');
@@ -290,6 +297,13 @@ app.use((req, res, next) => {
   if (process.env.NODE_ENV !== 'test') {
     pipelineOrchestrator.startPolling(15000);
     logger.info('Pipeline orchestrator started');
+
+    // Compliance deadline check: daily (run once on startup + every 24h)
+    checkComplianceDeadlines().catch(err => logger.warn('Initial deadline check failed:', err));
+    setInterval(() => checkComplianceDeadlines(), 24 * 60 * 60 * 1000);
+
+    // Approval timeout check: every 15 minutes
+    setInterval(() => checkApprovalTimeouts(), 15 * 60 * 1000);
   }
 
   // Graceful shutdown handler
