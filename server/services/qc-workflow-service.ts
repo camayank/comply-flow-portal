@@ -18,6 +18,7 @@ import {
   DELIVERY_STATUS,
 } from '@shared/schema';
 import { logger } from '../logger';
+import { transitionStatus } from './service-request-state-machine';
 
 // Types
 interface ChecklistItem {
@@ -394,15 +395,13 @@ class QCWorkflowService {
         })
         .where(eq(qualityReviews.id, reviewId));
 
-      // Update service request status
+      // Update service request status via state machine for proper validation and audit logging
       const newServiceStatus = decision === 'approved' ? 'ready_for_delivery' : 'in_progress';
-      await db
-        .update(serviceRequests)
-        .set({
-          status: newServiceStatus,
-          updatedAt: new Date(),
-        })
-        .where(eq(serviceRequests.id, review.serviceRequestId));
+      await transitionStatus(review.serviceRequestId, newServiceStatus, {
+        triggeredBy: 'qc_workflow',
+        reviewId: review.id,
+        decision,
+      });
 
       // Send notifications
       if (decision === 'rework_required') {
