@@ -9,23 +9,24 @@ import { db } from '../db';
 import { payments, serviceRequests, businessEntities, users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
-// Company details (would come from config in production)
+// Company details from environment variables with sensible fallbacks
 const COMPANY_INFO = {
-  name: 'DigiComply Solutions Pvt. Ltd.',
-  address: '123 Business Park, Sector 44',
-  city: 'Gurugram, Haryana 122003',
+  name: process.env.COMPANY_NAME || 'DigiComply Services Pvt Ltd',
+  gstin: process.env.COMPANY_GSTIN || '',
+  pan: process.env.COMPANY_PAN || '',
+  address: process.env.COMPANY_ADDRESS || '',
+  city: process.env.COMPANY_CITY || 'Bengaluru, Karnataka',
   country: 'India',
-  gstin: 'XXABC1234X1Z5',
-  pan: 'AABCD1234E',
-  email: 'billing@digicomply.in',
-  phone: '+91-124-4567890',
-  website: 'www.digicomply.in',
+  state: process.env.COMPANY_STATE || 'Karnataka',
+  email: process.env.COMPANY_EMAIL || 'billing@digicomply.in',
+  phone: process.env.COMPANY_PHONE || '',
+  website: process.env.COMPANY_WEBSITE || 'www.digicomply.in',
   bankDetails: {
-    accountName: 'DigiComply Solutions Pvt Ltd',
-    accountNumber: 'XXXX XXXX XXXX 1234',
-    bankName: 'HDFC Bank',
-    ifscCode: 'HDFC0001234',
-    branch: 'Gurugram Sector 44'
+    accountName: process.env.COMPANY_BANK_NAME || '',
+    accountNumber: process.env.COMPANY_BANK_ACCOUNT || '',
+    bankName: process.env.COMPANY_BANK || '',
+    ifscCode: process.env.COMPANY_BANK_IFSC || '',
+    branch: process.env.COMPANY_BANK_BRANCH || '',
   }
 };
 
@@ -118,7 +119,9 @@ export async function generateInvoiceData(paymentId: number): Promise<InvoiceDat
     // Calculate amounts
     const baseAmount = parseFloat(payment.amount);
     const gstRate = 18; // 18% GST
-    const isInterstate = false; // Would check client state vs company state
+    const companyState = process.env.COMPANY_STATE || 'Karnataka';
+    const clientState = businessEntity?.state || '';
+    const isInterstate = clientState !== '' && clientState.toLowerCase() !== companyState.toLowerCase();
 
     let cgst = 0, sgst = 0, igst = 0;
     if (isInterstate) {
@@ -554,6 +557,41 @@ export function generateInvoiceHTML(data: InvoiceData): string {
 </body>
 </html>
 `;
+}
+
+/**
+ * Persist invoice data to the database.
+ * Uses onConflictDoNothing for idempotency — safe to call multiple times for the same service request.
+ * Note: Depends on the `invoices` table from @shared/pipeline-schema (created in Task 7).
+ */
+export async function persistInvoice(data: InvoiceData, createdBy: number): Promise<number> {
+  const { invoices } = await import('@shared/pipeline-schema');
+  const serviceRequestId = data.service.id;
+
+  const result = await db.insert(invoices).values({
+    invoiceNumber: data.invoiceNumber,
+    serviceRequestId,
+    businessEntityId: null,
+    clientName: data.client.companyName,
+    clientGstin: data.client.gstin || null,
+    clientState: data.client.state || null,
+    lineItems: data.lineItems,
+    subtotal: String(data.subtotal),
+    cgstAmount: String(data.cgst),
+    sgstAmount: String(data.sgst),
+    igstAmount: String(data.igst),
+    totalTax: String(data.cgst + data.sgst + data.igst),
+    grandTotal: String(data.total),
+    dueDate: data.dueDate.toISOString().split('T')[0],
+    createdBy,
+  }).onConflictDoNothing().returning();
+
+  if (result.length > 0) return result[0].id;
+
+  // If conflict (already exists), look up the existing record
+  const [existing] = await db.select({ id: invoices.id }).from(invoices)
+    .where(eq(invoices.serviceRequestId, serviceRequestId)).limit(1);
+  return existing.id;
 }
 
 // Helper functions
