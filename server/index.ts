@@ -16,6 +16,7 @@ import { jobManager } from "./job-lifecycle-manager";
 import { apmMiddleware } from "./monitoring";
 import './compliance-state-scheduler'; // Auto-start compliance state scheduler
 import { checkSlaBreaches } from './jobs/sla-checker';
+import { pipelineOrchestrator } from './services/pipeline/pipeline-orchestrator';
 
 // Validate environment variables on startup
 const env = validateEnv();
@@ -279,6 +280,12 @@ app.use((req, res, next) => {
   if (process.env.NODE_ENV !== 'test') {
     setInterval(() => checkSlaBreaches(), 15 * 60 * 1000);
     logger.info('SLA checker job registered (every 15 minutes)');
+  }
+
+  // Start pipeline orchestrator polling (every 15 seconds)
+  if (process.env.NODE_ENV !== 'test') {
+    pipelineOrchestrator.startPolling(15000);
+    logger.info('Pipeline orchestrator started');
   }
 
   // Graceful shutdown handler
