@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, decimal, json, uuid, varchar, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal, json, uuid, varchar, numeric, jsonb, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -170,6 +170,9 @@ export const businessEntities = pgTable("business_entities", {
   notes: text("notes"),
   leadId: integer("lead_id"), // FK to leads.id - tracks conversion source
   isActive: boolean("is_active").default(true),
+  complianceInitialized: boolean('compliance_initialized').default(false),
+  complianceInitializedAt: timestamp('compliance_initialized_at'),
+  estimatedTurnover: decimal('estimated_turnover', { precision: 15, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -245,6 +248,11 @@ export const serviceRequests = pgTable("service_requests", {
   finalStatus: text("final_status"), // approved, rejected
   finalStatusDate: timestamp("final_status_date"),
   certificateUrl: text("certificate_url"),
+  automationLevel: varchar('automation_level', { length: 10 }),
+  pipelineStage: varchar('pipeline_stage', { length: 50 }),
+  renewalOf: integer('renewal_of'),
+  renewalDueDate: date('renewal_due_date'),
+  renewalDedupKey: varchar('renewal_dedup_key', { length: 200 }).unique(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -285,6 +293,9 @@ export const commissions = pgTable("commissions", {
   rejectedBy: integer("rejected_by"),
   rejectedAt: timestamp("rejected_at"),
   rejectionReason: text("rejection_reason"),
+  invoiceId: integer('invoice_id'),
+  clawbackEligible: boolean('clawback_eligible').default(true),
+  clawbackUntil: date('clawback_until'),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -2038,6 +2049,9 @@ export const leads = pgTable("leads", {
   lostReason: text("lost_reason"),
   assignedTo: integer("assigned_to"), // for lead transfer
   transferApprovalStatus: text("transfer_approval_status").default("pending"), // pending, approved, rejected
+  enrichmentData: jsonb('enrichment_data'),
+  enrichedAt: timestamp('enriched_at'),
+  enrichmentSource: varchar('enrichment_source', { length: 50 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
